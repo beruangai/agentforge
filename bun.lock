@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@agentforge/source",
+      "name": "@beruangai/agentforge",
       "dependencies": {
         "@aws/nx-plugin": "0.91.0",
       },
