@@ -1,0 +1,32 @@
+{
+  "name": "@agentforge/source",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "nx run-many --target build",
+    "lint": "nx run-many --target lint --configuration=fix",
+    "build:skip-lint": "nx run-many --target build --configuration=skip-lint",
+    "build:all": "nx run-many --target build --all",
+    "affected:all": "nx affected --target build"
+  },
+  "private": true,
+  "dependencies": {
+    "@aws/nx-plugin": "0.91.0"
+  },
+  "devDependencies": {
+    "@nx/js": "22.6.1",
+    "@nx/workspace": "22.6.1",
+    "@swc-node/register": "~1.11.1",
+    "@swc/core": "~1.15.5",
+    "@swc/helpers": "~0.5.18",
+    "nx": "22.6.1",
+    "prettier": "~3.6.2",
+    "tslib": "^2.3.0",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.58.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module"
+}
