@@ -4,12 +4,23 @@
   "namedInputs": {
     "default": [
       "{projectRoot}/**/*",
-      "sharedGlobals"
+      "sharedGlobals",
+      {
+        "dependentTasksOutputFiles": "**/*",
+        "transitive": true
+      }
     ],
     "production": [
-      "default"
+      "default",
+      "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
+      "!{projectRoot}/tsconfig.spec.json"
     ],
-    "sharedGlobals": []
+    "sharedGlobals": [],
+    "eslint": [
+      "default",
+      "{workspaceRoot}/eslint.config.mjs",
+      "{projectRoot}/eslint.config.mjs"
+    ]
   },
   "plugins": [
     {
@@ -19,7 +30,7 @@
           "targetName": "typecheck"
         },
         "build": {
-          "targetName": "build",
+          "targetName": "compile",
           "configName": "tsconfig.lib.json",
           "buildDepsName": "build-deps",
           "watchDepsName": "watch-deps"
@@ -29,10 +40,26 @@
   ],
   "targetDefaults": {
     "compile": {
-      "syncGenerators": [
-        "@nx/js:typescript-sync",
-        "@aws/nx-plugin:ts#sync"
-      ]
+      "cache": true,
+      "syncGenerators": ["@nx/js:typescript-sync", "@aws/nx-plugin:ts#sync"],
+      "inputs": ["default"]
+    },
+    "@nx/vitest:test": {
+      "cache": true,
+      "inputs": ["default", "^production"],
+      "configurations": {
+        "update-snapshot": {
+          "args": "--update"
+        }
+      }
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["default"]
+    },
+    "build": {
+      "cache": true,
+      "inputs": ["default"]
     }
   },
   "neverConnectToCloud": true

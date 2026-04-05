@@ -16,6 +16,18 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["@beruangai/agentforge"]
+    "customConditions": ["@beruangai/agentforge"],
+    "rootDir": ".",
+    "paths": {
+      ":beruangai/agentforge-temporal-workflow": [
+        "./packages/temporal-workflow/src/index.ts"
+      ],
+      ":beruangai/agentforge-claude-sandbox": [
+        "./packages/claude-sandbox/src/index.ts"
+      ],
+      ":beruangai/agentforge-mcp-gateway": [
+        "./packages/mcp-gateway/src/index.ts"
+      ]
+    }
   }
 }
