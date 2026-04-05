@@ -1,146 +1,63 @@
-# agentforge
-<<<<<<< HEAD
-Agentic workflow orchestration using LangGraph orchestration with Claude Agent SDK runtime harness.
-=======
+# AgentForge
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) has been successfully created! ✨.
+Production-grade TypeScript library for building agentic workflows with Temporal orchestration, Docker-sandboxed Claude Agent SDK execution, and MCP tool access.
 
-[Learn more about this workspace setup and the @aws/nx-plugin](https://awslabs.github.io/nx-plugin-for-aws). Now, let's get you up to speed!
+## Packages
 
-## Install Nx Console
+| Package | Description |
+|---------|-------------|
+| [`@beruangai/agentforge-temporal-workflow`](./packages/temporal-workflow) | Activity factories, retry presets, and LangSmith helpers for Temporal workflows |
+| [`@beruangai/agentforge-claude-sandbox`](./packages/claude-sandbox) | Docker container lifecycle for isolated Claude Agent SDK task execution |
+| [`@beruangai/agentforge-mcp-gateway`](./packages/mcp-gateway) | HTTP MCP gateway with profile-scoped tool filtering |
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+## Quick Start
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+# Install dependencies
+bun install
 
-## Available generators
+# Build all packages
+bun run build
 
-The following list of generators are what is currently available in the `@aws/nx-plugin`:
+# Run tests
+bunx nx run-many --target test
 
-- **connection**: Integrates a source project with a target project
-
-- **license**: Add LICENSE files and configure source code licence headers
-
-- **py#fast-api**: Generates a FastAPI Python project
-
-- **py#lambda-function**: Adds a lambda function to a python project
-
-- **py#mcp-server**: Generate a Python Model Context Protocol (MCP) server for providing context to Large Language Models
-
-- **py#project**: Generates a Python project
-
-- **py#strands-agent**: Add a Strands Agent to a Python project
-
-- **terraform#project**: Generates a Terraform project
-
-- **ts#infra**: Generates a cdk application
-
-- **ts#lambda-function**: Generate a TypeScript lambda function
-
-- **ts#mcp-server**: Generate a TypeScript Model Context Protocol (MCP) server for providing context to Large Language Models
-
-- **ts#nx-generator**: Generator for adding an Nx Generator to an existing TypeScript project
-
-- **ts#nx-plugin**: Generate an Nx Plugin of your own! Build custom generators automatically made available for AI vibe-coding via MCP
-
-- **ts#project**: Generates a TypeScript project
-
-- **ts#react-website**: Generates a React static website
-
-- **ts#react-website#auth**: Adds auth to an existing React website
-
-- **ts#smithy-api**: Create an API using Smithy and the Smithy TypeScript Server SDK
-
-- **ts#strands-agent**: Add a Strands Agent to a TypeScript project
-
-- **ts#trpc-api**: creates a trpc backend
-
-You also have the option of using additional [commmunity plugins](https://nx.dev/plugin-registry) as needed.
-
-## Invoking a generator
-
-```sh
-bunx nx g @aws/nx-plugin:<generator-name>
+# Build specific package
+bunx nx build @beruangai/agentforge-temporal-workflow
 ```
 
-Alternatively you can use the Nx IDE plugin to invoke your generators.
+## Architecture
 
-Refer to the [full documentation](https://awslabs.github.io/nx-plugin-for-aws) for additional guidance for each generator.
-
-## Common tasks
-
-### Build a single project
-
-```sh
-bunx nx build <project-name>
+```
+Consumer Application
+│
+├── @beruangai/agentforge-temporal-workflow
+│   Temporal SDK wrapper: activity factories, retry, tracing
+│
+├── @beruangai/agentforge-claude-sandbox
+│   Docker sandbox: container lifecycle, sentinel I/O, sessions
+│
+└── @beruangai/agentforge-mcp-gateway
+    Tool gateway: HTTP bridge, profiles, upstream management
 ```
 
-### Build all projects
+See [SOLUTION_SPACE.md](./SOLUTION_SPACE.md) for business context and [TECH_SCOPING.md](./TECH_SCOPING.md) for technical direction.
 
-```sh
-bunx nx run-many --target build --all
-# or
-bun build
+## Development
+
+Built with [Nx](https://nx.dev) workspace and [Bun](https://bun.sh) runtime.
+
+```bash
+# Lint all packages
+bun run lint
+
+# Test specific package
+bunx nx test @beruangai/agentforge-claude-sandbox
+
+# Build with skip lint
+bun run build:skip-lint
 ```
 
-### Run arbitrary task
+## License
 
-```sh
-bunx nx <target> <project-name>
-```
-
-### Lint (and fix) all projects
-
-```sh
-bunx nx run-many --target lint --configuration=fix --all
-# or
-bun lint
-```
-
-## Test all projects (and update snapshots)
-
-```sh
-bunx nx run-many --target test --all --update
-```
-
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the Nx docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Keep TypeScript project references up to date
-
-Nx automatically updates TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html) in `tsconfig.json` files to ensure they remain accurate based on your project dependencies (`import` statements). This sync is automatically done when running tasks such as `build`, which require updated references to function correctly.
-
-To manually trigger the process to sync the project graph dependencies information to the TypeScript project references, run the following command:
-
-```sh
-bunx nx sync
-```
-
-You can enforce that the TypeScript project references are always in the correct state when running in CI by adding a step to your CI job configuration that runs the following command:
-
-```sh
-bunx nx sync:check
-```
-
-[Learn more about nx sync](https://nx.dev/reference/nx-commands#sync)
-
-## Set up CI!
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-bunx nx g ci-workflow
-```
-
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [@aws/nx-plugin quick-start](https://awslabs.github.io/nx-plugin-for-aws/en/get_started/quick-start/)
-- [@aws/nx-plugin AI dungeon game](https://awslabs.github.io/nx-plugin-for-aws/en/get_started/tutorials/dungeon-game/overview/)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
->>>>>>> 054f64f (Initial commit)
+MIT

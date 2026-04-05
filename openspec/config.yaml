@@ -1,20 +1,22 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Tech stack: TypeScript, Bun, Nx monorepo, Vitest
+  Packages: temporal-workflow, claude-sandbox, mcp-gateway
+  Domain: Agentic workflow orchestration library
+  Key tech: Temporal.io, Docker, Claude Agent SDK, MCP protocol, LangSmith
+  Philosophy: Production-grade for small teams. Thin layer, not framework. Purpose-built packages.
+  See SOLUTION_SPACE.md and TECH_SCOPING.md for full context.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Reference SOLUTION_SPACE.md and TECH_SCOPING.md for alignment
+    - Include a "Non-goals" section
+    - Keep domain-agnostic (no TrendBot-specific language)
+  design:
+    - Include public API surface with TypeScript signatures
+    - Include error handling strategy
+    - Include testing approach
+  tasks:
+    - Break into implementable chunks (1-4 hours each)
+    - Include test tasks alongside implementation tasks
