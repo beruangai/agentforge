@@ -64,9 +64,7 @@ export async function createGateway(config: GatewayConfig): Promise<Gateway> {
       };
     },
 
-    mcpServersConfig(
-      tools?: string[],
-    ): Record<string, GatewayMcpServerEntry> {
+    mcpServersConfig(tools?: string[]): Record<string, GatewayMcpServerEntry> {
       return mcpConfigForGateway({
         gatewayHost: containerHost,
         gatewayPort: port,

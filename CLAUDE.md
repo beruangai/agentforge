@@ -76,13 +76,19 @@ This library is the **trusted foundation**. Tests must be thorough:
 
 ```bash
 # Run all tests
-bun test
+bun run test
+
+# Run all integ tests
+bun run integ
 
 # Run specific package
 bunx nx test @beruangai/agentforge-claude-sandbox
 
 # Run with coverage
 bunx nx test @beruangai/agentforge-claude-sandbox -- --coverage
+
+# Run integ test for specific package
+bunx nx run "@beruangai/agentforge-claude-sandbox":test:integ
 ```
 
 ## Building

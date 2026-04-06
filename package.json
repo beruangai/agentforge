@@ -4,6 +4,8 @@
   "license": "MIT",
   "scripts": {
     "build": "nx run-many --target build",
+    "test": "nx run-many --target test",
+    "integ": "nx run-many --target integ",
     "lint": "nx run-many --target lint --configuration=fix",
     "build:skip-lint": "nx run-many --target build --configuration=skip-lint",
     "build:all": "nx run-many --target build --all",
@@ -24,6 +26,8 @@
     "@nx/js": "22.6.1",
     "@nx/vitest": "22.6.1",
     "@nx/workspace": "22.6.1",
+    "@opentelemetry/resources": "^2.6.1",
+    "@opentelemetry/semantic-conventions": "^1.40.0",
     "@swc-node/register": "~1.11.1",
     "@swc/core": "~1.15.5",
     "@swc/helpers": "~0.5.18",

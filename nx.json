@@ -45,17 +45,28 @@
       "inputs": ["default"]
     },
     "@nx/vitest:test": {
-      "cache": true,
       "inputs": ["default", "^production"],
       "configurations": {
         "update-snapshot": {
           "args": "--update"
+        },
+        "no-coverage": {
+          "args": "--no-coverage"
         }
       }
     },
     "test": {
+      "cache": true,
       "dependsOn": ["^build"],
       "inputs": ["default"]
+    },
+    "integ": {
+      "cache": false,
+      "executor": "@nx/vitest:test",
+      "inputs": ["default"],
+      "options": {
+        "configFile": "{projectRoot}/vitest.integ.mts"
+      }
     },
     "build": {
       "cache": true,

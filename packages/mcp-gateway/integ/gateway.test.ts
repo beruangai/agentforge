@@ -1,16 +1,16 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { createGateway } from '../../gateway/create-gateway.js';
-import type { Gateway } from '../../gateway/types.js';
+import { createGateway } from '../src/gateway/create-gateway.js';
+import type { Gateway } from '../src/gateway/types.js';
 import { resolve } from 'node:path';
 
 const MOCK_SERVER_PATH = resolve(
   import.meta.dirname,
-  '../../__fixtures__/mock-stdio-server.ts',
+  '../src/__fixtures__/mock-stdio-server.ts',
 );
 
 const MOCK_CRASH_SERVER_PATH = resolve(
   import.meta.dirname,
-  '../../__fixtures__/mock-crash-server.ts',
+  '../src/__fixtures__/mock-crash-server.ts',
 );
 
 // Use a random port to avoid conflicts
@@ -18,7 +18,6 @@ function randomPort(): number {
   return 30000 + Math.floor(Math.random() * 10000);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function jsonPost(
   url: string,
   body: unknown,

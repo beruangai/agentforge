@@ -35,7 +35,8 @@
       "options": {
         "reportsDirectory": "{workspaceRoot}/coverage/{projectRoot}"
       }
-    }
+    },
+    "integ": {}
   },
   "metadata": {
     "generator": "ts#project"

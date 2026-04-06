@@ -36,7 +36,10 @@ describe('StreamableHttpConnection', () => {
 
     expect(conn.status()).toBe('running');
     expect(conn.tools().length).toBe(2);
-    const names = conn.tools().map((t) => t.name).sort();
+    const names = conn
+      .tools()
+      .map((t) => t.name)
+      .sort();
     expect(names).toEqual(['fetch', 'search']);
   });
 

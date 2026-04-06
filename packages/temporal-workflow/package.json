@@ -1,0 +1,75 @@
+{
+  "name": "@beruangai/agentforge-temporal-workflow",
+  "version": "0.0.1",
+  "description": "Activity factories, retry presets, and tracing helpers for Temporal workflows",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/index.d.ts"
+    }
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts",
+    "!src/__tests__"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/beruangai/agentforge",
+    "directory": "packages/temporal-workflow"
+  },
+  "dependencies": {
+    "@temporalio/activity": "^1.12.2",
+    "@temporalio/common": "^1.12.2",
+    "zod": "^4.3.6",
+    "@opentelemetry/resources": "^2.6.1",
+    "@opentelemetry/semantic-conventions": "^1.40.0"
+  },
+  "devDependencies": {
+    "@beruangai/agentforge-claude-sandbox": "workspace:*",
+    "@beruangai/agentforge-mcp-gateway": "workspace:*",
+    "@temporalio/interceptors-opentelemetry": "^1.12.2",
+    "@temporalio/testing": "^1.12.2",
+    "@temporalio/worker": "^1.12.2",
+    "@temporalio/workflow": "^1.12.2",
+    "@opentelemetry/sdk-trace-node": "^1.30.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.1",
+    "langsmith": "^0.5.16"
+  },
+  "peerDependencies": {
+    "@beruangai/agentforge-claude-sandbox": ">=0.0.1",
+    "@beruangai/agentforge-mcp-gateway": ">=0.0.1",
+    "@temporalio/interceptors-opentelemetry": ">=1.11.0",
+    "@opentelemetry/sdk-trace-node": ">=1.25.0",
+    "@opentelemetry/exporter-trace-otlp-http": ">=0.50.0",
+    "langsmith": ">=0.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@temporalio/interceptors-opentelemetry": {
+      "optional": true
+    },
+    "@temporalio/worker": {
+      "optional": true
+    },
+    "@temporalio/workflow": {
+      "optional": true
+    },
+    "@opentelemetry/sdk-trace-node": {
+      "optional": true
+    },
+    "@opentelemetry/exporter-trace-otlp-http": {
+      "optional": true
+    },
+    "langsmith": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

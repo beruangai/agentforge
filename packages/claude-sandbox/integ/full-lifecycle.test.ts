@@ -2,7 +2,7 @@
  * Integration tests for the full container lifecycle.
  * These tests require Docker to be running and will create/destroy real containers.
  *
- * Run with: INTEGRATION=true bunx vitest run --config packages/claude-sandbox/vitest.config.mts
+ * Run with: bunx nx run @beruangai/agentforge-claude-sandbox:test --configuration=integ
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,9 +10,8 @@ import { tmpdir } from 'node:os';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { ContainerRuntime } from '../../runner/container-runtime.js';
+import { ContainerRuntime } from '../src/runner/container-runtime.js';
 
-const SKIP = !process.env['INTEGRATION'];
 const TEST_IMAGE = 'agentforge-integration-test:latest';
 
 // Simple test image that reads stdin and echoes it with sentinels.
@@ -33,7 +32,7 @@ echo "{\\"status\\":\\"success\\",\\"structuredOutput\\":{\\"echo\\":\\"received
 echo "---AGENTFORGE_OUTPUT_END---"
 `;
 
-describe.skipIf(SKIP)('Integration: Full Lifecycle', () => {
+describe('Integration: Full Lifecycle', () => {
   let runtime: ContainerRuntime;
   let buildDir: string;
 

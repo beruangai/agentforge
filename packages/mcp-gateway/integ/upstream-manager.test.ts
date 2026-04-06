@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { UpstreamManager } from '../../upstream/upstream-manager.js';
+import { UpstreamManager } from '../src/upstream/upstream-manager.js';
 import { resolve } from 'node:path';
 
 const MOCK_SERVER_PATH = resolve(
   import.meta.dirname,
-  '../../__fixtures__/mock-stdio-server.ts',
+  '../src/__fixtures__/mock-stdio-server.ts',
 );
 
 describe('UpstreamManager integration', () => {
