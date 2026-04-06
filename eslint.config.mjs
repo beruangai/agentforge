@@ -1,5 +1,5 @@
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
-import nx from '@nx/eslint-plugin';
+import nx, { rules } from '@nx/eslint-plugin';
 
 export default [
   eslintPluginPrettierRecommended,
@@ -31,6 +31,18 @@ export default [
           ],
         },
       ],
+    },
+  },
+  {
+    files: [
+      '**/*.test.ts',
+      '**/*.test.js',
+      '**/*.spec.ts',
+      '**/*.spec.js',
+      '**/__tests__/**',
+    ],
+    rules: {
+      '@typescript-eslint/no-empty-function': 'off',
     },
   },
   {

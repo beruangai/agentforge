@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function */
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ImageManager } from './image-manager.js';

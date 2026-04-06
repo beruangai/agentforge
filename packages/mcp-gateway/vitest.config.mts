@@ -7,10 +7,11 @@ export default defineConfig(() => ({
     name: '@beruangai/agentforge-mcp-gateway',
     watch: false,
     globals: true,
-    environment: 'jsdom',
+    environment: 'node',
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {
+      enabled: true,
       reportsDirectory: './test-output/vitest/coverage',
       provider: 'v8' as const,
     },
