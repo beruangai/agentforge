@@ -32,6 +32,24 @@ This prevent wasted cycles during proposal and design iterations before finalize
 
 Unify naming across all docs. If CLI uses `<agent> <command>`, use it everywhere—not `<group> <action>` in one place and `[agent] [action]` in another.
 
+## Spec Naming
+
+**Prefix specs with package name.** Since OpenSpec doesn't support namespaced/nested specs, prefix capability names with the owning package for readability and separation of concern:
+- `claude-sandbox-execution`, not `execution`
+- `mcp-gateway-routing`, not `routing`
+
+## Spec Content
+
+**Requirements-focused, not implementation-mirroring.** Specs define WHAT the system must do, not HOW it's built. Implementation details should be able to drift without breaking spec-level requirements:
+- Specify observable behaviors, inputs, outputs, and constraints
+- Avoid referencing internal file names, class names, or module structure
+- Use scenarios that test from the consumer/boundary perspective
+- Implementation-level concerns belong in design.md, not specs
+
+## Spec Granularity
+
+**Merge aggressively to minimal separate specs.** Each spec should cover a meaningful behavioral surface area, not mirror internal modules. Fewer, broader specs are preferred over many fine-grained ones.
+
 ## Spec Deltas
 
 **Prefer REMOVED/ADDED over MODIFIED.** MODIFIED requires full copy/paste replacement of entire requirement. For most changes, surgical REMOVED/ADDED pairs are more concise and maintainable:

@@ -1,0 +1,84 @@
+# AgentForge Agent Container
+# Runs Claude Agent SDK in isolated container for execute-to-completion tasks
+#
+# Base: node:22-slim (Debian) — provides Node.js, npm, bash, and a stable Debian base.
+# Bun installed on top for running the agent-runner (faster TypeScript execution).
+# Claude Code requires: bash, git, Node.js (npm global install).
+
+FROM node:22-slim
+
+# Build labels (set at build time via --label)
+LABEL org.agentforge.dockerfile-hash="placeholder"
+LABEL org.agentforge.build-timestamp="0"
+
+# Install system dependencies
+# - git, curl: required by claude-code
+# - chromium + libs: browser support (installed but not enabled by default — consumers enable via skills)
+# - unzip: needed by bun installer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    unzip \
+    chromium \
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libxshmfence1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libx11-xcb1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set chromium env vars for playwright/puppeteer
+ENV CHROME_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Install Bun globally (for running agent-runner — faster than node for TypeScript)
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash
+
+# Install claude-code CLI globally (npm — the standard install method)
+RUN npm install -g @anthropic-ai/claude-code@latest
+
+# Create app directory
+WORKDIR /app
+
+# Copy agent-runner package manifest (no lockfile — rebuilds get latest matching claude-code)
+COPY agent-runner/package.json ./
+
+# Install agent-runner dependencies
+RUN bun install --no-save
+
+# Copy agent-runner source
+COPY agent-runner/ ./
+
+# Create workspace directories with 3-tier settings hierarchy:
+# /workspace/.claude — archetype-level capabilities (mounted by consumer)
+# /workspace/task — task working directory (cwd for agent execution)
+RUN mkdir -p /workspace/task
+
+# Non-root user (required for --dangerously-skip-permissions)
+RUN useradd -m -s /bin/bash agent || true
+RUN chown -R agent:agent /workspace /app
+
+USER agent
+
+# Clean .claude scope — session persistence mounted here from host
+RUN mkdir -p /home/agent/.claude \
+    && echo '{}' > /home/agent/.claude/settings.json
+
+WORKDIR /workspace/task
+
+ENTRYPOINT ["bun", "run", "/app/index.ts"]

@@ -69,10 +69,12 @@ interface SandboxRunnerConfig {
 }
 
 interface CredentialConfig {
-  /** 'env' = pass API key as env var; 'onecli' = use OneCLI HTTPS proxy */
-  mode: 'env' | 'onecli';
+  /** 'env' = pass API key as env var; 'onecli' = use OneCLI HTTPS proxy; 'proxy' = native credential proxy */
+  mode: 'env' | 'onecli' | 'proxy';
   /** OneCLI proxy URL (required for 'onecli' mode) */
   proxyUrl?: string;
+  /** Credential proxy URL (required for 'proxy' mode, default: http://host.docker.internal:3128) */
+  credentialProxyUrl?: string;
   /** Agent identifier for multi-credential OneCLI (optional) */
   agent?: string;
 }
@@ -120,9 +122,21 @@ interface AgentForgeContainerOutput {
   structuredOutput?: unknown;
   sessionId?: string;
   metrics?: {
-    tokens: number;
-    toolCalls: number;
+    /** Aggregate token usage from SDK */
+    usage: {
+      input_tokens: number;
+      output_tokens: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
+    /** Total cost in USD */
+    totalCostUsd?: number;
+    /** Wall-clock duration ms */
     durationMs: number;
+    /** API-only duration ms */
+    durationApiMs?: number;
+    /** Number of conversation turns */
+    numTurns?: number;
   };
   error?: string;
 }

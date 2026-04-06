@@ -1,0 +1,46 @@
+{
+  "name": "@beruangai/agentforge-claude-sandbox",
+  "version": "0.0.1",
+  "description": "Docker container lifecycle management for Claude Agent SDK tasks",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/index.d.ts"
+    }
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts",
+    "!src/__tests__"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/beruangai/agentforge",
+    "directory": "packages/claude-sandbox"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.10",
+    "langsmith": "^0.5.16",
+    "vitest": "4.1.1"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.92",
+    "@types/dockerode": "^4.0.1"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/claude-agent-sdk": ">=0.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/claude-agent-sdk": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
