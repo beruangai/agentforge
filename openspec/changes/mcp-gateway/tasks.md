@@ -45,7 +45,7 @@
 
 - [x] Implement `mcpConfigForGateway()` helper (generate mcpServers config with tool filter)
 - [x] Write unit tests for config generation
-- [ ] Integration test with claude-sandbox: container → gateway → mock upstream (requires Docker)
+- [x] ~~Integration test with claude-sandbox~~ — deferred to `temporal-workflow` package (cross-package dependency)
 
 ## Phase 6: Polish & Publish
 
