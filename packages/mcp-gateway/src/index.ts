@@ -9,6 +9,10 @@ export type {
 
 // Container integration
 export { mcpConfigForGateway } from './helpers/mcp-config.js';
+export type {
+  McpConfigOptions,
+  GatewayMcpServerEntry,
+} from './helpers/mcp-config.js';
 
 // Tool filtering (useful for consumers building custom behavior)
 export {

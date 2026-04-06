@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Create Temporal activities from sandbox execution config
-The package SHALL provide a factory function that creates typed Temporal activity functions wrapping `SandboxRunner.execute()`. The factory handles heartbeat management, trace propagation, and output extraction so consumers only specify task-specific configuration.
+The package SHALL provide a factory function that creates typed Temporal activity functions wrapping `SandboxRunner.execute()`. The factory handles heartbeat management, trace propagation, gateway integration, and output extraction so consumers only specify task-specific configuration.
 
 #### Scenario: Activity executes sandbox task and returns output
 - **WHEN** the activity function is called with input
@@ -18,6 +18,7 @@ The package SHALL provide a factory function that creates typed Temporal activit
 #### Scenario: Output validated against Zod schema
 - **WHEN** an output schema is provided and the sandbox returns structured output
 - **THEN** the output is validated against the schema before being returned
+- **AND** the schema is converted to JSON Schema draft-07 via `z.toJSONSchema(schema, { target: 'draft-07' })` (Zod v4+)
 
 #### Scenario: Schema validation failure is non-retryable
 - **WHEN** the sandbox output does not match the provided Zod schema
@@ -26,6 +27,15 @@ The package SHALL provide a factory function that creates typed Temporal activit
 #### Scenario: No output schema skips validation
 - **WHEN** no output schema is provided
 - **THEN** the structured output is returned as-is without validation
+
+#### Scenario: Gateway tool filters generate mcpServers config
+- **WHEN** a gateway instance is provided and the sandbox config includes tool filter patterns
+- **THEN** `gateway.mcpServersConfig(tools)` is called to generate the `mcpServers` config for the container
+- **AND** the generated config is merged with any explicitly provided `mcpServers`
+
+#### Scenario: No gateway skips mcpServers generation
+- **WHEN** no gateway instance is provided
+- **THEN** only explicitly provided `mcpServers` from the sandbox config are used
 
 ### Requirement: Classify sandbox errors into Temporal failure types
 The package SHALL map sandbox execution errors to appropriate Temporal `ApplicationFailure` types, distinguishing retryable from non-retryable failures so Temporal's retry policy handles them correctly.
@@ -74,11 +84,11 @@ The package SHALL export named retry policy configurations that consumers spread
 - **THEN** `SchemaValidationError` and `PermissionDenied` are listed as non-retryable error types
 
 ### Requirement: Propagate trace context from activities to containers
-The package SHALL extract the current trace context inside a Temporal activity and provide it as environment variables for injection into sandbox containers. This enables the container-side agent runner to link its LLM traces as children of the activity span.
+The package SHALL extract the current trace context inside a Temporal activity and provide it as environment variables for injection into sandbox containers. This enables the container-side agent runner to link its LLM traces as children of the activity span. LangSmith-specific logic is isolated in a dedicated adapter module.
 
 #### Scenario: Trace env vars extracted in activity context
 - **WHEN** `getTraceEnvVars()` is called inside a running activity
-- **THEN** environment variables containing the current trace context are returned
+- **THEN** environment variables containing the current trace context are returned (delegated to LangSmith adapter)
 
 #### Scenario: Trace env vars injected into sandbox execution
 - **WHEN** the activity factory executes a sandbox task

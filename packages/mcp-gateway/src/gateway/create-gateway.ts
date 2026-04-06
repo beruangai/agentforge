@@ -3,15 +3,25 @@ import { UpstreamManager } from '../upstream/upstream-manager.js';
 import { RateLimiter } from '../rate-limit/rate-limiter.js';
 import type { RateLimitConfig } from '../rate-limit/types.js';
 import type { UpstreamServerConfig } from '../upstream/types.js';
+import { mcpConfigForGateway } from '../helpers/mcp-config.js';
+import type { GatewayMcpServerEntry } from '../helpers/mcp-config.js';
 import { createMcpApp } from './server.js';
 import type { Gateway, GatewayConfig, GatewayStatus } from './types.js';
+
+const DEFAULT_CONTAINER_HOST = 'host.docker.internal';
 
 /**
  * Creates and starts the MCP gateway server.
  * Connects to all upstream servers before accepting requests.
  */
 export async function createGateway(config: GatewayConfig): Promise<Gateway> {
-  const { port, host = '0.0.0.0', servers, logging = true } = config;
+  const {
+    port,
+    host = '0.0.0.0',
+    servers,
+    logging = true,
+    containerHost = DEFAULT_CONTAINER_HOST,
+  } = config;
 
   // Separate upstream configs from rate limit configs
   const upstreamConfigs: Record<string, UpstreamServerConfig> = {};
@@ -52,6 +62,16 @@ export async function createGateway(config: GatewayConfig): Promise<Gateway> {
         port,
         upstreams: upstreamManager.getStatus(),
       };
+    },
+
+    mcpServersConfig(
+      tools?: string[],
+    ): Record<string, GatewayMcpServerEntry> {
+      return mcpConfigForGateway({
+        gatewayHost: containerHost,
+        gatewayPort: port,
+        tools,
+      });
     },
   };
 

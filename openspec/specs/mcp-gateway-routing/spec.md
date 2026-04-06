@@ -87,6 +87,10 @@ The gateway SHALL provide a helper to generate MCP server configuration for agen
 - **WHEN** the generated config is passed to a sandbox execution as `mcpServers`
 - **THEN** the agent inside the container connects to the gateway and sees only the filtered tools
 
+#### Scenario: Gateway instance generates config from tool filters
+- **WHEN** `gateway.mcpServersConfig(tools)` is called with tool filter patterns
+- **THEN** a valid MCP server config record is returned using the gateway's port and configured container host
+
 ### Requirement: Graceful startup and shutdown
 The gateway SHALL connect to all upstream servers before accepting requests, and SHALL complete in-flight requests before shutting down.
 

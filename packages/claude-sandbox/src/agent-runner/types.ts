@@ -16,6 +16,7 @@ export interface MessageBlock {
 export interface MCPServerConfig {
   type: 'http' | 'stdio';
   url?: string;
+  headers?: Record<string, string>;
   command?: string;
   args?: string[];
   env?: Record<string, string>;

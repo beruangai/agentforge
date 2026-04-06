@@ -1,5 +1,6 @@
 import type { UpstreamServerConfig } from '../upstream/types.js';
 import type { RateLimitConfig } from '../rate-limit/types.js';
+import type { GatewayMcpServerEntry } from '../helpers/mcp-config.js';
 
 export interface GatewayConfig {
   /** Port to listen on */
@@ -10,6 +11,8 @@ export interface GatewayConfig {
   servers: Record<string, GatewayServerConfig>;
   /** Enable request logging (default: true) */
   logging?: boolean;
+  /** Hostname containers use to reach this gateway (default: 'host.docker.internal') */
+  containerHost?: string;
 }
 
 export type GatewayServerConfig = UpstreamServerConfig & {
@@ -22,6 +25,12 @@ export interface Gateway {
   close(): Promise<void>;
   /** Current server status */
   status(): GatewayStatus;
+  /**
+   * Generate MCP server config for sandbox containers.
+   * Returns config ready to pass as `mcpServers` to sandbox execution.
+   * @param tools - Tool filter patterns (e.g., ['vault:*', 'serpapi:search']). Omit for all tools.
+   */
+  mcpServersConfig(tools?: string[]): Record<string, GatewayMcpServerEntry>;
 }
 
 export interface GatewayStatus {
