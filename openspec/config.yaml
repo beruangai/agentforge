@@ -16,12 +16,13 @@ context: |
   How a consumer relates runtime sessions, A2A contexts, Claude sessions and working
   directories is the consumer's, never AgentForge's.
   Consumers (StrategyFoundry, TrendBot) state requirements in their own repositories'
-  docs/AGENTFORGE_CONTRACT.md (ids H# and T#); see docs/CONSUMERS.md.
+  docs/AGENTFORGE_CONTRACT.md (ids H# and T#), which are unvetted drafts; docs/CONSUMERS.md
+  distils them into the set AgentForge answers to (ids D#) and records what is not carried.
   Everything in docs/ARCHITECTURE.md and adr/ is proposed, not accepted.
 
 rules:
   proposal:
-    - Trace to the consumer contract ids it serves (H#, T#), and name those it leaves unmet
+    - Trace to the distilled requirements it serves (D#), and name those it leaves unmet
     - Name the [OPEN §x] sections it depends on; never resolve one silently
     - Name the protocol or interface it changes, and why the change belongs there
     - Include a "Non-goals" section

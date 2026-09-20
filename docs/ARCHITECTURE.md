@@ -81,7 +81,7 @@ A fifth, the **idempotency key**, is AgentForge's own: it names one logical exec
 - **At most one container at a time per runtime session** — the platform's property, not a policy **[OPEN §B]**.
 - **One live task per continuity key.** The envelope may carry an opaque **continuity key**; the gateway refuses a second live task under the same one, loudly. A consumer sets it to whatever must not be written twice at once — in practice the Claude session id, because a transcript has one writer. Layer 1 never interprets it.
 - **One process per task** (§5).
-- **No queueing.** Concurrent tasks are never serialized behind one another (T27). They are bounded instead: a container has 2 vCPU and 8 GB, and an out-of-memory kill takes the whole session with it, so an agent declares an **admission limit**, and a task beyond it is *rejected* rather than queued (§4).
+- **No queueing.** Concurrent tasks are never serialized behind one another (D15). They are bounded instead: a container has 2 vCPU and 8 GB, and an out-of-memory kill takes the whole session with it, so an agent declares an **admission limit**, and a task beyond it is *rejected* rather than queued (§4).
 
 ---
 
@@ -96,9 +96,9 @@ Two halves, in separate modules ([ADR 0003](../adr/0003-procedures-are-type-safe
 - **Contract** — the name, the outer input and output schemas, and a hash. Zod alone, so a caller imports it without the implementation or the Agent SDK.
 - **Implementation** — what runs in the container, registered against that contract.
 
-The **outer contract** is what the caller sends and receives; the **agent contract** is what the agent fills in, given to the SDK as its output schema. They differ whenever the outer output carries computed fields the model must not be asked for (T18). The step between them is an ordinary function.
+The **outer contract** is what the caller sends and receives; the **agent contract** is what the agent fills in, given to the SDK as its output schema. They differ whenever the outer output carries computed fields the model must not be asked for (D2). The step between them is an ordinary function.
 
-The contract hash travels in the envelope. A container whose loaded bundle does not implement it refuses the task before any work (H3, T3).
+The contract hash travels in the envelope. A container whose loaded bundle does not implement it refuses the task before any work (D4).
 
 ### The implementation
 
@@ -106,15 +106,17 @@ Three steps, of which only the middle is required:
 
 | Step | Does | Examples |
 |---|---|---|
-| **before** | Side effects before the run | Sync a working copy, verify a mount, reconcile after a lost attempt (T33) |
-| **run** | Produces the outer output | Usually an agent run; sometimes plain consumer code (T4) |
-| **after** | Side effects on success and on failure | Commit and push, record, clean up (T33, T34) |
+| **before** | Side effects before the run | Sync a working copy, verify a mount, reconcile after a lost attempt (D33) |
+| **run** | Produces the outer output | Usually an agent run; sometimes plain consumer code (§J) |
+| **after** | Side effects on success and on failure | Commit and push, record, clean up (D33) |
 
-An agent run is written with the harness's `agent()` helper: the seed, the SDK options, the agent contract, and the function from agent output to outer output. The helper runs the kernel — one `query()` to a settled outcome, with the agent's output validated against its contract before anything else sees it. **Not optional and not middleware** (H7, H8, T15).
+An agent run is written with the harness's `agent()` helper: the seed, the SDK options, the agent contract, and the function from agent output to outer output. The helper runs the kernel — one `query()` to a settled outcome, with the agent's output validated against its contract before anything else sees it. **Not optional and not middleware** (D3).
 
 A procedure that invokes no agent simply does not call the helper. There is no second kind of procedure: the run step is a function either way.
 
-**Every option a procedure sets reaches the SDK, or the task is rejected** (H4, T7). The options are the SDK's own type rather than a parallel schema, and a test asserts every resolved key reaches `query()` — which is how the first AgentForge's silently-dropped `maxTurns` is prevented. What that cannot prove is that the SDK then *binds* the option; that is **[OPEN §E]**.
+**A task has exactly one time budget.** The procedure declares it; the envelope may override it per invocation, which is how a caller that sizes budgets per call rather than per declaration gets what it needs. The task enforces it and reports `timed_out`. A caller's own deadline — an activity's start-to-close, say — can only *cancel*; it is never a second authority on when a run ends, and the client reports the budget in force so a caller can size its deadline above it (D6).
+
+**Every option a procedure sets reaches the SDK, or the task is rejected** (D5). The options are the SDK's own type rather than a parallel schema, and a test asserts every resolved key reaches `query()` — which is how the first AgentForge's silently-dropped `maxTurns` is prevented. What that cannot prove is that the SDK then *binds* the option; that is **[OPEN §E]**.
 
 ### Side effects are the consumer's
 
@@ -122,7 +124,7 @@ A procedure that invokes no agent simply does not call the helper. There is no s
 
 ### Reuse
 
-Cross-cutting behavior — guardrail hooks, telemetry, a house style of options — is a function a procedure calls, shipped in a package. Composite options are **additive**: contributions to hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering (H5, T8). AgentForge ships a small library (§7); nothing is wired by default.
+Cross-cutting behavior — guardrail hooks, telemetry, a house style of options — is a function a procedure calls, shipped in a package. Composite options are **additive**: contributions to hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering (D8). AgentForge ships a small library (§7); nothing is wired by default.
 
 How a procedure is written — object literal, chained builder, or a class whose methods are its steps — is **[OPEN §N]**, settled by writing StrategyFoundry's real procedures rather than by argument.
 
@@ -153,11 +155,11 @@ The A2A SDK mints the task id and creates its event bus *before* the executor is
 
 ### Task state, the lease, and loss
 
-Task state lives in a store outside the microVM ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)), so an outcome survives the container, the caller's redeploy, and the connection that asked for it (H10, T24). It is the A2A task store, extended with the idempotency index, the lease and the outcome payload — one record, read through A2A, so a caller needs no store access of its own (T43).
+Task state lives in a store outside the microVM ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)), so an outcome survives the container, the caller's redeploy, and the connection that asked for it (D11). It is the A2A task store, extended with the idempotency index, the lease and the outcome payload — one record, read through A2A, so a caller needs no store access of its own (D32).
 
 **Writes are fenced.** A2A's `TaskStore.save` overwrites unconditionally, so the store implementation carries a **fencing token** — the lease generation — in the task's metadata and rejects a write from a stale holder. Without it, a container deriving `lost` and the original container finishing `succeeded` are two unordered writes, and whichever lands later wins.
 
-**Loss is derived at read time**, from a lease the executor renews while the task process lives. Nothing sweeps, so **detection latency is the caller's poll interval** — which is what a caller sizes its heartbeat against (H11, T25).
+**Loss is derived at read time**, from a lease the executor renews while the task process lives. Nothing sweeps, so **detection latency is the caller's poll interval** — which is what a caller sizes its heartbeat against (D12).
 
 ### Idempotency
 
@@ -195,30 +197,30 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 
 **The gateway** decides admission (§4). **The executor** spawns and supervises: one process per task, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md), measured by **[OPEN §G]**).
 
-- `/ping` shares no event loop with any task, so nothing a task does can stall the health check and get a busy session terminated (T42)
+- `/ping` shares no event loop with any task, so nothing a task does can stall the health check and get a busy session terminated (D31)
 - each task loads the bundle current at its start (§6)
 - a crash is contained: the executor records `failed` with the exit code and the tail of stderr, so a task never disappears without a record
 - the process speaks the task protocol, and its logs go to the container's log stream
 
-**Credentials.** The operator's subscription token is long-lived and subscription-wide, so it is not placed in the task process's environment where the agent's own shell could read it; the SDK is given a credential helper instead, and an expired credential surfaces as `credential_expired` rather than a generic failure **[OPEN §O]**. AWS credentials cannot be withheld from a child in the same microVM: the task process is *not given* store credentials, but store integrity rests on the microVM boundary, not on a scrubbed environment (T35, T44).
+**Credentials.** The operator's subscription token is long-lived and subscription-wide, so it is not placed in the task process's environment where the agent's own shell could read it; the SDK is given a credential helper instead, and an expired credential surfaces as `credential_expired` rather than a generic failure **[OPEN §O]**. AWS credentials cannot be withheld from a child in the same microVM: the task process is *not given* store credentials, but store integrity rests on the microVM boundary, not on a scrubbed environment (D24, D29).
 
 **Guardrails are cooperative.** `writeScope` and `stopGuard` constrain the model's tool use; they are not a sandbox, and a procedure with shell access goes around them.
 
-**Locally**, the same image runs in Docker, the client talks A2A to it directly, task state is on the filesystem behind the same fenced interface, and `docker stop` stands in for the blunt stop. One code path; local is not a mock (H20, T39).
+**Locally**, the same image runs in Docker, the client talks A2A to it directly, task state is on the filesystem behind the same fenced interface, and `docker stop` stands in for the blunt stop. One code path; local is not a mock (D25).
 
 ---
 
 ## 6. Agents, bundles and delivery
 
-**An agent is the deployable unit**: one AgentCore runtime, one card, one image, the bundle it serves, and its stores — the strongest isolation available. A consumer deploys as many as its strategy wants; TrendBot's three are three agents (T40).
+**An agent is the deployable unit**: one AgentCore runtime, one card, one image, the bundle it serves, and its stores — the strongest isolation available. A consumer deploys as many as its strategy wants; TrendBot's three are three agents (D31).
 
-**Agents nest in one project by default** ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)): agents sharing an image differ only by bundle and card, so one project builds one image and holds several agent definitions, each with its own build and deploy target. A separate project is for an agent needing its own image, such as one adding Python and NautilusTrader (H23).
+**Agents nest in one project by default** ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)): agents sharing an image differ only by bundle and card, so one project builds one image and holds several agent definitions, each with its own build and deploy target. A separate project is for an agent needing its own image, such as one adding Python and NautilusTrader (D28).
 
-**The bundle is a published artifact** ([ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)), **baked into the image by default**. Mounting it instead — so a change reaches the next task without an image rebuild (H22) — is opt-in and carries real cost: the mount forces the runtime into a VPC, a mount failure fails the invocation with the same 424 a container kill produces, and a shared writable mount would let one agent's shell rewrite every agent's code. A mounted bundle is therefore read-only, published content-addressed with a pointer file read once at task start, and never overwritten in place **[OPEN §D]**.
+**The bundle is a published artifact** ([ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)), **baked into the image by default**. Mounting it instead — so a change reaches the next task without an image rebuild (D27) — is opt-in and carries real cost: the mount forces the runtime into a VPC, a mount failure fails the invocation with the same 424 a container kill produces, and a shared writable mount would let one agent's shell rewrite every agent's code. A mounted bundle is therefore read-only, published content-addressed with a pointer file read once at task start, and never overwritten in place **[OPEN §D]**.
 
 **The agent card is generated at publish time** from the procedures the bundle registers, and baked into the image: a mount is not readable when the platform fetches the card, because a mount exists only during an invocation.
 
-**AgentForge ships the delivery tooling**: CDK constructs for the agent with its A2A configuration, the task store, the bundle and its mount, and `grantInvokeAccess` for a caller's least-privilege role (T43); and the bundle publish command, so deployment and mount cannot drift. Nx generators follow once the first project exists and shows what they should write **[OPEN §K]**.
+**AgentForge ships the delivery tooling**: CDK constructs for the agent with its A2A configuration, the task store, the bundle and its mount, and `grantInvokeAccess` for a caller's least-privilege role (D32); and the bundle publish command, so deployment and mount cannot drift. Nx generators follow once the first project exists and shows what they should write **[OPEN §K]**.
 
 ---
 
@@ -229,7 +231,7 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 One `query()` to a settled outcome, behind the `agent()` helper:
 
 - **Structured output** — the agent contract becomes the SDK's own `outputFormat` (draft-07), and the settled output is validated before anything else sees it. The SDK validates and re-prompts natively now; what beyond that is still needed is **[OPEN §E]**.
-- **Settlement** — work the agent dispatches runs in the foreground and completes within the turn that dispatched it, because a turn resumed by background work once cancelled its own final submission (H16, T12, T13). Whether that still holds is **[OPEN §E]**.
+- **Settlement** — work the agent dispatches runs in the foreground and completes within the turn that dispatched it, because a turn resumed by background work once cancelled its own final submission (D9). Whether that still holds is **[OPEN §E]**.
 - **Abort** — an `AbortSignal` and the SDK's interrupt reach the run; exactly one outcome is published.
 - **Session** — started, resumed or forked as the procedure said. How transcripts persist for resume in another container is **[OPEN §F]**; a failed mirror write is surfaced, never swallowed.
 - **No blocking** — nothing in the kernel or a helper blocks the event loop.
@@ -240,10 +242,10 @@ Optional functions a procedure calls, each serving a stated requirement:
 
 | Helper | Does |
 |---|---|
-| `writeScope` | Denies writes outside allowed paths, with allow-union semantics (T9) |
-| `stopGuard` | Refuses to end a session while a required artifact is missing (H5, T10) |
-| `guardrailDisclosure` | Tells the agent which rules apply, derived from what is enforced (T11) |
-| `telemetry` | OpenTelemetry export of the SDK's native telemetry, correlated to the task, flushed before the outcome (H19, T37) |
+| `writeScope` | Denies writes outside allowed paths, with allow-union semantics (D8) |
+| `stopGuard` | Refuses to end a session while a required artifact is missing (D8) |
+| `guardrailDisclosure` | Tells the agent which rules apply, derived from what is enforced (D8) |
+| `telemetry` | OpenTelemetry export of the SDK's native telemetry, correlated to the task, flushed before the outcome (D23) |
 
 The guardrail helpers serve TrendBot alone and wait for its contract to be confirmed; their *semantics* may belong in TrendBot's own package, with AgentForge carrying only the hooks (**[OPEN §L]**).
 
@@ -251,7 +253,7 @@ The guardrail helpers serve TrendBot alone and wait for its contract to be confi
 
 ## 8. What every task records
 
-Written by AgentForge: the outcome, the attempt and the prior attempt's state, timings, admission and cancel events, every identifier of §2, and any transcript-mirror failure — correlated to the caller's own ids (H18, T38). For an agent run, also the seed as sent, the resolved SDK options, where the transcript is, and usage: tokens, turns, cost (H18, T36).
+Written by AgentForge: the outcome, the attempt and the prior attempt's state, timings, admission and cancel events, every identifier of §2, and any transcript-mirror failure — correlated to the caller's own ids (D22). For an agent run, also the seed as sent, the resolved SDK options, where the transcript is, and usage: tokens, turns, cost (D22).
 
 ---
 
@@ -310,7 +312,7 @@ agentforge/
 ## 11. Deliberately absent
 
 - **Any mapping between the four identifiers** — the consumer's, procedure by procedure (§2)
-- **Queueing, and any concurrency ceiling that is not about memory** — the caller's (T27)
+- **Queueing, and any concurrency ceiling that is not about memory** — the caller's (D15)
 - **Recovery of a consumer's side effect** — the consumer's (§3)
 - **Rate limiting or durability for the tools an agent calls** — a consumer-hosted MCP server owns its limits and whatever backs them
 - **Agent discovery and agent-to-agent orchestration** — the card is generated and otherwise unused

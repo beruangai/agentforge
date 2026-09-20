@@ -13,18 +13,19 @@ Milestones deliver capability a consumer can use. Each is proposed through OpenS
 
 ## A1 — Local slice
 
-What StrategyFoundry's M0 requires, running locally in Docker.
+What StrategyFoundry's M0 requires — distilled in [CONSUMERS.md](CONSUMERS.md) — running locally in Docker.
 
 - Task protocol: envelope, identifiers, events, outcome
 - Procedure model: contracts, the three steps, the `agent()` helper, additive option contributions, marshalling
 - Procedure authoring settled against StrategyFoundry's real procedures (§N)
 - Kernel, with structured output validated inside it rather than as an option
-- Runtime: A2A server, TaskExecutor, a process per task, filesystem task store, generated agent card
+- Runtime: A2A server, gateway and executor, a process per task, filesystem task store behind the fenced interface, generated agent card
 - Caller-agnostic client, and the Temporal activity factory over it
-- Base image, and a bundle mounted from a directory
+- Base image with the bundle baked in; the mounted variant follows in A2
+- Session persistence chosen and wired (§F), the record fields D22 requires, and credential provisioning (§O) — the M0 items a local slice must still meet (D17, D22, D29)
 - Failure-injection tests for the layer-2 failures in `ARCHITECTURE.md` §8
 
-**Exit:** a StrategyFoundry workflow calls a procedure through a local link and gets schema-validated structured output back.
+**Exit:** a StrategyFoundry workflow calls a procedure through a local link and gets schema-validated structured output back. D25's "one code path" is only half-proven until A2.
 
 ## A2 — AgentCore
 

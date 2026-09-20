@@ -115,19 +115,14 @@ AgentForge is delivered as an Nx plugin with constructs and a publish command ([
 - How much of `@aws/nx-plugin` is reused directly rather than mirrored — its `ts#agent` generator is built for Strands, but its project, registry and construct conventions are not
 - Whether the generated client factory mirrors its `.local()` / `.withIamAuth()` shape
 
-## §L — Where the consumers' contracts pull apart *(OPEN)*
+## §L — Where the consumers still pull apart *(OPEN)*
 
-Read from StrategyFoundry's H1–H25 and TrendBot's draft T1–T44 on 2026-09-19. None is a hard conflict; each needs a design serving both through configuration, not a branch.
+Most of what looked like divergence dissolved in the distillation ([CONSUMERS.md](CONSUMERS.md)): the requirements are now stated as behavior, and the mechanisms each consumer had in mind are listed there as not carried. What remains genuinely open:
 
-- **Seed discovery (H6, T5, T6).** StrategyFoundry: nothing discovered at the entry point. TrendBot: capabilities resolve from a per-agent and a shared scope, and its seed invokes a command defined in the container. Both hold if what a session sees at its start is exactly what the consumer configured, including which capability scopes are mounted.
-- **Timeouts (H4, T2).** StrategyFoundry declares a run's timeout with the procedure and requires it enforced; TrendBot sets timeout, retry and heartbeat where it registers the activity. The run's time budget and the activity's Temporal timeouts are different things; name both.
-- **Failure granularity (H17, T20, T21).** StrategyFoundry needs typed causes so workflows wait on a usage limit; TrendBot maps every error to non-retryable today but distinguishes lost from errored. The outcome taxonomy serves both.
-- **Hold for review (T22).** TrendBot holds a failed attempt for the operator. A consumer side effect, or middleware? TrendBot decides whether it asks.
-- **Guardrail semantics (T8–T11).** TrendBot's write-scope and termination rules are stated as harness requirements, including a filename-date policy that is TrendBot's own. AgentForge's obligation is that hooks a procedure supplies reach the SDK and compose without loss (H5, T7); the semantics may belong in a TrendBot package that AgentForge merely carries.
-- **Session identity as mechanism (T29, T30).** Deterministic mapping of a non-canonical name and normalization of a raw runtime session key are derivations TrendBot can do before it calls. TrendBot's own "deliberately not required" list disclaims the normalized format while T30 requires the normalization.
-- **A domain-negative result as success (T19).** The outcome taxonomy has no place for "a gate decision that halts, returned as a successful outcome under its own discriminator"; it is the procedure's own output type, not an outcome kind. Confirm that reading.
-- **Secrets (T44).** Scope says accounts, networking and secrets are the consumer's, but T44 requires each runtime to read exactly the secrets it declares, and T35 requires no credential in anything the harness emits. T35 is AgentForge's; T44 straddles (§O).
-- **Side effects committed twice (T26).** "One invocation's side effects never commit twice" cannot be met by AgentForge alone: a container can die after a side effect and before its outcome is recorded. Under the rule that a consumer owns its side effects and their recovery, the clause is TrendBot's. For the operator's review of TrendBot's draft contract.
+- **What a session can see at its start (D7).** StrategyFoundry composes everything; TrendBot expects per-agent and shared capability scopes to be present. Both hold if the answer is configuration — which capability directories an agent's image and mounts contain — but the shape of that configuration is not designed.
+- **Holding a failed attempt (D21).** TrendBot holds one for operator review; today that lives in its activity code. Whether AgentForge needs to do anything beyond making the failure observable is TrendBot's to say when it adopts.
+- **Secrets (D29, §O).** Secret storage is the consumer's, but "each deployment reads only the secrets it declares" and "no credential in anything the harness emits" are partly ours.
+- **Procedures without an agent (§J).** In or out depending on whether TrendBot moves them to its own API layer.
 
 ## §M — Pausing for a human *(OPEN)*
 

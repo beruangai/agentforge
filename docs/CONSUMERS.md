@@ -1,41 +1,119 @@
 # Consumers
 
-AgentForge exists for its consumers, not for public use. They define what it must do; it decides how. Each keeps its requirements in its own repository, in a document of the same name. **Read both at the start of any design or implementation session** — together they are the specification this workspace answers to.
+AgentForge exists for StrategyFoundry and TrendBot. They say what they need; AgentForge decides everything about meeting it.
 
 | Consumer | Contract | Ids | Status |
 |---|---|---|---|
-| StrategyFoundry | `~/workspace/beruangai/StrategyFoundry/docs/AGENTFORGE_CONTRACT.md` | H1… | Current. Items marked **M0** gate StrategyFoundry's first milestone |
-| TrendBot | `~/workspace/PlayTek/trendbot-monorepo/docs/AGENTFORGE_CONTRACT.md` | T1… | Draft, seeded from TrendBot's specs; to be confirmed in a TrendBot session. Items marked **migration** gate its move off the first AgentForge |
+| StrategyFoundry | `~/workspace/beruangai/StrategyFoundry/docs/AGENTFORGE_CONTRACT.md` | H1… | Drafting, and adopts from day one, so its **M0** set is what the first milestone answers |
+| TrendBot | `~/workspace/PlayTek/trendbot-monorepo/docs/AGENTFORGE_CONTRACT.md` | T1… | Draft, seeded from its specs. Running on the first AgentForge today; refactors onto this one when it adopts |
+
+**Both contracts are unvetted drafts, written before this design existed.** Neither consumer has built against AgentForge, so a requirement often describes the mechanism its author had in mind rather than the behavior it protects. The distilled set below is what AgentForge answers to; the contracts are its sources.
 
 ## Rules
 
-- **A contract states behavior, never mechanism.** "An outcome survives the worker being redeployed mid-run", not "results are written to S3". Where a consumer's document names a mechanism, treat it as the behavior it protects, and raise it.
-- **AgentForge never edits a consumer's contract.** A requirement that is unclear, infeasible, or in conflict with the other consumer's is raised with the operator, in that consumer's repository.
-- **Every proposal traces to contract ids.** A change here names the H and T requirements it serves and says which it leaves unmet. A capability no consumer requires is not built.
-- **One consumer's need is met by configuration or by a helper it calls** — never by a branch in the harness or the runtime for that consumer.
-- **The consumer owns its isolation strategy.** How runtime sessions, contexts, Claude sessions and working directories relate is its decision, and may differ procedure by procedure. AgentForge propagates them and enforces only mechanical invariants.
-- **The consumer owns its side effects and their recovery.** AgentForge runs them in the before and after steps and gives them the idempotency key, the attempt, and the prior attempt's recorded state. A contract clause asking AgentForge to guarantee a consumer's side effect is raised.
+- **Distil, never transcribe.** Take what a requirement protects. Where it names a mechanism, meet the behavior and raise the wording.
+- **AgentForge never edits a consumer's contract.** Anything unclear, infeasible, or in conflict with the other consumer is raised with the operator, in that consumer's repository.
+- **Push back.** A requirement that costs more than it buys, encodes a workaround, or asks for something AgentForge cannot guarantee is renegotiated, not built.
+- **Every proposal traces to distilled ids (D#) and through them to sources.** A capability no consumer needs is not built.
+- **One consumer's need is met by configuration or a helper it calls** — never by a branch in the harness or the runtime.
+- **The consumer owns its isolation strategy and its side effects**, including recovery when one may have partly happened.
 - **No consumer vocabulary enters AgentForge.**
-- **Staying current.** When a consumer's contract changes, review it here before the next proposal: new requirements enter `DESIGN_OPTIONS.md` or a change, and anything the architecture no longer meets is raised. Check each contract's git history for changes since the last review.
+- **Re-distil when a contract changes.** Check each contract's git history since the last review; anything new enters this set or `DESIGN_OPTIONS.md`.
 
-## Raised, and waiting on the operator
+---
 
-Both contracts are unvetted drafts, and a requirement that states a mechanism is read as the behavior it protects. These are the ones to settle before they are built against; each is in `DESIGN_OPTIONS.md` §L with its reasoning.
+## What AgentForge answers to
 
-| Requirement | Why it is raised |
+### Declaring and typing
+
+| | Requirement | Sources |
+|---|---|---|
+| **D1** | A caller invokes a procedure by name with typed input and receives a typed outcome. A wrong name or shape fails at compile time; there is no per-procedure wiring | H1, H2, T1 |
+| **D2** | A procedure declares an outer contract and, separately, what the agent itself fills in. Computed fields and identifiers are added between them, never asked of the model | T18, both declarations |
+| **D3** | Parsing is strict in both directions and at every boundary. A non-conforming output fails loudly with its payload preserved — no coercion, no partial delivery, no silent drop — and field descriptions reach the agent with its schema | H7, H8, T15, T16, T17 |
+| **D4** | A container that cannot serve the contract a caller compiled against refuses the task before any work, naming what it could not resolve | H3, T3 |
+
+### Controlling the run
+
+| | Requirement | Sources |
+|---|---|---|
+| **D5** | Every option a procedure sets reaches the SDK, or the task is rejected. Nothing accepted is silently dropped | H4, T7 |
+| **D6** | A consumer controls a run's time budget and it is enforced. *Where* it is declared is AgentForge's: one budget per task, declared with the procedure and overridable per invocation, so a caller that sizes budgets per call is served without a second authority over when a run ends | H4, T2 |
+| **D7** | A session starts from exactly what the procedure composed. Nothing is discovered at the entry point, and what capabilities a session can see is the consumer's configuration rather than a resolution algorithm AgentForge runs | H6, T5, T6 |
+| **D8** | Guardrails a procedure supplies compose with the harness's own, and none is lost to ordering or merging. Their enforcement *semantics* are the consumer's to define | H5, T8, T9, T10, T11 |
+| **D33** | Side effects run before the run, and after it on success and on failure, each opt-in per procedure and each surfacing its own failure rather than swallowing it. Recovery when one may have partly happened is the consumer's | T33, T34, both declarations |
+| **D9** | The outcome is the agent's last declared answer, taken only once the run has settled with the work it dispatched complete. A run that ends with no answer is an error | H16, T12, T13, T14 |
+
+### Invoking, waiting, recovering
+
+| | Requirement | Sources |
+|---|---|---|
+| **D10** | Invocation is asynchronous and bounded by no synchronous request limit; a caller can heartbeat whatever it answers to while it waits | H9, T23 |
+| **D11** | An outcome survives the caller being redeployed or crashing mid-run | H10, T24 |
+| **D12** | A container that dies mid-run is reported as lost within a bounded, knowable time — not at the caller's own timeout | H11, T25 |
+| **D13** | Cancelling stops the run, and nothing it started outlives it | H12, T26, T32 |
+| **D14** | A retry attaches to a run in progress or already finished; a new attempt starts only once the previous one ended. One execution never runs twice at once | H13, T26 |
+| **D15** | Concurrency is the caller's: AgentForge imposes no ceiling of its own and never queues one start behind another. It may refuse a start it cannot run safely, and says so | T27 |
+
+### Identity and state
+
+| | Requirement | Sources |
+|---|---|---|
+| **D16** | The consumer controls every identifier the platforms expose — isolation, conversation, transcript, working directory — with their distinct meanings intact, and AgentForge carries and records them without imposing a mapping | H14, H15, T28, T29, T30 |
+| **D17** | A session started in one container resumes in another | H14, T31 |
+| **D18** | Nothing carries from one invocation to the next except state the consumer declared durable, and nothing an invocation started outlives it | T31, T32 |
+
+### Failure
+
+| | Requirement | Sources |
+|---|---|---|
+| **D19** | Every outcome is typed and every failure carries its cause, distinguishing at least: non-conforming output, budget exhausted, timeout, cancelled, lost, usage limit with its reset time, transient provider error, and harness or SDK error. A lost run is distinguishable from one that failed on its own terms | H17, T20, T21 |
+| **D20** | A domain-level negative result — a gate that halts, a rejection — is a successful outcome carrying that answer, never an error | T19 |
+| **D21** | A failed attempt is observable to the consumer before its own retry policy acts, with enough identity to act on. Holding it is the consumer's | T22 |
+
+### Recording
+
+| | Requirement | Sources |
+|---|---|---|
+| **D22** | Every task records the seed as sent, the resolved options, where the transcript is, usage, timings and every identifier, correlated to the caller's own | H18, T36, T38 |
+| **D23** | Traces export over OpenTelemetry and are flushed before the container goes away | H19, T37 |
+| **D24** | No credential appears in anything AgentForge emits — log line, error, or recorded value | T35 |
+
+### Building and deploying
+
+| | Requirement | Sources |
+|---|---|---|
+| **D25** | One code path locally and in the cloud; caller logic does not branch on which, and an unavailable target fails loudly rather than falling back | H20, T39 |
+| **D26** | A procedure runs in isolation against a fixture, with no container and no workflow engine | H21 |
+| **D27** | A change to a procedure can reach the next task without rebuilding an image, for a consumer willing to pay the deployment cost that carries | H22 |
+| **D28** | A consumer extends the base image with what its procedures need | H23 |
+| **D29** | Authentication is the operator's subscription; no pay-per-use key is present, and each deployment reads only the secrets it declares | H24, T44 |
+| **D30** | Identifiers AgentForge mints are uuid7 | H25 |
+| **D31** | Each deployed agent is resolvable by name, serves the current bundle, and reports liveness without running an agent — and nothing a procedure does delays that report | T40, T41, T42 |
+| **D32** | A caller invokes remotely with least privilege — exactly its own agents, and nothing else | T43 |
+
+---
+
+## What AgentForge does not carry, and why
+
+Raised with the operator; each is a wording change in the source contract rather than work here.
+
+| Source | Why not |
 |---|---|
-| **H14** | Names the mechanism — `~/.claude` and the working directory on a persistent mount — and that mechanism has since proven costly (§F). The behavior is "a session started in one container resumes in another" |
-| **T4** | Procedures with no agent, the only reason a non-agent run path exists. TrendBot may move them to its own API layer instead; settle before A3 |
-| **T8–T11** | Guardrail *semantics*, including a filename-date policy, stated as harness requirements. AgentForge's obligation is that supplied hooks reach the SDK and compose without loss |
-| **T13** | Encodes a workaround for a specific CLI behavior as a permanent contract; §E is establishing whether it still reproduces |
-| **T19** | A domain-negative result is the procedure's own output type, not an outcome kind |
-| **T26** | "Side effects never commit twice" cannot be met by AgentForge alone; a container can die between a side effect and its record |
-| **T29, T30** | Id derivation and normalization TrendBot can do before it calls; T30 requires a normalization whose format the same document disclaims |
-| **T41** | Restates a platform gotcha about `time_of_last_update` as a requirement |
-| **T44** | Straddles the scope line: secret storage is the consumer's, but "each runtime reads exactly the secrets it declares" is partly AgentForge's (§O) |
+| **T2** — timeouts are "not part of a directive's declaration" | The *where* is a mechanism. D6 gives the control the requirement protects, with one authority instead of two |
+| **T4** — procedures that invoke no agent | Needs no concept: a procedure's run step is a function, so one that calls no agent is already expressible. TrendBot may also move these to its own API layer (§J) |
+| **T5** — capabilities resolving from per-agent and shared scopes by whole-object replacement | Image and mount layout the consumer owns. D7 protects what the session sees at its start |
+| **T9** — a date segment in filenames under a root, exempting a scratchpad | TrendBot's file-naming policy in harness clothing. D8 carries the composition; the rule itself is its own hook |
+| **T13** — the last submission supersedes "even where the session's final result reports a superseded answer" | Encodes a workaround for specific CLI behavior as permanent contract. D9 states the behavior; §E establishes whether the workaround is still needed |
+| **T26** — "one invocation's side effects never commit twice" | Not meetable by AgentForge: a container can die between a side effect and its record. D13 and D14 cover what is meetable; the rest is the consumer's reconciliation |
+| **T29, T30** — session-id name mapping and raw-key normalization | Derivations the consumer does before it calls. D16 gives it control of the identifiers themselves |
+| **T41** — a last-change time that "moves only when the status does" | A restatement of a platform gotcha. D31 carries the behavior |
+| **H14** — "`~/.claude` and the working directory are on the persistent mount" | Names a mechanism that has since proven costly (§F). D17 is the behavior it protects |
+
+---
 
 ## What each consumer brings
 
-**StrategyFoundry** — local-first for now, then AgentCore. Several Claude projects rather than one, with an isolation strategy still to settle; sessions that resume in any container; procedures and harness mounted rather than baked; one image adding Python and NautilusTrader; a usage-limit failure distinct, with its reset time, so workflows wait; every run's seed and transcript recorded, because its capital-bearing decisions must be reconstructible.
+**StrategyFoundry** — adopting from day one, local first and then AgentCore. Several Claude projects rather than one, with an isolation strategy still to settle; sessions resumable in any container; one image adding Python and NautilusTrader; a usage limit distinct with its reset time, so workflows wait rather than fail; every run's seed and transcript recorded, because its capital-bearing decisions must be reconstructible.
 
-**TrendBot** — running in the cloud on the first AgentForge today ([lineage](lineage/first-agentforge.md)). One Claude project with isolation per entity; three deployed runtimes; a git lifecycle around every run — sync before, commit and push after, nothing on failure — as its own side effect in AgentForge's before and after steps; runs of up to hours; procedures that invoke no agent, in the agent container; composable fail-closed guardrails; concurrency bounded by the caller, never by AgentForge.
+**TrendBot** — running in the cloud on the first AgentForge today ([lineage](lineage/first-agentforge.md)). Isolation by entity path or lane, with a session per phase inside it; three deployed agents; a git lifecycle around every run — sync before, commit and push after, nothing on failure — as its own side effect in AgentForge's before and after steps; runs of up to hours; procedures that invoke no agent; composable fail-closed guardrails; concurrency bounded by the caller.
