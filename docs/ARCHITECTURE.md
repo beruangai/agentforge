@@ -44,7 +44,7 @@ This document defines the layers, what crosses between them, and the two places 
 
 **Layers 1 and 2 never import each other.** Each is testable alone: the harness runs a procedure against a fixture with no container and no caller; the runtime runs a task whose process is a stub. They share one library, the **task protocol** — the envelope, the identifiers, the process messages, and the outcome — which depends on Zod alone.
 
-**Delivery — the CDK constructs, the bundle publish command, and later the Nx generators — is tooling, not a layer.** It is how a consumer gets a deployed agent (§6).
+**Delivery — the Nx plugin, its generators, the CDK constructs and the bundle publish command — is tooling, not a layer.** It is how a consumer gets a deployed agent and stays in step with AgentForge as it changes (§6).
 
 ### The two protocols, and three interfaces
 
@@ -102,17 +102,15 @@ The contract hash travels in the envelope. A container whose loaded bundle does 
 
 ### The implementation
 
-Three steps, of which only the middle is required:
+**A procedure is an agent run, with side effects around it.** AgentForge runs agents; work that invokes no agent belongs in the consumer, not here.
 
-| Step | Does | Examples |
+| Part | Does | Examples |
 |---|---|---|
-| **before** | Side effects before the run | Sync a working copy, verify a mount, reconcile after a lost attempt (D33) |
-| **run** | Produces the outer output | Usually an agent run; sometimes plain consumer code (§J) |
-| **after** | Side effects on success and on failure | Commit and push, record, clean up (D33) |
+| **before** | Optional side effects before the run | Sync a working copy, verify a mount, reconcile after a lost attempt (D33) |
+| **the run** | The seed, the SDK options, the agent contract, and the function from agent output to outer output | |
+| **after** | Optional side effects on success and on failure | Commit and push, record, clean up (D33) |
 
-An agent run is written with the harness's `agent()` helper: the seed, the SDK options, the agent contract, and the function from agent output to outer output. The helper runs the kernel — one `query()` to a settled outcome, with the agent's output validated against its contract before anything else sees it. **Not optional and not middleware** (D3).
-
-A procedure that invokes no agent simply does not call the helper. There is no second kind of procedure: the run step is a function either way.
+**Input and output are structured, always.** The outer input is validated against the contract before the run starts; the agent's output is validated against the agent contract before anything else sees it; the outer output is validated before it leaves. There is no unstructured path and no opt-in — a prose answer is not a contract (D3).
 
 **A task has exactly one time budget.** The procedure declares it; the envelope may override it per invocation, which is how a caller that sizes budgets per call rather than per declaration gets what it needs. The task enforces it and reports `timed_out`. A caller's own deadline — an activity's start-to-close, say — can only *cancel*; it is never a second authority on when a run ends, and the client reports the budget in force so a caller can size its deadline above it (D6).
 
@@ -220,7 +218,7 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 
 **The agent card is generated at publish time** from the procedures the bundle registers, and baked into the image: a mount is not readable when the platform fetches the card, because a mount exists only during an invocation.
 
-**AgentForge ships the delivery tooling**: CDK constructs for the agent with its A2A configuration, the task store, the bundle and its mount, and `grantInvokeAccess` for a caller's least-privilege role (D32); and the bundle publish command, so deployment and mount cannot drift. Nx generators follow once the first project exists and shows what they should write **[OPEN §K]**.
+**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agents project, an agent nested in one, a procedure and a caller's wiring; CDK constructs for the agent with its A2A configuration, the task store, the bundle and its mount, and `grantInvokeAccess` for a caller's least-privilege role (D32); and the bundle publish command. A **sync generator** keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching in two repositories **[OPEN §K]**.
 
 ---
 
@@ -230,7 +228,7 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 
 One `query()` to a settled outcome, behind the `agent()` helper:
 
-- **Structured output** — the agent contract becomes the SDK's own `outputFormat` (draft-07), and the settled output is validated before anything else sees it. The SDK validates and re-prompts natively now; what beyond that is still needed is **[OPEN §E]**.
+- **Structured output** — the agent contract becomes the SDK's own `outputFormat` (draft-07), and the settled output is validated before anything else sees it. Not a helper a procedure can forget: a run without an agent contract is not expressible. The SDK validates and re-prompts natively now; what beyond that is still needed is **[OPEN §E]**.
 - **Settlement** — work the agent dispatches runs in the foreground and completes within the turn that dispatched it, because a turn resumed by background work once cancelled its own final submission (D9). Whether that still holds is **[OPEN §E]**.
 - **Abort** — an `AbortSignal` and the SDK's interrupt reach the run; exactly one outcome is published.
 - **Session** — started, resumed or forked as the procedure said. How transcripts persist for resume in another container is **[OPEN §F]**; a failed mirror write is surfaced, never swallowed.
@@ -316,6 +314,7 @@ agentforge/
 - **Recovery of a consumer's side effect** — the consumer's (§3)
 - **Rate limiting or durability for the tools an agent calls** — a consumer-hosted MCP server owns its limits and whatever backs them
 - **Agent discovery and agent-to-agent orchestration** — the card is generated and otherwise unused
-- **Agent frameworks other than the Claude Agent SDK** — a procedure's run step is a function; another framework needs no new concept here
+- **Agent frameworks other than the Claude Agent SDK**
+- **Procedures that invoke no agent** — AgentForge runs agents; a consumer's plain work belongs in the consumer
 - **Synchronous invocation, and any second server in the container**
 - **Consumer vocabulary** — no directive, entity, vault, or strategy

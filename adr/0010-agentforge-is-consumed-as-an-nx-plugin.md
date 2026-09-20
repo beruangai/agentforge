@@ -20,7 +20,7 @@ For layout: **one project per agent**, with a shared project holding the image a
 
 Chosen: **an Nx plugin**, with **agents nested in one project** by default.
 
-* **The constructs and the publish command ship first**, so the agent, its stores, its bundle and what is published cannot drift apart. **Generators follow the first real project**, which is what shows what they should write — shipping them before that would fix the wrong shape in code
+* **Generators, constructs and the publish command are all part of it.** The generators are not scaffolding convenience: a **sync generator** is how a consumer's wiring stays correct as AgentForge iterates, and without one every change becomes ad-hoc patching in two repositories. `@aws/nx-plugin` already does this, so AgentForge extends its conventions rather than starting over
 * Nesting follows from the bundle decision ([ADR 0008](0008-procedure-code-is-a-published-bundle.md)): agents on one image differ only by bundle and card, so one project builds one image and each agent keeps its own build and deploy target
 * A separate project remains right for an agent needing its own image, such as one adding Python and NautilusTrader (H23)
 * Each agent is still deployed as its own AgentCore runtime — the strongest isolation available — whatever project it lives in
@@ -31,4 +31,4 @@ Chosen: **an Nx plugin**, with **agents nested in one project** by default.
 * Good, because an agent's infrastructure comes from reviewed constructs rather than a folder copied from another consumer, and a generator can follow once the shape is known
 * Good, because the image is built once for a group of agents instead of once per agent
 * Bad, because nesting makes build granularity a matter of targets rather than project boundaries, and a careless target rebuilds every agent in the project
-* Bad, because generators are code to maintain, and they lag the libraries they scaffold unless a consumer exercises them
+* Bad, because generators are code to maintain and lag the libraries they scaffold unless a consumer exercises them — which the sync generator mitigates only if it is exercised on every release

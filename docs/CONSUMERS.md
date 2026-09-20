@@ -4,7 +4,7 @@ AgentForge exists for StrategyFoundry and TrendBot. They say what they need; Age
 
 | Consumer | Contract | Ids | Status |
 |---|---|---|---|
-| StrategyFoundry | `~/workspace/beruangai/StrategyFoundry/docs/AGENTFORGE_CONTRACT.md` | H1… | Drafting, and adopts from day one, so its **M0** set is what the first milestone answers |
+| StrategyFoundry | `~/workspace/beruangai/StrategyFoundry/docs/AGENTFORGE_CONTRACT.md` | H1… | Drafting, and adopts from day one. Its **M0** marks its own lowest bar, not AgentForge's first milestone |
 | TrendBot | `~/workspace/PlayTek/trendbot-monorepo/docs/AGENTFORGE_CONTRACT.md` | T1… | Draft, seeded from its specs. Running on the first AgentForge today; refactors onto this one when it adopts |
 
 **Both contracts are unvetted drafts, written before this design existed.** Neither consumer has built against AgentForge, so a requirement often describes the mechanism its author had in mind rather than the behavior it protects. The distilled set below is what AgentForge answers to; the contracts are its sources.
@@ -30,7 +30,7 @@ AgentForge exists for StrategyFoundry and TrendBot. They say what they need; Age
 |---|---|---|
 | **D1** | A caller invokes a procedure by name with typed input and receives a typed outcome. A wrong name or shape fails at compile time; there is no per-procedure wiring | H1, H2, T1 |
 | **D2** | A procedure declares an outer contract and, separately, what the agent itself fills in. Computed fields and identifiers are added between them, never asked of the model | T18, both declarations |
-| **D3** | Parsing is strict in both directions and at every boundary. A non-conforming output fails loudly with its payload preserved — no coercion, no partial delivery, no silent drop — and field descriptions reach the agent with its schema | H7, H8, T15, T16, T17 |
+| **D3** | Input and output are structured throughout, and parsing is strict in both directions and at every boundary. A non-conforming output fails loudly with its payload preserved — no coercion, no partial delivery, no silent drop — and field descriptions reach the agent with its schema | H7, H8, T15, T16, T17 |
 | **D4** | A container that cannot serve the contract a caller compiled against refuses the task before any work, naming what it could not resolve | H3, T3 |
 
 ### Controlling the run
@@ -101,7 +101,7 @@ Raised with the operator; each is a wording change in the source contract rather
 | Source | Why not |
 |---|---|
 | **T2** — timeouts are "not part of a directive's declaration" | The *where* is a mechanism. D6 gives the control the requirement protects, with one authority instead of two |
-| **T4** — procedures that invoke no agent | Needs no concept: a procedure's run step is a function, so one that calls no agent is already expressible. TrendBot may also move these to its own API layer (§J) |
+| **T4** — procedures that invoke no agent | Out of scope: AgentForge runs agents. TrendBot's were a convenience around its git-based working copy and move to its own API layer when it adopts |
 | **T5** — capabilities resolving from per-agent and shared scopes by whole-object replacement | Image and mount layout the consumer owns. D7 protects what the session sees at its start |
 | **T9** — a date segment in filenames under a root, exempting a scratchpad | TrendBot's file-naming policy in harness clothing. D8 carries the composition; the rule itself is its own hook |
 | **T13** — the last submission supersedes "even where the session's final result reports a superseded answer" | Encodes a workaround for specific CLI behavior as permanent contract. D9 states the behavior; §E establishes whether the workaround is still needed |
@@ -116,4 +116,4 @@ Raised with the operator; each is a wording change in the source contract rather
 
 **StrategyFoundry** — adopting from day one, local first and then AgentCore. Several Claude projects rather than one, with an isolation strategy still to settle; sessions resumable in any container; one image adding Python and NautilusTrader; a usage limit distinct with its reset time, so workflows wait rather than fail; every run's seed and transcript recorded, because its capital-bearing decisions must be reconstructible.
 
-**TrendBot** — running in the cloud on the first AgentForge today ([lineage](lineage/first-agentforge.md)). Isolation by entity path or lane, with a session per phase inside it; three deployed agents; a git lifecycle around every run — sync before, commit and push after, nothing on failure — as its own side effect in AgentForge's before and after steps; runs of up to hours; procedures that invoke no agent; composable fail-closed guardrails; concurrency bounded by the caller.
+**TrendBot** — running in the cloud on the first AgentForge today ([lineage](lineage/first-agentforge.md)). Isolation by entity path or lane, with a session per phase inside it; three deployed agents; a git lifecycle around every run — sync before, commit and push after, nothing on failure — as its own side effect in AgentForge's before and after steps; runs of up to hours; composable fail-closed guardrails; concurrency bounded by the caller.

@@ -1,43 +1,49 @@
 # Roadmap
 
-Milestones deliver capability a consumer can use. Each is proposed through OpenSpec, and the questions it depends on in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md) are settled first — by spike where they turn on platform behavior.
+Milestones deliver capability a consumer can actually run. Each is proposed through OpenSpec, and the questions it depends on in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md) are settled first — by spike where they turn on platform behavior.
 
-## A0 — Scaffold and local spikes
+**StrategyFoundry's M0 is its own lowest bar, not this roadmap's target.** A milestone here ends with agents that execute real work reliably, not with a foundation that compiles.
+
+## A0 — Scaffold, blocking decisions, local spikes
 
 - Nx workspace in the grouped layout on current `@aws/nx-plugin` defaults; Bun, Biome, catalog versions
-- Read `@aws/nx-plugin`'s `ts#agent` generator for the conventions worth reusing (§K)
-- Toolchain check for procedure authoring: standard decorators on Bun, inference, and decorator metadata (§N)
-- Local spikes: kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), session persistence and cross-container resume (§F), A2A server assembly and client behavior (§I)
+- Read `@aws/nx-plugin`'s `ts#agent` and its sync machinery for what to extend rather than rebuild (§K)
+- **Blocking decisions, before any server code:** how the A2A request handler is assembled (§I), and the task-store interface — conditional index insert, fenced write (§A)
+- Local spikes: kernel settlement and what structured output still needs (§E), the task-process protocol with cancellation and group kill (§C, §G), session persistence and cross-container resume (§F), A2A server assembly and client signing (§I), credential provisioning and expiry (§O)
+- Procedure authoring settled against real procedures, not argument (§N)
 
-**Exit:** each local spike recorded in `docs/research/`, and the questions it answers closed.
+**Exit:** every local spike recorded in `docs/research/`, and the questions it answers closed.
 
-## A1 — Local slice
+## A1 — A working agent, locally
 
-What StrategyFoundry's M0 requires — distilled in [CONSUMERS.md](CONSUMERS.md) — running locally in Docker.
+The whole loop, in Docker, for a procedure a consumer would actually ship.
 
 - Task protocol: envelope, identifiers, events, outcome
-- Procedure model: contracts, the three steps, the `agent()` helper, additive option contributions, marshalling
-- Procedure authoring settled against StrategyFoundry's real procedures (§N)
-- Kernel, with structured output validated inside it rather than as an option
+- Procedures: contracts and hashes, the run with its seed, options, agent contract and marshal, and the before and after steps (D1–D5, D33)
+- Kernel: structured input and output throughout, settlement, abort, session start, resume and fork (D3, D9, D17)
+- Guardrail hooks composing without loss, and telemetry (D8, D23)
 - Runtime: A2A server, gateway and executor, a process per task, filesystem task store behind the fenced interface, generated agent card
-- Caller-agnostic client, and the Temporal activity factory over it
-- Base image with the bundle baked in; the mounted variant follows in A2
-- Session persistence chosen and wired (§F), the record fields D22 requires, and credential provisioning (§O) — the M0 items a local slice must still meet (D17, D22, D29)
-- Failure-injection tests for the layer-2 failures in `ARCHITECTURE.md` §8
+- Caller-agnostic client and the Temporal activity factory: start, attach, await with heartbeat, cancel (D10, D13, D14)
+- Typed outcomes with their causes, and what every task records (D19, D22)
+- Base image with the bundle baked in; credentials provisioned as §O decides (D29)
+- Failure-injection tests for every layer-2 failure in `ARCHITECTURE.md` §9
 
-**Exit:** a StrategyFoundry workflow calls a procedure through a local link and gets schema-validated structured output back. D25's "one code path" is only half-proven until A2.
+**Exit:** a StrategyFoundry workflow runs a real directive against a local container, gets validated structured output, and can cancel it, retry it, and resume its session — with the run's seed, options, transcript and usage recorded.
 
-## A2 — AgentCore
+## A2 — The same agent on AgentCore
 
 - AgentCore spikes: busy-session reachability and concurrency (§B), cancellation (§C), task store and lease (§A), bundle mount and reload (§D)
-- A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency and loss detection; cancellation; admission limits
-- CDK constructs and the bundle publish command; the mounted bundle, read-only and content-addressed (§D, §K)
-- Failure-injection tests for the layer-1 failures, on AgentCore
+- A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency, lease and loss; admission limits
+- The Nx plugin: generators for an agents project, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
+- CDK constructs and the bundle publish command; the mounted bundle, read-only and content-addressed, for the consumer that wants it (D27)
+- Failure-injection tests for every layer-1 failure, on AgentCore
 
-**Exit:** the same workflow runs against a deployed runtime, unchanged, and survives a container kill.
+**Exit:** the same procedure, unchanged, runs against a deployed agent; it survives a container kill and a caller redeploy; and a deploy is a construct plus a publish.
 
 ## A3 — TrendBot
 
-- TrendBot's contract confirmed in a TrendBot session
-- Procedures without an agent (§J), the guardrail helpers, and the before and after steps TrendBot's git lifecycle needs
-- The requirements marked **migration** met; TrendBot moves off the first AgentForge
+- TrendBot's contract confirmed against the distilled set, and the items in [CONSUMERS.md](CONSUMERS.md)'s "not carried" table settled
+- Its guardrail semantics as its own hooks, its git lifecycle in the before and after steps, its three agents deployed
+- The sync generator exercised on a real consumer across at least one AgentForge release
+
+**Exit:** TrendBot runs on this AgentForge, and the first one is deleted.

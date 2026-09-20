@@ -92,24 +92,12 @@ This is not a detail to verify later: it decides the shape of the server and the
 - The client: `JsonRpcTransport` takes a `fetchImpl`, so SigV4 signing and the session header are straightforward, but the card resolver cannot reach a card served through `InvokeAgentRuntime` — the client is constructed with an explicit endpoint and a known card
 - Whether `GetAgentCard` validates the card it returns, since AgentCore's examples show protocol 0.3.0 while the SDK emits 1.0
 
-## §O — Credentials in the container *(OPEN)*
-
-The operator's subscription token is long-lived and subscription-wide; the container needs it, the agent's own shell can read anything in its process environment, and an expired one must fail loudly rather than as a generic error (T35, T44).
-
-- How the token reaches the SDK without sitting in the task process's environment — a credential helper the SDK re-runs is the leading shape
-- How expiry surfaces as `credential_expired` rather than being classified as a transient provider failure
-- What a compromised or prompt-injected procedure can reach from inside the microVM, and what is therefore not defensible by scrubbing an environment
-- Rotation, and whether a runtime can hold a credential scoped to itself
-
-## §J — Procedures without an agent *(OPEN)*
-
-TrendBot requires them (T4): working-copy reads, corpus scans, composers, and measurement runs of up to an hour, in the agent container because it owns that working copy, sharing a procedure's contract, invocation, failure and phases minus the agent run. The mechanical run kind is the shape (`ARCHITECTURE.md` §3); open is how much of the Claude kind's machinery it reuses, and the operator's constraint that the agent path gives up nothing to it. TrendBot may instead move these to its own API layer, which would be a revision to T4.
-
 ## §K — The plugin and infrastructure surface *(OPEN)*
 
-AgentForge is delivered as an Nx plugin with constructs and a publish command ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md), [ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)). Open:
+AgentForge is delivered as an Nx plugin with generators, constructs and a publish command ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md), [ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)). Open:
 
 - Which generators exist, and what each writes: an agents project with its image, an agent nested in one, a procedure, a caller's client wiring
+- **The sync generator** — what it keeps current in a consumer as AgentForge changes (wiring, construct props, the caller's client, image pins), how it reports a change it cannot make automatically, and how much of `@aws/nx-plugin`'s own sync machinery is reused rather than reimplemented
 - What each construct covers, what the consumer must supply, and how several agents share or separate stores, buckets and the image registry
 - Build granularity for nested agents: which targets are per agent, and what a shared image change rebuilds
 - How much of `@aws/nx-plugin` is reused directly rather than mirrored — its `ts#agent` generator is built for Strands, but its project, registry and construct conventions are not
@@ -122,7 +110,6 @@ Most of what looked like divergence dissolved in the distillation ([CONSUMERS.md
 - **What a session can see at its start (D7).** StrategyFoundry composes everything; TrendBot expects per-agent and shared capability scopes to be present. Both hold if the answer is configuration — which capability directories an agent's image and mounts contain — but the shape of that configuration is not designed.
 - **Holding a failed attempt (D21).** TrendBot holds one for operator review; today that lives in its activity code. Whether AgentForge needs to do anything beyond making the failure observable is TrendBot's to say when it adopts.
 - **Secrets (D29, §O).** Secret storage is the consumer's, but "each deployment reads only the secrets it declares" and "no credential in anything the harness emits" are partly ours.
-- **Procedures without an agent (§J).** In or out depending on whether TrendBot moves them to its own API layer.
 
 ## §M — Pausing for a human *(OPEN)*
 
@@ -150,7 +137,16 @@ Independent of the choice, decide by these: whether a wrong composition fails at
 
 **Check first, in A0:** whether standard TypeScript 5 decorators on Bun preserve inference through the decorated member, and whether decorator metadata needs a `Symbol.metadata` polyfill under our toolchain. If they are clean, decorator-based registration is available to N2 and N3; if not, it is out on toolchain grounds rather than taste.
 
-**Exit:** settled by writing StrategyFoundry's real M0 procedures in A1, not by argument.
+**Exit:** settled by writing real StrategyFoundry procedures in A0, not by argument.
+
+## §O — Credentials in the container *(OPEN)*
+
+The operator's subscription token is long-lived and subscription-wide; the container needs it, the agent's own shell can read anything in its process environment, and an expired one must fail loudly rather than as a generic error (T35, T44).
+
+- How the token reaches the SDK without sitting in the task process's environment — a credential helper the SDK re-runs is the leading shape
+- How expiry surfaces as `credential_expired` rather than being classified as a transient provider failure
+- What a compromised or prompt-injected procedure can reach from inside the microVM, and what is therefore not defensible by scrubbing an environment
+- Rotation, and whether a runtime can hold a credential scoped to itself
 
 ---
 
