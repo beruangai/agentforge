@@ -1,151 +1,73 @@
-# AgentForge Development Guide
+# Claude Code Orientation
 
-## What This Is
+**AgentForge** is a procedure wrapper for the Claude Agent SDK, built for its consumers — StrategyFoundry and TrendBot — not for public use. Consumers declare procedures; AgentForge runs each as an asynchronous task over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
 
-AgentForge (`@beruangai/agentforge-*`) is a monorepo of TypeScript packages providing orchestration, sandboxing, and tool-access layers for agentic AI pipelines. It's a shared foundation used by consumer applications.
+Design stage; no implementation yet. **Everything in `docs/ARCHITECTURE.md` and `adr/` is a proposal.** Accepting an ADR is the operator's call, made as implementation settles it.
 
-## Philosophy
+## Read first
 
-Production-grade library for small teams. Solo engineer, real workloads. Fully tested so consumers can trust it — consumers skip pedantic infrastructure testing and focus on business value.
+1. [`README.md`](README.md)
+2. [`docs/SOLUTION_SPACE.md`](docs/SOLUTION_SPACE.md) — the problem and the scope
+3. [`docs/CONSUMERS.md`](docs/CONSUMERS.md), **then both consumer contracts it points to** — the specification this workspace answers to:
+   - `~/workspace/beruangai/StrategyFoundry/docs/AGENTFORGE_CONTRACT.md`
+   - `~/workspace/PlayTek/trendbot-monorepo/docs/AGENTFORGE_CONTRACT.md`
+4. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the layers, the contract at each boundary, procedures, tasks, runtime, harness
+5. [`docs/DESIGN_OPTIONS.md`](docs/DESIGN_OPTIONS.md) — **what is not decided**, and the spikes that decide it
+6. [`adr/`](adr/README.md) — **read the relevant ADR before proposing to reverse a direction**
+7. [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terms
 
-## Development Approach
+Before relying on platform behavior, [`docs/research/`](docs/research/) — verified facts about AgentCore, A2A, and the Agent SDK, each with the date it was read. [`docs/lineage/`](docs/lineage/) is evidence from the first AgentForge, never a specification.
 
-**Spec-Driven Development**
-- Use OpenSpec (`/opsx:propose`) for all changes
-- Write specs before implementing
-- Keep it focused on what needs to be built now
+## Premise
 
-**Minimal Everything**
-- Minimal abstractions — solve current problems
-- Minimal API surface — expose what consumers need, nothing more
-- No enterprise patterns for prototype-scale problems
-- Production-grade: tested, reliable, observable — but not enterprise-grade
+Settled by the operator: consumers own the requirements; invocation is asynchronous; authentication is the operator's Claude Max subscription, used as intended — not a topic to reopen. The rest is the working direction, proposed.
 
-**Ask Over Assume**
-- When facing ambiguity, ask for clarification before proceeding
-- Use `AskUserQuestion` tool to gather requirements or decisions
+**Consumers define the requirements; AgentForge owns the decisions.** A consumer states behavior it depends on, at the contract, in its own repository. AgentForge derives its requirements from theirs and decides everything about meeting them. A requirement only one consumer has is met by configuration, middleware, or a phase — never by a branch in the harness or the runtime. A conflict between consumers is raised, not resolved silently.
 
-## Tech Stack
+**Four layers, with a contract at every boundary.** Runtime, harness, consumer, SDK. Layers 1 and 2 never import each other; they share only the task protocol. Each layer is testable alone, and a failure is fixed in the layer that owns it.
 
-- **Runtime:** Bun (dev/CI), Node.js compatible (production)
-- **Language:** TypeScript (latest stable)
-- **Monorepo:** Nx workspace with `@aws/nx-plugin`
-- **Testing:** Vitest
-- **Dependencies:** Latest stable versions
+**The caller is outside the boundary.** The client is caller-agnostic and the Temporal activity factory sits over it. Nothing in the runtime or the harness knows a caller exists, and Temporal is never a dependency of either.
 
-> Bun instead of Node.js throughout. (`bun <cmd>`, `bunx nx <target>`)
+**The consumer owns isolation and side effects.** How runtime sessions, A2A contexts, Claude sessions and working directories relate is the consumer's, and may differ per procedure. AgentForge propagates them and enforces only mechanical invariants. A side effect's recovery is the consumer's too.
 
-## Package Overview
+**Settle platform behavior by testing it.** Where a question turns on what AgentCore, A2A's SDK, S3 Files, or the Agent SDK actually does, a spike against the real thing answers it — not documentation, not a search summary, not what the first AgentForge assumed.
 
-| Package | npm Name | Purpose |
-|---------|----------|---------|
-| `temporal-workflow` | `@beruangai/agentforge-temporal-workflow` | Activity factories, retry presets, LangSmith helpers for Temporal |
-| `claude-sandbox` | `@beruangai/agentforge-claude-sandbox` | Docker container lifecycle for Claude Agent SDK tasks |
-| `mcp-gateway` | `@beruangai/agentforge-mcp-gateway` | HTTP MCP gateway with profile-scoped tool filtering |
+**Every intermittent failure becomes a test.** Reproduce it once, in the layer that owns it, and keep it covered.
 
-## Key Architectural Decisions
+## Conventions
 
-- **Temporal.io** for workflow orchestration (not LangGraph)
-- **Docker sandbox** for agent isolation (per-task containers)
-- **Sentinel I/O protocol** for structured output extraction
-- **LangSmith SDK** (standalone) for LLM observability
-- **MCP gateway** (shared HTTP) for tool access
+The operator's standing conventions across projects:
 
-See `TECH_SCOPING.md` for full rationale and details.
+- **Organize by scope, never by type.** Nx grouped layout on `@aws/nx-plugin` defaults: thin deployables in `apps/{scope}/{deployable}`, the code they run in `libs/{scope}/{capability}`. A capability owns its code, schemas, and tests together; file names carry the type. Never a `schemas/`, `types/`, or `utils/` tree collecting one kind across scopes.
+- **Verbose, unambiguous names.** `timestamp`, not `ts`; `configuration`, not `cfg`.
+- **Borrow terms before inventing them** — the Agent SDK's, AgentCore's, or A2A's first, then this glossary's, then a new one. No consumer's domain vocabulary.
+- **Binary state is a boolean.** An enum only where a third state is genuinely foreseeable.
+- **uuid7 for every id AgentForge mints.** Never uuid4. Ids minted by a dependency are opaque and not reformatted.
+- **Zero silent failures.** Throw and handle. No empty-result fallbacks, no swallowed exceptions, no defaults papering over missing data, no option accepted and dropped.
+- **No legacy support.** Latest stable toolchain; no shims or compatibility bridges.
+- **Minimal public surface.** Expose what consumers need; nothing internal leaks.
+- **Seams, not speculative abstractions.** An interface earns its place when a second implementation exists or two consumers need different ones.
+- **TypeScript on Bun.**
 
-## Code Structure
+## Working rules
 
-**Colocate by Concept**
-- Group by feature/concern within each package
-- ❌ `controllers/`, `services/`, `models/`
-- ✅ Feature-oriented organization within `src/`
+- **ADRs stay `proposed` until the operator accepts them.** Never write one as `accepted`, and never treat a proposed one as settled.
+- **An ADR records a decision, not a history.** A decision that stops being relevant is dropped; one that is replaced is superseded and marked.
+- **Consumer contracts are read, never edited here.** Raise anything unclear or conflicting with the operator, in that consumer's repository.
+- **[OPEN §x] means undecided.** Do not implement against an open section, and do not resolve one silently. Raise it, or use `AskUserQuestion`.
+- **Ask over assume.** The operator co-authors design decisions.
+- **Never pivot requirements to fix an issue.** If something is stuck, stop and say so.
+- **Complete means done to the fullness of the spec.** Report what was skipped and why.
+- **Decisions live where they are owned.** Structure in `ARCHITECTURE.md`, terms in `GLOSSARY.md`, reasoning in a short MADR ADR written when the decision is made, open questions in `DESIGN_OPTIONS.md`, verified platform facts in `docs/research/` with their date.
+- **Design documents stop above the detail.** Exact signatures, schemas, and thresholds are settled in a capability's proposal; sketches illustrate shape.
 
-**Package Independence**
-- Each package is independently buildable and testable
-- Minimize cross-package dependencies
-- `claude-sandbox` has no dependency on `temporal-workflow`
-- `mcp-gateway` has no dependency on either
+## Spec-driven development
 
-## Testing
+Non-trivial changes go through OpenSpec (proposal → specs → design → tasks, then verification). Behavior contracts in `openspec/specs/`; in-flight work in `openspec/changes/`. Rules in [`openspec/config.yaml`](openspec/config.yaml) and `.claude/rules/openspec.md`. OpenSpec artifacts are `docs` scope in Conventional Commits.
 
-This library is the **trusted foundation**. Tests must be thorough:
-- Unit tests for all public APIs and edge cases
-- Integration tests requiring Docker for sandbox package
-- Mock at package boundaries (mock SandboxRunner when testing temporal-workflow)
-- Test error paths and degraded scenarios
+## Related codebases
 
-```bash
-# Run all tests
-bun run test
-
-# Run all integ tests
-bun run integ
-
-# Run specific package
-bunx nx test @beruangai/agentforge-claude-sandbox
-
-# Run with coverage
-bunx nx test @beruangai/agentforge-claude-sandbox -- --coverage
-
-# Run integ test for specific package
-bunx nx run "@beruangai/agentforge-claude-sandbox":test:integ
-```
-
-## Building
-
-```bash
-# Build all packages
-bun run build
-
-# Build specific package
-bunx nx build @beruangai/agentforge-temporal-workflow
-```
-
-## Key Patterns
-
-### Activity Factory (temporal-workflow)
-```typescript
-const runTask = createClaudeSandboxActivity({
-  name: 'my-task',
-  runner: sandboxRunner,
-  sandbox: (input) => ({
-    prompt: buildPrompt(input),
-    model: 'sonnet',
-    allowedTools: ['Read', 'Grep', 'Bash'],
-  }),
-  heartbeatInterval: 15_000,
-  timeout: 300_000,
-});
-```
-
-### Sandbox Execution (claude-sandbox)
-```typescript
-const result = await runner.execute({
-  input: { prompt, model, outputFormat, allowedTools },
-  volumes: { '/host/data': '/workspace/data' },
-  env: { LANGSMITH_API_KEY: '...' },
-  timeout: 300_000,
-});
-```
-
-### Sentinel I/O Protocol
-```
-Container stdout:
----AGENTFORGE_OUTPUT_START---
-{"status":"success","structuredOutput":{...}}
----AGENTFORGE_OUTPUT_END---
-```
-
-## What Not to Do
-
-- Don't add domain-specific logic (trends, trading, etc.) — this is a generic library
-- Don't create abstract base classes or generic interfaces over concrete implementations
-- Don't add framework features that only one consumer needs
-- Don't build for hypothetical future requirements
-- Don't skip tests — this is the trusted foundation
-- Don't expose internals in the public API
-
-## Git Commits
-
-- When creating multiline commit messages, use direct multiline strings instead of HEREDOCs.
-- Use conventional commits.
+- **The first AgentForge**, in `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`, runs TrendBot today. Evidence of what hurt, never a specification ([lineage](docs/lineage/first-agentforge.md)). Port with review; never copy its shape. TrendBot's own drafts are rough; do not take them as fact.
+- **`a2a-claude` and `claude-a2a`** are A2A wrappers around the Agent SDK. Neither is a dependency or a model; [`docs/research/harness-references.md`](docs/research/harness-references.md) records the few mechanics worth a look.
+- **`@aws/nx-plugin`** is the convention AgentForge's own plugin follows; its `ts#agent` generator is built for Strands and is a reference, not a base ([ADR 0010](adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
+- **This workspace's April 2026 packages and research** are superseded and live only in git history.

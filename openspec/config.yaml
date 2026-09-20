@@ -1,22 +1,34 @@
 schema: spec-driven
 
 context: |
-  Tech stack: TypeScript, Bun, Nx monorepo, Vitest
-  Packages: temporal-workflow, claude-sandbox, mcp-gateway
-  Domain: Agentic workflow orchestration library
-  Key tech: Temporal.io, Docker, Claude Agent SDK, MCP protocol, LangSmith
-  Philosophy: Production-grade for small teams. Thin layer, not framework. Purpose-built packages.
-  See SOLUTION_SPACE.md and TECH_SCOPING.md for full context.
+  AgentForge: a procedure wrapper for the Claude Agent SDK, shared across projects.
+  Tech stack: TypeScript, Bun, Nx grouped layout on @aws/nx-plugin, Vitest, Zod, AWS CDK.
+  Four layers with a contract at every boundary (docs/ARCHITECTURE.md §1):
+  1 runtime (A2A server and client, TaskExecutor, durable task store, deployment constructs),
+  2 harness (procedure model, run kinds, kernel, middleware), 3 consumer, 4 Claude Agent SDK.
+  Layers 1 and 2 never import each other; they share only the task protocol library.
+  A2A is the contract between a caller and the runtime; the client is caller-agnostic and a
+  Temporal activity factory sits over it. A task runs in its own process, speaking JSON-RPC
+  over a pipe; task state is durable outside the microVM, indexed by a caller-supplied
+  idempotency key. AgentForge is delivered as an Nx plugin with CDK constructs; an agent is a
+  deployed AgentCore runtime, and agents that share an image nest in one project.
+  How a consumer relates runtime sessions, A2A contexts, Claude sessions and working
+  directories is the consumer's, never AgentForge's.
+  Consumers (StrategyFoundry, TrendBot) state requirements in their own repositories'
+  docs/AGENTFORGE_CONTRACT.md (ids H# and T#); see docs/CONSUMERS.md.
+  Everything in docs/ARCHITECTURE.md and adr/ is proposed, not accepted.
 
 rules:
   proposal:
-    - Reference SOLUTION_SPACE.md and TECH_SCOPING.md for alignment
+    - Trace to the consumer contract ids it serves (H#, T#), and name those it leaves unmet
+    - Name the [OPEN §x] sections it depends on; never resolve one silently
+    - Name the boundary contracts it changes (B1-B5), and why the change belongs there
     - Include a "Non-goals" section
-    - Keep domain-agnostic (no TrendBot-specific language)
+    - No consumer domain vocabulary
   design:
-    - Include public API surface with TypeScript signatures
-    - Include error handling strategy
-    - Include testing approach
+    - Include the public API surface with TypeScript signatures
+    - Include the error handling strategy and the outcomes each failure maps to
+    - Include the failure-injection tests the change adds
   tasks:
     - Break into implementable chunks (1-4 hours each)
     - Include test tasks alongside implementation tasks

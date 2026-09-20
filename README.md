@@ -1,63 +1,39 @@
 # AgentForge
 
-Production-grade TypeScript library for building agentic workflows with Temporal orchestration, Docker-sandboxed Claude Agent SDK execution, and MCP tool access.
+A procedure wrapper for the Claude Agent SDK, shared across projects.
 
-## Packages
+A consumer declares a **procedure** — its public contract, the agent's own contract and how one becomes the other, the context the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. Consumers own what their agents do and how they isolate them; AgentForge owns how they run.
 
-| Package | Description |
-|---------|-------------|
-| [`@beruangai/agentforge-temporal-workflow`](./packages/temporal-workflow) | Activity factories, retry presets, and LangSmith helpers for Temporal workflows |
-| [`@beruangai/agentforge-claude-sandbox`](./packages/claude-sandbox) | Docker container lifecycle for isolated Claude Agent SDK task execution |
-| [`@beruangai/agentforge-mcp-gateway`](./packages/mcp-gateway) | HTTP MCP gateway with profile-scoped tool filtering |
+It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
 
-## Quick Start
+**Status:** design stage. No implementation yet, and every [ADR](adr/README.md) is `proposed` until the operator accepts it.
 
-```bash
-# Install dependencies
-bun install
+Built for its consumers, StrategyFoundry and TrendBot, not for public use.
 
-# Build all packages
-bun run build
+## Read
 
-# Run tests
-bunx nx run-many --target test
+| Document | Holds |
+|---|---|
+| [docs/SOLUTION_SPACE.md](docs/SOLUTION_SPACE.md) | The problem, what AgentForge is, and what is out of scope |
+| [docs/CONSUMERS.md](docs/CONSUMERS.md) | The consumer contracts this workspace answers to, and the rules for them |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The layers, the contract at each boundary, procedures, tasks, the runtime, the harness |
+| [docs/DESIGN_OPTIONS.md](docs/DESIGN_OPTIONS.md) | What is not decided, and the spikes that decide it |
+| [adr/](adr/README.md) | Why each significant decision went the way it did |
+| [docs/GLOSSARY.md](docs/GLOSSARY.md) | Canonical terms |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones |
+| [docs/research/](docs/research/) | Verified facts about AgentCore, A2A, and the Agent SDK — re-read before relying on one |
+| [docs/lineage/](docs/lineage/) | The first AgentForge: the failures it paid for, as evidence |
 
-# Build specific package
-bunx nx build @beruangai/agentforge-temporal-workflow
-```
-
-## Architecture
+## Shape
 
 ```
-Consumer Application
-│
-├── @beruangai/agentforge-temporal-workflow
-│   Temporal SDK wrapper: activity factories, retry, tracing
-│
-├── @beruangai/agentforge-claude-sandbox
-│   Docker sandbox: container lifecycle, sentinel I/O, sessions
-│
-└── @beruangai/agentforge-mcp-gateway
-    Tool gateway: HTTP bridge, profiles, upstream management
+caller (a Temporal activity, or anything) ──A2A──► agent runtime (server, executor, durable task state)
+                                                      └─ a process per task ──► harness ──► Claude Agent SDK
 ```
 
-See [SOLUTION_SPACE.md](./SOLUTION_SPACE.md) for business context and [TECH_SCOPING.md](./TECH_SCOPING.md) for technical direction.
+Four layers: **runtime** owns the wire and the task's execution host; **harness** owns the procedure model and one agent run; the **consumer** owns its procedures and its identifiers; the **SDK** owns the agent loop. Layers 1 and 2 never import each other.
 
-## Development
+## Consumers
 
-Built with [Nx](https://nx.dev) workspace and [Bun](https://bun.sh) runtime.
-
-```bash
-# Lint all packages
-bun run lint
-
-# Test specific package
-bunx nx test @beruangai/agentforge-claude-sandbox
-
-# Build with skip lint
-bun run build:skip-lint
-```
-
-## License
-
-MIT
+- **StrategyFoundry** — `~/workspace/beruangai/StrategyFoundry`; contract in its `docs/AGENTFORGE_CONTRACT.md`
+- **TrendBot** — `~/workspace/PlayTek/trendbot-monorepo`; contract in its `docs/AGENTFORGE_CONTRACT.md`; migrates off the first AgentForge once its requirements are met
