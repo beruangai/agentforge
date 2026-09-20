@@ -22,11 +22,11 @@ Before relying on platform behavior, [`docs/research/`](docs/research/) — veri
 
 Settled by the operator: consumers own the requirements; invocation is asynchronous; authentication is the operator's Claude Max subscription, used as intended — not a topic to reopen. The rest is the working direction, proposed.
 
-**Consumers define the requirements; AgentForge owns the decisions.** A consumer states behavior it depends on, at the contract, in its own repository. AgentForge derives its requirements from theirs and decides everything about meeting them. A requirement only one consumer has is met by configuration, middleware, or a phase — never by a branch in the harness or the runtime. A conflict between consumers is raised, not resolved silently.
+**Consumers define the requirements; AgentForge owns the decisions.** A consumer states behavior it depends on, at the contract, in its own repository. AgentForge derives its requirements from theirs and decides everything about meeting them. A requirement only one consumer has is met by configuration or by a helper it calls — never by a branch in the harness or the runtime. A consumer contract is an unvetted draft: where a requirement states a mechanism, or asks for something AgentForge cannot meet, raise it rather than building it. A conflict between consumers is raised, not resolved silently.
 
 **Four layers, with a contract at every boundary.** Runtime, harness, consumer, SDK. Layers 1 and 2 never import each other; they share only the task protocol. Each layer is testable alone, and a failure is fixed in the layer that owns it.
 
-**The caller is outside the boundary.** The client is caller-agnostic and the Temporal activity factory sits over it. Nothing in the runtime or the harness knows a caller exists, and Temporal is never a dependency of either.
+**The caller is outside the boundary.** The client is caller-agnostic and the Temporal activity factory sits over it. Nothing below the client knows a caller exists, and Temporal is never a dependency of the runtime or the harness.
 
 **The consumer owns isolation and side effects.** How runtime sessions, A2A contexts, Claude sessions and working directories relate is the consumer's, and may differ per procedure. AgentForge propagates them and enforces only mechanical invariants. A side effect's recovery is the consumer's too.
 
@@ -63,11 +63,11 @@ The operator's standing conventions across projects:
 
 ## Spec-driven development
 
-Non-trivial changes go through OpenSpec (proposal → specs → design → tasks, then verification). Behavior contracts in `openspec/specs/`; in-flight work in `openspec/changes/`. Rules in [`openspec/config.yaml`](openspec/config.yaml) and `.claude/rules/openspec.md`. OpenSpec artifacts are `docs` scope in Conventional Commits.
+Non-trivial changes go through OpenSpec (proposal → specs → design → tasks, then verification). Behavior contracts go in `openspec/specs/`, created when the first change is synced; in-flight work in `openspec/changes/`. Rules in [`openspec/config.yaml`](openspec/config.yaml) and `.claude/rules/openspec.md`. OpenSpec artifacts are `docs` scope in Conventional Commits.
 
 ## Related codebases
 
 - **The first AgentForge**, in `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`, runs TrendBot today. Evidence of what hurt, never a specification ([lineage](docs/lineage/first-agentforge.md)). Port with review; never copy its shape. TrendBot's own drafts are rough; do not take them as fact.
 - **`a2a-claude` and `claude-a2a`** are A2A wrappers around the Agent SDK. Neither is a dependency or a model; [`docs/research/harness-references.md`](docs/research/harness-references.md) records the few mechanics worth a look.
 - **`@aws/nx-plugin`** is the convention AgentForge's own plugin follows; its `ts#agent` generator is built for Strands and is a reference, not a base ([ADR 0010](adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
-- **This workspace's April 2026 packages and research** are superseded and live only in git history.
+- **This workspace's April 2026 packages and research** are gone from the tree; their archived OpenSpec changes remain under `openspec/changes/archive/` as history.

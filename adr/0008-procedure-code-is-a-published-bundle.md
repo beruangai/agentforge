@@ -18,11 +18,12 @@ Changing a prompt or a schema in the first AgentForge means building and deployi
 
 ## Decision Outcome
 
-Chosen option: **a published bundle on a mount**, because a process per task already loads code at its start ([ADR 0004](0004-a-process-per-task.md)), so a mounted bundle needs no reload mechanism, no cache invalidation, and no restart.
+Chosen option: **a published bundle, baked into the image by default and mountable where a consumer needs the faster loop**. A process per task already loads code at its start ([ADR 0004](0004-a-process-per-task.md)), so a mounted bundle needs no reload mechanism, no cache invalidation and no restart — but mounting is not free, and most deployments should not pay for it.
 
-* A **runtime** is an image, the bundle it serves, its card, and its stores; publishing a bundle makes it the next task's code
+* An **agent** is an image, the bundle it serves, its card, and its stores ([ADR 0010](0010-agentforge-is-consumed-as-an-nx-plugin.md)); publishing a bundle makes it the next task's code
 * The image stays the slow-moving part and is rebuilt when Bun, the CLI, or a consumer's runtime changes
-* A baked bundle remains supported for a deployment that wants no mount; the loading path is the same
+* **What a mount costs**, and why it is opt-in: S3 Files and EFS force the runtime into a VPC, with everything else it reaches — `api.anthropic.com` among them — needing NAT or endpoints; a mount failure fails the whole invocation with the same 424 a container kill produces; and a shared writable mount would let one agent's shell rewrite every agent's code. A mounted bundle is read-only, content-addressed, and published beside a pointer file read once at task start, never overwritten in place
+* **The agent card is generated at publish time and baked in**, because a mount is readable only during an invocation and the platform may fetch the card outside one
 * The contract hash guards the seam: a task whose hash the loaded bundle does not implement is refused before any work ([ADR 0003](0003-procedures-are-type-safe-end-to-end.md))
 * AgentForge ships the publish command and the CDK constructs for the bucket, the mount, and the runtime, so deployment and mount cannot drift apart
 * The mount's limits and latency are `docs/DESIGN_OPTIONS.md` §D

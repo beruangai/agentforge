@@ -8,7 +8,7 @@ AgentForge is that plumbing, owned in one place and shared. Its consumers are St
 
 ## What AgentForge is
 
-**A procedure wrapper for the Claude Agent SDK.** A consumer declares a **procedure**: its public contract, the agent's own contract and how one becomes the other, the context the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** — on Bedrock AgentCore Runtime, or locally in Docker — and returns a typed, validated outcome to the Temporal activity that started it.
+**A procedure wrapper for the Claude Agent SDK.** A consumer declares a **procedure**: its public contract, the agent's own contract and how one becomes the other, the seed the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** — on Bedrock AgentCore Runtime, or locally in Docker — and returns a typed, validated outcome to whatever called it.
 
 It is not a pure agent wrapper. The contract a workflow depends on and the contract an agent fills in usually differ, and marshalling between them type-safely is a core concern rather than a consumer's afterthought.
 
@@ -16,15 +16,15 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 
 ## In scope
 
-- Declaring procedures: contracts, marshalling, context composition, SDK configuration, phase side effects
+- Declaring procedures: contracts, marshalling, seed composition, SDK configuration, side effects before and after the run
 - Running a procedure to a settled, validated, typed outcome — the kernel for an agent run, consumer code for a procedure without one
-- Opt-in middleware for concerns more than one consumer shares
+- Optional helpers for concerns more than one consumer shares
 - Asynchronous invocation by any caller: start, await, attach on retry, cancel — with a Temporal activity factory over it, first-class but not required
 - A2A as the contract between the caller and the runtime
 - Task state that outlives the container: idempotency, loss detection, the outcome
 - Hosting on Bedrock AgentCore Runtime, and the same path locally in Docker
 - A base image consumers extend, and a published bundle that reaches the next task without an image rebuild
-- Delivery as an Nx plugin on `@aws/nx-plugin` conventions: generators for an agents project, an agent, a procedure and a caller's client; CDK constructs for the runtime, its stores, its bundle and the caller's least-privilege access; the bundle publish command
+- Delivery on `@aws/nx-plugin` conventions: CDK constructs for an agent, its stores, its bundle and a caller's least-privilege access, and the bundle publish command; Nx generators once the first project shows what they should write
 - Recording what each task saw, did and produced
 
 ## Out of scope
@@ -37,8 +37,8 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 - Rate limiting, queueing or durability for the tools an agent calls — a consumer-hosted MCP server owns its limits and whatever backs them, and the agent knows nothing about what is behind the tool
 - Agent discovery and agent-to-agent orchestration; the agent card is generated and otherwise unused
 - Model providers other than Anthropic
-- Building agent run kinds other than the Claude Agent SDK; the run-kind boundary keeps one possible
-- Cloud infrastructure beyond what a runtime needs — accounts, networking, secrets and pipelines are the consumer's
+- Supporting agent frameworks other than the Claude Agent SDK; a procedure's run step is a function, so one would need no new concept here
+- Cloud infrastructure beyond what an agent needs — accounts, networking, secret storage and pipelines are the consumer's. Keeping a credential out of anything AgentForge emits is not (T35)
 - Multi-tenancy — one operator per deployment
 - Public use — no API stability promise beyond what the consumers need
 

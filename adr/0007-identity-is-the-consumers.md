@@ -8,7 +8,7 @@ decision-makers: Jeremy Jonas
 
 ## Context and Problem Statement
 
-Four identifiers meet in one task: AgentCore's `runtimeSessionId`, A2A's `contextId` and `taskId`, and the Claude Agent SDK's `sessionId` with its working directory. They come from three systems and isolate or continue different things. A harness can define how they relate — one runtime session per context, one task per Claude session — and that would make a tidy model. Should it?
+Four identifiers meet in one task: AgentCore's `runtimeSessionId`, A2A's `contextId`, and the Claude Agent SDK's `sessionId` and working directory. They come from three systems and isolate or continue different things. A harness can define how they relate — one runtime session per context, one task per Claude session — and that would make a tidy model. Should it?
 
 ## Considered Options
 

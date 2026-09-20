@@ -9,7 +9,9 @@ From [AgentCore Runtime quotas](https://docs.aws.amazon.com/bedrock-agentcore/la
 | Limit | Value | Adjustable |
 |---|---|---|
 | Synchronous request timeout | 15 minutes | No |
-| `InvokeAgentRuntime` timeout parameter | 1–3,600 s, default 300 | — |
+| `InvokeAgentRuntimeCommand` timeout parameter | 1–3,600 s, default 300 | — |
+| `InvokeAgentRuntimeCommand` command size | 1 byte – 64 KB | No |
+| Hardware per session | 2 vCPU / 8 GB | No |
 | Streaming connection duration | 60 minutes | No |
 | Asynchronous job duration | 8 hours | No |
 | Idle session timeout | 15 minutes | Yes — `idleRuntimeSessionTimeout` |
@@ -47,6 +49,17 @@ From [deploying A2A servers](https://docs.aws.amazon.com/bedrock-agentcore/lates
 - The documentation's examples show `protocolVersion` 0.3.0 and the `message/send` method name.
 - Errors: unlike A2A's convention of HTTP 200, AgentCore returns the real HTTP status with a JSON-RPC error body — `-32051` not found (404), `-32052` validation (400), `-32053` throttling (429), `-32054` conflict (409, including the retryable "Session operation in progress, please retry", which A2A clients do not retry on their own), `-32055` runtime client error (424), `-32603` otherwise (500). `AccessDeniedException` is a plain 403.
 
+## Filesystem and session storage
+
+From [filesystem configurations](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-filesystem-configurations.html):
+
+- **A mounted path is available only at the time of invocation, not during initialization.** Anything the container must serve outside an invocation — the agent card among them — cannot be read from a mount.
+- Mount paths must be under `/mnt/` with exactly one subdirectory level.
+- Each mount has a 30-second timeout, all configured filesystems mount in parallel, and **a single failure fails the whole invocation** with HTTP 424 — the same status a container kill produces.
+- S3 Files and EFS both require `networkMode: VPC`, with subnets in the mount targets' availability zones and security groups allowing TCP 2049. The container then needs NAT or endpoints for everything else it reaches, including `api.anthropic.com`, which has no VPC endpoint.
+- S3 Files and EFS mounts are **shared** across sessions and agents that use the same access point; write access is granted by the execution role, and the documentation allows a read-only access point.
+- **Session storage is Preview.** It is per-session rather than shared, capped at 1 GB and roughly 50 MB of metadata, reset after 14 idle days, and **wiped on a runtime version update** — a deploy destroys it. No hard links, no extended attributes.
+
 ## Stopping a session
 
 [`StopRuntimeSession`](https://docs.aws.amazon.com/bedrock-agentcore/latest/APIReference/API_StopRuntimeSession.html) stops a running session. Termination timing, signal handling, and what survives on a mount are not documented — `DESIGN_OPTIONS.md` §C.
@@ -55,10 +68,10 @@ From [deploying A2A servers](https://docs.aws.amazon.com/bedrock-agentcore/lates
 
 Package `bedrock-agentcore`, repository `aws/bedrock-agentcore-sdk-typescript`, AWS-maintained. From its [reference](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-typescript-sdk-reference.html) and the runtime module's own documentation:
 
-- `serveA2A({ executor, agentCard?, pingHandler?, taskStore?, contextBuilder?, logger?, host? })` — hosts an `@a2a-js/sdk` `AgentExecutor` on the A2A contract: JSON-RPC at `POST /`, the card at `/.well-known/agent-card.json`, `/ping`. Binds `A2A_PORT`, default 9000, deliberately ignoring `PORT`. Active tasks switch `/ping` to `HealthyBusy` automatically. `@a2a-js/sdk` and `express` are optional peer dependencies.
+- `serveA2A({ executor, agentCard?, pingHandler?, taskStore?, contextBuilder?, logger?, host? })` — **merged 2026-09-18 ([PR #229](https://github.com/aws/bedrock-agentcore-sdk-typescript/pull/229)) and not yet in the published SDK reference, which documents only `BedrockAgentCoreApp`, `RuntimeClient`, Identity and CodeInterpreter.** Hosts an `@a2a-js/sdk` `AgentExecutor` on the A2A contract: JSON-RPC at `POST /`, the card at `/.well-known/agent-card.json`, `/ping`. Binds `A2A_PORT`, default 9000, deliberately ignoring `PORT`. Active tasks switch `/ping` to `HealthyBusy` automatically. `@a2a-js/sdk` and `express` are optional peer dependencies.
 - `BedrockAgentCoreApp({ invocationHandler: { requestSchema, process } })` serves the HTTP protocol on 8080 instead — Fastify, JSON and SSE, `context.sessionId`.
 - `addAsyncTask(name, metadata)` / `completeAsyncTask(id)` / `asyncTask(fn)` drive busy status; `getCurrentPingStatus()` resolves Forced > custom handler > automatic.
-- Invocation from a worker uses `InvokeAgentRuntimeCommand` from `@aws-sdk/client-bedrock-agentcore`.
+- **`InvokeAgentRuntime` and `InvokeAgentRuntimeCommand` are different APIs.** The first carries an invocation to the agent and has a fixed 15-minute request timeout with no timeout parameter. The second is the data-plane API for deterministic shell command execution in the same session, and it is the one with the 1–3,600 s timeout and the 64 KB command cap. A caller invoking a procedure uses `InvokeAgentRuntime`.
 
 ## Asynchronous calling patterns
 

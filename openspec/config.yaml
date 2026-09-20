@@ -5,8 +5,9 @@ context: |
   Tech stack: TypeScript, Bun, Nx grouped layout on @aws/nx-plugin, Vitest, Zod, AWS CDK.
   Four layers with a contract at every boundary (docs/ARCHITECTURE.md §1):
   1 runtime (A2A server and client, TaskExecutor, durable task store, deployment constructs),
-  2 harness (procedure model, run kinds, kernel, middleware), 3 consumer, 4 Claude Agent SDK.
+  2 harness (procedures, the agent() helper and kernel, optional helpers), 3 consumer, 4 Claude Agent SDK.
   Layers 1 and 2 never import each other; they share only the task protocol library.
+  Only two crossings are protocols: the A2A wire, and the pipe to a task process.
   A2A is the contract between a caller and the runtime; the client is caller-agnostic and a
   Temporal activity factory sits over it. A task runs in its own process, speaking JSON-RPC
   over a pipe; task state is durable outside the microVM, indexed by a caller-supplied
@@ -22,7 +23,7 @@ rules:
   proposal:
     - Trace to the consumer contract ids it serves (H#, T#), and name those it leaves unmet
     - Name the [OPEN §x] sections it depends on; never resolve one silently
-    - Name the boundary contracts it changes (B1-B5), and why the change belongs there
+    - Name the protocol or interface it changes, and why the change belongs there
     - Include a "Non-goals" section
     - No consumer domain vocabulary
   design:

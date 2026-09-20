@@ -20,9 +20,9 @@ A workflow calls a procedure by name with an input and gets an output back. Both
 
 Chosen option: **typed data in two halves**, because the call is asynchronous — the outcome is read from durable state rather than returned by the call — which leaves an RPC framework's request-response typing with nothing to type, while a contract imported directly gives the worker exactly the types it needs.
 
-* The **contract** is the name, outer input and output schemas, and a hash; it depends on Zod alone, so importing it never pulls the Agent SDK into a worker bundle
+* The **contract** is the name, outer input and output schemas, and a hash; it depends on Zod alone, so importing it never pulls the Agent SDK into a caller's build
 * The **implementation** registers against that contract in the container
-* **Outer and agent contracts are separate**, with a marshal step between them: computed fields and identifiers are added there, never asked of the model (H8, T18)
+* **Outer and agent contracts are separate**, with a marshal step between them: computed fields and identifiers are added there, never asked of the model (T18, and both consumers' declarations)
 * The **contract hash** travels in the envelope; a container that does not implement it refuses the task before any work (H3, T3)
 * Strict parsing at every boundary — an undeclared field is rejected, never dropped (T16)
 
@@ -30,4 +30,4 @@ Chosen option: **typed data in two halves**, because the call is asynchronous �
 
 * Good, because nothing sits between the wire and the procedure, and there is no client to generate
 * Good, because version skew fails loudly at the start of a task instead of midway
-* Bad, because the contract and implementation split is a layout rule to hold; importing an implementation into a worker would pull the SDK into its bundle
+* Bad, because the contract and implementation split is a layout rule to hold; importing an implementation into a caller would pull the SDK into its build

@@ -16,9 +16,9 @@ Milestones deliver capability a consumer can use. Each is proposed through OpenS
 What StrategyFoundry's M0 requires, running locally in Docker.
 
 - Task protocol: envelope, identifiers, events, outcome
-- Procedure model: contracts, run kinds, phases, contribution merging with its check, marshalling
+- Procedure model: contracts, the three steps, the `agent()` helper, additive option contributions, marshalling
 - Procedure authoring settled against StrategyFoundry's real procedures (§N)
-- Kernel, and the `structuredOutput` middleware
+- Kernel, with structured output validated inside it rather than as an option
 - Runtime: A2A server, TaskExecutor, a process per task, filesystem task store, generated agent card
 - Caller-agnostic client, and the Temporal activity factory over it
 - Base image, and a bundle mounted from a directory
@@ -29,8 +29,8 @@ What StrategyFoundry's M0 requires, running locally in Docker.
 ## A2 — AgentCore
 
 - AgentCore spikes: busy-session reachability and concurrency (§B), cancellation (§C), task store and lease (§A), bundle mount and reload (§D)
-- A2A client over `InvokeAgentRuntime`; durable task store; idempotency and loss detection; cancellation
-- CDK constructs, the bundle publish command, and the generators for an agents project and a nested agent (§K)
+- A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency and loss detection; cancellation; admission limits
+- CDK constructs and the bundle publish command; the mounted bundle, read-only and content-addressed (§D, §K)
 - Failure-injection tests for the layer-1 failures, on AgentCore
 
 **Exit:** the same workflow runs against a deployed runtime, unchanged, and survives a container kill.
@@ -38,5 +38,5 @@ What StrategyFoundry's M0 requires, running locally in Docker.
 ## A3 — TrendBot
 
 - TrendBot's contract confirmed in a TrendBot session
-- The mechanical run kind (§J), guardrail middleware, the phases TrendBot's git lifecycle needs
+- Procedures without an agent (§J), the guardrail helpers, and the before and after steps TrendBot's git lifecycle needs
 - The requirements marked **migration** met; TrendBot moves off the first AgentForge

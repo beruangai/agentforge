@@ -24,6 +24,16 @@ From [Persist sessions to external storage](https://code.claude.com/docs/en/agen
 - Conflicts: `persistSession: false` and file checkpointing both throw at startup when combined with a store.
 - Reference adapters for S3, Redis and Postgres ship in the SDK repositories, with a conformance suite. Retention is the adapter's responsibility; the SDK never deletes.
 
+## Structured output
+
+Established against the current SDK, superseding the first AgentForge's workarounds:
+
+- `outputFormat: { type: 'json_schema', schema }` is native. The SDK validates and re-prompts on its own; exhausting its retries surfaces as `error_max_structured_output_retries`.
+- Schemas must target **draft-07** — `z.toJSONSchema(schema, { target: 'draft-7' })`. `format` is accepted as an annotation.
+- An invalid schema now fails at startup rather than being ignored (since CLI v2.1.205).
+
+What remains for AgentForge is the outer validation and the typed `output_invalid` outcome, not a pile of conversion workarounds. Whether an in-turn `PreToolUse` rejection still adds anything over native re-prompting is `DESIGN_OPTIONS.md` §E — and if it does, the hook's matcher names an undocumented internal tool, so it must be asserted at startup rather than failing quietly.
+
 ## What this means here
 
 - The working directory is not cosmetic: it keys the project, the transcript location, and the store lookup. A procedure that changes it changes where its session lives (H15).

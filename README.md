@@ -2,7 +2,7 @@
 
 A procedure wrapper for the Claude Agent SDK, shared across projects.
 
-A consumer declares a **procedure** — its public contract, the agent's own contract and how one becomes the other, the context the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. Consumers own what their agents do and how they isolate them; AgentForge owns how they run.
+A consumer declares a **procedure** — its public contract, the agent's own contract and how one becomes the other, the seed the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. Consumers own what their agents do and how they isolate them; AgentForge owns how they run.
 
 It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
 
@@ -27,11 +27,11 @@ Built for its consumers, StrategyFoundry and TrendBot, not for public use.
 ## Shape
 
 ```
-caller (a Temporal activity, or anything) ──A2A──► agent runtime (server, executor, durable task state)
+caller (a Temporal activity, or anything) ──A2A──► agent (gateway, executor, durable task state)
                                                       └─ a process per task ──► harness ──► Claude Agent SDK
 ```
 
-Four layers: **runtime** owns the wire and the task's execution host; **harness** owns the procedure model and one agent run; the **consumer** owns its procedures and its identifiers; the **SDK** owns the agent loop. Layers 1 and 2 never import each other.
+Four layers: **runtime** owns the wire and the task's execution host; **harness** owns procedures and the agent run; the **consumer** owns its procedures and its identifiers; the **SDK** owns the agent loop. Layers 1 and 2 never import each other, and only two crossings are protocols — the A2A wire, and the pipe to a task process.
 
 ## Consumers
 

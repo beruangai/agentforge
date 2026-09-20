@@ -2,31 +2,41 @@
 
 Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore's, or A2A's term first, then a term here with the same intent, and only then a new one. A term names a thing or a state, not a command. No consumer's vocabulary enters — a StrategyFoundry *directive* and a TrendBot *directive* are both a **procedure**; a *vault* is a working directory.
 
+## Layers
+
+**Runtime** — Layer 1: the wire, the gateway, the executor, task state, and the client. Distinct from a **runtime session** and from a deployed **agent**.
+
+**Harness** — Layer 2: procedures, the agent run, the outcome. Knows nothing of the wire or the container.
+
+**Caller** — Whatever starts a task through the client. A Temporal activity in both consumers, through the activity factory, but the runtime never knows that.
+
+**Client** — The caller-agnostic API over the wire: `start`, `await`, `cancel`, typed by the contract the caller imports.
+
+**Activity factory** — The Temporal adapter over the client: heartbeats while awaiting, and maps cancellation and outcomes to activity terms. First-class, never required.
+
 ## Procedures
 
-**Procedure** — The unit a consumer declares and AgentForge runs: a contract, an implementation, a run kind, and the phases between them.
+**Procedure** — What a consumer declares and AgentForge runs: a contract and an implementation.
 
-**Contract** — A procedure's name, outer input and output schemas, and hash. Depends on Zod alone, so a worker imports it without the implementation.
+**Contract** — A procedure's name, outer input and output schemas, and hash. Zod alone, so a caller imports it without the implementation.
 
-**Implementation** — The half of a procedure that runs in the container, registered against its contract.
+**Implementation** — What runs in the container: an optional *before* step, a required *run* step, an optional *after* step.
 
-**Contract hash** — Identifies the contract a task was started against; a container that does not implement it refuses the task.
+**Contract hash** — Identifies the contract a task was started against; a container whose bundle does not implement it refuses the task.
 
 **Outer contract** — What a procedure's caller sends and receives.
 
-**Agent contract** — What the agent itself fills in, given to the SDK as its output schema. Often differs from the outer output.
+**Agent contract** — What the agent fills in, given to the SDK as its output schema. Often differs from the outer output; an ordinary function maps one to the other.
 
-**Marshal** — The phase turning agent output, with the outer input and run metadata, into outer output.
+**Step** — One part of an implementation: before, run, after. A function, not a framework phase.
 
-**Run kind** — What a procedure's run phase does: *Claude*, the kernel running one SDK query; or *mechanical*, consumer code. Nothing above the procedure depends on which.
+**Agent run** — A run step written with the `agent()` helper: seed, SDK options, agent contract, and the map to outer output.
 
-**Phase** — One step of a task, receiving the defaults so far and returning what to keep, extend or override. Prepare, run and finalize belong to every run kind; compose, configure and marshal to the Claude kind.
+**Kernel** — What that helper runs: one SDK query to a settled, validated, typed outcome.
 
-**Seed** — The messages a Claude session starts from, produced by the compose phase.
+**Seed** — The messages a Claude session starts from.
 
-**Middleware** — A reusable bundle of phase contributions. Opt-in; never wired by default.
-
-**Kernel** — The Claude run kind's core: one SDK query to a settled, typed outcome.
+**Helper** — A reusable function a procedure calls — guardrails, telemetry. Optional; nothing is wired by default. Contributions to a composite option are additive.
 
 ## Tasks
 
@@ -34,49 +44,55 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Envelope** — What starts a task, carried as an A2A data part: procedure name, contract hash, outer input, idempotency key, identifiers, correlation ids.
 
-**Idempotency key** — Supplied by the caller and stable across its retries of the same logical work; the server indexes tasks by it, so starting again with it attaches rather than runs again ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)). The Temporal activity factory derives it from workflow and activity identity.
+**Idempotency key** — Supplied by the caller and stable across its retries; the store indexes tasks by it, so starting again with it attaches rather than runs again ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
+
+**Continuity key** — An opaque value in the envelope under which only one task may be live at a time. A consumer sets it to whatever must not be written twice at once, usually the Claude session id; layer 1 never interprets it.
 
 **Attempt** — One task under an idempotency key. A new attempt starts only after the previous task failed, was cancelled, or was lost.
 
 **Retention** — How long task state is kept for a later start with the same idempotency key to attach to.
 
-**TaskExecutor** — The runtime server's implementation of A2A's `AgentExecutor`. One per container, agnostic of run kind: validates the envelope, applies idempotency and the session lock, spawns and signals the task process, renews the lease, and is the only writer of task state.
+**Gateway** — The runtime server's request handler, in front of the A2A SDK's: validates the envelope, applies idempotency, admission and the contract-hash check, and either returns a running task or admits a new one.
 
-**Task process** — The process a TaskExecutor spawns for one task, in its own process group, where the consumer's entrypoint runs the procedure through the harness.
+**Executor** — What spawns and supervises a task process, renews the lease, and publishes events and the outcome. Agnostic of what the task runs.
 
-**Task protocol** — The contract between TaskExecutor and task process: the envelope, events, and the outcome. Shared by layers 1 and 2; depends on Zod alone.
+**Task process** — The process spawned for one task, in its own process group, where the consumer's entrypoint runs the procedure through the harness.
 
-**Task store** — Durable state outside the microVM: the A2A task store, plus the index by idempotency key, the lease, the container instance, and the outcome payload.
+**Task protocol** — The contract between executor and task process: the envelope, events, and the outcome. Shared by layers 1 and 2; Zod alone.
 
-**Lease** — A timestamp the TaskExecutor renews while a task process lives. Stale on an unfinished task means the task is lost.
+**Task store** — Durable state outside the microVM: A2A's task store, extended with the idempotency index, the lease, and the outcome payload.
 
-**Outcome** — A task's typed result: success with the outer output, or a failure carrying its cause. Generic causes apply to every run kind; a run kind adds its own.
+**Lease** — A timestamp the executor renews while a task process lives. Stale on an unfinished task means the task is lost.
 
-**Lost** — The outcome of a task whose container died, from a stale lease or from a later container in the same runtime session.
+**Fencing token** — The lease generation, carried in the task's metadata, that a store write must match; it keeps a stale holder from overwriting a newer one.
 
-## Runtime and deployment
+**Admission limit** — The most tasks an agent runs at once in one container. A task beyond it is rejected, never queued.
 
-**Agent** — A deployed AgentCore runtime: an image, the bundle it serves, its agent card, and its stores. The strongest isolation available, and the unit a consumer deploys.
+**Outcome** — A task's typed result: success with the outer output, or a failure carrying its cause.
+
+**Lost** — The outcome of a task whose container died, derived from a stale lease at read time. Its side effects may have happened.
+
+## Agents and delivery
+
+**Agent** (deployed) — One AgentCore runtime: an image, the bundle it serves, its agent card, and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
 
 **Agents project** — One project holding an image and the agent definitions that share it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
 
-**Bundle** — The published procedures and harness a runtime serves, loaded by each task process at its start.
+**Bundle** — The published procedures and harness an agent serves, loaded by each task process at its start. Baked into the image by default; mountable where a consumer wants the faster loop.
+
+**Agent card** — The A2A discovery document, generated at publish time from the procedures a bundle registers.
 
 **Base image** — What AgentForge ships for consumers to extend: Bun, the Claude CLI, and the runtime server.
 
-**Client** — The caller-agnostic API over A2A: start, await, cancel, typed by the procedure contract the caller imports.
-
-**Activity factory** — The Temporal adapter over the client: heartbeats while awaiting, maps cancellation and outcomes to activity terms. First-class, never required.
-
 ## Identity
 
-**Runtime session** — AgentCore's `runtimeSessionId`: one microVM with its own compute, memory and filesystem. At most one container per id.
+**Runtime session** — AgentCore's `runtimeSessionId`: one microVM with its own compute, memory and filesystem. At most one container at a time per id.
 
-**Context** — A2A's `contextId`: a conversation, as a group of related tasks. Always supplied by the client, uuid7 when the caller gives none; the consumer chooses what it groups, and usually aligns it with the Claude session. Never the idempotency key ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
+**Context** — A2A's `contextId`: a conversation, as a group of related tasks. Always supplied by the client, uuid7 when the caller gives none; the consumer chooses what it groups. Never the idempotency key.
 
 **Session** — The Claude Agent SDK's: one transcript, started, resumed or forked by id. One live writer at a time.
 
-**Working directory** — Where a procedure's run happens; it decides the Claude project that namespaces the transcript and memory.
+**Working directory** — Where a run happens; it decides the Claude project that namespaces the transcript and memory.
 
 How these relate is the consumer's choice ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
 

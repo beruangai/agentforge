@@ -12,9 +12,11 @@ Sections are marked **[OPEN §x]** at their points of use. Do not build against 
 
 The store must outlive the microVM, serve the A2A task store, index tasks by idempotency key, and hold a lease ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)).
 
-- **A1 — DynamoDB for state, S3 for payloads.** Conditional writes give attach-or-start atomically; lease renewal is a cheap update; payloads escape the 400 KB item limit. Leaning.
-- **A2 — S3 alone**, through the API or a Files mount. One service; read-after-write and listing semantics to verify for the lease.
-- **A3 — The consumer's database.** Rejected unless a consumer requires it: it would put layer 1's state behind a consumer's schema.
+**Its interface is not open and is settled in the first slice**, because the local filesystem store and the cloud store must implement the same thing: a conditional insert for the idempotency index, and a fenced write that rejects a stale lease generation. A2A's `TaskStore.save` overwrites unconditionally, so this is ours to add. What remains open is only the backing:
+
+- **DynamoDB for state, S3 for payloads.** Conditional writes give attach-or-start atomically; lease renewal is a cheap update; payloads escape the 400 KB item limit. Leaning.
+- **S3 alone**, through the API or a Files mount. One service; read-after-write and listing semantics to verify for the lease.
+- **The consumer's database.** Rejected unless a consumer requires it: it would put layer 1's state behind a consumer's schema.
 
 **Spike:** write and renew a lease from inside a microVM; read it from outside; measure visibility latency and the cost of renewal at the interval loss detection needs.
 
@@ -29,7 +31,9 @@ Everything a caller does after `SendMessage` depends on it — `GetTask`, `Cance
 ## §C — Cancellation *(OPEN)*
 
 - **C1 — `CancelTask`**, which the TaskExecutor turns into a graceful stop and then a process-group kill. Keeps the container and its other tasks alive. Depends on §B.
-- **C2 — `StopRuntimeSession`**, which terminates the microVM. Blunt: it takes every other task in the session with it.
+- **C2 — `StopRuntimeSession`**, which terminates the microVM. Blunt: it takes every other task in the session with it, and whether the container gets a graceful signal first is undocumented.
+
+Three cases the mechanism must cover whichever is chosen: a cancel arriving **before the task process exists**; a cancel from a caller that **attached to another caller's task**, which ends work nobody else asked to stop; and a cancel reaching a **freshly provisioned container** whose A2A SDK would otherwise mark the task cancelled without consulting the executor that owns it.
 
 Leaning C1, with C2 as the fallback when the container cannot be reached. **Spike:** cancel mid-run both ways; measure time to termination; whether the container receives `SIGTERM` under C2 and how long before the kill; whether telemetry flushes and an outcome is recorded inside the grace period; whether a Claude session left mid-turn resumes cleanly. Locally `docker stop` stands in for C2.
 
@@ -53,10 +57,12 @@ What the first AgentForge learned about settling a run may not hold. To establis
 
 A session must be resumable in another container (H14), and each runtime session's state must be private and survive its container (T31).
 
-- **F1 — The SDK's `SessionStore` adapter.** Transcripts mirror to S3 or a database; resume loads from the store into a temporary config directory. Keyed by the working directory, so resume needs a matching one. Mirror writes are best-effort with a `mirror_error` message on failure, and a run resumed from the store leaves no local copy.
+- **F1 — The SDK's `SessionStore` adapter.** *Leaning, on the evidence below.* Transcripts mirror to S3 or a database; resume loads from the store into a temporary config directory. Keyed by the working directory, so resume needs a matching one. Mirror writes are best-effort with a `mirror_error` message on failure, and a run resumed from the store leaves no local copy.
 - **F2 — A persistent mount for `~/.claude` and the working directory.** What StrategyFoundry assumed; no SDK dependency, but state is tied to what is mounted where.
 
-They differ in what the base image needs, what the CDK constructs provision, and what a lost mirror costs. **Spike:** both paths, resuming a session in a second container, including a subagent transcript, and a forced mirror failure.
+F2 is worse than it looks: a mount path must be `/mnt/<one level>`, so `CLAUDE_CONFIG_DIR` moves there and takes `.credentials.json` with it onto shared storage; a shared S3 Files or EFS mount is visible to every session using that access point; and session storage — the per-session alternative — is Preview, capped at 1 GB, and **wiped on a runtime version update**, so a deploy would destroy every transcript and working copy.
+
+**Spike:** both paths, resuming a session in a second container, including a subagent transcript, and a forced mirror failure.
 
 ## §G — Health and per-task cost *(OPEN)*
 
@@ -71,20 +77,33 @@ The caller supplies the key and the two edges are settled ([ADR 0009](../adr/000
 - **A caller-minted task id** and **`contextId` as the key** were both considered and rejected ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)): the first moves a multi-probe look-back onto the caller, where each probe is an AgentCore invocation; the second collides with the Claude session, which is what a context naturally names.
 - Powertools idempotency was considered and kept as a reference only: outside Lambda an in-progress record stays locked until expiry, there is no lease renewal, and it caches the wrapped function's return value rather than an outcome ([research](research/a2a.md)).
 
-## §I — A2A and AgentCore details to verify *(OPEN)*
+## §I — How the server is assembled *(OPEN — blocks the first slice)*
 
-- Whether to build the server on the AgentCore TypeScript SDK's `serveA2A`, which wraps an `@a2a-js/sdk` executor and already serves the card, `/ping` and busy tracking, or to assemble the same from `@a2a-js/sdk` directly
-- Whether `DefaultRequestHandler` honors `returnImmediately` as the specification describes
+This is not a detail to verify later: it decides the shape of the server and the store, and the first local slice cannot be written around it.
+
+- **The request handler.** Idempotency, admission and the contract-hash check must run before a task id is minted, which the SDK's `DefaultRequestHandler` does not allow. The shape is a handler implementing the public `A2ARequestHandler` interface and delegating to the SDK's once it has decided the request is a new task. Confirm that wrapping works, and that a `submitted` event published synchronously makes `returnImmediately` resolve.
+- Whether to build on the AgentCore TypeScript SDK's `serveA2A` — which serves the card, `/ping` and busy tracking, but was merged four days before this was written and is not in the published reference — or to assemble the same from `@a2a-js/sdk` and an HTTP server directly
+- `returnImmediately`: the specification says a send MUST return once the task is created; the SDK returns after the *first task event* ([research](research/a2a.md)). Open is whether that is soon enough, and whether the executor must publish a `submitted` event synchronously to make it so
 - Protocol version: AgentCore's documentation shows 0.3.0 and `message/send`; the SDK targets 1.0 with a 0.3 compatibility layer
 - Error handling: AgentCore returns real HTTP statuses (409, 424) with a JSON-RPC error body where A2A expects 200, and its retryable 409 is not retried by A2A clients
 - Authentication: whether the A2A client can send SigV4-signed requests under the caller's least-privilege role (T43), or whether the call goes through `InvokeAgentRuntimeCommand` carrying the JSON-RPC payload
 - Identifiers: the SDK mints task and context ids with uuid4 and exposes no hook, but uses a client-supplied value when one is present. The client therefore always supplies `contextId` (uuid7), and treats the task id as opaque
-- What `DefaultRequestHandler` does with a client-supplied task id naming no stored task — create it, or error. The decision does not rest on this ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)), but a clear answer closes the question
 - Whether a client-supplied `contextId` survives AgentCore's pass-through unchanged and comes back on every task
+- The client: `JsonRpcTransport` takes a `fetchImpl`, so SigV4 signing and the session header are straightforward, but the card resolver cannot reach a card served through `InvokeAgentRuntime` — the client is constructed with an explicit endpoint and a known card
+- Whether `GetAgentCard` validates the card it returns, since AgentCore's examples show protocol 0.3.0 while the SDK emits 1.0
+
+## §O — Credentials in the container *(OPEN)*
+
+The operator's subscription token is long-lived and subscription-wide; the container needs it, the agent's own shell can read anything in its process environment, and an expired one must fail loudly rather than as a generic error (T35, T44).
+
+- How the token reaches the SDK without sitting in the task process's environment — a credential helper the SDK re-runs is the leading shape
+- How expiry surfaces as `credential_expired` rather than being classified as a transient provider failure
+- What a compromised or prompt-injected procedure can reach from inside the microVM, and what is therefore not defensible by scrubbing an environment
+- Rotation, and whether a runtime can hold a credential scoped to itself
 
 ## §J — Procedures without an agent *(OPEN)*
 
-TrendBot requires them (T4): vault reads, corpus scans, composers, and measurement runs of up to an hour, in the agent container because it owns the working copy, sharing a procedure's contract, invocation, failure and phases minus the agent run. The mechanical run kind is the shape (`ARCHITECTURE.md` §3); open is how much of the Claude kind's machinery it reuses, and the operator's constraint that the agent path gives up nothing to it. TrendBot may instead move these to its own API layer, which would be a revision to T4.
+TrendBot requires them (T4): working-copy reads, corpus scans, composers, and measurement runs of up to an hour, in the agent container because it owns that working copy, sharing a procedure's contract, invocation, failure and phases minus the agent run. The mechanical run kind is the shape (`ARCHITECTURE.md` §3); open is how much of the Claude kind's machinery it reuses, and the operator's constraint that the agent path gives up nothing to it. TrendBot may instead move these to its own API layer, which would be a revision to T4.
 
 ## §K — The plugin and infrastructure surface *(OPEN)*
 
@@ -104,6 +123,10 @@ Read from StrategyFoundry's H1–H25 and TrendBot's draft T1–T44 on 2026-09-19
 - **Timeouts (H4, T2).** StrategyFoundry declares a run's timeout with the procedure and requires it enforced; TrendBot sets timeout, retry and heartbeat where it registers the activity. The run's time budget and the activity's Temporal timeouts are different things; name both.
 - **Failure granularity (H17, T20, T21).** StrategyFoundry needs typed causes so workflows wait on a usage limit; TrendBot maps every error to non-retryable today but distinguishes lost from errored. The outcome taxonomy serves both.
 - **Hold for review (T22).** TrendBot holds a failed attempt for the operator. A consumer side effect, or middleware? TrendBot decides whether it asks.
+- **Guardrail semantics (T8–T11).** TrendBot's write-scope and termination rules are stated as harness requirements, including a filename-date policy that is TrendBot's own. AgentForge's obligation is that hooks a procedure supplies reach the SDK and compose without loss (H5, T7); the semantics may belong in a TrendBot package that AgentForge merely carries.
+- **Session identity as mechanism (T29, T30).** Deterministic mapping of a non-canonical name and normalization of a raw runtime session key are derivations TrendBot can do before it calls. TrendBot's own "deliberately not required" list disclaims the normalized format while T30 requires the normalization.
+- **A domain-negative result as success (T19).** The outcome taxonomy has no place for "a gate decision that halts, returned as a successful outcome under its own discriminator"; it is the procedure's own output type, not an outcome kind. Confirm that reading.
+- **Secrets (T44).** Scope says accounts, networking and secrets are the consumer's, but T44 requires each runtime to read exactly the secrets it declares, and T35 requires no credential in anything the harness emits. T35 is AgentForge's; T44 straddles (§O).
 - **Side effects committed twice (T26).** "One invocation's side effects never commit twice" cannot be met by AgentForge alone: a container can die after a side effect and before its outcome is recorded. Under the rule that a consumer owns its side effects and their recovery, the clause is TrendBot's. For the operator's review of TrendBot's draft contract.
 
 ## §M — Pausing for a human *(OPEN)*
@@ -112,7 +135,7 @@ Neither consumer requires human-in-the-loop today — TrendBot's T22 is an opera
 
 **The agent never learns how a human was reached.** The trigger is the SDK's own permission interrupt — its permission callback, or a hook that asks — which the harness turns into an A2A pause. The caller waits however it likes; a Temporal workflow waiting on a signal is one way, and nothing below the client knows that is what happened.
 
-The constraint: a task is an OS process, and AgentCore caps a session at 8 hours of lifetime and 15 minutes idle. A pause longer than the session lifetime cannot be held in a live process at any price.
+The constraint: a task is an OS process, and AgentCore caps an asynchronous job at 8 hours, which is not adjustable. The idle timeout and maximum session lifetime are configurable, so they bound a pause only as they are configured — but a pause outliving the job cap cannot be held in a live process at all.
 
 - **M1 — Block in place.** The permission interrupt blocks while `/ping` reports `HealthyBusy`. Closest to asking mid-turn, keeps the turn's context and the pending tool call, bounded by the session lifetime. Costs a held process and a held Claude session for the length of a human's attention.
 - **M2 — Park as a task state.** The task moves to `input-required` or `auth-required` carrying the request and the schema of the expected answer; the run ends at a phase boundary; the answer arrives on a later `message/send` against the same task, which A2A allows because those states are not terminal. Unbounded in time and cheap while waiting; it loses the in-flight tool call, and the procedure resumes through the SDK's own session resume rather than mid-turn.
@@ -124,9 +147,9 @@ Whichever is chosen, four rules from the study hold: the request carries the **s
 
 The contribution rule and its merge check (`ARCHITECTURE.md` §3) hold whatever the authoring style is, so this is a question of developer ergonomics at the layer a consumer touches most — and ergonomics there is a real requirement, not a preference.
 
-- **N1 — Object literal.** What the sketches show. Inspectable without running it; verbose for a procedure with many phases.
+- **N1 — Object literal.** The default reading of the architecture. Inspectable without running it; verbose for a procedure with many phases.
 - **N2 — Chained builder.** `defineProcedure(contract).compose(...).configure(...)`; reads well, infers types through the chain, and can make an invalid composition a compile error.
-- **N3 — A class whose methods are the phases.** Familiar from other harnesses, good discoverability; the risk is that overriding rather than contributing becomes the habit, which the merge check catches but only at run time.
+- **N3 — A class whose methods are the steps.** Familiar from other harnesses, good discoverability; the risk is that overriding rather than contributing becomes the habit, which the merge check catches but only at run time.
 
 Independent of the choice, decide by these: whether a wrong composition fails at compile time; whether the resolved configuration is inspectable without executing the declaration; and whether a reviewer can see everything a procedure contributes without following a chain of inheritance.
 
@@ -138,14 +161,15 @@ Independent of the choice, decide by these: whether a wrong composition fails at
 
 ## Spike plan
 
-The local spikes need only Bun, Docker and the SDK, and come first. The AgentCore spikes run against a throwaway runtime, never a deployment.
+Two questions block the first slice and are decided, not deferred: how the A2A request handler is assembled (§I) and the task store's interface (§A's first paragraph). The local spikes need only Bun, Docker and the SDK; the AgentCore spikes run against a throwaway runtime, never a deployment.
 
 | Spike | Answers | Needs |
 |---|---|---|
 | Kernel settlement | §E | Local |
 | Task-process protocol, cancellation and group kill | §C, §G | Local |
 | Session persistence and cross-container resume | §F | Local, then AgentCore |
-| A2A server assembly and client behavior | §I | Local |
+| A2A server assembly, the wrapping request handler, and client signing | §I | Local |
+| Credential provisioning and expiry surfacing | §O | Local |
 | Busy-session reachability and concurrency | §B | AgentCore |
 | Cancellation on the platform | §C | AgentCore |
 | Task store visibility and lease | §A | AgentCore |

@@ -14,7 +14,9 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0002](0002-a2a-is-the-boundary-contract.md) | A2A is the contract between caller and runtime | proposed |
 | [0003](0003-procedures-are-type-safe-end-to-end.md) | Procedures are type-safe end to end | proposed |
 | [0004](0004-a-process-per-task.md) | A process per task, speaking JSON-RPC over a pipe | proposed |
-| [0005](0005-the-executor-is-agnostic-of-what-a-task-runs.md) | The executor is agnostic of what a task runs | proposed |
+
+Numbers are stable ids; 0005 was dropped when its decision — that the executor is agnostic of what a task runs — became a consequence of 0001 and 0004 rather than a choice.
+
 | [0006](0006-task-state-is-durable-outside-the-session.md) | Task state is durable outside the runtime session | proposed |
 | [0007](0007-identity-is-the-consumers.md) | Identity and isolation are the consumer's | proposed |
 | [0008](0008-procedure-code-is-a-published-bundle.md) | Procedure code is a published bundle, not a baked image | proposed |

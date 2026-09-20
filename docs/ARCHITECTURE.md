@@ -1,314 +1,285 @@
 # Architecture
 
-> **Status: working proposal.** Nothing here is accepted. Every [ADR](../adr/README.md) is `proposed` until implementation settles it and the operator accepts it. Requirements this must meet are the consumers', in [CONSUMERS.md](CONSUMERS.md). Open questions are in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md), marked inline as **[OPEN §x]**; code sketches show shape, not signatures.
+> **Status: working proposal.** Nothing here is accepted. Every [ADR](../adr/README.md) is `proposed` until implementation settles it and the operator accepts it. Requirements this must meet are the consumers', in [CONSUMERS.md](CONSUMERS.md) — themselves unvetted drafts. Open questions are in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md), marked inline as **[OPEN §x]**; code sketches show shape, not signatures.
 
-AgentForge runs a consumer's **procedure** as an asynchronous **task**, in an isolated runtime, and returns a typed outcome to whatever called it. Temporal is the caller both consumers use, and it is supported first-class through an activity factory — but nothing below the client knows a caller exists. This document defines the layers, the contract at each boundary between them, and the transport that carries it. Everything else is a layer's private concern.
+AgentForge runs a consumer's **procedure** as an asynchronous **task**, in an isolated runtime, and returns a typed outcome to whatever called it. Temporal is the caller both consumers use and is supported first-class through an activity factory, but nothing below the client knows a caller exists.
+
+This document defines the layers, what crosses between them, and the two places where that crossing is a protocol rather than a function call.
 
 ---
 
-## 1. Layers and boundaries
+## 1. Layers
 
 ```
   caller — any process; a Temporal activity through the activity factory
         │
-        │  B1  client API, typed by the procedure contract
+        │  client API, typed by the procedure contract
         ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ 1. RUNTIME                                                    │
-│    client  ── B2  A2A JSON-RPC ──►  server + TaskExecutor     │
-│                                       │                       │
-│                             B4  task store (durable)          │
-└───────────────────────────────────────┼───────────────────────┘
-                                        │  B3  task-process protocol
-                                        ▼
+│    client ── A2A JSON-RPC ──► gateway ──► executor            │
+│                                  │           │                │
+│                          task store          │                │
+└──────────────────────────────────────────────┼────────────────┘
+                                               │  task-process protocol
+                                               ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ 3. CONSUMER    task entrypoint — resolves the procedure        │
 │                the only place layers 1 and 2 meet              │
-└───────────────────────────────────────┼───────────────────────┘
-                                        ▼
+└──────────────────────────────────────────────┼────────────────┘
+                                               ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 2. HARNESS     procedure model, run kinds, middleware          │
-└───────────────────────────────────────┼───────────────────────┘
-                                        ▼
+│ 2. HARNESS     procedures, the agent run, the outcome          │
+└──────────────────────────────────────────────┼────────────────┘
+                                               ▼
                          4. Claude Agent SDK — query()
 ```
 
 | Layer | Owns | Knows nothing of |
 |---|---|---|
-| **1. Runtime** | The wire; the TaskExecutor — envelope validation, idempotency, spawning and signalling the task process, the lease, writing task state; `/ping`; the agent card; the caller-agnostic client; the Nx generators, constructs and bundle publishing | Claude, the SDK, run kinds, what a procedure does, who is calling |
-| **2. Harness** | The procedure model — contracts, phases, run kinds, marshalling, middleware; running one Claude query to a settled outcome | A2A, AgentCore, callers, the task store, the container |
-| **3. Consumer** | Its procedures, its context, its identifiers, its side effects and their recovery; which runtimes it deploys and what each serves | How 1 and 2 work internally |
+| **1. Runtime** | The wire; the gateway (envelope, idempotency, admission) and the executor (spawn, signal, lease); task state; `/ping`; the agent card; the client | Claude, the SDK, what a procedure does, who is calling |
+| **2. Harness** | Procedures — contracts, marshalling, side-effect steps; running one Claude query to a settled, typed outcome | A2A, AgentCore, callers, task state, the container |
+| **3. Consumer** | Its procedures, its identifiers, its side effects and their recovery; which agents it deploys and what each serves | How 1 and 2 work internally |
 | **4. SDK** | The agent loop | — |
 
-**Layers 1 and 2 never import each other.** Each is testable alone: the harness runs a procedure against a fixture with no container and no caller; the runtime runs a task whose process is a stub. They share one library, the **task protocol** — the envelope, the B3 messages, the identifiers, and the outcome — which depends on Zod alone.
+**Layers 1 and 2 never import each other.** Each is testable alone: the harness runs a procedure against a fixture with no container and no caller; the runtime runs a task whose process is a stub. They share one library, the **task protocol** — the envelope, the identifiers, the process messages, and the outcome — which depends on Zod alone.
 
-### The five contracts
+**Delivery — the CDK constructs, the bundle publish command, and later the Nx generators — is tooling, not a layer.** It is how a consumer gets a deployed agent (§6).
 
-| | Between | Contract | Transport |
-|---|---|---|---|
-| **B1** | Caller ↔ client | `start` returns the task, whether it attached to one already running, and the stream cursor to resume from — never taken as an input, so a caller cannot supply a stale one; `await` polls or subscribes from there; `cancel`. Input and output types come from the procedure contract the caller imports. Caller-agnostic; the Temporal activity factory adapts it to heartbeats, cancellation scopes and retry policy | In-process function calls |
-| **B2** | Client ↔ runtime server | A2A: `SendMessage` starts a task, `GetTask` reads it, `CancelTask` stops it, `SubscribeToTask` streams it. The envelope is a data part; the outcome is an artifact ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md)) | JSON-RPC 2.0 over `InvokeAgentRuntime`, SigV4; direct HTTP locally |
-| **B3** | TaskExecutor ↔ task process | `run` carrying the envelope, and `cancel`, go in; semantic events — never raw model bytes — and exactly one outcome come out, each event numbered in sequence and capped in size by the producer, with the executor stamping identity and timestamps that a producer cannot set; the exit code is the backstop ([ADR 0004](../adr/0004-a-process-per-task.md)) | JSON-RPC 2.0, one message per line, over a dedicated pipe; `SIGTERM` then `SIGKILL` to the process group |
-| **B4** | Server ↔ task store | A2A `TaskStore` plus an index by idempotency key, a lease, and the outcome payload. One writer: the TaskExecutor ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)) | AWS SDK to the store; filesystem locally |
-| **B5** | Deployment ↔ container | A published **bundle** — procedures and harness — which each task process loads at its start, refusing a contract hash it does not implement ([ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)) | S3 Files mount; baked into the image as the alternative |
+### The two protocols, and three interfaces
+
+Only two crossings are protocols: a contract between separately deployed, separately versioned things. Everything else is an interface inside a layer and gets no ceremony.
+
+| Protocol | Between | Contract |
+|---|---|---|
+| **Wire** | Caller's client ↔ the agent's gateway | A2A JSON-RPC 2.0 over `InvokeAgentRuntime`, SigV4-signed, routed by the session header. `SendMessage` with `returnImmediately` starts or attaches; `GetTask` reads; `CancelTask` stops. The envelope is a data part; the outcome is an artifact ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md)) |
+| **Task process** | Executor ↔ task process | JSON-RPC 2.0, one message per line, over a dedicated pipe. `run` and `cancel` in; semantic events numbered per task, and exactly one outcome, out; the exit code is the backstop. `SIGTERM` then `SIGKILL` to the process group ([ADR 0004](../adr/0004-a-process-per-task.md)) |
+
+| Interface | Inside | Note |
+|---|---|---|
+| Client API | Layer 1 | `start`, `await`, `cancel`, typed by the contract the caller imports. Caller-agnostic; the Temporal activity factory sits over it |
+| Task store | Layer 1 | A2A's `TaskStore`, extended with an index by idempotency key and a fencing token (§4) |
+| Bundle | Deployment | What a task process loads, guarded by the contract hash (§6) |
 
 ---
 
 ## 2. Identity and isolation
 
-Four identifiers, from three systems, each meaning something different. **The consumer decides how they relate; AgentForge carries them, propagates them, records them, and never imposes a mapping.** StrategyFoundry isolating by strategy or by iteration and TrendBot isolating by entity are the same mechanism configured differently, and a consumer may differ procedure by procedure.
+Four identifiers, from three systems. **The consumer decides how they relate; AgentForge carries, propagates and records them, and never imposes a mapping** ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
 
-| Identifier | System | What it isolates or continues | AgentForge's part |
+| Identifier | System | Isolates or continues | AgentForge's part |
 |---|---|---|---|
-| `runtimeSessionId` | AgentCore | One microVM: compute, memory, filesystem. At most one container per id | Routes the call to it; keeps the id stable across attempts |
-| `contextId` | A2A | A conversation: a group of related tasks on the wire | Always supplied by the client, uuid7 when the caller gives none; returned on every task. Consumers usually align it with the Claude session |
-| `sessionId` | Claude Agent SDK | One transcript, started, resumed, or forked | Passes the consumer's choice to the SDK; records which was used |
-| Working directory | Claude Agent SDK | The Claude project, which namespaces the transcript and memory | Sets it per procedure, as the procedure says |
+| `runtimeSessionId` | AgentCore | One microVM: compute, memory, filesystem. At most one container at a time per id **[OPEN §B]** | Routes to it; keeps it stable across attempts |
+| `contextId` | A2A | A conversation: related tasks on the wire | Supplied by the client, uuid7 when the caller gives none; returned on every task |
+| `sessionId` | Claude Agent SDK | One transcript, started, resumed or forked | Passed to the SDK as the procedure says; recorded |
+| Working directory | Claude Agent SDK | The Claude project, which namespaces transcript and memory | Set per procedure |
 
-A fifth identifier, the **idempotency key**, is AgentForge's own and deliberately not one of these: it names one logical execution across its attempts, where a context names a conversation (§4).
+A fifth, the **idempotency key**, is AgentForge's own: it names one logical execution across its attempts, where a context names a conversation (§4).
 
-**The invariants AgentForge does enforce are mechanical, never policy:**
+**The invariants AgentForge enforces are mechanical, and none interprets a consumer's meaning:**
 
-- **One container per runtime session**, which is the platform's property. It makes that container's TaskExecutor the single authority for every live task in the session — no distributed lock is needed for anything inside one.
-- **One writer per Claude session.** A task that would resume a session a live task holds is rejected, loudly. A consumer that wants a branch instead forks the session.
+- **At most one container at a time per runtime session** — the platform's property, not a policy **[OPEN §B]**.
+- **One live task per continuity key.** The envelope may carry an opaque **continuity key**; the gateway refuses a second live task under the same one, loudly. A consumer sets it to whatever must not be written twice at once — in practice the Claude session id, because a transcript has one writer. Layer 1 never interprets it.
 - **One process per task** (§5).
-- **No ceiling of its own.** Concurrent tasks in one runtime session are allowed and never queued behind one another (T27). What concurrent tasks do to a shared working directory is the consumer's concern. What the platform does with concurrent invocations to one session is **[OPEN §B]**.
+- **No queueing.** Concurrent tasks are never serialized behind one another (T27). They are bounded instead: a container has 2 vCPU and 8 GB, and an out-of-memory kill takes the whole session with it, so an agent declares an **admission limit**, and a task beyond it is *rejected* rather than queued (§4).
 
 ---
 
 ## 3. Procedures
 
-A **procedure** is the unit a consumer declares and AgentForge runs: data in code, namespaced by the consumer, not a router or a framework object.
+A **procedure** is what a consumer declares and AgentForge runs.
 
 ### Type-safe end to end
 
-A procedure is declared in two halves, in separate modules ([ADR 0003](../adr/0003-procedures-are-type-safe-end-to-end.md)):
+Two halves, in separate modules ([ADR 0003](../adr/0003-procedures-are-type-safe-end-to-end.md)):
 
-- **Contract** — the name, the outer input and output schemas, and a hash. Depends on Zod alone, so the worker imports it to call the procedure type-safely without pulling in the implementation or the Agent SDK.
-- **Implementation** — everything that runs in the container, registered against that contract.
+- **Contract** — the name, the outer input and output schemas, and a hash. Zod alone, so a caller imports it without the implementation or the Agent SDK.
+- **Implementation** — what runs in the container, registered against that contract.
 
-The **outer contract** is what the caller sends and receives. The **agent contract** is what the agent itself fills in, given to the SDK as its output schema. They differ whenever the outer output carries computed fields the model must not be asked for, identifiers from the input, or a different shape — so a procedure declares both and the **marshal** step between them. Where they are the same, marshalling is the identity.
+The **outer contract** is what the caller sends and receives; the **agent contract** is what the agent fills in, given to the SDK as its output schema. They differ whenever the outer output carries computed fields the model must not be asked for (T18). The step between them is an ordinary function.
 
-The contract hash travels in the envelope. A container that does not implement it refuses the task before spawning anything, so version skew between an independently deployed worker and a container fails loudly rather than as a confusing validation error mid-run (H3, T3).
+The contract hash travels in the envelope. A container whose loaded bundle does not implement it refuses the task before any work (H3, T3).
 
-### Run kinds
+### The implementation
 
-A procedure's **run kind** decides what its run phase does. Composition, not a subclass: nothing above the procedure changes with it ([ADR 0005](../adr/0005-the-executor-is-agnostic-of-what-a-task-runs.md)).
+Three steps, of which only the middle is required:
 
-| Run kind | Run phase | Adds |
+| Step | Does | Examples |
 |---|---|---|
-| **Claude** | The kernel (§6): one SDK query to a settled outcome | Compose, configure, the agent contract, marshal; Claude middleware; Claude failure causes |
-| **Mechanical** | Consumer code, given the input and an abort signal | Nothing — procedures that invoke no agent (T4, **[OPEN §J]**) |
+| **before** | Side effects before the run | Sync a working copy, verify a mount, reconcile after a lost attempt (T33) |
+| **run** | Produces the outer output | Usually an agent run; sometimes plain consumer code (T4) |
+| **after** | Side effects on success and on failure | Commit and push, record, clean up (T33, T34) |
 
-The shared interface is deliberately thin — input and an abort signal in, an outcome out — so the Claude kind gives up nothing: content blocks, hooks, tools, permissions, structured output and settlement live in its own interface. Claude is the only agent run kind built.
+An agent run is written with the harness's `agent()` helper: the seed, the SDK options, the agent contract, and the function from agent output to outer output. The helper runs the kernel — one `query()` to a settled outcome, with the agent's output validated against its contract before anything else sees it. **Not optional and not middleware** (H7, H8, T15).
 
-### Phases
+A procedure that invokes no agent simply does not call the helper. There is no second kind of procedure: the run step is a function either way.
 
-Each phase is a function the procedure may supply, receiving what has been computed so far and returning its **contributions** to it:
-
-| Phase | Run kinds | Decides | Examples |
-|---|---|---|---|
-| **prepare** | All | Side effects before the run | Sync a working copy, verify mounts, reconcile a prior attempt |
-| **compose** | Claude | The seed messages | Fragments, injected memory, the objective, content blocks, cache boundaries |
-| **configure** | Claude | The SDK options | Model, tools, permissions, MCP servers, hooks, working directory, session choice, turn budget, timeout |
-| **run** | All | — (the kernel, or consumer code) | |
-| **marshal** | Claude | Agent output → outer output | Add computed fields, reshape |
-| **finalize** | All | Side effects after the run, on success or failure | Commit and push, record, clean up |
-
-#### Contributions, and the check that they survive
-
-A composite option — hooks, MCP servers, denied tools, allowed paths — is built from **contributions, not values**. Each contributor returns what it adds; the framework concatenates. Replacing one rather than adding to it takes an explicit marker, so it is visible in review and lands in the task's record.
-
-This is what H5 and T8 actually require: several sources combining with nothing dropped. Neither a phase that returns a fresh object nor a class that forgets to call its parent satisfies that by convention, so it is checked rather than trusted:
-
-- every contribution carries its source
-- when the options resolve, the framework asserts each contribution is present in what goes to the SDK
-- one that vanished throws, naming the contributor and the option
-
-**Every option a procedure sets reaches the SDK, or the task is rejected** (H4, T7). Nothing accepted is silently dropped, and nothing contributed is silently lost.
+**Every option a procedure sets reaches the SDK, or the task is rejected** (H4, T7). The options are the SDK's own type rather than a parallel schema, and a test asserts every resolved key reaches `query()` — which is how the first AgentForge's silently-dropped `maxTurns` is prevented. What that cannot prove is that the SDK then *binds* the option; that is **[OPEN §E]**.
 
 ### Side effects are the consumer's
 
-**A consumer owns its side effects and their recovery.** AgentForge runs them at phases and gives every phase the idempotency key, the attempt number, and the **prior attempt's recorded state** — none, failed, cancelled, or lost. *Lost* is the signal that side effects may have happened with no record of them; a consumer whose source of truth is its own state reconciles against it. AgentForge never infers, retries, or compensates a consumer's side effect.
+**A consumer owns its side effects and how to recover when one may have partly happened.** Every step receives the idempotency key, the attempt number, and the prior attempt's recorded state — none, failed, cancelled, or lost. Because the *after* step runs inside the task process before the outcome leaves it, **`lost` always means side effects may have happened**; a consumer whose source of truth is its own state reconciles against it. AgentForge never infers, retries or compensates a consumer's side effect.
 
-### Middleware
+### Reuse
 
-**Middleware** is a reusable bundle of phase contributions, declared by a procedure or by a consumer for a group of them. It runs in declared order, and the procedure's own phase functions run last. Because contributions merge and the merge is checked, ordering cannot cost a guardrail (H5, T8). AgentForge ships a library (§6); none is wired by default. How a procedure is written — object literal, chained builder, or a class whose methods are its phases — is **[OPEN §N]**; the contribution rule holds whichever it is.
+Cross-cutting behavior — guardrail hooks, telemetry, a house style of options — is a function a procedure calls, shipped in a package. Composite options are **additive**: contributions to hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering (H5, T8). AgentForge ships a small library (§7); nothing is wired by default.
 
-```ts
-// Illustrative only.
-const plan = defineProcedure(planContract, {
-  run: claude({
-    agentOutput: PlanDecisionSchema,
-    middleware: [structuredOutput(), writeScope(['iterations/**'])],
-    compose: ({ input }) => [fragment('rnd'), objective(input)],
-    configure: ({ defaults, input }) => ({
-      ...defaults,
-      model: 'opus',
-      maxTurns: 40,
-      cwd: input.workingDirectory,
-      session: { resume: input.sessionId },
-    }),
-    marshal: ({ agentOutput, input }) => ({ ...agentOutput, loopId: input.loopId }),
-  }),
-});
-```
+How a procedure is written — object literal, chained builder, or a class whose methods are its steps — is **[OPEN §N]**, settled by writing StrategyFoundry's real procedures rather than by argument.
 
 ---
 
 ## 4. Tasks
 
-A **task** is one attempt at one procedure, ending in one **outcome**. It is an A2A task on the wire and an asynchronous job to AgentCore, tracked so `/ping` reports `HealthyBusy` while it runs.
+A **task** is one attempt at one procedure, ending in one **outcome**. It is an A2A task on the wire and an asynchronous job to AgentCore, which keeps `/ping` reporting `HealthyBusy` while it runs.
 
 ### Lifecycle
 
-1. **Start.** The caller sends the envelope — procedure name, contract hash, outer input, idempotency key, the identifiers of §2, correlation ids — as an A2A message with `returnImmediately`. The TaskExecutor validates it, applies idempotency, takes the Claude-session lock, spawns the task process, and returns the task as `submitted`.
-2. **Await.** The caller reads the task through A2A until it is terminal, heartbeating whatever it answers to. The store behind the server answers even when the original microVM is gone; a subscription is available where streaming is wanted, bounded by AgentCore's 60-minute connection limit.
-3. **Outcome.** A completed task carries the outer output as its artifact. Every failure is a failed task whose artifact carries the typed cause (§ Outcome), because A2A has one failed state and our callers need the reason.
-4. **Cancel.** `CancelTask` reaches the TaskExecutor, which cancels over B3: the run aborts, flushes telemetry, and records `cancelled`; after a grace period the process group is killed, so nothing the task started — the Claude CLI, shells, MCP servers — outlives it. `StopRuntimeSession` remains the blunt fallback when the container cannot be reached **[OPEN §C]**.
+1. **Start.** The caller sends the envelope — procedure name, contract hash, outer input, idempotency key, the identifiers of §2, correlation ids — as an A2A message with `returnImmediately`. The **gateway** handles it before a task id is minted: it validates the envelope, looks up the idempotency key, and either returns the task already running or admits a new one. The **executor** then publishes `submitted` synchronously, before its first `await`, and spawns the task process.
+2. **Await.** The caller polls `GetTask` and heartbeats whatever it answers to. **Polling is the default**: streaming is capped at 60 minutes and A2A has no replay across a reconnect, so a run of hours would reconnect repeatedly and recover only the task snapshot. A subscription is for short runs that want progress.
+3. **Outcome.** A completed task carries the outer output as its artifact; every failure is a failed task whose artifact carries the typed cause, because A2A has one failed state and a caller needs the reason.
+4. **Cancel.** `CancelTask` reaches the gateway, which cancels over the task protocol: the run aborts, flushes telemetry, records `cancelled`, and after a grace period its process group is killed so nothing it started outlives it. A cancel arriving before the process exists is caught by a token the executor sets before its first `await`. **A cancel never falls through to the A2A SDK's default path**, which would mark a task cancelled without consulting the executor — including from a container freshly provisioned to answer it while the original still runs. `StopRuntimeSession` is the blunt fallback and takes every other task in the session with it **[OPEN §C]**.
 
 | Task state | A2A |
 |---|---|
 | accepted, running | `SUBMITTED`, `WORKING` |
 | succeeded | `COMPLETED` + outer output artifact |
 | cancelled | `CANCELED` |
+| refused before admission — unknown contract hash, continuity conflict, over the admission limit | `REJECTED` + reason |
 | every failure, including lost | `FAILED` + typed cause artifact |
 
-### Durability, lease and loss
+### Why the gateway exists
 
-Task state lives in a store outside the microVM ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)), so an outcome survives the container, a caller's redeploy, and the connection that asked for it (H10, T24). The TaskExecutor is its **only writer**; the task process holds no credentials for it. The A2A task store is that store, so a caller reads state through A2A alone and needs no store access of its own (T43).
+The A2A SDK mints the task id and creates its event bus *before* the executor is reached, and `returnImmediately` resolves on the first event on that bus. An executor therefore cannot answer a request with a different, already-running task — so idempotency, admission and the contract-hash check cannot live in it. They live in a request handler wrapping the SDK's, which inspects the envelope and delegates only once it has decided this is a new task **[OPEN §I]**.
 
-The TaskExecutor renews a **lease** while the task process lives. A stale lease on an unfinished task means the task is **lost** — reported within the lease interval rather than at the activity's start-to-close timeout (H11, T25). A container that starts in a runtime session and finds a live task recorded there under another container instance knows that container is gone, and records it lost immediately without waiting for the lease. Where the store lives is **[OPEN §A]**.
+### Task state, the lease, and loss
+
+Task state lives in a store outside the microVM ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)), so an outcome survives the container, the caller's redeploy, and the connection that asked for it (H10, T24). It is the A2A task store, extended with the idempotency index, the lease and the outcome payload — one record, read through A2A, so a caller needs no store access of its own (T43).
+
+**Writes are fenced.** A2A's `TaskStore.save` overwrites unconditionally, so the store implementation carries a **fencing token** — the lease generation — in the task's metadata and rejects a write from a stale holder. Without it, a container deriving `lost` and the original container finishing `succeeded` are two unordered writes, and whichever lands later wins.
+
+**Loss is derived at read time**, from a lease the executor renews while the task process lives. Nothing sweeps, so **detection latency is the caller's poll interval** — which is what a caller sizes its heartbeat against (H11, T25).
 
 ### Idempotency
 
-**The caller supplies an idempotency key** — stable across its retries of the same logical work, and its own to derive ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)). The Temporal activity factory derives it from workflow and activity identity; another caller may hash a payload or use anything else stable. Starting with the same key *is* the idempotency contract: the caller never looks a task up. `ListTasks` filters by `contextId` and status but not by metadata, so the key is not queryable through the protocol and the store's index carries it.
+**The caller supplies the key**, stable across its retries and its own to derive ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)); the Temporal factory derives it from workflow and activity identity. Starting with the same key *is* the idempotency operation — `ListTasks` filters by context and status but not by metadata, so the key is not queryable through the protocol and the store's index carries it. The task id is not the key: A2A mints it, a failed task is terminal, and a new attempt is a new task carrying `referenceTaskIds` to its predecessor, so the chain reads from the protocol alone.
 
-The **task id is not the key**. A2A mints it — the specification does not support client-provided ids for new tasks — and a failed task is terminal, so a new attempt is a new task. A task id identifies one attempt on the wire, never the execution behind it. A new attempt carries `referenceTaskIds` pointing at the prior attempt's task, so the chain is readable from the protocol without the index.
+- **Concurrent — guaranteed.** Attempts carry the same runtime session id and reach the same container, whose gateway is that session's single authority; a start whose key names a live task returns that task. The index insert is conditional, so two starts racing cannot both admit.
+- **Later — within a retention window** that exceeds the longest retry horizon a consumer configures. Beyond it a repeated request runs again, and `start` reports whether it attached or started, so this is never silent **[OPEN §H]**.
 
-Two edges, with different guarantees:
-
-- **Concurrent — guaranteed.** Attempts carry the same runtime session id, so they reach the same container, whose TaskExecutor is that session's single authority; a start whose key names a live task returns that task instead of starting a second run (H13, T26).
-- **Later — within a retention window.** A start whose key matches a task that is running or succeeded attaches to it and returns its outcome; one whose task failed, was cancelled, or was lost starts a new attempt as a new task. Retention exceeds the longest retry horizon a consumer configures, so every retry is covered; beyond it a repeated request runs again, and `start` says whether it attached or started, so this is never silent. Retention's default is **[OPEN §H]**.
+A cancel from one caller ends a task other callers attached to, so the outcome distinguishes who asked: a caller that did not ask should treat it as retryable.
 
 ### Outcome
 
-Typed; every failure carries its cause. Generic causes apply to every run kind; a run kind adds its own. Layer 1 reads only the kind and its retry guidance — the detail passes through untouched.
+Typed; every failure carries its cause. Layer 1 reads only the kind and its retry guidance — the detail passes through untouched.
 
-| Outcome | Run kinds | Retry guidance |
-|---|---|---|
-| `succeeded` | All | — |
-| `timed_out` | All | Consumer's decision |
-| `cancelled` | All | No |
-| `lost` — the container died | All | Yes, as a new attempt |
-| `failed` — harness, SDK, or procedure error, with its detail | All | Consumer's decision |
-| `output_invalid` — could not conform within the turn budget; payload preserved | Claude | Not blindly; a second identical run is not a correction |
-| `turn_budget_exhausted` | Claude | Consumer's decision |
-| `usage_limited` — with the reset time | Claude | Wait until the reset |
-| `provider_transient` — with the provider's own retry-after where it gave one | Claude | Yes, after that delay |
+| Outcome | Retry guidance |
+|---|---|
+| `succeeded` | — |
+| `output_invalid` — could not conform; payload preserved | Not blindly: a second identical run is not a correction |
+| `turn_budget_exhausted` | Consumer's decision |
+| `timed_out` — the procedure's own budget | Consumer's decision |
+| `deadline_exceeded` — the platform's 8-hour job cap, which no retry beats | No; the procedure must be split |
+| `cancelled` — by this caller | No |
+| `cancelled_by_another` — a different attached caller asked | Yes, as a new attempt |
+| `lost` — the container died; side effects may have happened | Yes, as a new attempt |
+| `usage_limited` — with the reset time | Wait until the reset, with jitter: one subscription serves every agent, so tasks hit the limit together |
+| `credential_expired` | No; an operator must act |
+| `provider_transient` — with the provider's retry-after where it gave one | Yes, after that delay |
+| `failed` — harness, SDK or procedure error, with its detail | Consumer's decision |
 
 ---
 
-## 5. The runtime
+## 5. The container
 
-### The container
+One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC on `POST /`, the card at `/.well-known/agent-card.json`, and `/ping` reporting the container's aggregate status. Whether it is assembled from `@a2a-js/sdk` directly or on the AgentCore SDK's `serveA2A` is **[OPEN §I]**, and it blocks the first slice rather than the first deployment.
 
-One server, an A2A server on AgentCore's A2A protocol contract: `0.0.0.0:9000`, JSON-RPC on `POST /`, the agent card at `/.well-known/agent-card.json`, `GET /ping` reporting `Healthy` or `HealthyBusy` for the container as a whole. Whether it is built on the AgentCore TypeScript SDK's `serveA2A`, which wraps an `@a2a-js/sdk` executor and tracks busy status already, is **[OPEN §I]**.
-
-**The agent card is generated** from what this runtime registers: its procedures as skills, with their contract hashes. Nothing discovers it today; it costs nothing and is truthful if anything ever does.
-
-**The TaskExecutor** implements A2A's `AgentExecutor`. There is one, and it never varies by procedure or run kind. It validates the envelope, applies idempotency and the session lock, spawns the task process, renews the lease, forwards cancellation, writes task state, and maps events and the outcome to A2A.
-
-**Each task runs in its own process**, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md)):
+**The gateway** decides admission (§4). **The executor** spawns and supervises: one process per task, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md), measured by **[OPEN §G]**).
 
 - `/ping` shares no event loop with any task, so nothing a task does can stall the health check and get a busy session terminated (T42)
-- each task loads the bundle current at its start, which is what makes a mounted, reloadable bundle work (H22)
-- a crash is contained: the TaskExecutor records `failed` with the exit code and the tail of stderr, so a task never disappears without a record
-- the process speaks B3 and its logs go to the container's log stream
+- each task loads the bundle current at its start (§6)
+- a crash is contained: the executor records `failed` with the exit code and the tail of stderr, so a task never disappears without a record
+- the process speaks the task protocol, and its logs go to the container's log stream
 
-### An agent is the deployable unit
+**Credentials.** The operator's subscription token is long-lived and subscription-wide, so it is not placed in the task process's environment where the agent's own shell could read it; the SDK is given a credential helper instead, and an expired credential surfaces as `credential_expired` rather than a generic failure **[OPEN §O]**. AWS credentials cannot be withheld from a child in the same microVM: the task process is *not given* store credentials, but store integrity rests on the microVM boundary, not on a scrubbed environment (T35, T44).
 
-One AgentCore runtime serves one agent card, and a runtime is the strongest isolation there is — its own microVMs, its own filesystem, its own IAM role. So **an agent is a deployed runtime: an image, the bundle it serves, its card, and its stores.** A consumer deploys as many agents as its isolation strategy wants — TrendBot's three are three runtimes (T40) — and decides which procedures each serves.
+**Guardrails are cooperative.** `writeScope` and `stopGuard` constrain the model's tool use; they are not a sandbox, and a procedure with shell access goes around them.
 
-**Agents are nested in one project by default** ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)). Agents that share an image differ only by their bundle and card, so one project builds one image and holds several agent definitions, each deployed as its own runtime and each with its own build and deploy target. A separate project is for an agent that needs its own image — StrategyFoundry's runtime with Python and NautilusTrader (H23).
-
-**The bundle carries the procedures and the harness** ([ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)). Publishing a bundle makes it the next task's code without rebuilding the image (H22); the image stays the slow-moving part — Bun, the Claude CLI, and whatever the consumer adds. A bundle baked into the image remains available for a deployment that wants no mount. Limits of the mount are **[OPEN §D]**.
-
-### AgentForge is consumed as an Nx plugin
-
-Following `@aws/nx-plugin`'s conventions, whose own agent generator is built for Strands and therefore not extensible to another framework ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)). It provides:
-
-- **Generators** — an agents project with its image and first agent; an additional agent nested in one; a procedure; the caller's client wiring
-- **CDK constructs** — the runtime with its A2A configuration and card, the task store, the bundle bucket and its mount, and `grantInvokeAccess` for a caller's least-privilege role (T43)
-- **The bundle publish command**, so deployment and mount cannot drift apart
-- **A shared image registry** across a workspace's agents, rather than one per agent
-
-The consumer composes the constructs in its own CDK application and owns everything around them — accounts, networking, secrets, pipelines. The generated client is caller-agnostic; the Temporal activity factory is generated beside it for consumers that use Temporal. Their surface is **[OPEN §K]**.
-
-**Locally**, the same image runs in Docker and the client talks A2A to it directly, with a filesystem task store and `docker stop` as the blunt stop. One code path; local is not a mock (H20, T39).
+**Locally**, the same image runs in Docker, the client talks A2A to it directly, task state is on the filesystem behind the same fenced interface, and `docker stop` stands in for the blunt stop. One code path; local is not a mock (H20, T39).
 
 ---
 
-## 6. The harness
+## 6. Agents, bundles and delivery
+
+**An agent is the deployable unit**: one AgentCore runtime, one card, one image, the bundle it serves, and its stores — the strongest isolation available. A consumer deploys as many as its strategy wants; TrendBot's three are three agents (T40).
+
+**Agents nest in one project by default** ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)): agents sharing an image differ only by bundle and card, so one project builds one image and holds several agent definitions, each with its own build and deploy target. A separate project is for an agent needing its own image, such as one adding Python and NautilusTrader (H23).
+
+**The bundle is a published artifact** ([ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)), **baked into the image by default**. Mounting it instead — so a change reaches the next task without an image rebuild (H22) — is opt-in and carries real cost: the mount forces the runtime into a VPC, a mount failure fails the invocation with the same 424 a container kill produces, and a shared writable mount would let one agent's shell rewrite every agent's code. A mounted bundle is therefore read-only, published content-addressed with a pointer file read once at task start, and never overwritten in place **[OPEN §D]**.
+
+**The agent card is generated at publish time** from the procedures the bundle registers, and baked into the image: a mount is not readable when the platform fetches the card, because a mount exists only during an invocation.
+
+**AgentForge ships the delivery tooling**: CDK constructs for the agent with its A2A configuration, the task store, the bundle and its mount, and `grantInvokeAccess` for a caller's least-privilege role (T43); and the bundle publish command, so deployment and mount cannot drift. Nx generators follow once the first project exists and shows what they should write **[OPEN §K]**.
+
+---
+
+## 7. The harness
 
 ### Kernel
 
-The Claude run kind's core: one `query()` to a settled outcome.
+One `query()` to a settled outcome, behind the `agent()` helper:
 
-- **Settlement** — decides when a result is final. Work the agent dispatches runs in the foreground and completes within the turn that dispatched it, because a turn resumed by background work cancelled its own final structured-output call (T12, T13). Whether that still holds on the current SDK is **[OPEN §E]**.
-- **Abort** — an `AbortSignal`, and the SDK's interrupt, reach the run; exactly one outcome is published.
-- **Outcome** — extracted from the SDK's result, classified (§4), serialized across B3.
-- **Session** — starts, resumes, or forks as the procedure said, under the identifiers of §2. How transcripts persist for resume in another container — the SDK's `SessionStore` adapter or a persistent mount — is **[OPEN §F]**.
-- **No blocking** — nothing in the kernel or middleware blocks the event loop.
+- **Structured output** — the agent contract becomes the SDK's own `outputFormat` (draft-07), and the settled output is validated before anything else sees it. The SDK validates and re-prompts natively now; what beyond that is still needed is **[OPEN §E]**.
+- **Settlement** — work the agent dispatches runs in the foreground and completes within the turn that dispatched it, because a turn resumed by background work once cancelled its own final submission (H16, T12, T13). Whether that still holds is **[OPEN §E]**.
+- **Abort** — an `AbortSignal` and the SDK's interrupt reach the run; exactly one outcome is published.
+- **Session** — started, resumed or forked as the procedure said. How transcripts persist for resume in another container is **[OPEN §F]**; a failed mirror write is surfaced, never swallowed.
+- **No blocking** — nothing in the kernel or a helper blocks the event loop.
 
-### Middleware library
+### Library
 
-Opt-in; each a bundle of phase contributions.
+Optional functions a procedure calls, each serving a stated requirement:
 
-| Middleware | Run kind | Does |
-|---|---|---|
-| `structuredOutput` | Claude | Converts the agent schema for the SDK; a `PreToolUse` hook rejects a non-conforming submission with a readable error so the agent corrects it in-turn; validates the settled output; recovers a submission the CLI dropped (H7, H8, T15) |
-| `writeScope` | Claude | Denies writes outside allowed paths, with allow-union semantics (T9) |
-| `stopGuard` | Claude | Refuses to end a session while a required artifact is missing, or a validator fails (T10) |
-| `guardrailDisclosure` | Claude | Tells the agent which write-scope and termination rules apply, derived from what is enforced (T11) |
-| `telemetry` | Claude | OpenTelemetry export of the SDK's native telemetry, correlated to the task, flushed before the outcome (H19, T37) |
-| `transientRetry` | Claude | Retries a transient provider failure, resuming the session |
-| `forcedExit` | Claude | A tool the agent calls to end deliberately, with a reason |
+| Helper | Does |
+|---|---|
+| `writeScope` | Denies writes outside allowed paths, with allow-union semantics (T9) |
+| `stopGuard` | Refuses to end a session while a required artifact is missing (H5, T10) |
+| `guardrailDisclosure` | Tells the agent which rules apply, derived from what is enforced (T11) |
+| `telemetry` | OpenTelemetry export of the SDK's native telemetry, correlated to the task, flushed before the outcome (H19, T37) |
 
-Which ship in the first slice is settled in its proposal.
+The guardrail helpers serve TrendBot alone and wait for its contract to be confirmed; their *semantics* may belong in TrendBot's own package, with AgentForge carrying only the hooks (**[OPEN §L]**).
 
 ---
 
-## 7. What every task records
+## 8. What every task records
 
-Written by AgentForge, no middleware required: the outcome, the attempt and the prior attempt's state, timings, and every identifier of §2, correlated to the caller's own ids (H18, T38). For the Claude run kind, also the seed as sent, the resolved SDK options, where the transcript is, and usage — tokens, turns, cost (T36). A consumer's decisions are only as reconstructible as what the task recorded.
+Written by AgentForge: the outcome, the attempt and the prior attempt's state, timings, admission and cancel events, every identifier of §2, and any transcript-mirror failure — correlated to the caller's own ids (H18, T38). For an agent run, also the seed as sent, the resolved SDK options, where the transcript is, and usage: tokens, turns, cost (H18, T36).
 
 ---
 
-## 8. Failures reproduced as tests
+## 9. Failures reproduced as tests
 
-Each failure that cost the first AgentForge time ([lineage](lineage/first-agentforge.md)) becomes a failure-injection test in the layer that owns it:
+Each failure the first AgentForge paid for ([lineage](lineage/first-agentforge.md)), and each the new boundaries introduce. The last four are new:
 
 | Failure | Layer |
 |---|---|
-| Worker redeployed mid-run; the result had nowhere to go | 1 |
+| Caller redeployed mid-run; the result had nowhere to go | 1 |
 | Container killed mid-run (AgentCore 424) | 1 |
 | A run outlasting the 15-minute synchronous request limit | 1 |
 | `/ping` stalled by blocking work on the same event loop | 1 |
 | A timed-out attempt left running while its retry started | 1 |
-| A cancelled task leaving subprocesses behind | 1 |
-| Two tasks resuming one Claude session | 1 |
 | A resumed turn cancelling the final structured-output call | 2 |
 | The result taken before dispatched work settled | 2 |
 | Structured output lost to schema conversion | 2 |
 | An SDK option accepted and silently dropped | 2 |
-| A middleware's contribution lost to a later phase or a missed merge | 2 |
+| A stale lease holder's write landing after a newer one | 1 |
+| A cancelled task leaving subprocesses behind | 1 |
+| A second live task admitted under one continuity key | 1 |
+| Admission beyond the container's memory, killing its neighbours | 1 |
 
 ---
 
-## 9. Repository layout
+## 10. Repository layout
 
-**By scope, never by type**, in the Nx grouped layout on `@aws/nx-plugin` defaults. The tree shows shape; projects are settled when proposed.
+**By scope, never by type**, in the Nx grouped layout on `@aws/nx-plugin` defaults. Shape, not a commitment.
 
 ```
 agentforge/
@@ -318,32 +289,31 @@ agentforge/
 │       └── base-image/        # the image consumers extend
 └── libs/
     ├── task/
-    │   └── protocol/          # envelope, identifiers, B3 messages, outcome — Zod only
+    │   └── protocol/          # envelope, identifiers, process messages, outcome — Zod only
     ├── runtime/
-    │   ├── server/            # A2A server, TaskExecutor, card, /ping
+    │   ├── server/            # A2A server, gateway, executor, card, /ping
     │   ├── client/            # A2A client: AgentCore and local
-    │   ├── task-store/        # A2A task store, execution index, lease
-    │   └── bundle/            # publishing a bundle; loading one in a task process
+    │   └── task-store/        # fenced store, idempotency index, lease
     ├── harness/
-    │   ├── procedure/         # contracts, definitions, phases, run kinds, middleware composition
-    │   ├── claude/            # the Claude run kind: kernel, marshalling, its middleware
-    │   └── mechanical/        # the mechanical run kind
+    │   ├── procedure/         # contracts, implementations, marshalling
+    │   ├── agent/             # the agent() helper and the kernel
+    │   └── helpers/           # guardrails, telemetry
     ├── infra/
-    │   ├── constructs/        # CDK: runtime, task store, bundle bucket and mount, caller policy
-    │   └── plugin/            # Nx generators: agents project, agent, procedure, client wiring
+    │   ├── constructs/        # CDK: agent, task store, bundle, caller policy
+    │   └── publish/           # the bundle publish command
     └── temporal/
-        └── activity/          # activity factory over the client: heartbeat, cancellation, retry mapping
+        └── activity/          # activity factory over the client
 ```
 
 ---
 
-## 10. Deliberately absent
+## 11. Deliberately absent
 
 - **Any mapping between the four identifiers** — the consumer's, procedure by procedure (§2)
-- **A concurrency ceiling** — the caller's (T27)
-- **Rate limiting or durability for the tools an agent calls** — a consumer-hosted MCP server owns its limits and whatever backs them; the agent calls a tool and knows nothing about it
-- **Recovery of a consumer's side effect** — the consumer's, in its phases (§3)
-- **Agent discovery and agent-to-agent orchestration** — the card is generated and unused until a consumer wants it ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md))
-- **Agent frameworks other than the Claude Agent SDK** — a run kind would carry one ([ADR 0005](../adr/0005-the-executor-is-agnostic-of-what-a-task-runs.md))
-- **Synchronous invocation, and any second server in the container** ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md), [ADR 0004](../adr/0004-a-process-per-task.md))
+- **Queueing, and any concurrency ceiling that is not about memory** — the caller's (T27)
+- **Recovery of a consumer's side effect** — the consumer's (§3)
+- **Rate limiting or durability for the tools an agent calls** — a consumer-hosted MCP server owns its limits and whatever backs them
+- **Agent discovery and agent-to-agent orchestration** — the card is generated and otherwise unused
+- **Agent frameworks other than the Claude Agent SDK** — a procedure's run step is a function; another framework needs no new concept here
+- **Synchronous invocation, and any second server in the container**
 - **Consumer vocabulary** — no directive, entity, vault, or strategy
