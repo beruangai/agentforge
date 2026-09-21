@@ -52,7 +52,7 @@ Only two crossings are protocols: a contract between separately deployed, separa
 
 | Protocol | Between | Contract |
 |---|---|---|
-| **Wire** | Caller's client ↔ the agent's gateway | A2A JSON-RPC 2.0 over `InvokeAgentRuntime`, SigV4-signed, routed by the session header. `SendMessage` with `returnImmediately` starts or attaches; `GetTask` reads; `CancelTask` stops. The envelope is a data part; the outcome is an artifact ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md)) |
+| **Wire** | Caller's client ↔ the agent's gateway | A2A JSON-RPC 2.0 over `InvokeAgentRuntime`, SigV4-signed, routed by the session header. `SendMessage` with `returnImmediately` starts or attaches; `GetTask` polls; `CancelTask` stops. Streaming and blocking sends are unused until a procedure needs them. The envelope is a data part; the outcome is an artifact ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md)) |
 | **Task process** | Executor ↔ task process | JSON-RPC 2.0, one message per line, over a dedicated pipe. `run` and `cancel` in; semantic events numbered per task, and exactly one outcome, out; the exit code is the backstop. `SIGTERM` then `SIGKILL` to the process group ([ADR 0004](../adr/0004-a-process-per-task.md)) |
 
 | Interface | Inside | Note |
@@ -112,13 +112,13 @@ The contract hash travels in the envelope. A container whose image does not impl
 
 **Input and output are structured, always.** The outer input is validated against the contract before the run starts; the agent's output is validated against the agent contract before anything else sees it; the outer output is validated before it leaves. There is no unstructured path and no opt-in — a prose answer is not a contract (D3).
 
-**A task has exactly one time budget.** The procedure declares it; the envelope may override it per invocation, which is how a caller that sizes budgets per call rather than per declaration gets what it needs. The task enforces it and reports `timed_out`. A caller's own deadline — an activity's start-to-close, say — can only *cancel*; it is never a second authority on when a run ends, and the client reports the budget in force so a caller can size its deadline above it (D6).
+**A task has exactly one time budget.** The procedure declares it; the envelope may override it per invocation, which is how a caller that sizes budgets per call rather than per declaration gets what it needs. The task enforces it and reports `TIMED_OUT`. A caller's own deadline — an activity's start-to-close, say — can only *cancel*; it is never a second authority on when a run ends, and the client reports the budget in force so a caller can size its deadline above it (D6).
 
 **Every option a procedure sets reaches the SDK, or the task is rejected** (D5). The options are the SDK's own type rather than a parallel schema, and a test asserts every resolved key reaches `query()` — which is how the first AgentForge's silently-dropped `maxTurns` is prevented. What that cannot prove is that the SDK then *binds* the option; that is **[OPEN §E]**.
 
 ### Side effects are the consumer's
 
-**A consumer owns its side effects and how to recover when one may have partly happened.** Every step receives the idempotency key, the attempt number, and the prior attempt's recorded state — none, failed, cancelled, or lost. Because the *after* step runs inside the task process before the outcome leaves it, **`lost` always means side effects may have happened**; a consumer whose source of truth is its own state reconciles against it. AgentForge never infers, retries or compensates a consumer's side effect.
+**A consumer owns its side effects and how to recover when one may have partly happened.** Every step receives the idempotency key, the attempt number, and the prior attempt's recorded state — none, `FAILED`, `CANCELLED`, or `LOST`. Because the *after* step runs inside the task process before the outcome leaves it, **`LOST` always means side effects may have happened**; a consumer whose source of truth is its own state reconciles against it. AgentForge never infers, retries or compensates a consumer's side effect.
 
 ### Reuse
 
@@ -130,22 +130,24 @@ How a procedure is written — object literal, chained builder, or a class whose
 
 ## 4. Tasks
 
-A **task** is one attempt at one procedure, ending in one **outcome**. It is an A2A task on the wire and an asynchronous job to AgentCore, which keeps `/ping` reporting `HealthyBusy` while it runs.
+A **task** is one attempt at one procedure, ending in one **outcome**. It is an A2A task on the wire and an asynchronous job to AgentCore.
+
+**`/ping` reports capacity, not activity.** On the A2A protocol the SDK does no busy tracking of its own — its handler defaults to `Healthy` — so the policy is ours: `Healthy` while the container can admit another task, `HealthyBusy` once it is at its admission limit and wants new work shed elsewhere. That differs from the HTTP protocol, whose handler reports busy while any task runs, because that path serves one task at a time. The tension to watch is that `Healthy` is also what the platform reads as idle: a session reporting it for 15 minutes is terminated, and whether a caller's `GetTask` polls count as the activity that resets that timer is **[OPEN §B]**.
 
 ### Lifecycle
 
 1. **Start.** The caller sends the envelope — procedure name, contract hash, outer input, idempotency key, the identifiers of §2, correlation ids — as an A2A message with `returnImmediately`. The **gateway** handles it before a task id is minted: it validates the envelope, looks up the idempotency key, and either returns the task already running or admits a new one. The **executor** then publishes `submitted` synchronously, before its first `await`, and spawns the task process.
-2. **Await.** The caller polls `GetTask` and heartbeats whatever it answers to. **Polling is the default**: streaming is capped at 60 minutes and A2A has no replay across a reconnect, so a run of hours would reconnect repeatedly and recover only the task snapshot. A subscription is for short runs that want progress.
+2. **Await.** The caller polls `GetTask` and heartbeats whatever it answers to. **Polling is the only supported way to wait.** Streaming is capped at 60 minutes and A2A has no replay across a reconnect, and both consumers are long-running workflow steps where latency is not a concern. A subscription, and a blocking send, are added if a procedure ever appears whose latency warrants them — not before.
 3. **Outcome.** A completed task carries the outer output as its artifact; every failure is a failed task whose artifact carries the typed cause, because A2A has one failed state and a caller needs the reason.
-4. **Cancel.** `CancelTask` reaches the gateway, which cancels over the task protocol: the run aborts, flushes telemetry, records `cancelled`, and after a grace period its process group is killed so nothing it started outlives it. A cancel arriving before the process exists is caught by a token the executor sets before its first `await`. **A cancel never falls through to the A2A SDK's default path**, which would mark a task cancelled without consulting the executor — including from a container freshly provisioned to answer it while the original still runs. `StopRuntimeSession` is the blunt fallback and takes every other task in the session with it **[OPEN §C]**.
+4. **Cancel.** `CancelTask` reaches the gateway, which cancels over the task protocol: the run aborts, flushes telemetry, records `CANCELLED`, and after a grace period its process group is killed so nothing it started outlives it. A cancel arriving before the process exists is caught by a token the executor sets before its first `await`. **A cancel never falls through to the A2A SDK's default path**, which would mark a task cancelled without consulting the executor — including from a container freshly provisioned to answer it while the original still runs. `StopRuntimeSession` is the blunt fallback and takes every other task in the session with it **[OPEN §C]**.
 
 | Task state | A2A |
 |---|---|
-| accepted, running | `SUBMITTED`, `WORKING` |
-| succeeded | `COMPLETED` + outer output artifact |
-| cancelled | `CANCELED` |
-| refused before admission — unknown contract hash, continuity conflict, over the admission limit | `REJECTED` + reason |
-| every failure, including lost | `FAILED` + typed cause artifact |
+| `ACCEPTED`, `RUNNING` | `SUBMITTED`, `WORKING` |
+| `SUCCEEDED` | `COMPLETED` + outer output artifact |
+| `CANCELLED` | `CANCELED` |
+| `REFUSED` — unknown contract hash, continuity conflict, over the admission limit | `REJECTED` + reason |
+| every failure, including `LOST` | `FAILED` + typed cause artifact |
 
 ### Why the gateway exists
 
@@ -174,18 +176,18 @@ Typed; every failure carries its cause. Layer 1 reads only the kind and its retr
 
 | Outcome | Retry guidance |
 |---|---|
-| `succeeded` | — |
-| `output_invalid` — could not conform; payload preserved | Not blindly: a second identical run is not a correction |
-| `turn_budget_exhausted` | Consumer's decision |
-| `timed_out` — the procedure's own budget | Consumer's decision |
-| `deadline_exceeded` — the platform's 8-hour job cap, which no retry beats | No; the procedure must be split |
-| `cancelled` — by this caller | No |
-| `cancelled_by_another` — a different attached caller asked | Yes, as a new attempt |
-| `lost` — the container died; side effects may have happened | Yes, as a new attempt |
-| `usage_limited` — with the reset time | Wait until the reset, with jitter: one subscription serves every agent, so tasks hit the limit together |
-| `credential_expired` | No; an operator must act |
-| `provider_transient` — with the provider's retry-after where it gave one | Yes, after that delay |
-| `failed` — harness, SDK or procedure error, with its detail | Consumer's decision |
+| `SUCCEEDED` | — |
+| `OUTPUT_INVALID` — could not conform; payload preserved | Not blindly: a second identical run is not a correction |
+| `TURN_BUDGET_EXHAUSTED` | Consumer's decision |
+| `TIMED_OUT` — the procedure's own budget | Consumer's decision |
+| `DEADLINE_EXCEEDED` — the platform's 8-hour job cap, which no retry beats | No; the procedure must be split |
+| `CANCELLED` — by this caller | No |
+| `CANCELLED_BY_ANOTHER` — a different attached caller asked | Yes, as a new attempt |
+| `LOST` — the container died; side effects may have happened | Yes, as a new attempt |
+| `USAGE_LIMITED` — with the reset time | Wait until the reset, with jitter: one subscription serves every agent, so tasks hit the limit together |
+| `CREDENTIAL_EXPIRED` | No; an operator must act |
+| `PROVIDER_TRANSIENT` — with the provider's retry-after where it gave one | Yes, after that delay |
+| `FAILED` — harness, SDK or procedure error, with its detail | Consumer's decision |
 
 ---
 
@@ -197,10 +199,10 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 
 - `/ping` shares no event loop with any task, so nothing a task does can stall the health check and get a busy session terminated (D31)
 - each task loads its procedures from the image it was deployed with (§6)
-- a crash is contained: the executor records `failed` with the exit code and the tail of stderr, so a task never disappears without a record
+- a crash is contained: the executor records `FAILED` with the exit code and the tail of stderr, so a task never disappears without a record
 - the process speaks the task protocol, and its logs go to the container's log stream
 
-**Credentials.** The operator's subscription token is long-lived and subscription-wide, so it is not placed in the task process's environment where the agent's own shell could read it; the SDK is given a credential helper instead, and an expired credential surfaces as `credential_expired` rather than a generic failure **[OPEN §O]**. AWS credentials cannot be withheld from a child in the same microVM: the task process is *not given* store credentials, but store integrity rests on the microVM boundary, not on a scrubbed environment (D24, D29).
+**Credentials.** The Agent SDK reads the operator's subscription token from the environment, so that is where it lives; there is no provider interface to hand it through. The same is true of the API keys a procedure's tools need for external data providers, which reach the container from a secret store through AgentCore Identity. An expired credential surfaces as `CREDENTIAL_EXPIRED` rather than a generic failure, and nothing AgentForge emits ever contains one (D24, D29). A credential proxy at the container level — brokering provider calls so their keys never sit in the task process's environment at all — is a worthwhile later addition for everything except the subscription token, and is **[OPEN §O]**. AWS credentials cannot be withheld from a child in the same microVM: the task process is *not given* store credentials, but store integrity rests on the microVM boundary, not on a scrubbed environment.
 
 **Guardrails are cooperative.** `writeScope` and `stopGuard` constrain the model's tool use; they are not a sandbox, and a procedure with shell access goes around them.
 
@@ -289,17 +291,31 @@ Each failure the first AgentForge paid for ([lineage](lineage/first-agentforge.m
 
 ---
 
-## 10. Repository layout
+## 10. What is published, and how the repository is laid out
 
-**By scope, never by type**, in the Nx grouped layout on `@aws/nx-plugin` defaults. Shape, not a commitment.
+**AgentForge vends one package.** A consumer depends on `@beruangai/agentforge` and nothing else — no independent versioning across a family of packages, no micro-dependencies for a consumer to keep in step. What prevents that package from polluting a caller's bundle is **entry points**, each exporting only what its environment may load:
+
+| Entry point | For | Carries |
+|---|---|---|
+| `/contract` | Anywhere, including a worker | Contract declaration and types. Zod only; never the Agent SDK |
+| `/client` | A caller | The A2A client, typed by an imported contract |
+| `/temporal` | A Temporal worker | The activity factory over the client |
+| `/agent` | Inside the container | Procedures, the `agent()` helper, the kernel, the helper library |
+| `/runtime` | The container's entrypoint | The A2A server, gateway, executor, task store |
+| `/infra` | A CDK application | The constructs |
+
+The boundary is enforced, not documented: an import of `/agent` from a worker's build fails, because the contract half is the only thing both sides share ([ADR 0003](../adr/0003-procedures-are-type-safe-end-to-end.md)). The Nx generators ship in the same package, which is what makes the sync generator a version of AgentForge rather than a separate thing to upgrade.
+
+Internally the workspace is **organized by scope, never by type**, in the Nx grouped layout on `@aws/nx-plugin` defaults. Shape, not a commitment:
 
 ```
 agentforge/
 ├── adr/  docs/  openspec/
 ├── apps/
 │   └── runtime/
-│       └── base-image/        # the image consumers extend
+│       └── base-image/        # agentforge/a2a-claude, the image consumers extend
 └── libs/
+    ├── agentforge/            # the single published package: entry points, generators, build
     ├── task/
     │   └── protocol/          # envelope, identifiers, process messages, outcome — Zod only
     ├── runtime/
@@ -317,6 +333,8 @@ agentforge/
         └── activity/          # activity factory over the client
 ```
 
+Internal libraries are never published on their own; they are composed into the one package.
+
 ---
 
 ## 11. Deliberately absent
@@ -328,5 +346,6 @@ agentforge/
 - **Agent discovery and agent-to-agent orchestration** — the card is generated and otherwise unused
 - **Agent frameworks other than the Claude Agent SDK**
 - **Procedures that invoke no agent** — AgentForge runs agents; a consumer's plain work belongs in the consumer
-- **Synchronous invocation, and any second server in the container**
+- **Synchronous invocation, streaming and blocking sends** — polling is the only way to wait until a procedure needs otherwise
+- **Any second server in the container**
 - **Consumer vocabulary** — no directive, entity, vault, or strategy

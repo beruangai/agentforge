@@ -89,9 +89,9 @@ The caller supplies the key and the two edges are settled ([ADR 0009](../adr/000
 
 This is not a detail to verify later: it decides the shape of the server and the store, and the first local slice cannot be written around it.
 
-- **The request handler.** Idempotency, admission and the contract-hash check must run before a task id is minted, which the SDK's `DefaultRequestHandler` does not allow. The shape is a handler implementing the public `A2ARequestHandler` interface and delegating to the SDK's once it has decided the request is a new task. Confirm that wrapping works, and that a `submitted` event published synchronously makes `returnImmediately` resolve.
+- **The request handler.** Idempotency, admission and the contract-hash check must run before a task id is minted, which the SDK's `DefaultRequestHandler` does not allow. The shape is a handler implementing the public `A2ARequestHandler` interface and delegating to the SDK's once it has decided the request is a new task. Confirm that wrapping works, and that a `SUBMITTED` event published synchronously makes `returnImmediately` resolve.
 - Whether to build on the AgentCore TypeScript SDK's `serveA2A` — which serves the card, `/ping` and busy tracking, but was merged four days before this was written and is not in the published reference — or to assemble the same from `@a2a-js/sdk` and an HTTP server directly
-- `returnImmediately`: the specification says a send MUST return once the task is created; the SDK returns after the *first task event* ([research](research/a2a.md)). Open is whether that is soon enough, and whether the executor must publish a `submitted` event synchronously to make it so
+- `returnImmediately`: the specification says a send MUST return once the task is created; the SDK returns after the *first task event* ([research](research/a2a.md)). Open is whether that is soon enough, and whether the executor must publish a `SUBMITTED` event synchronously to make it so
 - Protocol version: AgentCore's documentation shows 0.3.0 and `message/send`; the SDK targets 1.0 with a 0.3 compatibility layer
 - Error handling: AgentCore returns real HTTP statuses (409, 424) with a JSON-RPC error body where A2A expects 200, and its retryable 409 is not retried by A2A clients
 - Authentication: whether the A2A client can send SigV4-signed requests under the caller's least-privilege role (T43), or whether the call goes through `InvokeAgentRuntimeCommand` carrying the JSON-RPC payload
@@ -149,12 +149,12 @@ Independent of the choice, decide by these: whether a wrong composition fails at
 
 ## §O — Credentials in the container *(OPEN)*
 
-The operator's subscription token is long-lived and subscription-wide; the container needs it, the agent's own shell can read anything in its process environment, and an expired one must fail loudly rather than as a generic error (T35, T44).
+The Agent SDK reads the subscription token from the environment and offers no provider interface, so that token stays in the environment. The open question is everything else: the API keys a procedure's tools need for external data providers, which reach the container from a secret store through AgentCore Identity and today would sit in the same environment the agent's own shell can read.
 
-- How the token reaches the SDK without sitting in the task process's environment — a credential helper the SDK re-runs is the leading shape
-- How expiry surfaces as `credential_expired` rather than being classified as a transient provider failure
+- A **credential proxy at the container level** — brokering provider calls so their keys never enter the task process's environment, in the shape of something like Infisical's agent-vault. A later addition rather than a first-slice one, but the first slice should not make it harder
+- How expiry surfaces as `CREDENTIAL_EXPIRED` rather than being classified as a transient provider failure
+- Rotation, and how a key reaches a long-running task that started before it changed
 - What a compromised or prompt-injected procedure can reach from inside the microVM, and what is therefore not defensible by scrubbing an environment
-- Rotation, and whether a runtime can hold a credential scoped to itself
 
 ---
 

@@ -68,9 +68,9 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Admission limit** — The most tasks an agent runs at once in one container. A task beyond it is rejected, never queued.
 
-**Outcome** — A task's typed result: success with the outer output, or a failure carrying its cause.
+**Outcome** — A task's typed result: `SUCCEEDED` with the outer output, or a failure carrying its cause. Values are `SCREAMING_SNAKE_CASE`.
 
-**Lost** — The outcome of a task whose container died, derived from a stale lease at read time. Its side effects may have happened.
+**`LOST`** — The outcome of a task whose container died, derived from a stale lease at read time. Its side effects may have happened.
 
 ## Agents and delivery
 
@@ -82,7 +82,9 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Agent card** — The A2A discovery document, generated at build time from the procedures an image contains, and served from the image.
 
-**Base image** — What AgentForge ships for consumers to extend: Bun, the Claude CLI, the runtime server and the harness. It changes when AgentForge releases.
+**Base image** — What AgentForge ships for consumers to extend, `agentforge/a2a-claude`: Bun, the Claude CLI, the runtime server and the harness. It changes when AgentForge releases.
+
+**Entry point** — One of the package's exports, scoped to where it may be loaded: `/contract`, `/client`, `/temporal`, `/agent`, `/runtime`, `/infra`. AgentForge publishes one package with these, never a family of packages.
 
 ## Identity
 
