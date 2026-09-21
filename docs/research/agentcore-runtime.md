@@ -74,7 +74,7 @@ From [CreateAgentRuntime](https://docs.aws.amazon.com/bedrock-agentcore-control/
 
 - `agentRuntimeName` is `[a-zA-Z][a-zA-Z0-9_]{0,47}` — letters, digits and underscores only, **no hyphens or slashes, 48 characters maximum**, starting with a letter. The returned ARN appends a ten-character suffix of its own.
 - ECR `repositoryName` is `[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*`, 2–256 characters, starting with a letter. Slashes namespace a repository — "prepended with a namespace to group the repository into a category" — and `-+` means consecutive hyphens are legal.
-- So one string cannot name both: a registry path and a runtime name are derived separately from the same identity.
+- So one string cannot name both. A registry path carries the readable identity; the runtime name is generated (CDK's `Names.uniqueResourceName` bounded to 48 characters), and callers address an agent by ARN.
 
 ## Versions and running sessions
 

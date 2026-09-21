@@ -214,11 +214,11 @@ Three levels, each a bundle of one or more of the next. **Where the lines fall i
 
 | | What it is | Named | Changes when |
 |---|---|---|---|
-| **Base image** | AgentForge's: Bun, the Claude CLI, the runtime server and the harness | `agentforge` | AgentForge releases |
+| **Base image** | AgentForge's: Bun, the Claude CLI, the runtime server and the harness | `agentforge/a2a-claude`, namespaced so variants can follow | AgentForge releases |
 | **Package image** | The consumer's layer over it, named for the package that vends it: the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share | `{consumer}/{package}` | Those capabilities change |
 | **Agent** | A deployed AgentCore runtime, extending its package image with its own procedures, card, mounts and stores | `{consumer}/{package}/{agent}` | Its own procedures or configuration change |
 
-**One identity, names derived from it.** Several consumers, each with several packages and several agents, share a registry and an account, so the triple `{consumer}/{package}/{agent}` is the identity and every platform name comes from it — because no single string is legal everywhere. The ECR repository takes the triple as-is, since slashes are what ECR namespaces with. The AgentCore runtime name takes it with underscores, because `agentRuntimeName` allows only letters, digits and underscores and caps at 48 characters — which a long triple overflows, so the plugin truncates deterministically and appends a short hash rather than failing at deploy. Images are referenced by digest, never by a moving tag.
+**One identity; AWS resource names are generated, not composed.** Several consumers, each with several packages and several agents, share a registry and an account, so the triple `{consumer}/{package}/{agent}` is the identity: it names the ECR repository, since slashes are what ECR namespaces with, and it is what a task's record and telemetry carry. It is *not* the AgentCore runtime name. `agentRuntimeName` is required, allows only letters, digits and underscores, and caps at 48 characters, so the construct generates it with CDK's [`Names.uniqueResourceName`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.Names.html) — bounded to 48, underscores as the only permitted special character — rather than composing a name that silently overflows. A caller addresses an agent by the ARN its deployment exports, never by a name it assembles itself (D31). Images are referenced by digest, never by a moving tag.
 
 A package image serving one agent, or an agent serving one procedure, is the same shape with a count of one. A consumer that wants an agent isolated from every other capability extends the base image directly.
 

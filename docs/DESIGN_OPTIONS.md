@@ -46,7 +46,8 @@ Code ships in the image and layering is what keeps a change from spreading ([ADR
 - Comparing digests before calling `UpdateAgentRuntime`, so an unchanged agent is never given a new version
 - What the build costs when a package image changes and every agent above it rebuilds
 - Whether the agent card can be generated as a build step from the image's own registry of procedures
-- Where AgentForge's base image is published and how a consumer pins it, and how the derived names stay stable when a triple is truncated to fit `agentRuntimeName`'s 48 characters
+- Where `agentforge/a2a-claude` is published and how a consumer pins it
+- How an agent's ARN reaches its callers — a construct output, a parameter, or the generated client — given that the runtime name is CDK-generated rather than predictable (D31, D32)
 
 **Spike (local):** build one package image and three agent images from it; change one agent's procedure; confirm the other two rebuild to identical digests and that the deploy path skips them; then change the package image and confirm all three move.
 

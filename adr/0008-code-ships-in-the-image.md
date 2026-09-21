@@ -26,7 +26,7 @@ Chosen option: **code always ships in the image**, with layering as the mechanis
 * **What is mounted is state** — the working directory, memory, transcripts — on S3 Files or EFS, which the documentation says a version update does not affect. Managed session storage is wiped by a version update and is therefore not where durable session state goes.
 * **Local development builds the same image.** No mounted code, no hot reload: the only thing mounted locally is the state that is mounted in the cloud. A few seconds of rebuild is cheaper than a second code path, and over-engineering the development loop is how the first AgentForge drifted from what it ran in production.
 * A task's record carries the artifact version that ran it, because a mixed-version fleet is normal while long sessions drain.
-* **Identity is one triple, `{consumer}/{package}/{agent}`, and platform names derive from it.** No single string is legal in both places: ECR namespaces with slashes, while `agentRuntimeName` allows only letters, digits and underscores within 48 characters.
+* **Identity is one triple, `{consumer}/{package}/{agent}`** — the registry path, the record, the telemetry. AWS resource names are generated rather than composed from it: `agentRuntimeName` is required, allows only letters, digits and underscores within 48 characters, and the construct generates it with CDK's `Names.uniqueResourceName`. A caller addresses an agent by the ARN its deployment exports.
 * The contract hash guards the seam: a task whose hash the image does not implement is refused before any work ([ADR 0003](0003-procedures-are-type-safe-end-to-end.md)).
 
 ### Consequences
