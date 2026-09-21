@@ -21,7 +21,7 @@ Built for its consumers, StrategyFoundry and TrendBot, not for public use.
 | [adr/](adr/README.md) | Why each significant decision went the way it did |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | Canonical terms |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones |
-| [docs/research/](docs/research/) | Verified facts about AgentCore, A2A, and the Agent SDK — re-read before relying on one |
+| [docs/research/](docs/research/) | Verified facts about AgentCore, A2A, the Agent SDK and `@aws/nx-plugin` — re-read before relying on one |
 | [docs/lineage/](docs/lineage/) | The first AgentForge: the failures it paid for, as evidence |
 
 ## Shape

@@ -1,0 +1,27 @@
+# `@aws/nx-plugin` — Conventions Worth Following
+
+Read from the [nx-plugin-for-aws guides](https://awslabs.github.io/nx-plugin-for-aws/en/guides/ts-agent/) on 2026-09-20/21. AgentForge extends these conventions rather than inventing its own ([ADR 0010](../../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)). Its own `ts#agent` generator is built for Strands, so the generator is not reusable — the conventions around it are.
+
+## What it does
+
+- **`ts#agent` scaffolds** an agent project: entry point, agent definition, a typed client, and a `Dockerfile` when the infrastructure target is `agentcore-ecr`. Protocol options include A2A, which uses the Strands A2A server on port 9000.
+- **Deployment** is either `agentcore` (code packaged as a zip onto a managed runtime) or `agentcore-ecr` (an arm64 image). With ECR, **agents share one workspace-wide asset repository** rather than one repository per agent.
+- **Infrastructure** is generated CDK constructs (or Terraform modules) under a common package, exposing `grantInvokeAccess()` for a caller's role.
+- **Agent runtime names are CDK- or Terraform-generated.** The construct creates them; a developer does not name them.
+
+## How a caller finds an agent
+
+Three mechanisms, in the plugin's own order of preference:
+
+1. **A construct output** — `agent.agentCoreRuntime.agentRuntimeArn`, and a convenience `agent.invocationUrl`. The ARN has the form `arn:aws:bedrock-agentcore:<region>:<account>:runtime/<agent-runtime-id>`.
+2. **AppConfig runtime configuration** — `RUNTIME_CONFIG_APP_ID` names an AppConfig application from which a caller resolves the agent's runtime ARN. Session persistence settings are registered the same way, with the agent's role granted read access for bucket discovery.
+3. **An explicit ARN** passed to the client factory: `MyAgentClient.withIamAuth({ agentRuntimeArn })`, alongside `.local()` and `.withJwtAuth()` variants.
+
+## What AgentForge takes from this
+
+- Generated runtime names, with **discovery through AppConfig** rather than a name a caller assembles (`ARCHITECTURE.md` §6).
+- A client factory with a local variant and an IAM-authenticated variant.
+- One workspace-wide image registry.
+- Constructs exposing `grantInvokeAccess` for least-privilege invocation (D32).
+
+The exact AppConfig schema, its caching and refresh behavior, and what a non-Lambda caller such as a Temporal worker pays to read it are confirmed when the constructs are built — `DESIGN_OPTIONS.md` §K.

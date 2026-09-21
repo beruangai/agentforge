@@ -47,7 +47,7 @@ Code ships in the image and layering is what keeps a change from spreading ([ADR
 - What the build costs when a package image changes and every agent above it rebuilds
 - Whether the agent card can be generated as a build step from the image's own registry of procedures
 - Where `agentforge/a2a-claude` is published and how a consumer pins it
-- How an agent's ARN reaches its callers — a construct output, a parameter, or the generated client — given that the runtime name is CDK-generated rather than predictable (D31, D32)
+- The AppConfig runtime configuration an agent's ARN is published into, following `@aws/nx-plugin`: its schema, what the identity triple keys, caching and refresh, and what a long-lived caller such as a Temporal worker pays to read it (D31, D32)
 
 **Spike (local):** build one package image and three agent images from it; change one agent's procedure; confirm the other two rebuild to identical digests and that the deploy path skips them; then change the package image and confirm all three move.
 
