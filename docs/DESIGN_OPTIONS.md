@@ -150,7 +150,7 @@ Decide by: whether a wrong composition fails at compile time; whether the resolv
 
 **Check first:** whether standard TypeScript 5 decorators on Bun preserve inference through the decorated member, and whether decorator metadata needs a `Symbol.metadata` polyfill. If clean, decorator registration is available to N2 and N3; if not, it is out on toolchain grounds rather than taste.
 
-**Exit:** settled by writing real StrategyFoundry procedures in A0.
+**Exit:** settled by writing a **baseline set of procedures inferred from both consumers** — their contracts, specs and existing code — and authoring each candidate style against it. AgentForge ships before StrategyFoundry's development starts, so waiting for its real procedures would wait forever; and a style settled against one consumer's first attempt would be coupled to it anyway. The baseline is representative, not exhaustive: enough shapes to expose the differences between the styles.
 
 ## §O — Credentials in the container *(OPEN — operator)*
 
