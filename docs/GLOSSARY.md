@@ -94,7 +94,11 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Session** — The Claude Agent SDK's: one transcript, started, resumed or forked by id. One live writer at a time.
 
-**Working directory** — Where a run happens; it decides the Claude project that namespaces the transcript and memory.
+**Working directory** — Where a run happens. With the project key it scopes the run's transcript, and it persists by syncing to an object store rather than by being mounted ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)).
+
+**Project key** — What scopes a session's transcript in the store, pinned with `CLAUDE_CODE_PROJECT_DIR_NAME` and namespaced by AgentForge so one store serves many agents.
+
+**Sync strategy** — What a consumer declares about a working directory's persistence: direction, delete propagation, cadence, exclusions. Declared per agent, overridable per procedure; AgentForge runs it and guarantees the flush before an outcome.
 
 How these relate is the consumer's choice ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
 
