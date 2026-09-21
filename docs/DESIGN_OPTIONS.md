@@ -70,17 +70,17 @@ Structured output is largely answered: the SDK takes a draft-07 schema, validate
 
 Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)). Transcripts mirror through a `SessionStore`; the config directory is image content; working directories sync to an object store under **a strategy the consumer declares, per agent and overridable per procedure**. AgentForge guarantees the flush-and-verify barrier, the process-group lifetime, and that a sync failure is an outcome.
 
-**The declaration.** What a consumer can say, and what each defaults to:
+**The declaration is settled in shape**: the agentic project declares it whole, with every field required so nothing is implicit, and a procedure overrides the fields it differs on. What remains is the fields themselves:
 
-- Direction — up only, down only, or both — and, if both, what wins a conflict, which is the one genuinely hard case
-- Whether a delete propagates. Additive is the safer default: an agent removing a file should not empty a vault
-- Cadence — once at the close, on an interval, or on change — with continuous trading atomic hand-off for a small close and less lost on a dead container
-- Exclusions, and whether AgentForge ships sensible ones (`.git`, `node_modules`, editor scratch) or leaves the list entirely to the consumer
-- Scope — what a procedure inherits from its agent, and how an override reads at the call site
+- Direction — up only, down only, or both — and, if both, what wins a conflict, which is the one genuinely hard case and may be reason enough not to offer it
+- Delete propagation, as an explicit choice rather than a default
+- Cadence — once at the close, on an interval, or on change — and the quiescence threshold that keeps a file mid-write out of a continuous pass
+- Exclusions: whether AgentForge ships a starting list (`.git`, `node_modules`, editor scratch) that a project must still accept explicitly, or writes its own from nothing
+- How a partial override reads at the call site, and whether an override may relax something the project tightened
 
 **The implementation.** Leading candidate is [`s7cmd`](https://github.com/nidor1998/s7cmd): a single static Rust binary with ARM64 Linux builds, Apache-2.0, bundling the `s3sync` engine — local-to-S3, S3-to-local and S3-to-S3, include and exclude patterns, filtering by `LastModifiedDate` and size, checksum verification, configurable concurrency and a dry run. The `LastModifiedDate` filter is also the quiescence heuristic: sync only what has been still for longer than a threshold, so a file mid-write is left for the next pass. Against it: a personal project whose dependencies are updated best-effort, shipped in our base image and running with credentials — so pin it by digest, and keep an AWS-SDK walk as the fallback if that risk stops being acceptable.
 
-**The project key.** `CLAUDE_CODE_PROJECT_DIR_NAME` pins it, which is what frees resume from reproducing an identical path — but one store serves many agents, so the namespace is AgentForge's: what it derives from, whether two agents may ever share one, and what a collision does.
+**The project key.** `CLAUDE_CODE_PROJECT_DIR_NAME` pins it, which frees resume from reproducing an identical path. What it is scoped to is **undecided and with the operator**: per agent (`{consumer}/{project}/{agent}`) means transcripts never collide and a session belongs to the agent that made it; per project means agents can resume each other's sessions; either way the namespace is AgentForge's to enforce, and what a collision does has to be defined.
 
 **The remaining edges**, whatever is declared: when a file is quiescent enough to upload so a half-written file is not published; how writes are coalesced so a tool loop is not a request storm; and what a caller sees when a run is lost mid-sync, which is partial artifacts already visible — consistent with `LOST` meaning side effects may have happened, but worth writing down rather than discovering.
 
@@ -157,7 +157,7 @@ Decide by: whether a wrong composition fails at compile time; whether the resolv
 
 The Agent SDK reads the subscription token from the environment and offers no provider interface, so that token stays there. The question is everything else: the provider API keys a procedure's tools need, which arrive from a secret store through AgentCore Identity and would otherwise sit in the same environment the agent's own shell can read.
 
-- **How far to take a credential proxy** at the container level, brokering provider calls so their keys never enter the task process's environment — in the shape of something like Infisical's agent-vault. A later addition rather than a first-slice one, but the first slice should not make it harder. **The operator's call on scope.**
+- **Decided: the environment now, a proxy later.** The subscription token and a procedure's provider keys reach the container from a secret store through AgentCore Identity and live in the environment, where the agent's own shell can read them. That exposure is recorded rather than mitigated in the first slice; the base image keeps room for a broker in the shape of something like Infisical's agent-vault. Open is what the broker would look like when it arrives, and what the first slice must avoid doing to keep it cheap.
 - How expiry surfaces as `CREDENTIAL_EXPIRED` rather than as a transient provider failure
 - Rotation, and how a new key reaches a task that started before it changed
 - What a compromised or prompt-injected procedure can reach inside the microVM, and what is therefore not defensible by scrubbing an environment

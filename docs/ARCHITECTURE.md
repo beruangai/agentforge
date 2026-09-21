@@ -210,7 +210,7 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 - a crash is contained: the executor records `FAILED` with the exit code and the tail of stderr, so a task never disappears without a record
 - the process speaks the task protocol, and its logs go to the container's log stream
 
-**Credentials.** The Agent SDK reads the operator's subscription token from the environment, so that is where it lives; there is no provider interface to hand it through. The same is true of the API keys a procedure's tools need for external data providers, which reach the container from a secret store through AgentCore Identity. An expired credential surfaces as `CREDENTIAL_EXPIRED` rather than a generic failure, and nothing AgentForge emits ever contains one (D24, D29). A credential proxy at the container level — brokering provider calls so their keys never sit in the task process's environment at all — is a worthwhile later addition for everything except the subscription token, and is **[OPEN §O]**. AWS credentials cannot be withheld from a child in the same microVM: the task process is *not given* store credentials, but store integrity rests on the microVM boundary, not on a scrubbed environment.
+**Credentials live in the environment, for now.** The Agent SDK reads the operator's subscription token from there and offers no provider interface. A procedure's provider keys arrive the same way, from a secret store through AgentCore Identity. The agent's own shell can read both, which is recorded rather than mitigated: a container-level broker comes later, and the base image keeps room for it **[OPEN §O]**. An expired credential surfaces as `CREDENTIAL_EXPIRED` rather than a generic failure, and nothing AgentForge emits ever contains one (D24, D29). A credential proxy at the container level — brokering provider calls so their keys never sit in the task process's environment at all — is a worthwhile later addition for everything except the subscription token, and is **[OPEN §O]**. AWS credentials cannot be withheld from a child in the same microVM: the task process is *not given* store credentials, but store integrity rests on the microVM boundary, not on a scrubbed environment.
 
 **Guardrails are cooperative.** `writeScope` and `stopGuard` constrain the model's tool use; they are not a sandbox, and a procedure with shell access goes around them.
 
@@ -243,14 +243,14 @@ An agentic base image serving one agent, or an agent serving one procedure, is t
 
 | State | How it persists | Whose |
 |---|---|---|
-| Session transcripts | The SDK's `SessionStore` adapter, over an object store's API. `CLAUDE_CODE_PROJECT_DIR_NAME` pins the project key, which AgentForge namespaces so one store serves many agents (D17) | AgentForge |
+| Session transcripts | The SDK's `SessionStore` adapter, over an object store's API. `CLAUDE_CODE_PROJECT_DIR_NAME` pins the project key; what that key is scoped to is **[OPEN §F]** (D17) | AgentForge |
 | The rest of the config directory | Baked into the image — settings, skills, plugins and user-tier memory are capabilities, not state | AgentForge |
 | Working directories | Synced to an object store under a strategy the consumer declares, per agent or per procedure | The consumer declares; AgentForge runs it |
 | Anything else | The consumer's own mechanism | The consumer |
 
 The mirror is best-effort by design — three attempts, then the batch is dropped with a `mirror_error` — so it is verified rather than trusted: entries deduped by id, the transcript's last entry checked after the run, and a dropped batch failing the task rather than appearing in a log.
 
-**The sync strategy is the consumer's, per agent and overridable per procedure**: direction, whether deletes propagate, whether it runs continuously or once at the close, how often, and what is excluded. These are the knobs existing sync tools already expose, and a procedure that wants atomic hand-off picks close-only while one producing a long narrative picks continuous — case by case, which is the point.
+**The sync strategy is the consumer's, declared whole at the agentic project and overridden in part by a procedure**: direction, whether deletes propagate, whether it runs continuously or once at the close, how often, and what is excluded. **Every field is required where it is declared** — there is no implicit default, so nothing behaves a way nobody chose — and a procedure supplies only the fields it differs on. A procedure wanting atomic hand-off overrides the cadence; one producing a long narrative leaves it continuous.
 
 **What AgentForge guarantees, whatever the strategy:** the sync is flushed and verified *before* the outcome is published, so a task never reports `SUCCEEDED` over unsynced files and a failed flush fails the task; the sync runs in the task's own process group, so cancelling the task takes it too and nothing it does touches the event loop answering `/ping`; and a sync failure is an outcome, never a log line.
 
