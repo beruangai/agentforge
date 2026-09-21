@@ -132,7 +132,7 @@ How a procedure is written — object literal, chained builder, or a class whose
 
 A **task** is one attempt at one procedure, ending in one **outcome**. It is an A2A task on the wire and an asynchronous job to AgentCore.
 
-**`/ping` reports capacity, not activity.** On the A2A protocol the SDK does no busy tracking of its own — its handler defaults to `Healthy` — so the policy is ours: `Healthy` while the container can admit another task, `HealthyBusy` once it is at its admission limit and wants new work shed elsewhere. That differs from the HTTP protocol, whose handler reports busy while any task runs, because that path serves one task at a time. The tension to watch is that `Healthy` is also what the platform reads as idle: a session reporting it for 15 minutes is terminated, and whether a caller's `GetTask` polls count as the activity that resets that timer is **[OPEN §B]**.
+**`/ping` manages the session's lifecycle; it does not gate delivery.** `HealthyBusy` means work is in progress, so the session is kept alive and must not be reaped; `Healthy` means idle, and fifteen minutes of it ends the session. Neither status stops an invocation arriving — a container can receive a start, a poll or a cancel whatever it last reported. So the policy is simply: `HealthyBusy` while any task is running, `Healthy` when none is. **Concurrency is the server's own business**, enforced by the gateway's admission limit and answered with a refusal, never signalled through `/ping`. The A2A SDK does no busy tracking of its own — its handler defaults to `Healthy` — so this is ours to implement, where the HTTP path tracks it automatically because it serves one task at a time.
 
 ### Lifecycle
 
@@ -198,6 +198,7 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 **The gateway** decides admission (§4). **The executor** spawns and supervises: one process per task, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md), measured by **[OPEN §G]**).
 
 - `/ping` shares no event loop with any task, so nothing a task does can stall the health check and get a busy session terminated (D31)
+- **the server answers `/ping` within the platform's startup window**, so the container binds and serves before any slow initialisation — loading procedures, warming the SDK — happens behind it
 - each task loads its procedures from the image it was deployed with (§6)
 - a crash is contained: the executor records `FAILED` with the exit code and the tail of stderr, so a task never disappears without a record
 - the process speaks the task protocol, and its logs go to the container's log stream

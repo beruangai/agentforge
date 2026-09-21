@@ -22,11 +22,11 @@ The store must outlive the microVM, serve the A2A task store, index tasks by ide
 
 ## §B — Concurrency and reachability of a busy session *(OPEN)*
 
-A runtime session is an isolation boundary; how many tasks run inside one is AgentForge's to allow and the consumer's to use (`ARCHITECTURE.md` §2). What the platform does is not documented: whether an invocation arriving while `/ping` reports `HealthyBusy` is delivered, queued, or refused, and whether concurrent invocations to one session are delivered in parallel.
+A runtime session is an isolation boundary; how many tasks run inside one is AgentForge's to allow and the consumer's to use (`ARCHITECTURE.md` §2). `/ping` is a lifecycle signal rather than admission control, so a busy container should still receive invocations — but that is inference from the contract's silence, and the whole await path depends on it.
 
 Everything a caller does after `SendMessage` depends on it — `GetTask`, `CancelTask`, and attaching a retry all reach a busy container.
 
-**Spike:** a runtime holding a long task; send a second `SendMessage`, a `GetTask`, and a `CancelTask` to the same session; record delivery, latency, and what the container sees. Confirm that two tasks can run in one container at once, and that no second container appears for one session id, including during the provisioning window that returns 409.
+**Spike:** a runtime holding a long task and reporting `HealthyBusy`; send a second `SendMessage`, a `GetTask`, and a `CancelTask` to the same session; record delivery, latency, and what the container sees. Confirm that two tasks can run in one container at once, that no second container appears for one session id — including during the provisioning window that returns 409 — and that the startup window for the first `Healthy` response is what the operator reports.
 
 ## §C — Cancellation *(OPEN)*
 

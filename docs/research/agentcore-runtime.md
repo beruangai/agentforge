@@ -34,7 +34,9 @@ From [isolated sessions](https://docs.aws.amazon.com/bedrock-agentcore/latest/de
 
 From the [long-running agents guide](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-long-run.html):
 
-- `/ping` returns HTTP 200 with `{"status": "Healthy" | "HealthyBusy"}` — "Healthy" is idle and waiting, "HealthyBusy" is processing background tasks. The status describes the container, not any one task.
+- `/ping` returns HTTP 200 with `{"status": "Healthy" | "HealthyBusy"}`. `Healthy` is "ready to accept new work"; `HealthyBusy` is "operational but currently busy with async tasks. While the status is `HealthyBusy`, the runtime session is considered active and is kept alive."
+- **It is a lifecycle signal, not admission control.** Nothing in the contract says a status stops an invocation being delivered; the status decides whether the session is kept alive or reaped. Concurrency is the container's own responsibility on both protocols, and both can receive messages while work is in progress.
+- **Operator, not found in the pages read:** the container must answer `Healthy` within 120 seconds of starting, and that first healthy response is the snapshot used for warm starts. Treat as operating knowledge until confirmed.
 - A session reporting `Healthy` for 15 minutes is terminated; `HealthyBusy` keeps it alive past the idle timeout.
 - `time_of_last_update` is optional; setting it on every ping prevents the idle timeout from firing and can exhaust the session quota.
 - "Ensure `@app.entrypoint` handler does not perform blocking operations, as this might also block the /ping health check endpoint."
