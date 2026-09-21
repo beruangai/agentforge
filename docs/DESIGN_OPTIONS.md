@@ -12,12 +12,12 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§A** | Task store details behind the fixed interface | Design in the first slice; one AgentCore spike | The first slice's store |
 | **§N** | How a procedure is written | Writing real procedures in A0 | The procedure model |
 | ~~§E~~ | ~~What the kernel still needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
-| **§C** | Cancellation on the platform | Local spike, then AgentCore | Cancel on AgentCore |
+| **§C** | Cancellation on the platform | Local half **settled 2026-09-22**; platform half **blocked** with §B | Cancel on AgentCore |
 | **§O** | What a credential broker looks like when it arrives | Later; the first slice keeps room | Nothing yet |
 | **§F** | The sync declaration's fields, and the key's derivation | Design in the first slice | Session resume and artifacts |
-| **§B** | Whether a busy container receives invocations | AgentCore spike | The await path on AgentCore |
+| **§B** | Whether a busy container receives invocations | AgentCore spike — **blocked on `iam:PassRole`** (§B) | The await path on AgentCore |
 | **§D** | Image determinism and deploy granularity | Local spike | Deployment |
-| **§G** | Health and per-task cost | Local measurement | Confirms ADR 0004 |
+| ~~§G~~ | ~~Health and per-task cost~~ | **Settled 2026-09-22** ([research](research/task-process-and-cost.md)) — ADR 0004 confirmed | — |
 | **§H** | Container identity in the record | Design in the first slice | Loss detection on retry |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
 | **§L** | Where the consumers still pull apart | **Operator**, with each consumer | A3 |
@@ -34,19 +34,39 @@ The interface is fixed and built in the first slice: a conditional insert for th
 
 **Spike (AgentCore):** write and renew a lease from inside a microVM, read it from outside, and measure visibility latency and renewal cost at the chosen interval.
 
-## §B — Whether a busy container receives invocations *(OPEN)*
+## §B — Whether a busy container receives invocations *(OPEN — BLOCKED on IAM, 2026-09-22)*
+
+> **Blocked, not unanswered.** The AgentCore half of the spike plan — §B, §C's platform half and §A's lease measurement — could not run on 2026-09-22. `CreateAgentRuntime` requires `--role-arn`, and the `agentforge` SSO profile is `AWSReservedSSO_PowerUserAccess`, which denies both `iam:CreateRole` and, decisively, **`iam:PassRole`**:
+>
+> ```
+> AccessDeniedException: User: …/AWSReservedSSO_PowerUserAccess_…/jeremy is not authorized to
+> perform: iam:PassRole on resource: arn:aws:iam::913756569129:role/agentforge-spike-agentcore-execution
+> ```
+>
+> The execution role itself exists (the operator created it out of band); passing it is the block, so creating more roles does not help. ECR, DynamoDB and S3 are all reachable under the same profile — AgentCore alone is gated.
+>
+> **Remediation, operator's choice:** add `iam:PassRole` on that role ARN, conditioned on `iam:PassedToService: bedrock-agentcore.amazonaws.com`, to the PowerUser permission set; or run the AgentCore spikes from the admin identity that created the role. `spikes/agentcore/` holds everything else ready to go.
+
 
 `/ping` is a lifecycle signal, not admission control, so a container should receive a start, a poll or a cancel whatever it last reported (`ARCHITECTURE.md` §4). That is inference from the contract's silence, and the whole await path rests on it.
 
 **Spike (AgentCore):** hold a long task while reporting `HealthyBusy`; send a second `SendMessage`, a `GetTask` and a `CancelTask` to the same session; record delivery, latency and what the container sees. Confirm two tasks can run in one container, that no second container appears for one session id — including in the provisioning window that returns 409 — and what the startup window for the first `Healthy` response actually is.
 
-## §C — Cancellation on the platform *(OPEN)*
+## §C — Cancellation on the platform *(the local half SETTLED 2026-09-22; the platform half BLOCKED with §B)*
 
-The mechanism is decided: `CancelTask` reaches the gateway, which stops the task gracefully and then kills its process group, with `StopRuntimeSession` as the blunt fallback (`ARCHITECTURE.md` §4). What is not known is how the platform behaves.
+The mechanism is decided: `CancelTask` reaches the gateway, which stops the task gracefully and then kills its process group, with `StopRuntimeSession` as the blunt fallback (`ARCHITECTURE.md` §4).
 
-**Spike (local, then AgentCore):** cancel mid-run both ways; measure time to termination; whether the container receives `SIGTERM` under `StopRuntimeSession` and how long before the kill; whether telemetry flushes and an outcome is recorded inside the grace period; whether a Claude session left mid-turn resumes cleanly. `docker stop` stands in locally.
+**Settled locally** — [`research/task-process-and-cost.md`](research/task-process-and-cost.md), `spikes/task-process/`:
 
-Three cases the implementation must cover whichever way the spike goes: a cancel arriving **before the task process exists**; a cancel from a caller that **attached to another caller's task**; and a cancel reaching a **freshly provisioned container**, whose A2A SDK would otherwise mark the task cancelled without consulting the executor that owns it.
+- The protocol runs over a **dedicated bidirectional socketpair on fd 3** (`"socket-fd"` at stdio index 3, `net.connect({ fd })` at the parent). The task wrote a decoy protocol response to stdout claiming a different outcome and the executor was unaffected, so the separation is real rather than nominal.
+- `cancel` over the protocol settles a run gracefully in **5 ms**.
+- A task that **ignores `SIGTERM`** — a no-op handler replaces the default disposition — is killed at **511 ms** against a 500 ms grace, `signal = SIGKILL`.
+- **`SIGKILL` of the process group takes a grandchild the task started**; the negative control, killing the process alone, left it running. `detached: true` (`setsid`) plus `kill(-pid)` is what makes this true.
+- **A cancel arriving before the task process exists** is caught by a token set before the executor's first `await`.
+
+**Not settled, and not attemptable on 2026-09-22** — blocked with §B on `iam:PassRole`: whether the container receives `SIGTERM` under `StopRuntimeSession` and how long before the kill; whether telemetry flushes and an outcome is recorded inside the grace period; whether a Claude session left mid-turn resumes cleanly; and the third of the three cases below, which is inherently a platform question.
+
+Three cases the implementation must cover whichever way the spike goes: a cancel arriving **before the task process exists** (settled above); a cancel from a caller that **attached to another caller's task**; and a cancel reaching a **freshly provisioned container**, whose A2A SDK would otherwise mark the task cancelled without consulting the executor that owns it.
 
 ## §D — Image determinism and deploy granularity *(OPEN)*
 
@@ -90,9 +110,13 @@ Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-thro
 
 **The remaining edges**, whatever is declared: when a file is quiescent enough to upload so a half-written file is not published; how writes are coalesced so a tool loop is not a request storm; and what a caller sees when a run is lost mid-sync, which is partial artifacts already visible — consistent with `LOST` meaning side effects may have happened, but worth writing down rather than discovering.
 
-## §G — Health and per-task cost *(OPEN)*
+## §G — Health and per-task cost *(SETTLED 2026-09-22)*
 
-Measure under a real run: `/ping` latency with several tasks in child processes; the start cost of a process per task — module load plus SDK startup — against a typical run's duration. Confirms or overturns [ADR 0004](../adr/0004-a-process-per-task.md) with numbers.
+Measured; [ADR 0004](../adr/0004-a-process-per-task.md) confirmed. Findings in [`research/task-process-and-cost.md`](research/task-process-and-cost.md), spike in `spikes/task-process/`.
+
+- **`/ping` is untouched by running tasks.** Four tasks, two of them saturating a core, moved p95 not at all: 1.32 ms idle against 0.18 ms busy. D31 holds by construction, because the tasks are separate processes.
+- **A process per task costs 65 ms** ready-to-serve with the Agent SDK imported (15 ms without) — **0.054 %** of a 120-second run.
+- **Per-task fixed memory is tens of megabytes**, ≈ 61 MB RSS, so the admission limit will be governed by what an agent run costs rather than by the process-per-task decision. The limit itself is **not** derived from this number: the fixture does not spawn the Claude Code CLI a real task spawns, and a limit set from a harness floor would err in the unsafe direction. Measured properly on AgentCore.
 
 ## §H — Container identity *(OPEN)*
 
@@ -186,7 +210,7 @@ Not open questions — deliberately not being worked until something asks for th
 |---|---|---|
 | A2A server assembly, the wrapping gateway, client signing | §I | Local |
 | Kernel settlement and structured output | §E | Local — **done**, `spikes/kernel-settlement/` |
-| Task-process protocol, cancellation, group kill | §C, §G | Local |
+| Task-process protocol, cancellation, group kill | §C, §G | Local — **done**, `spikes/task-process/` |
 | Procedure authoring against real procedures | §N | Local |
 | Credential provisioning and expiry | §O | Local |
 | Deterministic image builds and skipped deploys | §D | Local |

@@ -202,7 +202,7 @@ Typed; every failure carries its cause. Layer 1 reads only the kind and its retr
 
 One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC on `POST /`, the card at `/.well-known/agent-card.json`, and `/ping` reporting the container's aggregate status. Whether it is assembled from `@a2a-js/sdk` directly or on the AgentCore SDK's `serveA2A` is **[OPEN §I]**, and it blocks the first slice rather than the first deployment.
 
-**The gateway** decides admission (§4). **The executor** spawns and supervises: one process per task, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md), measured by **[OPEN §G]**).
+**The gateway** decides admission (§4). **The executor** spawns and supervises: one process per task, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md)). Measured: **65 ms** to a task process ready to serve with the Agent SDK imported — 0.054 % of a two-minute run — and `/ping` p95 unmoved by four running tasks, two of them saturating a core ([research](research/task-process-and-cost.md)). The channel is a **dedicated bidirectional socketpair on fd 3**, so a task's own logging cannot corrupt its outcome; `detached: true` gives it its own process group, and `kill(-pid)` is what makes cancellation reach a grandchild.
 
 - `/ping` shares no event loop with any task, so nothing a task does can stall the health check and get a busy session terminated (D31)
 - **the server answers `/ping` within the platform's startup window**, so the container binds and serves before any slow initialisation — loading procedures, warming the SDK — happens behind it
