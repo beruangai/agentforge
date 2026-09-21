@@ -72,7 +72,7 @@ Four identifiers, from three systems. **The consumer decides how they relate; Ag
 | `runtimeSessionId` | AgentCore | One microVM: compute, memory, filesystem. At most one container at a time per id **[OPEN §B]** | Routes to it; keeps it stable across attempts |
 | `contextId` | A2A | A conversation: related tasks on the wire | Supplied by the client, uuid7 when the caller gives none; returned on every task |
 | `sessionId` | Claude Agent SDK | One transcript, started, resumed or forked | Passed to the SDK as the procedure says; recorded |
-| Working directory | Claude Agent SDK | The Claude project, which namespaces transcript and memory | Set per procedure |
+| Working directory | Claude Agent SDK | The Claude project, which namespaces transcript and memory | Set per procedure, beneath `/mnt/workspace` (§6) |
 
 A fifth, the **idempotency key**, is AgentForge's own: it names one logical execution across its attempts, where a context names a conversation (§4).
 
@@ -157,6 +157,8 @@ The A2A SDK mints the task id and creates its event bus *before* the executor is
 
 Task state lives in a store outside the microVM ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)), so an outcome survives the container, the caller's redeploy, and the connection that asked for it (D11). It is the A2A task store, extended with the idempotency index, the lease and the outcome payload — one record, read through A2A, so a caller needs no store access of its own (D32).
 
+**DynamoDB holds it**: conditional writes give attach-or-start atomically and lease renewal is a cheap update. Only a payload too large for an item goes to S3 — the exception, not the path. **An outcome is expected to be small**: status, identifiers, and references to what the run produced. A procedure that generates long-form work writes it to the working directory and returns where it is, which is what makes the record cheap to store, cheap to read on every poll, and readable in a task's history. AgentForge cannot prevent a consumer returning a novel, and does not try; it sizes for the common case and the large-payload path catches the rest. Remaining details are **[OPEN §A]**.
+
 **Writes are fenced.** A2A's `TaskStore.save` overwrites unconditionally, so the store implementation carries a **fencing token** — the lease generation — in the task's metadata and rejects a write from a stale holder. Without it, a container deriving `lost` and the original container finishing `succeeded` are two unordered writes, and whichever lands later wins.
 
 **Loss is derived at read time**, from a lease the executor renews while the task process lives. Nothing sweeps, so **detection latency is the caller's poll interval** — which is what a caller sizes its heartbeat against (D12).
@@ -232,7 +234,14 @@ A package image serving one agent, or an agent serving one procedure, is the sam
 
 **That only holds if builds are deterministic.** An image digest changes if any byte changes, so an unaffected agent must rebuild to a byte-identical image and never be updated: pinned bases, reproducible bundler output, content-addressed tags, and `UpdateAgentRuntime` called only when the digest changed. Nx's affected graph decides what to rebuild; the digest decides what to deploy **[OPEN §D]**.
 
-**Mounts carry state, never code** — the working directory, memory, transcripts. On S3 Files or EFS a version update has no effect on them; AgentCore's managed session storage is wiped by one, so durable session state does not live there **[OPEN §F]**.
+**Mounts carry state, never code**, on S3 Files — which a runtime version update does not affect, unlike AgentCore's managed session storage, which it wipes. Two of them:
+
+| Mount | Owned by | Holds |
+|---|---|---|
+| `/mnt/claude-config` | AgentForge | `CLAUDE_CONFIG_DIR`: settings, session history, projects — everything the SDK keeps on local disk, so a session resumes in any container (D17) |
+| `/mnt/workspace` | The consumer | The working directories procedures run in. A procedure's `cwd` is a path beneath it, which is also what decides its Claude project |
+
+The workspace mount is deliberately shared: it is the artifact vault, and procedures are meant to see each other's output. **How it is partitioned — which access points, which prefixes, what may write where — is the consumer's to define and AgentForge's to provide**, and the mechanism for it is **[OPEN §F]**.
 
 **The agent card is generated at build time** from the procedures the image contains, and served from the image: a mount is readable only during an invocation, and the platform may fetch the card outside one.
 
@@ -249,7 +258,7 @@ One `query()` to a settled outcome, behind the `agent()` helper:
 - **Structured output** — the agent contract becomes the SDK's own `outputFormat` (draft-07), and the settled output is validated before anything else sees it. Not a helper a procedure can forget: a run without an agent contract is not expressible. The SDK validates and re-prompts natively now; what beyond that is still needed is **[OPEN §E]**.
 - **Settlement** — work the agent dispatches runs in the foreground and completes within the turn that dispatched it, because a turn resumed by background work once cancelled its own final submission (D9). Whether that still holds is **[OPEN §E]**.
 - **Abort** — an `AbortSignal` and the SDK's interrupt reach the run; exactly one outcome is published.
-- **Session** — started, resumed or forked as the procedure said. How transcripts persist for resume in another container is **[OPEN §F]**; a failed mirror write is surfaced, never swallowed.
+- **Session** — started, resumed or forked as the procedure said, with its transcript on the `/mnt/claude-config` mount so it resumes in any container (§6).
 - **No blocking** — nothing in the kernel or a helper blocks the event loop.
 
 ### Library
