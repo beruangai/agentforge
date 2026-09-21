@@ -124,7 +124,7 @@ The contract hash travels in the envelope. A container whose image does not impl
 
 Cross-cutting behavior — guardrail hooks, telemetry, a house style of options — is a function a procedure calls, shipped in a package. Composite options are **additive**: contributions to hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering (D8). AgentForge ships a small library (§7); nothing is wired by default.
 
-How a procedure is written — object literal, chained builder, or a class whose methods are its steps — is **[OPEN §N]**, settled by writing StrategyFoundry's real procedures rather than by argument.
+**A procedure is an object literal** ([ADR 0013](../adr/0013-a-procedure-is-an-object-literal.md)), settled against a baseline inferred from both consumers rather than by argument. All three candidate styles proved equally safe against six composition mistakes under `tsc --strict`; the literal wins because its declaration *is* the resolved object, and because a class's `override guardrails()` can silently drop the house contribution with the compiler's blessing ([research](research/procedure-authoring.md)).
 
 ---
 

@@ -10,7 +10,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 |---|---|---|---|
 | **§I** | How the A2A server is assembled | **Decided 2026-09-22** ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), proposed); AgentCore pass-through still open | The first slice |
 | **§A** | Task store details behind the fixed interface | Design in the first slice; one AgentCore spike | The first slice's store |
-| **§N** | How a procedure is written | Writing real procedures in A0 | The procedure model |
+| ~~§N~~ | ~~How a procedure is written~~ | **Decided 2026-09-22** ([ADR 0013](../adr/0013-a-procedure-is-an-object-literal.md), proposed) | — |
 | ~~§E~~ | ~~What the kernel still needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
 | **§C** | Cancellation on the platform | Local half **settled 2026-09-22**; platform half **blocked** with §B | Cancel on AgentCore |
 | **§O** | What a credential broker looks like when it arrives | Later; the first slice keeps room | Nothing yet |
@@ -166,6 +166,7 @@ Most apparent divergence dissolved in the distillation ([CONSUMERS.md](CONSUMERS
 - **What a session sees at its start (D7).** StrategyFoundry composes everything; TrendBot expects per-agent and shared capability scopes to be present. Both hold if the answer is configuration — which capability directories an image and its mounts contain — but that configuration is not designed.
 - **Holding a failed attempt (D21).** TrendBot holds one for operator review, today in its own activity code. Whether AgentForge does anything beyond making the failure observable is TrendBot's to say.
 - **Secrets (D29, §O).** Secret storage is the consumer's, but "each deployment reads only the secrets it declares" and "no credential in anything the harness emits" are partly ours.
+- **Procedures that invoke no agent (T4).** Raised by the §N spike on 2026-09-22. TrendBot **T4** requires them — vault reads, corpus scans, snapshot and publish composers, measurement runs of up to an hour — sharing a directive's contract, invocation, failure and side-effect phases, minus the agent run. `ARCHITECTURE.md` §11 excludes them: "AgentForge runs agents; a consumer's plain work belongs in the consumer". **T4's stated reason is co-location** — the work needs the container's working copy — which "put it in the consumer" does not answer, so this is not a misreading of the contract. Three shapes: hold the line, and TrendBot duplicates the working-copy sync in its own container; **admit a second procedure kind** with the same machinery minus the run, which is cheap to build but makes §11 false and needs a superseding ADR; or treat it as a procedure with a trivial run, which is dishonest and burns a model call per vault read. Operator's, with TrendBot ([research](research/procedure-authoring.md)).
 
 ## §M — Pausing for a human *(OPEN — operator)*
 
@@ -179,19 +180,18 @@ Neither consumer requires it, so nothing is built. It is here because the shape 
 
 Four rules hold whichever is chosen ([reference](research/harness-references.md)): the request carries the **schema of the answer**, validated at the boundary; a malformed answer is rejected **without consuming the pause**; pending pauses appear in the task's own state as well as on the stream; and the surface that resolves a pause is **not on the agent card** beside ordinary procedure calls.
 
-## §N — How a procedure is written *(OPEN)*
+## §N — How a procedure is written *(DECIDED 2026-09-22)*
 
-A question of ergonomics at the layer a consumer touches most, which is a requirement rather than a preference.
+**Decided: the object literal (N1)** — [ADR 0013](../adr/0013-a-procedure-is-an-object-literal.md), status `proposed`. Settled by writing a baseline inferred from both consumers in all three styles and running the compiler over deliberately-wrong variants, not by argument. Findings in [`research/procedure-authoring.md`](research/procedure-authoring.md); spike in `spikes/procedure-authoring/`.
 
-- **N1 — Object literal.** Inspectable without running it; verbose for a procedure with many parts.
-- **N2 — Chained builder.** Reads well, infers types through the chain, can make an invalid composition a compile error.
-- **N3 — A class whose methods are the steps.** Familiar and discoverable; the risk is that overriding rather than contributing becomes the habit.
+- **On safety the three are equal.** Six real composition mistakes, written in all three styles and fed to `tsc --strict`: **all three caught all six**. The builder's one claimed advantage — `.build()` reachable only on a complete builder — is matched by the literal's own parameter type, without the machinery.
+- **On inspectability the literal wins**: the declaration *is* the resolved object. The class needs `new Draft().resolve()` — instantiation and a method call — so the card generator would have to construct objects to read procedures.
+- **The class has an unguarded hazard**, which is what rejects it: `override guardrails() { return []; }` **silently drops every house guardrail and `tsc` accepts it**. In the literal and the builder that mistake is not expressible.
+- **N2 is not foreclosed.** Both resolve to the same object, so a builder can be added later as sugar if verbosity becomes a real problem. It is rejected as unearned, not as wrong.
 
-Decide by: whether a wrong composition fails at compile time; whether the resolved configuration is inspectable without executing the declaration; whether a reviewer sees everything a procedure contributes without following an inheritance chain.
+**The gate is clean.** Standard TypeScript 5 decorators run on Bun 1.4.0 and **preserve inference through the decorated member** (proved with `@ts-expect-error`). `Symbol.metadata` is undefined and needs the one-line polyfill `Symbol.metadata ??= Symbol('Symbol.metadata')`. So decorators were available on merit and were not chosen: registration at module load is all they buy, and an exported literal is already discoverable through the same import graph.
 
-**Check first:** whether standard TypeScript 5 decorators on Bun preserve inference through the decorated member, and whether decorator metadata needs a `Symbol.metadata` polyfill. If clean, decorator registration is available to N2 and N3; if not, it is out on toolchain grounds rather than taste.
-
-**Exit:** settled by writing a **baseline set of procedures inferred from both consumers** — their contracts, specs and existing code — and authoring each candidate style against it. AgentForge ships before StrategyFoundry's development starts, so waiting for its real procedures would wait forever; and a style settled against one consumer's first attempt would be coupled to it anyway. The baseline is representative, not exhaustive: enough shapes to expose the differences between the styles.
+**Raised, not resolved — belongs in §L.** TrendBot **T4** requires procedures that invoke no agent; `ARCHITECTURE.md` §11 excludes them. T4's reason is **co-location** — the work needs the container's working copy — which "put it in the consumer" does not answer. Three shapes, the operator's call with TrendBot: hold the line and make TrendBot duplicate the sync machinery; admit a second procedure kind with the same contract, invocation, failure and phase machinery minus the run, which makes §11 false and needs a superseding decision; or pretend it is a procedure with a trivial run, which would burn a model call per vault read.
 
 ## §O — Credentials in the container *(OPEN — operator)*
 
@@ -221,7 +221,7 @@ Not open questions — deliberately not being worked until something asks for th
 | A2A server assembly, the wrapping gateway, client signing | §I | Local |
 | Kernel settlement and structured output | §E | Local — **done**, `spikes/kernel-settlement/` |
 | Task-process protocol, cancellation, group kill | §C, §G | Local — **done**, `spikes/task-process/` |
-| Procedure authoring against real procedures | §N | Local |
+| Procedure authoring against an inferred baseline | §N | Local — **done**, `spikes/procedure-authoring/` |
 | Credential provisioning and expiry | §O | Local |
 | Deterministic image builds and skipped deploys | §D | Local — **done**, `spikes/images/` |
 | Busy-container reachability and concurrency | §B | AgentCore |
