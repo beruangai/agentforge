@@ -68,6 +68,14 @@ From [filesystem configurations](https://docs.aws.amazon.com/bedrock-agentcore/l
 - So durable per-session state that must survive a deploy belongs on S3 Files or EFS, not on managed session storage.
 - Mount paths must be `/mnt/<one level>`, 6–200 characters, unique, and not nested inside one another; at most 5 configurations per runtime.
 
+## Naming constraints
+
+From [CreateAgentRuntime](https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_CreateAgentRuntime.html) and [ECR CreateRepository](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_CreateRepository.html):
+
+- `agentRuntimeName` is `[a-zA-Z][a-zA-Z0-9_]{0,47}` — letters, digits and underscores only, **no hyphens or slashes, 48 characters maximum**, starting with a letter. The returned ARN appends a ten-character suffix of its own.
+- ECR `repositoryName` is `[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*`, 2–256 characters, starting with a letter. Slashes namespace a repository — "prepended with a namespace to group the repository into a category" — and `-+` means consecutive hyphens are legal.
+- So one string cannot name both: a registry path and a runtime name are derived separately from the same identity.
+
 ## Versions and running sessions
 
 From [lifecycle settings](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-lifecycle-settings.html):

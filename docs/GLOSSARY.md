@@ -74,11 +74,11 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 ## Agents and delivery
 
-**Agent** (deployed) — One AgentCore runtime: an image extending a capability image, the procedures it contains, its card, its mounts and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
+**Agent** (deployed) — One AgentCore runtime: an image extending a package image, the procedures it contains, its card, its mounts and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
 
-**Agents project** — One project holding a capability image and the agents that extend it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
+**Agents project** — One package holding a package image and the agents that extend it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
 
-**Capability image** — A consumer's image layer over AgentForge's base: the skills, tools, MCP servers, prompt foundation, language runtimes and memory configuration a group of agents share. An agent's image extends one ([ADR 0008](../adr/0008-code-ships-in-the-image.md)).
+**Package image** — A consumer's image layer over AgentForge's base, named for the package that vends it (`{consumer}/{package}`): the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share. An agent's image extends one ([ADR 0008](../adr/0008-code-ships-in-the-image.md)).
 
 **Agent card** — The A2A discovery document, generated at build time from the procedures an image contains, and served from the image.
 

@@ -41,13 +41,14 @@ Leaning C1, with C2 as the fallback when the container cannot be reached. **Spik
 
 Code ships in the image and layering is what keeps a change from spreading ([ADR 0008](../adr/0008-code-ships-in-the-image.md)). That only works if an unaffected agent rebuilds to a byte-identical image and is never updated.
 
-- How the layers are cut: what belongs in AgentForge's base, what in a consumer's capability image, what in an agent's own
+- How the layers are cut: what belongs in AgentForge's base, what in a consumer's package image, what in an agent's own
 - What it takes to make the build reproducible on this toolchain — pinned bases, bundler output, file ordering and timestamps — and whether Bun's bundler is deterministic enough without help
 - Comparing digests before calling `UpdateAgentRuntime`, so an unchanged agent is never given a new version
-- What the build costs when a capability image changes and every agent above it rebuilds
+- What the build costs when a package image changes and every agent above it rebuilds
 - Whether the agent card can be generated as a build step from the image's own registry of procedures
+- Where AgentForge's base image is published and how a consumer pins it, and how the derived names stay stable when a triple is truncated to fit `agentRuntimeName`'s 48 characters
 
-**Spike (local):** build one capability image and three agent images from it; change one agent's procedure; confirm the other two rebuild to identical digests and that the deploy path skips them; then change the capability image and confirm all three move.
+**Spike (local):** build one package image and three agent images from it; change one agent's procedure; confirm the other two rebuild to identical digests and that the deploy path skips them; then change the package image and confirm all three move.
 
 ## §E — Kernel settlement on the current SDK *(OPEN)*
 
@@ -102,7 +103,7 @@ This is not a detail to verify later: it decides the shape of the server and the
 
 AgentForge is delivered as an Nx plugin with generators, constructs and a deploy path ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md), [ADR 0008](../adr/0008-code-ships-in-the-image.md)). Open:
 
-- Which generators exist, and what each writes: an agents project, a capability image, an agent over it, a procedure, a caller's client wiring
+- Which generators exist, and what each writes: an agents project, a package image, an agent over it, a procedure, a caller's client wiring
 - **The sync generator** — what it keeps current in a consumer as AgentForge changes (wiring, construct props, the caller's client, image pins), how it reports a change it cannot make automatically, and how much of `@aws/nx-plugin`'s own sync machinery is reused rather than reimplemented
 - What each construct covers, what the consumer must supply, and how several agents share or separate stores, buckets and the image registry
 - Build granularity for nested agents: which targets are per agent, and what a shared image change rebuilds

@@ -212,13 +212,15 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 
 Three levels, each a bundle of one or more of the next. **Where the lines fall is the consumer's**, exactly as identity is (§2); AgentForge vends the bottom one and the tooling.
 
-| | What it is | Changes when |
-|---|---|---|
-| **Base image** | AgentForge's: Bun, the Claude CLI, the runtime server and the harness | AgentForge releases |
-| **Capability image** | The consumer's layer over it: the skills, tools, MCP servers, prompt foundation, language runtimes and memory configuration a group of agents share | Those capabilities change |
-| **Agent** | A deployed AgentCore runtime, extending a capability image with its own procedures, its card, its mounts and its stores | Its own procedures or configuration change |
+| | What it is | Named | Changes when |
+|---|---|---|---|
+| **Base image** | AgentForge's: Bun, the Claude CLI, the runtime server and the harness | `agentforge` | AgentForge releases |
+| **Package image** | The consumer's layer over it, named for the package that vends it: the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share | `{consumer}/{package}` | Those capabilities change |
+| **Agent** | A deployed AgentCore runtime, extending its package image with its own procedures, card, mounts and stores | `{consumer}/{package}/{agent}` | Its own procedures or configuration change |
 
-A capability image serving one agent, or an agent serving one procedure, is the same shape with a count of one. A consumer that wants an agent isolated from every other capability extends the base image directly.
+**One identity, names derived from it.** Several consumers, each with several packages and several agents, share a registry and an account, so the triple `{consumer}/{package}/{agent}` is the identity and every platform name comes from it — because no single string is legal everywhere. The ECR repository takes the triple as-is, since slashes are what ECR namespaces with. The AgentCore runtime name takes it with underscores, because `agentRuntimeName` allows only letters, digits and underscores and caps at 48 characters — which a long triple overflows, so the plugin truncates deterministically and appends a short hash rather than failing at deploy. Images are referenced by digest, never by a moving tag.
+
+A package image serving one agent, or an agent serving one procedure, is the same shape with a count of one. A consumer that wants an agent isolated from every other capability extends the base image directly.
 
 **Code ships in the image** ([ADR 0008](../adr/0008-code-ships-in-the-image.md)). A deploy cannot interrupt a run: AgentCore keeps existing sessions on the artifact they started with and gives new sessions the new one. So nothing needs mounting to avoid churn — what a change must avoid is spreading, and layering is what stops it. A change to one agent's procedures rebuilds that agent's image alone; a change to shared capabilities rebuilds the images above it; a change to neither rebuilds nothing.
 
@@ -230,7 +232,7 @@ A capability image serving one agent, or an agent serving one procedure, is the 
 
 **A task's record carries the artifact version that ran it**, because while long sessions drain, two versions serve traffic at once.
 
-**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agents project, a capability image, an agent and a procedure; a **sync generator** that keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching across two repositories; CDK constructs for an agent with its A2A configuration, its stores, its mounts and `grantInvokeAccess` for a caller's least-privilege role (D32); and the build-and-deploy path that updates only what changed **[OPEN §K]**.
+**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agents project, a package image, an agent and a procedure; a **sync generator** that keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching across two repositories; CDK constructs for an agent with its A2A configuration, its stores, its mounts and `grantInvokeAccess` for a caller's least-privilege role (D32); and the build-and-deploy path that updates only what changed **[OPEN §K]**.
 
 ## 7. The harness
 

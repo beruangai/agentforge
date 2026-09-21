@@ -23,8 +23,8 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 - A2A as the contract between the caller and the runtime
 - Task state that outlives the container: idempotency, loss detection, the outcome
 - Hosting on Bedrock AgentCore Runtime, and the same path locally in Docker
-- A base image consumers extend, layered into their own capability and agent images, so a change deploys only what contains it
-- Delivery as an Nx plugin on `@aws/nx-plugin` conventions: generators for an agents project, a capability image, an agent, a procedure and a caller's wiring, a sync generator that keeps a consumer current as AgentForge changes, CDK constructs for an agent with its stores, mounts and least-privilege access, and a deploy path that updates only what changed
+- A base image consumers extend, layered into their own package and agent images, so a change deploys only what contains it
+- Delivery as an Nx plugin on `@aws/nx-plugin` conventions: generators for an agents project, a package image, an agent, a procedure and a caller's wiring, a sync generator that keeps a consumer current as AgentForge changes, CDK constructs for an agent with its stores, mounts and least-privilege access, and a deploy path that updates only what changed
 - Recording what each task saw, did and produced
 
 ## Out of scope

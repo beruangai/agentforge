@@ -25,7 +25,7 @@ The whole loop, in Docker, for a procedure a consumer would actually ship.
 - Runtime: A2A server, gateway and executor, a process per task, filesystem task store behind the fenced interface, generated agent card
 - Caller-agnostic client and the Temporal activity factory: start, attach, await with heartbeat, cancel (D10, D13, D14)
 - Typed outcomes with their causes, and what every task records (D19, D22)
-- Base image, and one capability image with an agent over it, built locally; credentials provisioned as §O decides (D29)
+- Base image, and one package image with an agent over it, built locally; credentials provisioned as §O decides (D29)
 - Failure-injection tests for every layer-2 failure in `ARCHITECTURE.md` §9
 
 **Exit:** a StrategyFoundry workflow runs a real directive against a local container, gets validated structured output, and can cancel it, retry it, and resume its session — with the run's seed, options, transcript and usage recorded.
@@ -34,7 +34,7 @@ The whole loop, in Docker, for a procedure a consumer would actually ship.
 
 - AgentCore spikes: busy-session reachability and concurrency (§B), cancellation (§C), task store and lease (§A), state mounts (§F)
 - A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency, lease and loss; admission limits
-- The Nx plugin: generators for an agents project, a capability image, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
+- The Nx plugin: generators for an agents project, a package image, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
 - CDK constructs and the deploy path: deterministic images, digest comparison, and an update only where the digest moved (§D)
 - Failure-injection tests for every layer-1 failure, on AgentCore
 
