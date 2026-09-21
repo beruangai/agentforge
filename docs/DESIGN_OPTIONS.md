@@ -69,14 +69,15 @@ Structured output is largely answered: the SDK takes a draft-07 schema, validate
 
 ## §F — How the workspace mount is partitioned *(OPEN — operator)*
 
-Decided: state lives on S3 Files, in two mounts — `/mnt/claude-config`, AgentForge's, carrying `CLAUDE_CONFIG_DIR`; and `/mnt/workspace`, the consumer's, holding the working directories procedures run in (`ARCHITECTURE.md` §6).
+Decided: `/mnt/claude-config` is AgentForge's, required, on S3 Files, carrying `CLAUDE_CONFIG_DIR`. `/mnt/workspace` is the consumer's and optional; further filesystems are the consumer's within the platform's budget (`ARCHITECTURE.md` §6).
 
-The workspace is shared on purpose — it is the artifact vault, and procedures are meant to read each other's output — so the open question is how it is partitioned without corruption or leakage:
+A workspace is shared on purpose — it is the artifact vault, and procedures are meant to read each other's output — so the open question is how it is partitioned without corruption or leakage:
 
 - Access points and prefixes: one per consumer, per agent, or per procedure, and which of those AgentForge's constructs generate
 - The POSIX uid/gid an access point runs as, which must match the container's user
 - What prevents two concurrent tasks corrupting one directory, given close-to-open consistency and no cross-session file locking
 - Whether `/mnt/claude-config` is partitioned the same way, and what that means for a session resumed by a different agent
+- What the constructs generate for a consumer that mounts no workspace, and whether anything warns that its files are ephemeral while its conversations are not
 - Credentials: `CLAUDE_CONFIG_DIR` holds `.credentials.json`, which on a shared mount is visible to every session using that access point — the reason to keep credentials off disk (§O), not a reason to avoid the mount
 - Which VPC preconditions the constructs assert at synth, and which can only be checked at deploy: network mode, availability-zone overlap with the mount targets, security-group rules for TCP 2049, DNS resolution, account boundary, access-point POSIX identity, and the egress the container needs for everything that is not the mount
 

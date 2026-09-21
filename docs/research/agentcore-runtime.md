@@ -68,7 +68,8 @@ From [filesystem configurations](https://docs.aws.amazon.com/bedrock-agentcore/l
 | **S3 Files / EFS** (bring your own) | **Shared** across sessions and agents | **"No effect – data persists"** | Customer-managed and permanent; VPC required; write access from the execution role, and a read-only access point is allowed |
 
 - So durable per-session state that must survive a deploy belongs on S3 Files or EFS, not on managed session storage.
-- Mount paths must be `/mnt/<one level>`, 6–200 characters, unique, and not nested inside one another; at most 5 configurations per runtime.
+- Mount paths must be `/mnt/<one level>`, 6–200 characters, unique, and not nested inside one another.
+- **Budget per runtime:** 5 filesystem configurations in total, of which at most 2 S3 Files, 2 EFS, and 1 managed session storage. Capacity provider volumes are Instances-only and cannot be combined with the others.
 
 ## Naming constraints
 

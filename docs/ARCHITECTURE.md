@@ -236,14 +236,17 @@ A package image serving one agent, or an agent serving one procedure, is the sam
 
 **Mounts carry state, never code**, on S3 Files — which a runtime version update does not affect, unlike AgentCore's managed session storage, which it wipes. Two of them:
 
-| Mount | Owned by | Holds |
-|---|---|---|
-| `/mnt/claude-config` | AgentForge | `CLAUDE_CONFIG_DIR`: settings, session history, projects — everything the SDK keeps on local disk, so a session resumes in any container (D17) |
-| `/mnt/workspace` | The consumer | The working directories procedures run in. A procedure's `cwd` is a path beneath it, which is also what decides its Claude project |
+| Mount | Owned by | Required | Holds |
+|---|---|---|---|
+| `/mnt/claude-config` | AgentForge | **Yes** | `CLAUDE_CONFIG_DIR`: settings, session history, projects — everything the SDK keeps on local disk, so a session resumes in any container (D17) |
+| `/mnt/workspace` | The consumer | No | The working directories procedures run in. A procedure's `cwd` is a path beneath it, which is also what decides its Claude project |
+| Anything else | The consumer | No | Whatever a consumer configures, within the platform's budget |
 
-The workspace mount is deliberately shared: it is the artifact vault, and procedures are meant to see each other's output. **How it is partitioned — which access points, which prefixes, what may write where — is the consumer's to define and AgentForge's to provide**, and the mechanism for it is **[OPEN §F]**.
+**Only the config mount is AgentForge's, and only it is required.** A consumer that wants a shared artifact vault mounts a workspace and partitions it; one that works in per-session ephemeral files mounts nothing else, and its runs lose their files when the container goes while their conversations still resume. Beyond those two, a consumer adds filesystems through the constructs or its own CDK, within the platform's budget: five configurations per runtime, of which at most two are S3 Files, two EFS, and one managed session storage. AgentForge's config mount spends one S3 Files slot; a workspace spends the other.
 
-**Mounting state puts the agent in a VPC, and the VPC is the consumer's.** S3 Files is a bring-your-own filesystem: it requires `networkMode: VPC`, subnets sharing an availability zone with a mount target, security groups allowing TCP 2049 both ways, DNS resolution, the same account, and an access point whose POSIX identity matches the container's user. The consumer supplies all of it; **AgentForge's constructs verify it at synth** — network mode, availability-zone overlap, security-group rules, mount-path shape, and the egress the container still needs for everything that is not the mount, since `api.anthropic.com` has no VPC endpoint. A missing piece fails the synthesis with what is missing, rather than arriving as a 424 on the first invocation, which is indistinguishable from a container kill.
+The workspace mount is deliberately shared where it exists: it is the artifact vault, and procedures are meant to see each other's output. **How it is partitioned — which access points, which prefixes, what may write where — is the consumer's to define and AgentForge's to provide**, and the mechanism for it is **[OPEN §F]**.
+
+**Every AgentForge agent runs in a VPC**, because the config mount is required and S3 Files is a bring-your-own filesystem. The VPC is the consumer's. S3 Files requires `networkMode: VPC`, subnets sharing an availability zone with a mount target, security groups allowing TCP 2049 both ways, DNS resolution, the same account, and an access point whose POSIX identity matches the container's user. The consumer supplies all of it; **AgentForge's constructs verify it at synth** — network mode, availability-zone overlap, security-group rules, mount-path shape, and the egress the container still needs for everything that is not the mount, since `api.anthropic.com` has no VPC endpoint. A missing piece fails the synthesis with what is missing, rather than arriving as a 424 on the first invocation, which is indistinguishable from a container kill.
 
 **The agent card is generated at build time** from the procedures the image contains, and served from the image: a mount is readable only during an invocation, and the platform may fetch the card outside one.
 
