@@ -114,7 +114,7 @@ The contract hash travels in the envelope. A container whose image does not impl
 
 **A task has exactly one time budget.** The procedure declares it; the envelope may override it per invocation, which is how a caller that sizes budgets per call rather than per declaration gets what it needs. The task enforces it and reports `TIMED_OUT`. A caller's own deadline — an activity's start-to-close, say — can only *cancel*; it is never a second authority on when a run ends, and the client reports the budget in force so a caller can size its deadline above it (D6).
 
-**Every option a procedure sets reaches the SDK, or the task is rejected** (D5). The options are the SDK's own type rather than a parallel schema, and a test asserts every resolved key reaches `query()` — which is how the predecessor harness's silently-dropped `maxTurns` is prevented. What that cannot prove is that the SDK then *binds* the option; that is **[OPEN §E]**.
+**Every option a procedure sets reaches the SDK, or the task is rejected** (D5). The options are the SDK's own type rather than a parallel schema, and a test asserts every resolved key reaches `query()` — which is how the predecessor harness's silently-dropped `maxTurns` is prevented. This is load-bearing rather than belt-and-braces: **the SDK silently ignores an option key it does not know**, so nothing but AgentForge's own validation rejects a typo. The options that were checked do bind — `maxTurns`, `maxBudgetUsd`, `model`, `disallowedTools`, `cwd`, `systemPrompt` and `settingSources` each have an observed consequence ([research](research/kernel-settlement.md)).
 
 ### Side effects are the consumer's
 
@@ -272,9 +272,9 @@ The mirror is best-effort by design — three attempts, then the batch is droppe
 
 One `query()` to a settled outcome, behind the `agent()` helper:
 
-- **Structured output** — the agent contract becomes the SDK's own `outputFormat` (draft-07), and the settled output is validated before anything else sees it. Not a helper a procedure can forget: a run without an agent contract is not expressible. The SDK validates and re-prompts natively now; what beyond that is still needed is **[OPEN §E]**.
-- **Settlement** — work the agent dispatches runs in the foreground and completes within the turn that dispatched it, because a turn resumed by background work once cancelled its own final submission (D9). Whether that still holds is **[OPEN §E]**.
-- **Abort** — an `AbortSignal` and the SDK's interrupt reach the run; exactly one outcome is published.
+- **Structured output** — the agent contract becomes the SDK's own `outputFormat` (draft-07), and the settled output is validated before anything else sees it. Not a helper a procedure can forget: a run without an agent contract is not expressible. The SDK validates and re-prompts natively, carrying the submission on a real tool named `StructuredOutput`. A result that arrives `subtype: success` with **no** `structured_output` is `OUTPUT_INVALID`, never success — a denial loop ends exactly that way ([research](research/kernel-settlement.md)).
+- **Settlement** — the kernel calls the SDK in its **closed-input** form and takes the **first** result, then stops reading. Foreground dispatch is safe: a final submission survives subagents and long tool storms. What is not safe is open input, where a completing background task starts a new turn and publishes a second, contradictory result — D9's failure in its current shape. "Exactly one outcome" is the kernel's guarantee, not the SDK's.
+- **Abort** — an `AbortSignal` and the SDK's interrupt reach the run; exactly one outcome is published. The kernel also **catches around the iterator**: `maxTurns` and `maxBudgetUsd` bind by throwing rather than by a result message, so `TURN_BUDGET_EXHAUSTED` is reachable only from the thrown error.
 - **Session** — started, resumed or forked as the procedure said, with its transcript mirrored through a `SessionStore` so it resumes in any container (§6).
 - **No blocking** — nothing in the kernel or a helper blocks the event loop.
 
@@ -288,6 +288,8 @@ Optional functions a procedure calls, each serving a stated requirement:
 | `stopGuard` | Refuses to end a session while a required artifact is missing (D8) |
 | `guardrailDisclosure` | Tells the agent which rules apply, derived from what is enforced (D8) |
 | `telemetry` | OpenTelemetry export of the SDK's native telemetry, correlated to the task, flushed before the outcome (D23) |
+
+Every helper that installs a `PreToolUse` matcher **asserts at startup that `init.tools` contains the tool it names**, because a matcher naming a tool that does not exist fires zero times and reports nothing. A helper that can compute the correct value repairs the submission through `updatedInput` rather than denying it: repair costs no additional model turn, and a denial whose reason contradicts the declared contract is refused by the model as an injected instruction ([research](research/kernel-settlement.md)).
 
 The guardrail helpers serve TrendBot alone and wait for its contract to be confirmed; their *semantics* may belong in TrendBot's own package, with AgentForge carrying only the hooks (**[OPEN §L]**).
 
@@ -322,7 +324,10 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | A run outlasting the 15-minute synchronous request limit | 1 |
 | `/ping` stalled by blocking work on the same event loop | 1 |
 | A timed-out attempt left running while its retry started | 1 |
-| A resumed turn cancelling the final structured-output call | 2 |
+| A resumed turn publishing a second, contradictory outcome over the first | 2 |
+| A result arriving `success` with no structured output, and being believed | 2 |
+| A turn or budget limit that binds by throwing, surfacing as a generic failure | 2 |
+| A hook matcher naming a tool that does not exist, and firing zero times | 2 |
 | The result taken before dispatched work settled | 2 |
 | Structured output lost to schema conversion | 2 |
 | An SDK option accepted and silently dropped | 2 |

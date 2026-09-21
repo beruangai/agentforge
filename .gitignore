@@ -49,6 +49,10 @@ vitest.config.*.timestamp*
 test-output/
 
 # Local environment
-.env
-.env.*
+*.local
+*.local.*
 !.env.*.example
+
+# Spike scratch
+spikes/out/
+spikes/.sandboxes/

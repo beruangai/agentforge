@@ -11,7 +11,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§I** | How the A2A server is assembled | Local spike, then a decision | The first slice |
 | **§A** | Task store details behind the fixed interface | Design in the first slice; one AgentCore spike | The first slice's store |
 | **§N** | How a procedure is written | Writing real procedures in A0 | The procedure model |
-| **§E** | What the kernel still needs to settle a run | Local spike | The kernel |
+| ~~§E~~ | ~~What the kernel still needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
 | **§C** | Cancellation on the platform | Local spike, then AgentCore | Cancel on AgentCore |
 | **§O** | What a credential broker looks like when it arrives | Later; the first slice keeps room | Nothing yet |
 | **§F** | The sync declaration's fields, and the key's derivation | Design in the first slice | Session resume and artifacts |
@@ -60,11 +60,17 @@ Layering keeps a change from spreading only if an unaffected agent rebuilds to a
 
 **Spike (local):** build one agentic base image and three agent images over it; change one agent's procedure; confirm the other two rebuild to identical digests and the deploy path skips them; then change the agentic base image and confirm all three move.
 
-## §E — What the kernel still needs *(OPEN)*
+## §E — What the kernel still needs *(SETTLED 2026-09-22)*
 
-Structured output is largely answered: the SDK takes a draft-07 schema, validates and re-prompts natively, and fails at startup on an invalid schema ([research](research/claude-agent-sdk.md)). What the predecessor harness learned beyond that may no longer hold.
+Settled by spike against `@anthropic-ai/claude-agent-sdk@0.3.278` — findings, evidence and method in [`research/kernel-settlement.md`](research/kernel-settlement.md); the spikes are in `spikes/kernel-settlement/`. The rules the kernel must follow move to `ARCHITECTURE.md` §7.
 
-**Spike (local):** does a final submission survive dispatched work in the foreground; with background work enabled, does a resumed turn still cancel its tool calls; does an in-turn `PreToolUse` rejection still add anything over native re-prompting, and does its matcher name a tool that exists; does every option set — `maxTurns` among them — actually reach and bind the run.
+- **A final submission survives foreground dispatch**, in every shape tried — subagents and long tool storms alike. The foreground rule buys nothing on its own.
+- **D9's failure changed shape rather than going away.** A resumed turn no longer cancels its tool calls; on an **open-input** session a completing background task starts a new turn and publishes a **second, contradictory result**. Closed input yields exactly one result and kills the background task.
+- **The carrier is a real tool named `StructuredOutput`**, advertised in `init.tools`, so a matcher can name it and its existence is assertable at startup. A wrong matcher fires zero times, silently.
+- **An in-turn rejection adds what the schema cannot express**, and an `updatedInput` repair is 4× cheaper than a denial. But a denial contradicting the contract is refused by the model as an injected instruction, and a denial loop ends in `subtype: success` with **no output at all**.
+- **Every option tried binds; an unknown key is silently ignored**, so D5's promise is AgentForge's to keep. `maxTurns` and `maxBudgetUsd` bind by **throwing**, not by a result message.
+
+**Still open, narrowly:** whether the base image sets `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`. It removes `run_in_background` from the Bash tool's schema outright — a real kill switch — but no procedure could then opt in, and closed input already kills background tasks at the result. Decided when a procedure asks for background work.
 
 ## §F — The sync declaration and the project key *(OPEN)*
 
@@ -178,7 +184,7 @@ Not open questions — deliberately not being worked until something asks for th
 | Spike | Answers | Needs |
 |---|---|---|
 | A2A server assembly, the wrapping gateway, client signing | §I | Local |
-| Kernel settlement and structured output | §E | Local |
+| Kernel settlement and structured output | §E | Local — **done**, `spikes/kernel-settlement/` |
 | Task-process protocol, cancellation, group kill | §C, §G | Local |
 | Procedure authoring against real procedures | §N | Local |
 | Credential provisioning and expiry | §O | Local |

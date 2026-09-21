@@ -42,7 +42,9 @@ Established against the current SDK, superseding the predecessor harness's worka
 - Schemas must target **draft-07** — `z.toJSONSchema(schema, { target: 'draft-7' })`. `format` is accepted as an annotation.
 - An invalid schema now fails at startup rather than being ignored (since CLI v2.1.205).
 
-What remains for AgentForge is the outer validation and the typed `output_invalid` outcome, not a pile of conversion workarounds. Whether an in-turn `PreToolUse` rejection still adds anything over native re-prompting is `DESIGN_OPTIONS.md` §E — and if it does, the hook's matcher names an undocumented internal tool, so it must be asserted at startup rather than failing quietly.
+What remains for AgentForge is the outer validation and the typed `output_invalid` outcome, not a pile of conversion workarounds.
+
+**The rest of §E is now settled by spike** — see [`kernel-settlement.md`](kernel-settlement.md), read 2026-09-22 against `0.3.278`. In particular: the submission is carried by a real tool named `StructuredOutput` that is advertised in `init.tools`, so a `PreToolUse` matcher can name it *and* assert it at startup; a matcher naming a tool that does not exist fires zero times, silently.
 
 ## What this means here
 
