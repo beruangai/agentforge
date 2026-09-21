@@ -14,7 +14,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§E** | What the kernel still needs to settle a run | Local spike | The kernel |
 | **§C** | Cancellation on the platform | Local spike, then AgentCore | Cancel on AgentCore |
 | **§O** | Credentials in the container | **Operator** — how far to take the proxy | The base image's shape |
-| **§F** | How the workspace mount is partitioned | **Operator**, with each consumer | AgentCore deployment |
+| **§F** | Workspace sync policy and the project key | Design in the first slice | Session resume and artifacts |
 | **§B** | Whether a busy container receives invocations | AgentCore spike | The await path on AgentCore |
 | **§D** | Image determinism and deploy granularity | Local spike | Deployment |
 | **§G** | Health and per-task cost | Local measurement | Confirms ADR 0004 |
@@ -67,21 +67,22 @@ Structured output is largely answered: the SDK takes a draft-07 schema, validate
 
 **Spike (local):** does a final submission survive dispatched work in the foreground; with background work enabled, does a resumed turn still cancel its tool calls; does an in-turn `PreToolUse` rejection still add anything over native re-prompting, and does its matcher name a tool that exists; does every option set — `maxTurns` among them — actually reach and bind the run.
 
-## §F — How the workspace mount is partitioned *(OPEN — operator)*
+## §F — Workspace sync and the project key *(OPEN)*
 
-Decided: `/mnt/claude-config` is AgentForge's, required, on S3 Files, carrying `CLAUDE_CONFIG_DIR`. `/mnt/workspace` is the consumer's and optional; further filesystems are the consumer's within the platform's budget (`ARCHITECTURE.md` §6).
+Decided: state persists through APIs, not mounts ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)). Transcripts mirror through a `SessionStore`; the rest of the config directory is image content; working directories sync to an object store. A mount stays available per agent for a consumer that needs live shared POSIX and accepts the VPC. What remains is the policy and the keys:
 
-A workspace is shared on purpose — it is the artifact vault, and procedures are meant to read each other's output — so the open question is how it is partitioned without corruption or leakage:
+**The project key.** `CLAUDE_CODE_PROJECT_DIR_NAME` pins it, which is what frees resume from reproducing an identical path — but one store serves many agents, so the namespace is AgentForge's to define: what the key is derived from (the identity triple, the consumer's own scope, or both), whether two agents may ever share one, and what a collision would do.
 
-- Access points and prefixes: one per consumer, per agent, or per procedure, and which of those AgentForge's constructs generate
-- The POSIX uid/gid an access point runs as, which must match the container's user
-- What prevents two concurrent tasks corrupting one directory, given close-to-open consistency and no cross-session file locking
-- Whether `/mnt/claude-config` is partitioned the same way, and what that means for a session resumed by a different agent
-- What the constructs generate for a consumer that mounts no workspace, and whether anything warns that its files are ephemeral while its conversations are not
-- Credentials: `CLAUDE_CONFIG_DIR` holds `.credentials.json`, which on a shared mount is visible to every session using that access point — the reason to keep credentials off disk (§O), not a reason to avoid the mount
-- Which VPC preconditions the constructs assert at synth, and which can only be checked at deploy: network mode, availability-zone overlap with the mount targets, security-group rules for TCP 2049, DNS resolution, account boundary, access-point POSIX identity, and the egress the container needs for everything that is not the mount
+**The sync policy**, now that it runs continuously rather than only at the close:
 
-AgentForge provides the mechanism; each consumer defines its own semantics, so this needs the operator with each consumer rather than a spike.
+- What is included and excluded — a `.git` directory, a `node_modules`, an editor's scratch file are not artifacts
+- Whether a delete propagates. Additive by default is the safer reading: an agent removing a file should not silently empty a vault
+- When a file is quiescent enough to upload, so a half-written file is not published mid-write, and how writes are coalesced so a tool loop does not become a request storm
+- Where the daemon lives and dies: in the task's own process group, so cancellation takes it with the task, and never on the event loop answering `/ping`
+- The close barrier: flush, verify, *then* publish the outcome — and what happens when the flush fails, which is a failed task rather than a successful one with missing files
+- What a caller sees when a run is lost mid-sync: partial artifacts are already visible, which is consistent with `LOST` meaning side effects may have happened, but it should be written down rather than discovered
+
+**If a consumer takes the mount instead:** which VPC preconditions the constructs assert at synth and which can only be checked at deploy — network mode, availability-zone overlap with mount targets, security-group rules on 2049, DNS attributes, account boundary, access-point POSIX identity, and the egress everything that is not the mount still needs.
 
 ## §G — Health and per-task cost *(OPEN)*
 
@@ -178,4 +179,4 @@ Local spikes need only Bun, Docker and the SDK. AgentCore spikes run against a t
 | Busy-container reachability and concurrency | §B | AgentCore |
 | Cancellation on the platform | §C | AgentCore |
 | Task store lease and visibility | §A | AgentCore |
-| Session resume across containers, on the mounts | §F | AgentCore |
+| Session resume across containers, and workspace sync | §F | Local, then AgentCore |
