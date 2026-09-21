@@ -64,11 +64,11 @@ The operator's standing conventions across projects:
 
 ## Spec-driven development
 
-Non-trivial changes go through OpenSpec (proposal → specs → design → tasks, then verification). Behavior contracts go in `openspec/specs/`, created when the first change is synced; in-flight work in `openspec/changes/`. Rules in [`openspec/config.yaml`](openspec/config.yaml) and `.claude/rules/openspec.md`. OpenSpec artifacts are `docs` scope in Conventional Commits.
+Non-trivial changes go through OpenSpec (proposal → specs → design → tasks, then verification). Behavior contracts go in `openspec/specs/` and in-flight work in `openspec/changes/`; both are created when the first change is proposed. Rules in [`openspec/config.yaml`](openspec/config.yaml) and `.claude/rules/openspec.md`. OpenSpec artifacts are `docs` scope in Conventional Commits.
 
 ## Related codebases
 
 - **TrendBot's predecessor harness**, in `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`, runs TrendBot today. Evidence of what hurt, never a specification ([lineage](docs/lineage/predecessor-harness.md)). Port with review; never copy its shape. TrendBot's own drafts are rough; do not take them as fact.
 - **`a2a-claude`, `claude-a2a` and `temporal-agent-harness`** wrap an agent SDK behind a protocol boundary. None is a dependency or a model; [`docs/research/harness-references.md`](docs/research/harness-references.md) records the mechanics worth borrowing from each, and why each differs.
 - **`@aws/nx-plugin`** is the convention AgentForge's own plugin follows; its `ts#agent` generator is built for Strands and is a reference, not a base ([ADR 0010](adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
-- **This workspace's April 2026 packages and research** are gone from the tree; their archived OpenSpec changes remain under `openspec/changes/archive/` as history.
+- **This workspace's April 2026 packages, research and OpenSpec changes** are gone from the tree; git history keeps them.

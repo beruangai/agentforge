@@ -6,6 +6,28 @@ Unit tests run against nothing external. **Runtime integration tests** run again
 
 **A spike is written as an integration test, not a script.** Every question in `docs/DESIGN_OPTIONS.md` that a spike answers lands in `integ/`, so the answer is re-checked as the platform moves instead of being recorded once and trusted.
 
+Each tier is its own target and its own vitest config, so the guard is the target rather than a conditional inside a test:
+
+```json
+"test":  { "executor": "@nx/vitest:test" },
+"integ": { "executor": "nx:run-commands",
+           "options": { "command": "vitest --config vitest.integ.mts --run", "cwd": "{projectRoot}" } },
+"e2e":   { "executor": "nx:run-commands",
+           "options": { "command": "vitest --config vitest.e2e.mts --run", "cwd": "{projectRoot}" } }
+```
+
+The integ and e2e configs include only their own directory, and run sequentially with long timeouts because they shell out to containers and the platform:
+
+```ts
+test: {
+  include: ['integ/**/*.{test,spec}.ts'],
+  fileParallelism: false,
+  sequence: { concurrent: false },
+  testTimeout: 120_000,
+  hookTimeout: 120_000,
+}
+```
+
 ## No Placeholder Integration Tests
 
 Never create placeholder or deferred integration tests with `expect(true).toBe(true)` or `// TODO: implement` stubs.
