@@ -23,3 +23,4 @@ Numbers are stable ids; 0005 was dropped when its decision — that the executor
 | [0008](0008-code-ships-in-the-image.md) | Code ships in the image; images layer; only state is mounted | accepted |
 | [0009](0009-the-caller-supplies-the-idempotency-key.md) | The caller supplies the idempotency key; a task id is a wire handle | accepted |
 | [0010](0010-agentforge-is-consumed-as-an-nx-plugin.md) | AgentForge is consumed as an Nx plugin, and agents nest in one project | accepted |
+| [0011](0011-state-persists-through-apis-not-mounts.md) | State persists through APIs, not mounts | accepted |
