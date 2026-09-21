@@ -172,7 +172,7 @@ Offloading instead would push the cost outward: a caller orchestrating on the ou
 **The caller supplies the key**, stable across its retries and its own to derive ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)); the Temporal factory derives it from workflow and activity identity. Starting with the same key *is* the idempotency operation — `ListTasks` filters by context and status but not by metadata, so the key is not queryable through the protocol and the store's index carries it. The task id is not the key: A2A mints it, a failed task is terminal, and a new attempt is a new task carrying `referenceTaskIds` to its predecessor, so the chain reads from the protocol alone.
 
 - **Concurrent — guaranteed.** Attempts carry the same runtime session id and reach the same container, whose gateway is that session's single authority; a start whose key names a live task returns that task. The index insert is conditional, so two starts racing cannot both admit.
-- **Later — within a retention window** that exceeds the longest retry horizon a consumer configures. Beyond it a repeated request runs again, and `start` reports whether it attached or started, so this is never silent **[OPEN §H]**.
+- **Later — within the record's retention**, which is **seven days**. The key includes the caller's *run* identity — for the Temporal factory, the workflow run id with the activity id — so a key belongs to one workflow run and nothing re-sends it afterwards; a reset, which re-executes with the same activity ids under a new run id, therefore runs fresh rather than attaching to the old outcome. Retention is a storage bound rather than a correctness one, and a repeated start after it runs again, with `start` reporting that it started rather than attached.
 
 A cancel from one caller ends a task other callers attached to, so the outcome distinguishes who asked: a caller that did not ask should treat it as retryable.
 
@@ -243,12 +243,16 @@ An agentic base image serving one agent, or an agent serving one procedure, is t
 
 | State | How it persists | Whose |
 |---|---|---|
-| Session transcripts | The SDK's `SessionStore` adapter, over an object store's API. `CLAUDE_CODE_PROJECT_DIR_NAME` pins the project key; what that key is scoped to is **[OPEN §F]** (D17) | AgentForge |
+| Session transcripts | The SDK's `SessionStore` adapter, over an object store's API, under a **project key scoped to the agent and its working directory** — see below (D17) | AgentForge |
 | The rest of the config directory | Baked into the image — settings, skills, plugins and user-tier memory are capabilities, not state | AgentForge |
 | Working directories | Synced to an object store under a strategy the consumer declares, per agent or per procedure | The consumer declares; AgentForge runs it |
 | Anything else | The consumer's own mechanism | The consumer |
 
 The mirror is best-effort by design — three attempts, then the batch is dropped with a `mirror_error` — so it is verified rather than trusted: entries deduped by id, the transcript's last entry checked after the run, and a dropped batch failing the task rather than appearing in a log.
+
+**The project key is derived, never supplied.** It is `{consumer}-{project}-{agent}` plus the working directory the run uses, so continuity is scoped to an agent *and* the directory it works in: one agent's procedures working in different directories — per lane, per strategy — keep separate transcript scopes, rather than sharing one because they share an agent. A procedure that sets its own working directory moves its scope with it.
+
+`CLAUDE_CODE_PROJECT_DIR_NAME` carries it, which constrains the derivation: 1–64 characters of letters, digits, hyphens or underscores, no separators, and not a Windows device name. AgentForge sanitizes and, where the parts do not fit, truncates deterministically with a hash — the same treatment the runtime name gets (§6). It also sets `CLAUDE_CONFIG_DIR`, without which the name is ignored. **An invalid name does not fail; the SDK silently falls back to a path-derived one**, so the run asserts the transcript landed under the expected key and fails the task if it did not.
 
 **The sync strategy is the consumer's, declared whole at the agentic project and overridden in part by a procedure**: direction, whether deletes propagate, whether it runs continuously or once at the close, how often, and what is excluded. **Every field is required where it is declared** — there is no implicit default, so nothing behaves a way nobody chose — and a procedure supplies only the fields it differs on. A procedure wanting atomic hand-off overrides the cadence; one producing a long narrative leaves it continuous.
 
@@ -325,6 +329,7 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | A stale lease holder's write landing after a newer one | 1 |
 | A cancelled task leaving subprocesses behind | 1 |
 | A second live task admitted under one continuity key | 1 |
+| A project key the SDK silently ignored, scattering transcripts | 2 |
 | A task process whose protocol version the executor does not accept | 1 |
 | Admission beyond the container's memory, killing its neighbours | 1 |
 

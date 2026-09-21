@@ -96,7 +96,7 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Working directory** — Where a run happens. With the project key it scopes the run's transcript, and it persists by syncing to an object store rather than by being mounted ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)).
 
-**Project key** — What scopes a session's transcript in the store, pinned with `CLAUDE_CODE_PROJECT_DIR_NAME` and namespaced by AgentForge so one store serves many agents.
+**Project key** — What scopes a session's transcript in the store: the agent and the working directory a run uses, derived by AgentForge and carried in `CLAUDE_CODE_PROJECT_DIR_NAME`, whose alphabet it must fit. Continuity is per agent *and* directory, so one agent's procedures working in different directories keep separate scopes.
 
 **Sync strategy** — What a consumer declares about a working directory's persistence: direction, delete propagation, cadence, exclusions. Declared per agent, overridable per procedure; AgentForge runs it and guarantees the flush before an outcome.
 

@@ -13,12 +13,12 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§N** | How a procedure is written | Writing real procedures in A0 | The procedure model |
 | **§E** | What the kernel still needs to settle a run | Local spike | The kernel |
 | **§C** | Cancellation on the platform | Local spike, then AgentCore | Cancel on AgentCore |
-| **§O** | Credentials in the container | **Operator** — how far to take the proxy | The base image's shape |
-| **§F** | The sync declaration and the project key | Design in the first slice; **operator** on defaults | Session resume and artifacts |
+| **§O** | What a credential broker looks like when it arrives | Later; the first slice keeps room | Nothing yet |
+| **§F** | The sync declaration's fields, and the key's derivation | Design in the first slice | Session resume and artifacts |
 | **§B** | Whether a busy container receives invocations | AgentCore spike | The await path on AgentCore |
 | **§D** | Image determinism and deploy granularity | Local spike | Deployment |
 | **§G** | Health and per-task cost | Local measurement | Confirms ADR 0004 |
-| **§H** | Retention and container identity | **Operator** — retention window | Idempotency on AgentCore |
+| **§H** | Container identity in the record | Design in the first slice | Loss detection on retry |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
 | **§L** | Where the consumers still pull apart | **Operator**, with each consumer | A3 |
 | **§M** | Pausing for a human | **Operator** — whether to support it at all | Nothing yet |
@@ -80,7 +80,7 @@ Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-thro
 
 **The implementation.** Leading candidate is [`s7cmd`](https://github.com/nidor1998/s7cmd): a single static Rust binary with ARM64 Linux builds, Apache-2.0, bundling the `s3sync` engine — local-to-S3, S3-to-local and S3-to-S3, include and exclude patterns, filtering by `LastModifiedDate` and size, checksum verification, configurable concurrency and a dry run. The `LastModifiedDate` filter is also the quiescence heuristic: sync only what has been still for longer than a threshold, so a file mid-write is left for the next pass. Against it: a personal project whose dependencies are updated best-effort, shipped in our base image and running with credentials — so pin it by digest, and keep an AWS-SDK walk as the fallback if that risk stops being acceptable.
 
-**The project key.** `CLAUDE_CODE_PROJECT_DIR_NAME` pins it, which frees resume from reproducing an identical path. What it is scoped to is **undecided and with the operator**: per agent (`{consumer}/{project}/{agent}`) means transcripts never collide and a session belongs to the agent that made it; per project means agents can resume each other's sessions; either way the namespace is AgentForge's to enforce, and what a collision does has to be defined.
+**The project key is decided** (`ARCHITECTURE.md` §6): derived from the agent and its working directory, carried in `CLAUDE_CODE_PROJECT_DIR_NAME`, sanitized to the 1–64 character alphabet that variable allows, and asserted after the run because an invalid name fails silently. What remains is the derivation's details — how the working directory reduces to a segment, and how truncation stays stable when a lane name changes length.
 
 **The remaining edges**, whatever is declared: when a file is quiescent enough to upload so a half-written file is not published; how writes are coalesced so a tool loop is not a request storm; and what a caller sees when a run is lost mid-sync, which is partial artifacts already visible — consistent with `LOST` meaning side effects may have happened, but worth writing down rather than discovering.
 
@@ -88,12 +88,11 @@ Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-thro
 
 Measure under a real run: `/ping` latency with several tasks in child processes; the start cost of a process per task — module load plus SDK startup — against a typical run's duration. Confirms or overturns [ADR 0004](../adr/0004-a-process-per-task.md) with numbers.
 
-## §H — Retention and container identity *(OPEN — operator on retention)*
+## §H — Container identity *(OPEN)*
 
-The key and the two edges are settled ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)). Open:
+The key, its two edges and its retention are settled: seven days, with the key scoped to the caller's run so nothing re-sends it afterwards ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md), `ARCHITECTURE.md` §4). What remains:
 
-- **Retention** — how long task state is kept for a later start to attach to. It must exceed the longest retry horizon a consumer configures, and a consumer sets that where it registers an activity, so AgentForge cannot read it from a declaration. **Needs a number from the operator.**
-- **Container instance identity** — how a container names itself in the record, so a later one recognizes a dead one's task as lost.
+- **Container instance identity** — how a container names itself in the record, so a later one in the same runtime session recognizes a dead one's task as lost without waiting for the lease.
 
 ## §I — How the server is assembled *(OPEN — blocks the first slice)*
 

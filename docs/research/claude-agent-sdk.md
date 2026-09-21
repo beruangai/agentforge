@@ -24,6 +24,16 @@ From [Persist sessions to external storage](https://code.claude.com/docs/en/agen
 - Conflicts: `persistSession: false` and file checkpointing both throw at startup when combined with a store.
 - Reference adapters for S3, Redis and Postgres ship in the SDK repositories, with a conformance suite. Retention is the adapter's responsibility; the SDK never deletes.
 
+## The project directory name
+
+From [Manage sessions](https://code.claude.com/docs/en/sessions#name-the-project-directory-yourself):
+
+- By default `<project>` is "your working directory path with non-alphanumeric characters replaced by `-`"; a converted name over 200 characters is truncated and given a hash of the full path.
+- `CLAUDE_CODE_PROJECT_DIR_NAME` overrides it, and transcripts *and* auto memory go under that name "whatever the working directory is". Requires CLI v2.1.234 or later.
+- **"Use 1-64 letters, digits, hyphens, or underscores"** — no slashes, no dots — and not a Windows device name such as `con`.
+- **An invalid value fails silently:** "Claude Code ignores any other value and uses the derived name." So a bad key does not error, it scatters transcripts under a path-derived name and quietly breaks resume — which has to be checked rather than trusted.
+- It is ignored altogether unless `CLAUDE_CONFIG_DIR` is set too, and it is read once at startup from the process environment, so a settings file cannot supply it.
+
 ## Structured output
 
 Established against the current SDK, superseding the predecessor harness's workarounds:
