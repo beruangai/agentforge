@@ -24,3 +24,4 @@ Numbers are stable ids; 0005 was dropped when its decision — that the executor
 | [0009](0009-the-caller-supplies-the-idempotency-key.md) | The caller supplies the idempotency key; a task id is a wire handle | accepted |
 | [0010](0010-agentforge-is-consumed-as-an-nx-plugin.md) | AgentForge is consumed as an Nx plugin, and agents nest in one project | accepted |
 | [0011](0011-state-persists-through-apis-not-mounts.md) | State persists through APIs, not mounts | accepted |
+| [0012](0012-the-server-is-assembled-not-inherited.md) | The A2A server is assembled from `@a2a-js/sdk`, not inherited from the AgentCore SDK | **proposed** |

@@ -10,7 +10,15 @@
     "typescript": "^7"
   },
   "dependencies": {
+    "@a2a-js/sdk": "1.2.0",
     "@anthropic-ai/claude-agent-sdk": "0.3.278",
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.1136.0",
+    "@aws-sdk/credential-providers": "^3.1136.0",
+    "@smithy/signature-v4": "^5.7.3",
+    "bedrock-agentcore": "0.4.4",
+    "express": "^5.2.1",
+    "uuid": "^14.0.2",
     "zod": "^4.6.5"
   }
 }

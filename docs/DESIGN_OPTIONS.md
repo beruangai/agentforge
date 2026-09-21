@@ -8,7 +8,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 
 | | Question | Settled by | Blocks |
 |---|---|---|---|
-| **§I** | How the A2A server is assembled | Local spike, then a decision | The first slice |
+| **§I** | How the A2A server is assembled | **Decided 2026-09-22** ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), proposed); AgentCore pass-through still open | The first slice |
 | **§A** | Task store details behind the fixed interface | Design in the first slice; one AgentCore spike | The first slice's store |
 | **§N** | How a procedure is written | Writing real procedures in A0 | The procedure model |
 | ~~§E~~ | ~~What the kernel still needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
@@ -100,19 +100,20 @@ The key, its two edges and its retention are settled: seven days, with the key s
 
 - **Container instance identity** — how a container names itself in the record, so a later one in the same runtime session recognizes a dead one's task as lost without waiting for the lease.
 
-## §I — How the server is assembled *(OPEN — blocks the first slice)*
+## §I — How the server is assembled *(DECIDED 2026-09-22 — the AgentCore half remains)*
 
-This decides the shape of the server and the store, and the first slice cannot be written around it.
+**Decided:** assemble directly from `@a2a-js/sdk` and Express, porting `serveA2A`'s AgentCore-contract mechanics rather than depending on it — [ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), status `proposed`. Findings in [`research/a2a-server-assembly.md`](research/a2a-server-assembly.md); the spike is `spikes/server-assembly/i1-gateway-wrap.ts`. **The first slice is unblocked.**
 
-**The decision:** idempotency, admission and the contract-hash check must run before a task id is minted, which the SDK's `DefaultRequestHandler` does not allow. The shape is a gateway implementing the public `A2ARequestHandler` interface and delegating to the SDK's once it has decided a request is a new task. Whether to build on the AgentCore SDK's `serveA2A` — which serves the card and `/ping`, but was merged days before this was written and is not in the published reference — or to assemble the same from `@a2a-js/sdk` and an HTTP server, is part of the same call.
+`serveA2A` was excluded on two independent grounds: its options take an **executor and no request handler**, and `buildA2AApp` constructs `DefaultRequestHandler` itself — so there is no seam for a gateway, which does not change when it publishes; and it is not in `bedrock-agentcore@0.4.4`, the latest published version. The gateway shape itself was confirmed in full: `returnImmediately` resolved in 8 ms against a 6 000 ms run on a synchronously published `submitted`, and blocked for exactly the deferral when the publish was withheld; a duplicate idempotency key returned the running task with the executor started once; a uuid7 `contextId` returned verbatim; cancel reached the executor; admission refused rather than queued; and a client built from a known card signed through `JsonRpcTransportFactory`'s `fetchImpl` without fetching a card.
 
-**Spike (local), which the decision waits on:**
+Two constraints found along the way, both recorded in the research note: **`@a2a-js/sdk@1.2.0` is protobuf-typed**, so a part written the way the specification documents it serializes to an empty part with no error; and **an absent `A2A-Version` header means protocol 0.3**, so anything that drops it downgrades the request.
 
-- Wrapping `DefaultRequestHandler` works, and a `SUBMITTED` event published synchronously makes `returnImmediately` resolve — the SDK returns after the first event on the task's bus, not on creation
-- A client constructed with an explicit endpoint and a known card, signing through `JsonRpcTransport`'s `fetchImpl` with SigV4 and the session header (D32); the card resolver cannot reach a card served through `InvokeAgentRuntime`
-- A client-supplied `contextId` (uuid7) survives AgentCore's pass-through and returns on every task
-- AgentCore's real HTTP statuses (409, 424) surface as errors the client can act on, and its retryable 409 is retried with backoff, which A2A clients do not do on their own
-- Protocol version: AgentCore's examples show 0.3.0 and `message/send` while the SDK emits 1.0 — whether pass-through cares, and whether `GetAgentCard` validates what it returns
+**Still open — needs AgentCore:**
+
+- Whether `InvokeAgentRuntime` forwards `A2A-Version`. A silent downgrade presents as a blanket `VERSION_NOT_SUPPORTED`, so this is checked first.
+- Whether a client-supplied `contextId` (uuid7) survives the pass-through and returns on every task. It survives the SDK; the pass-through is untested.
+- AgentCore's real 409 and 424 as errors the client can act on, and retrying the retryable 409 with backoff, which A2A clients do not do on their own.
+- Whether `GetAgentCard` validates what it returns.
 
 ## §K — The plugin and construct surface *(OPEN)*
 
