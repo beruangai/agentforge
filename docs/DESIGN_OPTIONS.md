@@ -14,7 +14,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§E** | What the kernel still needs to settle a run | Local spike | The kernel |
 | **§C** | Cancellation on the platform | Local spike, then AgentCore | Cancel on AgentCore |
 | **§O** | Credentials in the container | **Operator** — how far to take the proxy | The base image's shape |
-| **§F** | Workspace sync policy and the project key | Design in the first slice | Session resume and artifacts |
+| **§F** | The sync declaration and the project key | Design in the first slice; **operator** on defaults | Session resume and artifacts |
 | **§B** | Whether a busy container receives invocations | AgentCore spike | The await path on AgentCore |
 | **§D** | Image determinism and deploy granularity | Local spike | Deployment |
 | **§G** | Health and per-task cost | Local measurement | Confirms ADR 0004 |
@@ -67,22 +67,25 @@ Structured output is largely answered: the SDK takes a draft-07 schema, validate
 
 **Spike (local):** does a final submission survive dispatched work in the foreground; with background work enabled, does a resumed turn still cancel its tool calls; does an in-turn `PreToolUse` rejection still add anything over native re-prompting, and does its matcher name a tool that exists; does every option set — `maxTurns` among them — actually reach and bind the run.
 
-## §F — Workspace sync and the project key *(OPEN)*
+## §F — The sync declaration and the project key *(OPEN)*
 
-Decided: state persists through APIs, not mounts ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)). Transcripts mirror through a `SessionStore`; the rest of the config directory is image content; working directories sync to an object store. A mount stays available per agent for a consumer that needs live shared POSIX and accepts the VPC. What remains is the policy and the keys:
+Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)). Transcripts mirror through a `SessionStore`; the config directory is image content; working directories sync to an object store under **a strategy the consumer declares, per agent and overridable per procedure**. AgentForge guarantees the flush-and-verify barrier, the process-group lifetime, and that a sync failure is an outcome.
 
-**The project key.** `CLAUDE_CODE_PROJECT_DIR_NAME` pins it, which is what frees resume from reproducing an identical path — but one store serves many agents, so the namespace is AgentForge's to define: what the key is derived from (the identity triple, the consumer's own scope, or both), whether two agents may ever share one, and what a collision would do.
+**The declaration.** What a consumer can say, and what each defaults to:
 
-**The sync policy**, now that it runs continuously rather than only at the close:
+- Direction — up only, down only, or both — and, if both, what wins a conflict, which is the one genuinely hard case
+- Whether a delete propagates. Additive is the safer default: an agent removing a file should not empty a vault
+- Cadence — once at the close, on an interval, or on change — with continuous trading atomic hand-off for a small close and less lost on a dead container
+- Exclusions, and whether AgentForge ships sensible ones (`.git`, `node_modules`, editor scratch) or leaves the list entirely to the consumer
+- Scope — what a procedure inherits from its agent, and how an override reads at the call site
 
-- What is included and excluded — a `.git` directory, a `node_modules`, an editor's scratch file are not artifacts
-- Whether a delete propagates. Additive by default is the safer reading: an agent removing a file should not silently empty a vault
-- When a file is quiescent enough to upload, so a half-written file is not published mid-write, and how writes are coalesced so a tool loop does not become a request storm
-- Where the daemon lives and dies: in the task's own process group, so cancellation takes it with the task, and never on the event loop answering `/ping`
-- The close barrier: flush, verify, *then* publish the outcome — and what happens when the flush fails, which is a failed task rather than a successful one with missing files
-- What a caller sees when a run is lost mid-sync: partial artifacts are already visible, which is consistent with `LOST` meaning side effects may have happened, but it should be written down rather than discovered
+**The implementation.** Which sync does the work, since existing tools already have direction, delete, filters and cadence: a Go binary such as `s5cmd` or `rclone` in the base image, or the AWS SDK with our own walk. It affects image size, determinism, and whether bidirectional is even on the table.
 
-**If a consumer takes the mount instead:** which VPC preconditions the constructs assert at synth and which can only be checked at deploy — network mode, availability-zone overlap with mount targets, security-group rules on 2049, DNS attributes, account boundary, access-point POSIX identity, and the egress everything that is not the mount still needs.
+**The project key.** `CLAUDE_CODE_PROJECT_DIR_NAME` pins it, which is what frees resume from reproducing an identical path — but one store serves many agents, so the namespace is AgentForge's: what it derives from, whether two agents may ever share one, and what a collision does.
+
+**The remaining edges**, whatever is declared: when a file is quiescent enough to upload so a half-written file is not published; how writes are coalesced so a tool loop is not a request storm; and what a caller sees when a run is lost mid-sync, which is partial artifacts already visible — consistent with `LOST` meaning side effects may have happened, but worth writing down rather than discovering.
+
+**If a consumer takes a mount instead:** which VPC preconditions the constructs assert at synth and which can only be checked at deploy — network mode, availability-zone overlap with mount targets, security-group rules on 2049, DNS attributes, account boundary, access-point POSIX identity, and the egress everything that is not the mount still needs.
 
 ## §G — Health and per-task cost *(OPEN)*
 

@@ -240,10 +240,14 @@ A package image serving one agent, or an agent serving one procedure, is the sam
 |---|---|---|
 | Session transcripts | The SDK's `SessionStore` adapter, over an object store's API. `CLAUDE_CODE_PROJECT_DIR_NAME` pins the project key, which AgentForge namespaces so one store serves many agents (D17) | AgentForge |
 | The rest of the config directory | Baked into the image — settings, skills, plugins and user-tier memory are capabilities, not state | AgentForge |
-| Working directories | Synced to an object store continuously while a task runs, then **flushed and verified before the outcome is published**: a task never reports `SUCCEEDED` over unsynced files | The consumer, through a helper |
+| Working directories | Synced to an object store under a strategy the consumer declares, per agent or per procedure | The consumer declares; AgentForge runs it |
 | Anything else | The consumer's own mechanism | The consumer |
 
 The mirror is best-effort by design — three attempts, then the batch is dropped with a `mirror_error` — so it is verified rather than trusted: entries deduped by id, the transcript's last entry checked after the run, and a dropped batch failing the task rather than appearing in a log.
+
+**The sync strategy is the consumer's, per agent and overridable per procedure**: direction, whether deletes propagate, whether it runs continuously or once at the close, how often, and what is excluded. These are the knobs existing sync tools already expose, and a procedure that wants atomic hand-off picks close-only while one producing a long narrative picks continuous — case by case, which is the point.
+
+**What AgentForge guarantees, whatever the strategy:** the sync is flushed and verified *before* the outcome is published, so a task never reports `SUCCEEDED` over unsynced files and a failed flush fails the task; the sync runs in the task's own process group, so cancelling the task takes it too and nothing it does touches the event loop answering `/ping`; and a sync failure is an outcome, never a log line.
 
 **A mount stays available per agent**, for a consumer that needs live shared POSIX: concurrent procedures reading each other's files mid-run, or a writer outside the agent. It is S3 Files or EFS, it requires `networkMode: VPC` with everything that implies — private subnets and a NAT gateway for `api.anthropic.com`, ECR, S3 and CloudWatch endpoints, subnets in allow-listed availability zones aligned with mount targets, paired rules on TCP 2049, DNS attributes enabled, no cross-account — and **AgentForge's constructs verify it at synth**, so a missing piece fails the synthesis rather than arriving as the 424 that also means a container kill. What the sync policy covers, and how the project key is namespaced, is **[OPEN §F]**.
 
