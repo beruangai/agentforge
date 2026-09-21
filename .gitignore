@@ -47,3 +47,8 @@ vitest.config.*.timestamp*
 
 # Test output
 test-output/
+
+# Local environment
+.env
+.env.*
+!.env.*.example
