@@ -26,7 +26,7 @@ Chosen option: **a process per task, speaking JSON-RPC 2.0 over a dedicated pipe
 * `run` and `cancel` go in; semantic status and artifact events and exactly one outcome come out, which the executor maps to A2A; the exit code is the backstop, and a process that exits without an outcome is recorded `failed` with its stderr tail
 * A dedicated pipe rather than stdout, because a stray `console.log` from consumer code or a library would otherwise corrupt the protocol; stdout and stderr stay logs
 * JSON-RPC rather than an ad-hoc frame or a runtime-specific IPC channel, because it is already the vocabulary at the outer boundary, it is trivially faked in tests, and it leaves a task process implementable in another language
-* Each task loads the bundle current at its start, which is what makes a reloadable bundle work
+* Each task loads its procedures at its start, from the image the container was deployed with
 * The executor never knows what the process runs — Claude, or plain consumer code. That is what keeps the SDK out of the transport layer
 
 ### Consequences

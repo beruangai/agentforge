@@ -19,6 +19,6 @@ Numbers are stable ids; 0005 was dropped when its decision — that the executor
 
 | [0006](0006-task-state-is-durable-outside-the-session.md) | Task state is durable outside the runtime session | proposed |
 | [0007](0007-identity-is-the-consumers.md) | Identity and isolation are the consumer's | proposed |
-| [0008](0008-procedure-code-is-a-published-bundle.md) | Procedure code is a published bundle, not a baked image | proposed |
+| [0008](0008-code-ships-in-the-image.md) | Code ships in the image; images layer; only state is mounted | proposed |
 | [0009](0009-the-caller-supplies-the-idempotency-key.md) | The caller supplies the idempotency key; a task id is a wire handle | proposed |
 | [0010](0010-agentforge-is-consumed-as-an-nx-plugin.md) | AgentForge is consumed as an Nx plugin, and agents nest in one project | proposed |

@@ -57,8 +57,24 @@ From [filesystem configurations](https://docs.aws.amazon.com/bedrock-agentcore/l
 - Mount paths must be under `/mnt/` with exactly one subdirectory level.
 - Each mount has a 30-second timeout, all configured filesystems mount in parallel, and **a single failure fails the whole invocation** with HTTP 424 — the same status a container kill produces.
 - S3 Files and EFS both require `networkMode: VPC`, with subnets in the mount targets' availability zones and security groups allowing TCP 2049. The container then needs NAT or endpoints for everything else it reaches, including `api.anthropic.com`, which has no VPC endpoint.
-- S3 Files and EFS mounts are **shared** across sessions and agents that use the same access point; write access is granted by the execution role, and the documentation allows a read-only access point.
-- **Session storage is Preview.** It is per-session rather than shared, capped at 1 GB and roughly 50 MB of metadata, reset after 14 idle days, and **wiped on a runtime version update** — a deploy destroys it. No hard links, no extended attributes.
+- Three mount types, and their lifecycles differ in the way that matters most:
+
+| | Isolation | On a runtime version update | Notes |
+|---|---|---|---|
+| Managed **session storage** (Preview, microVM) | Per session | **"Data wiped – fresh file system on next invoke"** | No VPC needed; 14-day idle reset; no hard links or xattrs |
+| **Capacity provider volume** (Instances) | Per session | "Data persists – volume re-attached on next invoke" | EBS, Instances compute only |
+| **S3 Files / EFS** (bring your own) | **Shared** across sessions and agents | **"No effect – data persists"** | Customer-managed and permanent; VPC required; write access from the execution role, and a read-only access point is allowed |
+
+- So durable per-session state that must survive a deploy belongs on S3 Files or EFS, not on managed session storage.
+- Mount paths must be `/mnt/<one level>`, 6–200 characters, unique, and not nested inside one another; at most 5 configurations per runtime.
+
+## Versions and running sessions
+
+From [lifecycle settings](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-lifecycle-settings.html):
+
+- "Each microVM session uses the code assets (`agentRuntimeArtifact`) that were deployed at the time of microVM creation. **If you update your agent runtime with new code, existing sessions will continue using the previous version until they terminate and new sessions are created.**"
+- So a deploy does not recycle running containers and cannot interrupt a turn. Two artifact versions serve traffic while long sessions drain, which is normal rather than a fault — but a task's record has to say which artifact ran it.
+- Lifecycle timers are per session: the idle timeout resets on each invocation to that session, `maxLifetime` starts at creation and cannot be reset, and when either fires only that session's microVM is terminated.
 
 ## Stopping a session
 

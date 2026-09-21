@@ -85,11 +85,10 @@ AgentForge exists for StrategyFoundry and TrendBot. They say what they need; Age
 |---|---|---|
 | **D25** | One code path locally and in the cloud; caller logic does not branch on which, and an unavailable target fails loudly rather than falling back | H20, T39 |
 | **D26** | A procedure runs in isolation against a fixture, with no container and no workflow engine | H21 |
-| **D27** | A change to a procedure can reach the next task without rebuilding an image, for a consumer willing to pay the deployment cost that carries | H22 |
 | **D28** | A consumer extends the base image with what its procedures need | H23 |
 | **D29** | Authentication is the operator's subscription; no pay-per-use key is present, and each deployment reads only the secrets it declares | H24, T44 |
 | **D30** | Identifiers AgentForge mints are uuid7 | H25 |
-| **D31** | Each deployed agent is resolvable by name, serves the current bundle, and reports liveness without running an agent — and nothing a procedure does delays that report | T40, T41, T42 |
+| **D31** | Each deployed agent is resolvable by name, serves the image it was deployed with, and reports liveness without running an agent — and nothing a procedure does delays that report | T40, T41, T42 |
 | **D32** | A caller invokes remotely with least privilege — exactly its own agents, and nothing else | T43 |
 
 ---
@@ -108,7 +107,8 @@ Raised with the operator; each is a wording change in the source contract rather
 | **T26** — "one invocation's side effects never commit twice" | Not meetable by AgentForge: a container can die between a side effect and its record. D13 and D14 cover what is meetable; the rest is the consumer's reconciliation |
 | **T29, T30** — session-id name mapping and raw-key normalization | Derivations the consumer does before it calls. D16 gives it control of the identifiers themselves |
 | **T41** — a last-change time that "moves only when the status does" | A restatement of a platform gotcha. D31 carries the behavior |
-| **H14** — "`~/.claude` and the working directory are on the persistent mount" | Names a mechanism that has since proven costly (§F). D17 is the behavior it protects |
+| **H14** — "`~/.claude` and the working directory are on the persistent mount" | Names a mechanism; D17 is the behavior. As it happens the mechanism is also where §F is leaning, but the requirement should not fix it |
+| **H22** — a change reaching the next run without an image rebuild (was D27) | Withdrawn. Code ships in the image ([ADR 0008](../adr/0008-code-ships-in-the-image.md)); with layered images and affected-only rebuilds, a change deploys only the agent that contains it, and a deploy never interrupts a running session |
 
 ---
 

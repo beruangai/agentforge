@@ -9,7 +9,7 @@ Milestones deliver capability a consumer can actually run. Each is proposed thro
 - Nx workspace in the grouped layout on current `@aws/nx-plugin` defaults; Bun, Biome, catalog versions
 - Read `@aws/nx-plugin`'s `ts#agent` and its sync machinery for what to extend rather than rebuild (§K)
 - **Blocking decisions, before any server code:** how the A2A request handler is assembled (§I), and the task-store interface — conditional index insert, fenced write (§A)
-- Local spikes: kernel settlement and what structured output still needs (§E), the task-process protocol with cancellation and group kill (§C, §G), session persistence and cross-container resume (§F), A2A server assembly and client signing (§I), credential provisioning and expiry (§O)
+- Local spikes: kernel settlement and what structured output still needs (§E), the task-process protocol with cancellation and group kill (§C, §G), session persistence and cross-container resume (§F), A2A server assembly and client signing (§I), credential provisioning and expiry (§O), deterministic image builds (§D)
 - Procedure authoring settled against real procedures, not argument (§N)
 
 **Exit:** every local spike recorded in `docs/research/`, and the questions it answers closed.
@@ -25,20 +25,20 @@ The whole loop, in Docker, for a procedure a consumer would actually ship.
 - Runtime: A2A server, gateway and executor, a process per task, filesystem task store behind the fenced interface, generated agent card
 - Caller-agnostic client and the Temporal activity factory: start, attach, await with heartbeat, cancel (D10, D13, D14)
 - Typed outcomes with their causes, and what every task records (D19, D22)
-- Base image with the bundle baked in; credentials provisioned as §O decides (D29)
+- Base image, and one capability image with an agent over it, built locally; credentials provisioned as §O decides (D29)
 - Failure-injection tests for every layer-2 failure in `ARCHITECTURE.md` §9
 
 **Exit:** a StrategyFoundry workflow runs a real directive against a local container, gets validated structured output, and can cancel it, retry it, and resume its session — with the run's seed, options, transcript and usage recorded.
 
 ## A2 — The same agent on AgentCore
 
-- AgentCore spikes: busy-session reachability and concurrency (§B), cancellation (§C), task store and lease (§A), bundle mount and reload (§D)
+- AgentCore spikes: busy-session reachability and concurrency (§B), cancellation (§C), task store and lease (§A), state mounts (§F)
 - A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency, lease and loss; admission limits
-- The Nx plugin: generators for an agents project, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
-- CDK constructs and the bundle publish command; the mounted bundle, read-only and content-addressed, for the consumer that wants it (D27)
+- The Nx plugin: generators for an agents project, a capability image, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
+- CDK constructs and the deploy path: deterministic images, digest comparison, and an update only where the digest moved (§D)
 - Failure-injection tests for every layer-1 failure, on AgentCore
 
-**Exit:** the same procedure, unchanged, runs against a deployed agent; it survives a container kill and a caller redeploy; and a deploy is a construct plus a publish.
+**Exit:** the same procedure, unchanged, runs against a deployed agent; it survives a container kill and a caller redeploy; and changing one agent deploys that agent alone.
 
 ## A3 — TrendBot
 

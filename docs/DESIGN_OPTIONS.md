@@ -37,11 +37,17 @@ Three cases the mechanism must cover whichever is chosen: a cancel arriving **be
 
 Leaning C1, with C2 as the fallback when the container cannot be reached. **Spike:** cancel mid-run both ways; measure time to termination; whether the container receives `SIGTERM` under C2 and how long before the kill; whether telemetry flushes and an outcome is recorded inside the grace period; whether a Claude session left mid-turn resumes cleanly. Locally `docker stop` stands in for C2.
 
-## §D — The bundle mount *(OPEN)*
+## §D — Image layering, determinism and deploy granularity *(OPEN)*
 
-A published bundle must be visible to the next task process without an image rebuild ([ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)).
+Code ships in the image and layering is what keeps a change from spreading ([ADR 0008](../adr/0008-code-ships-in-the-image.md)). That only works if an unaffected agent rebuilds to a byte-identical image and is never updated.
 
-**Spike:** within AgentCore Runtime's [filesystem limits](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-filesystem-configurations.html#_limits), mount a bundle; measure module-load time for a task against a baked bundle; publish a new bundle and confirm the next task runs it while a running task is unaffected; confirm a stale contract hash is refused.
+- How the layers are cut: what belongs in AgentForge's base, what in a consumer's capability image, what in an agent's own
+- What it takes to make the build reproducible on this toolchain — pinned bases, bundler output, file ordering and timestamps — and whether Bun's bundler is deterministic enough without help
+- Comparing digests before calling `UpdateAgentRuntime`, so an unchanged agent is never given a new version
+- What the build costs when a capability image changes and every agent above it rebuilds
+- Whether the agent card can be generated as a build step from the image's own registry of procedures
+
+**Spike (local):** build one capability image and three agent images from it; change one agent's procedure; confirm the other two rebuild to identical digests and that the deploy path skips them; then change the capability image and confirm all three move.
 
 ## §E — Kernel settlement on the current SDK *(OPEN)*
 
@@ -57,10 +63,10 @@ What the first AgentForge learned about settling a run may not hold. To establis
 
 A session must be resumable in another container (H14), and each runtime session's state must be private and survive its container (T31).
 
-- **F1 — The SDK's `SessionStore` adapter.** *Leaning, on the evidence below.* Transcripts mirror to S3 or a database; resume loads from the store into a temporary config directory. Keyed by the working directory, so resume needs a matching one. Mirror writes are best-effort with a `mirror_error` message on failure, and a run resumed from the store leaves no local copy.
-- **F2 — A persistent mount for `~/.claude` and the working directory.** What StrategyFoundry assumed; no SDK dependency, but state is tied to what is mounted where.
+- **F1 — A mount for the Claude state** — `~/.claude` and the working directory on S3 Files or EFS, which a runtime version update does not affect. *Leaning, on the evidence below.* Transcripts mirror to S3 or a database; resume loads from the store into a temporary config directory. Keyed by the working directory, so resume needs a matching one. Mirror writes are best-effort with a `mirror_error` message on failure, and a run resumed from the store leaves no local copy.
+- **F2 — The SDK's `SessionStore` adapter**, mirroring transcripts to a database. Its real appeal is queryability later rather than live resume, and it adds a best-effort mirror whose failure must be surfaced.
 
-F2 is worse than it looks: a mount path must be `/mnt/<one level>`, so `CLAUDE_CONFIG_DIR` moves there and takes `.credentials.json` with it onto shared storage; a shared S3 Files or EFS mount is visible to every session using that access point; and session storage — the per-session alternative — is Preview, capped at 1 GB, and **wiped on a runtime version update**, so a deploy would destroy every transcript and working copy.
+What the mount path must respect, whichever is chosen: it is `/mnt/<one level>`, so `CLAUDE_CONFIG_DIR` moves there and would take `.credentials.json` with it onto storage shared with every session on that access point — which is a reason to keep credentials off disk entirely (§O), not a reason to avoid the mount. AgentCore's managed session storage is not a candidate for anything durable: a version update wipes it. S3 Files and EFS are unaffected by one.
 
 **Spike:** both paths, resuming a session in a second container, including a subagent transcript, and a forced mirror failure.
 
@@ -94,9 +100,9 @@ This is not a detail to verify later: it decides the shape of the server and the
 
 ## §K — The plugin and infrastructure surface *(OPEN)*
 
-AgentForge is delivered as an Nx plugin with generators, constructs and a publish command ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md), [ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)). Open:
+AgentForge is delivered as an Nx plugin with generators, constructs and a deploy path ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md), [ADR 0008](../adr/0008-code-ships-in-the-image.md)). Open:
 
-- Which generators exist, and what each writes: an agents project with its image, an agent nested in one, a procedure, a caller's client wiring
+- Which generators exist, and what each writes: an agents project, a capability image, an agent over it, a procedure, a caller's client wiring
 - **The sync generator** — what it keeps current in a consumer as AgentForge changes (wiring, construct props, the caller's client, image pins), how it reports a change it cannot make automatically, and how much of `@aws/nx-plugin`'s own sync machinery is reused rather than reimplemented
 - What each construct covers, what the consumer must supply, and how several agents share or separate stores, buckets and the image registry
 - Build granularity for nested agents: which targets are per agent, and what a shared image change rebuilds

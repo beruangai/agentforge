@@ -44,7 +44,7 @@ This document defines the layers, what crosses between them, and the two places 
 
 **Layers 1 and 2 never import each other.** Each is testable alone: the harness runs a procedure against a fixture with no container and no caller; the runtime runs a task whose process is a stub. They share one library, the **task protocol** — the envelope, the identifiers, the process messages, and the outcome — which depends on Zod alone.
 
-**Delivery — the Nx plugin, its generators, the CDK constructs and the bundle publish command — is tooling, not a layer.** It is how a consumer gets a deployed agent and stays in step with AgentForge as it changes (§6).
+**Delivery — the Nx plugin, its generators, the CDK constructs and the build-and-deploy path — is tooling, not a layer.** It is how a consumer gets a deployed agent and stays in step with AgentForge as it changes (§6).
 
 ### The two protocols, and three interfaces
 
@@ -59,7 +59,7 @@ Only two crossings are protocols: a contract between separately deployed, separa
 |---|---|---|
 | Client API | Layer 1 | `start`, `await`, `cancel`, typed by the contract the caller imports. Caller-agnostic; the Temporal activity factory sits over it |
 | Task store | Layer 1 | A2A's `TaskStore`, extended with an index by idempotency key and a fencing token (§4) |
-| Bundle | Deployment | What a task process loads, guarded by the contract hash (§6) |
+| Image | Deployment | What a task process runs, guarded by the contract hash (§6) |
 
 ---
 
@@ -98,7 +98,7 @@ Two halves, in separate modules ([ADR 0003](../adr/0003-procedures-are-type-safe
 
 The **outer contract** is what the caller sends and receives; the **agent contract** is what the agent fills in, given to the SDK as its output schema. They differ whenever the outer output carries computed fields the model must not be asked for (D2). The step between them is an ordinary function.
 
-The contract hash travels in the envelope. A container whose loaded bundle does not implement it refuses the task before any work (D4).
+The contract hash travels in the envelope. A container whose image does not implement it refuses the task before any work (D4).
 
 ### The implementation
 
@@ -196,7 +196,7 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 **The gateway** decides admission (§4). **The executor** spawns and supervises: one process per task, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md), measured by **[OPEN §G]**).
 
 - `/ping` shares no event loop with any task, so nothing a task does can stall the health check and get a busy session terminated (D31)
-- each task loads the bundle current at its start (§6)
+- each task loads its procedures from the image it was deployed with (§6)
 - a crash is contained: the executor records `failed` with the exit code and the tail of stderr, so a task never disappears without a record
 - the process speaks the task protocol, and its logs go to the container's log stream
 
@@ -204,23 +204,33 @@ One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC o
 
 **Guardrails are cooperative.** `writeScope` and `stopGuard` constrain the model's tool use; they are not a sandbox, and a procedure with shell access goes around them.
 
-**Locally**, the same image runs in Docker, the client talks A2A to it directly, task state is on the filesystem behind the same fenced interface, and `docker stop` stands in for the blunt stop. One code path; local is not a mock (D25).
+**Locally**, the same image runs in Docker — rebuilt, not hot-reloaded, because a development-only code path is how a system drifts from what it ships. The client talks A2A to it directly, task state is on the filesystem behind the same fenced interface, and `docker stop` stands in for the blunt stop. The only thing mounted locally is the state that is mounted in the cloud. One code path; local is not a mock (D25).
 
 ---
 
-## 6. Agents, bundles and delivery
+## 6. Agents, images and delivery
 
-**An agent is the deployable unit**: one AgentCore runtime, one card, one image, the bundle it serves, and its stores — the strongest isolation available. A consumer deploys as many as its strategy wants; TrendBot's three are three agents (D31).
+Three levels, each a bundle of one or more of the next. **Where the lines fall is the consumer's**, exactly as identity is (§2); AgentForge vends the bottom one and the tooling.
 
-**Agents nest in one project by default** ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)): agents sharing an image differ only by bundle and card, so one project builds one image and holds several agent definitions, each with its own build and deploy target. A separate project is for an agent needing its own image, such as one adding Python and NautilusTrader (D28).
+| | What it is | Changes when |
+|---|---|---|
+| **Base image** | AgentForge's: Bun, the Claude CLI, the runtime server and the harness | AgentForge releases |
+| **Capability image** | The consumer's layer over it: the skills, tools, MCP servers, prompt foundation, language runtimes and memory configuration a group of agents share | Those capabilities change |
+| **Agent** | A deployed AgentCore runtime, extending a capability image with its own procedures, its card, its mounts and its stores | Its own procedures or configuration change |
 
-**The bundle is a published artifact** ([ADR 0008](../adr/0008-procedure-code-is-a-published-bundle.md)), **baked into the image by default**. Mounting it instead — so a change reaches the next task without an image rebuild (D27) — is opt-in and carries real cost: the mount forces the runtime into a VPC, a mount failure fails the invocation with the same 424 a container kill produces, and a shared writable mount would let one agent's shell rewrite every agent's code. A mounted bundle is therefore read-only, published content-addressed with a pointer file read once at task start, and never overwritten in place **[OPEN §D]**.
+A capability image serving one agent, or an agent serving one procedure, is the same shape with a count of one. A consumer that wants an agent isolated from every other capability extends the base image directly.
 
-**The agent card is generated at publish time** from the procedures the bundle registers, and baked into the image: a mount is not readable when the platform fetches the card, because a mount exists only during an invocation.
+**Code ships in the image** ([ADR 0008](../adr/0008-code-ships-in-the-image.md)). A deploy cannot interrupt a run: AgentCore keeps existing sessions on the artifact they started with and gives new sessions the new one. So nothing needs mounting to avoid churn — what a change must avoid is spreading, and layering is what stops it. A change to one agent's procedures rebuilds that agent's image alone; a change to shared capabilities rebuilds the images above it; a change to neither rebuilds nothing.
 
-**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agents project, an agent nested in one, a procedure and a caller's wiring; CDK constructs for the agent with its A2A configuration, the task store, the bundle and its mount, and `grantInvokeAccess` for a caller's least-privilege role (D32); and the bundle publish command. A **sync generator** keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching in two repositories **[OPEN §K]**.
+**That only holds if builds are deterministic.** An image digest changes if any byte changes, so an unaffected agent must rebuild to a byte-identical image and never be updated: pinned bases, reproducible bundler output, content-addressed tags, and `UpdateAgentRuntime` called only when the digest changed. Nx's affected graph decides what to rebuild; the digest decides what to deploy **[OPEN §D]**.
 
----
+**Mounts carry state, never code** — the working directory, memory, transcripts. On S3 Files or EFS a version update has no effect on them; AgentCore's managed session storage is wiped by one, so durable session state does not live there **[OPEN §F]**.
+
+**The agent card is generated at build time** from the procedures the image contains, and served from the image: a mount is readable only during an invocation, and the platform may fetch the card outside one.
+
+**A task's record carries the artifact version that ran it**, because while long sessions drain, two versions serve traffic at once.
+
+**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agents project, a capability image, an agent and a procedure; a **sync generator** that keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching across two repositories; CDK constructs for an agent with its A2A configuration, its stores, its mounts and `grantInvokeAccess` for a caller's least-privilege role (D32); and the build-and-deploy path that updates only what changed **[OPEN §K]**.
 
 ## 7. The harness
 
@@ -299,8 +309,8 @@ agentforge/
     │   ├── agent/             # the agent() helper and the kernel
     │   └── helpers/           # guardrails, telemetry
     ├── infra/
-    │   ├── constructs/        # CDK: agent, task store, bundle, caller policy
-    │   └── publish/           # the bundle publish command
+    │   ├── constructs/        # CDK: agent, task store, mounts, caller policy
+    │   └── plugin/            # Nx generators, including sync
     └── temporal/
         └── activity/          # activity factory over the client
 ```

@@ -22,7 +22,7 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Implementation** — What runs in the container: an optional *before* step, a required *run* step, an optional *after* step.
 
-**Contract hash** — Identifies the contract a task was started against; a container whose bundle does not implement it refuses the task.
+**Contract hash** — Identifies the contract a task was started against; a container whose image does not implement it refuses the task.
 
 **Outer contract** — What a procedure's caller sends and receives.
 
@@ -74,15 +74,15 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 ## Agents and delivery
 
-**Agent** (deployed) — One AgentCore runtime: an image, the bundle it serves, its agent card, and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
+**Agent** (deployed) — One AgentCore runtime: an image extending a capability image, the procedures it contains, its card, its mounts and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
 
-**Agents project** — One project holding an image and the agent definitions that share it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
+**Agents project** — One project holding a capability image and the agents that extend it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
 
-**Bundle** — The published procedures and harness an agent serves, loaded by each task process at its start. Baked into the image by default; mountable where a consumer wants the faster loop.
+**Capability image** — A consumer's image layer over AgentForge's base: the skills, tools, MCP servers, prompt foundation, language runtimes and memory configuration a group of agents share. An agent's image extends one ([ADR 0008](../adr/0008-code-ships-in-the-image.md)).
 
-**Agent card** — The A2A discovery document, generated at publish time from the procedures a bundle registers.
+**Agent card** — The A2A discovery document, generated at build time from the procedures an image contains, and served from the image.
 
-**Base image** — What AgentForge ships for consumers to extend: Bun, the Claude CLI, and the runtime server.
+**Base image** — What AgentForge ships for consumers to extend: Bun, the Claude CLI, the runtime server and the harness. It changes when AgentForge releases.
 
 ## Identity
 

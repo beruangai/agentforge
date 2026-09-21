@@ -20,9 +20,9 @@ For layout: **one project per agent**, with a shared project holding the image a
 
 Chosen: **an Nx plugin**, with **agents nested in one project** by default.
 
-* **Generators, constructs and the publish command are all part of it.** The generators are not scaffolding convenience: a **sync generator** is how a consumer's wiring stays correct as AgentForge iterates, and without one every change becomes ad-hoc patching in two repositories. `@aws/nx-plugin` already does this, so AgentForge extends its conventions rather than starting over
-* Nesting follows from the bundle decision ([ADR 0008](0008-procedure-code-is-a-published-bundle.md)): agents on one image differ only by bundle and card, so one project builds one image and each agent keeps its own build and deploy target
-* A separate project remains right for an agent needing its own image, such as one adding Python and NautilusTrader (H23)
+* **Generators, constructs and the deploy path are all part of it.** The generators are not scaffolding convenience: a **sync generator** is how a consumer's wiring stays correct as AgentForge iterates, and without one every change becomes ad-hoc patching in two repositories. `@aws/nx-plugin` already does this, so AgentForge extends its conventions rather than starting over
+* Nesting follows the image layering ([ADR 0008](0008-code-ships-in-the-image.md)): a project holds one capability image and the agents that extend it, each agent keeping its own image, build target and deploy target, so a change rebuilds only the layer that contains it
+* A separate project is right for an agent whose capabilities are unlike its neighbours', such as one adding Python and NautilusTrader (D28); it extends AgentForge's base image directly
 * Each agent is still deployed as its own AgentCore runtime — the strongest isolation available — whatever project it lives in
 * Worth taking from `@aws/nx-plugin`: one workspace-wide image registry rather than one per agent, constructs exposing `grantInvokeAccess`, and a client factory with local and IAM-authenticated variants
 
