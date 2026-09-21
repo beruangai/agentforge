@@ -29,6 +29,13 @@ Every message of every run is written to `out/<spike>.jsonl`, and a machine-read
 | `kernel-settlement/e2-background-settlement.ts` | §E — background work and the resumed turn | ″ |
 | `kernel-settlement/e3-in-turn-correction.ts` | §E — `PreToolUse` rejection vs native re-prompting | ″ |
 | `kernel-settlement/e4-option-binding.ts` | §E — does every option bind | ″ |
+| `server-assembly/i1-gateway-wrap.ts` | §I — a gateway wrapping `DefaultRequestHandler` | [a2a-server-assembly.md](../docs/research/a2a-server-assembly.md) |
+| `task-process/cg1-protocol-and-cost.ts` | §C local, §G — the protocol, group kill, `/ping`, per-task cost | [task-process-and-cost.md](../docs/research/task-process-and-cost.md) |
+| `images/d1-deterministic-builds.sh` | §D — deterministic builds and deploy granularity | [image-determinism.md](../docs/research/image-determinism.md) |
+| `procedure-authoring/n0-decorators-on-bun.ts` | §N — do TypeScript 5 decorators work on Bun | [procedure-authoring.md](../docs/research/procedure-authoring.md) |
+| `procedure-authoring/n4-judge.ts` | §N — the three styles, judged by `tsc` | ″ |
+
+`images/` needs `bash images/setup.sh` first (a throwaway registry, a `docker-container` builder, and a `DOCKER_CONFIG` without the macOS keychain helper), and `bash images/teardown.sh` after.
 
 ## AWS
 
