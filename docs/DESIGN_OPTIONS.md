@@ -78,6 +78,7 @@ The workspace is shared on purpose — it is the artifact vault, and procedures 
 - What prevents two concurrent tasks corrupting one directory, given close-to-open consistency and no cross-session file locking
 - Whether `/mnt/claude-config` is partitioned the same way, and what that means for a session resumed by a different agent
 - Credentials: `CLAUDE_CONFIG_DIR` holds `.credentials.json`, which on a shared mount is visible to every session using that access point — the reason to keep credentials off disk (§O), not a reason to avoid the mount
+- Which VPC preconditions the constructs assert at synth, and which can only be checked at deploy: network mode, availability-zone overlap with the mount targets, security-group rules for TCP 2049, DNS resolution, account boundary, access-point POSIX identity, and the egress the container needs for everything that is not the mount
 
 AgentForge provides the mechanism; each consumer defines its own semantics, so this needs the operator with each consumer rather than a spike.
 

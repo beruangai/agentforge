@@ -243,6 +243,8 @@ A package image serving one agent, or an agent serving one procedure, is the sam
 
 The workspace mount is deliberately shared: it is the artifact vault, and procedures are meant to see each other's output. **How it is partitioned — which access points, which prefixes, what may write where — is the consumer's to define and AgentForge's to provide**, and the mechanism for it is **[OPEN §F]**.
 
+**Mounting state puts the agent in a VPC, and the VPC is the consumer's.** S3 Files is a bring-your-own filesystem: it requires `networkMode: VPC`, subnets sharing an availability zone with a mount target, security groups allowing TCP 2049 both ways, DNS resolution, the same account, and an access point whose POSIX identity matches the container's user. The consumer supplies all of it; **AgentForge's constructs verify it at synth** — network mode, availability-zone overlap, security-group rules, mount-path shape, and the egress the container still needs for everything that is not the mount, since `api.anthropic.com` has no VPC endpoint. A missing piece fails the synthesis with what is missing, rather than arriving as a 424 on the first invocation, which is indistinguishable from a container kill.
+
 **The agent card is generated at build time** from the procedures the image contains, and served from the image: a mount is readable only during an invocation, and the platform may fetch the card outside one.
 
 **A task's record carries the artifact version that ran it**, because while long sessions drain, two versions serve traffic at once.
