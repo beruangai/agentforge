@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status: working proposal.** Nothing here is accepted. Every [ADR](../adr/README.md) is `proposed` until implementation settles it and the operator accepts it. Requirements this must meet are the consumers', in [CONSUMERS.md](CONSUMERS.md) — themselves unvetted drafts. Open questions are in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md), marked inline as **[OPEN §x]**; code sketches show shape, not signatures.
+> **Status.** The decisions this rests on are [accepted ADRs](../adr/README.md); reversing one is a superseding ADR, not an edit. What is still undecided is in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md), marked inline as **[OPEN §x]**. Requirements come from the consumers, distilled in [CONSUMERS.md](CONSUMERS.md) — their contracts are unvetted drafts. Code sketches show shape, not signatures; there is no implementation yet.
 
 AgentForge runs a consumer's **procedure** as an asynchronous **task**, in an isolated runtime, and returns a typed outcome to whatever called it. Temporal is the caller both consumers use and is supported first-class through an activity factory, but nothing below the client knows a caller exists.
 

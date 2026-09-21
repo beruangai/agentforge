@@ -2,7 +2,7 @@
 
 **AgentForge** is a procedure wrapper for the Claude Agent SDK, built for its consumers — StrategyFoundry and TrendBot — not for public use. Consumers declare procedures; AgentForge runs each as an asynchronous task over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
 
-Design stage; no implementation yet. **Everything in `docs/ARCHITECTURE.md` and `adr/` is a proposal.** Accepting an ADR is the operator's call, made as implementation settles it.
+No implementation yet. **The [ADRs](adr/README.md) were accepted on 2026-09-21 and the architecture rests on them** — reversing one is a superseding ADR, not an edit. A new decision is still written `proposed` until the operator accepts it, and everything in `docs/DESIGN_OPTIONS.md` is open.
 
 ## Read first
 
@@ -51,7 +51,7 @@ The operator's standing conventions across projects:
 
 ## Working rules
 
-- **ADRs stay `proposed` until the operator accepts them.** Never write one as `accepted`, and never treat a proposed one as settled.
+- **A new ADR is written `proposed`** and the operator accepts it. Never write one as `accepted` yourself, and never treat a proposed one as settled.
 - **An ADR records a decision, not a history.** A decision that stops being relevant is dropped; one that is replaced is superseded and marked.
 - **Consumer contracts are read, never edited here.** Raise anything unclear or conflicting with the operator, in that consumer's repository.
 - **[OPEN §x] means undecided.** Do not implement against an open section, and do not resolve one silently. Raise it, or use `AskUserQuestion`.
@@ -68,6 +68,6 @@ Non-trivial changes go through OpenSpec (proposal → specs → design → tasks
 ## Related codebases
 
 - **The first AgentForge**, in `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`, runs TrendBot today. Evidence of what hurt, never a specification ([lineage](docs/lineage/first-agentforge.md)). Port with review; never copy its shape. TrendBot's own drafts are rough; do not take them as fact.
-- **`a2a-claude` and `claude-a2a`** are A2A wrappers around the Agent SDK. Neither is a dependency or a model; [`docs/research/harness-references.md`](docs/research/harness-references.md) records the few mechanics worth a look.
+- **`a2a-claude`, `claude-a2a` and `temporal-agent-harness`** wrap an agent SDK behind a protocol boundary. None is a dependency or a model; [`docs/research/harness-references.md`](docs/research/harness-references.md) records the mechanics worth borrowing from each, and why each differs.
 - **`@aws/nx-plugin`** is the convention AgentForge's own plugin follows; its `ts#agent` generator is built for Strands and is a reference, not a base ([ADR 0010](adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
 - **This workspace's April 2026 packages and research** are gone from the tree; their archived OpenSpec changes remain under `openspec/changes/archive/` as history.

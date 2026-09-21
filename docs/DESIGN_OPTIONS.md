@@ -121,7 +121,7 @@ Most of what looked like divergence dissolved in the distillation ([CONSUMERS.md
 
 ## §M — Pausing for a human *(OPEN)*
 
-Neither consumer requires human-in-the-loop today — TrendBot's T22 is an operator hold on a *failed* attempt, which is adjacent but not this — so nothing is built. It is recorded because the shape must be decided rather than fall out of whichever case ships first, and because a pause is the one capability a durable-workflow harness gets free and we do not ([research](research/temporal-agent-harness.md)).
+Neither consumer requires human-in-the-loop today — TrendBot's T22 is an operator hold on a *failed* attempt, which is adjacent but not this — so nothing is built. It is recorded because the shape must be decided rather than fall out of whichever case ships first, and because a pause is the one capability a durable-workflow harness gets free and we do not ([research](research/harness-references.md)).
 
 **The agent never learns how a human was reached.** The trigger is the SDK's own permission interrupt — its permission callback, or a hook that asks — which the harness turns into an A2A pause. The caller waits however it likes; a Temporal workflow waiting on a signal is one way, and nothing below the client knows that is what happened.
 
@@ -131,7 +131,7 @@ The constraint: a task is an OS process, and AgentCore caps an asynchronous job 
 - **M2 — Park as a task state.** The task moves to `input-required` or `auth-required` carrying the request and the schema of the expected answer; the run ends at a phase boundary; the answer arrives on a later `message/send` against the same task, which A2A allows because those states are not terminal. Unbounded in time and cheap while waiting; it loses the in-flight tool call, and the procedure resumes through the SDK's own session resume rather than mid-turn.
 - **M3 — Both**, with the procedure declaring which it wants at a pause point.
 
-Whichever is chosen, four rules from the study hold: the request carries the **schema of the answer**, validated at the boundary; a malformed answer is rejected **without consuming the pause**, so it can be resubmitted; pending pauses appear both on the event stream and in the task's own state, so a caller attaching late sees what is blocked; and the surface that resolves a pause is **not advertised on the agent card** beside ordinary procedure calls, so a calling agent cannot answer a gate meant for a human.
+Whichever is chosen, four rules from `temporal-agent-harness` hold ([reference](research/harness-references.md)): the request carries the **schema of the answer**, validated at the boundary; a malformed answer is rejected **without consuming the pause**, so it can be resubmitted; pending pauses appear both on the event stream and in the task's own state, so a caller attaching late sees what is blocked; and the surface that resolves a pause is **not advertised on the agent card** beside ordinary procedure calls, so a calling agent cannot answer a gate meant for a human.
 
 ## §N — How a procedure is written *(OPEN)*
 

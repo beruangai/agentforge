@@ -18,7 +18,7 @@ context: |
   Consumers (StrategyFoundry, TrendBot) state requirements in their own repositories'
   docs/AGENTFORGE_CONTRACT.md (ids H# and T#), which are unvetted drafts; docs/CONSUMERS.md
   distils them into the set AgentForge answers to (ids D#) and records what is not carried.
-  Everything in docs/ARCHITECTURE.md and adr/ is proposed, not accepted.
+  The ADRs in adr/ are accepted; docs/DESIGN_OPTIONS.md holds what is still open.
 
 rules:
   proposal:
