@@ -1,6 +1,6 @@
 # Claude Agent SDK — Verified Facts
 
-Read at the source on 2026-09-20. Only what bears on AgentForge's design. Behavior the first AgentForge relied on is **not** recorded here as fact — it is re-established by the settlement spike, [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
+Read at the source on 2026-09-20. Only what bears on AgentForge's design. Behavior the predecessor harness relied on is **not** recorded here as fact — it is re-established by the settlement spike, [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
 
 ## Sessions
 
@@ -26,7 +26,7 @@ From [Persist sessions to external storage](https://code.claude.com/docs/en/agen
 
 ## Structured output
 
-Established against the current SDK, superseding the first AgentForge's workarounds:
+Established against the current SDK, superseding the predecessor harness's workarounds:
 
 - `outputFormat: { type: 'json_schema', schema }` is native. The SDK validates and re-prompts on its own; exhausting its retries surfaces as `error_max_structured_output_retries`.
 - Schemas must target **draft-07** — `z.toJSONSchema(schema, { target: 'draft-7' })`. `format` is accepted as an annotation.

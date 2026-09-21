@@ -2,7 +2,7 @@
 
 A procedure wrapper for the Claude Agent SDK, shared across projects.
 
-A consumer declares a **procedure** — its public contract, the agent's own contract and how one becomes the other, the seed the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. Consumers own what their agents do and how they isolate them; AgentForge owns how they run.
+A consumer declares a **procedure** — its public contract, the agent's own contract and how one becomes the other, the prompt the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. Consumers own what their agents do and how they isolate them; AgentForge owns how they run.
 
 It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
 
@@ -22,7 +22,7 @@ Built for its consumers, StrategyFoundry and TrendBot, not for public use.
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | Canonical terms |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones |
 | [docs/research/](docs/research/) | Verified facts about AgentCore, A2A, the Agent SDK and `@aws/nx-plugin` — re-read before relying on one |
-| [docs/lineage/](docs/lineage/) | The first AgentForge: the failures it paid for, as evidence |
+| [docs/lineage/](docs/lineage/) | TrendBot's predecessor harness: the failures it paid for, as evidence |
 
 ## Shape
 
@@ -36,4 +36,4 @@ Four layers: **runtime** owns the wire and the task's execution host; **harness*
 ## Consumers
 
 - **StrategyFoundry** — `~/workspace/beruangai/StrategyFoundry`; contract in its `docs/AGENTFORGE_CONTRACT.md`
-- **TrendBot** — `~/workspace/PlayTek/trendbot-monorepo`; contract in its `docs/AGENTFORGE_CONTRACT.md`; migrates off the first AgentForge once its requirements are met
+- **TrendBot** — `~/workspace/PlayTek/trendbot-monorepo`; contract in its `docs/AGENTFORGE_CONTRACT.md`; migrates off the predecessor harness once its requirements are met

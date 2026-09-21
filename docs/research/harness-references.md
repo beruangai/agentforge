@@ -51,4 +51,4 @@ Read at `ericabouaf/claude-a2a`, `src/executor.ts`, 2026-09-20. Explicitly exper
 - **A persisted context-to-session map**, so multi-turn conversations survive a restart.
 - **Cancellation** — `interrupt()` raced against a timeout, then abort, with a flag suppressing further status publishing.
 
-**Not worth borrowing:** it treats the first `result` message as final, which is the settlement bug that cost the first AgentForge a day; it runs queries in the server's own process; and its input-required parking depends on internal event-bus behavior of the A2A SDK that its own comments call fragile.
+**Not worth borrowing:** it treats the first `result` message as final, which is the settlement bug that cost the predecessor harness a day; it runs queries in the server's own process; and its input-required parking depends on internal event-bus behavior of the A2A SDK that its own comments call fragile.

@@ -58,11 +58,11 @@ Layering keeps a change from spreading only if an unaffected agent rebuilds to a
 - Whether the agent card is generated as a build step from the image's own registry of procedures
 - Where `agentforge/a2a-claude` is published, how a consumer pins it, and whether the constructs assert a compatible package-and-image pairing at deploy rather than at first task
 
-**Spike (local):** build one package image and three agent images over it; change one agent's procedure; confirm the other two rebuild to identical digests and the deploy path skips them; then change the package image and confirm all three move.
+**Spike (local):** build one agentic base image and three agent images over it; change one agent's procedure; confirm the other two rebuild to identical digests and the deploy path skips them; then change the agentic base image and confirm all three move.
 
 ## §E — What the kernel still needs *(OPEN)*
 
-Structured output is largely answered: the SDK takes a draft-07 schema, validates and re-prompts natively, and fails at startup on an invalid schema ([research](research/claude-agent-sdk.md)). What the first AgentForge learned beyond that may no longer hold.
+Structured output is largely answered: the SDK takes a draft-07 schema, validates and re-prompts natively, and fails at startup on an invalid schema ([research](research/claude-agent-sdk.md)). What the predecessor harness learned beyond that may no longer hold.
 
 **Spike (local):** does a final submission survive dispatched work in the foreground; with background work enabled, does a resumed turn still cancel its tool calls; does an in-turn `PreToolUse` rejection still add anything over native re-prompting, and does its matcher name a tool that exists; does every option set — `maxTurns` among them — actually reach and bind the run.
 
@@ -113,7 +113,7 @@ This decides the shape of the server and the store, and the first slice cannot b
 
 Delivered as an Nx plugin with generators, constructs and a deploy path ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)). Designed once the first real agent exists to show what they should write. Open:
 
-- Which generators exist and what each writes: an agents project, a package image, an agent over it, a procedure, a caller's wiring
+- Which generators exist and what each writes: an agentic project, an agentic base image, an agent over it, a procedure, a caller's wiring
 - **The sync generator** — what it keeps current as AgentForge changes (wiring, construct props, the caller's client, image pins), how it reports a change it cannot make automatically, and how much of `@aws/nx-plugin`'s own sync machinery is reused
 - What each construct covers, what a consumer supplies, and how several agents share or separate stores, buckets and the registry
 - The AppConfig runtime configuration an agent's ARN is published into, following `@aws/nx-plugin` ([research](research/aws-nx-plugin.md)): its schema, what the identity triple keys, caching and refresh, and what a long-lived caller such as a Temporal worker pays to read it (D31, D32)

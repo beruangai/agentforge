@@ -1,6 +1,6 @@
-# The First AgentForge
+# The Predecessor Harness
 
-TrendBot runs today on a harness of the same name inside its monorepo, at `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`. It is **evidence, not a specification**: what was tried, and what it cost. Nothing here is a design constraint; the requirements it implies are the consumers', in their contracts. Read at 2026-09-17.
+TrendBot runs today on a harness inside its own monorepo, at `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`. It shares a name with AgentForge and is not it — a proof of the idea, built one fix at a time inside one consumer. It is **evidence, not a specification**: what was tried, and what it cost. Nothing here is a design constraint; the requirements it implies are the consumers', in their contracts. Read at 2026-09-17.
 
 ## The failures that became tests
 

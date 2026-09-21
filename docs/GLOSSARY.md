@@ -30,11 +30,11 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Step** — One part of an implementation: before, run, after. A function, not a framework phase.
 
-**Agent run** — A run step written with the `agent()` helper: seed, SDK options, agent contract, and the map to outer output.
+**Agent run** — A run step written with the `agent()` helper: the prompt, SDK options, agent contract, and the map to outer output.
 
 **Kernel** — What that helper runs: one SDK query to a settled, validated, typed outcome.
 
-**Seed** — The messages a Claude session starts from.
+**Prompt** — What a session starts from: the SDK's term for the ordered content the procedure composes.
 
 **Helper** — A reusable function a procedure calls — guardrails, telemetry. Optional; nothing is wired by default. Contributions to a composite option are additive.
 
@@ -74,11 +74,11 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 ## Agents and delivery
 
-**Agent** (deployed) — One AgentCore runtime: an image extending a package image, the procedures it contains, its card, its mounts and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
+**Agent** (deployed) — One AgentCore runtime: an image extending an agentic base image, the procedures it contains, its card, its mounts and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
 
-**Agents project** — One package holding a package image and the agents that extend it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
+**Agentic project** — One Nx project holding an agentic base image and the agents that extend it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
 
-**Package image** — A consumer's image layer over AgentForge's base, named for the package that vends it (`{consumer}/{package}`): the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share. An agent's image extends one ([ADR 0008](../adr/0008-code-ships-in-the-image.md)).
+**Agentic base image** — A consumer's image layer over AgentForge's base, named for the project that vends it (`{consumer}/{project}`): the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share. An agent's image extends one ([ADR 0008](../adr/0008-code-ships-in-the-image.md)).
 
 **Agent card** — The A2A discovery document, generated at build time from the procedures an image contains, and served from the image.
 

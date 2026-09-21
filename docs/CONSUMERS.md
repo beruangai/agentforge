@@ -4,8 +4,8 @@ AgentForge exists for StrategyFoundry and TrendBot. They say what they need; Age
 
 | Consumer | Contract | Ids | Status |
 |---|---|---|---|
-| StrategyFoundry | `~/workspace/beruangai/StrategyFoundry/docs/AGENTFORGE_CONTRACT.md` | H1… | Drafting, and adopts from day one. Its **M0** marks its own lowest bar, not AgentForge's first milestone |
-| TrendBot | `~/workspace/PlayTek/trendbot-monorepo/docs/AGENTFORGE_CONTRACT.md` | T1… | Draft, seeded from its specs. Running on the first AgentForge today; refactors onto this one when it adopts |
+| StrategyFoundry | `~/workspace/beruangai/StrategyFoundry/docs/AGENTFORGE_CONTRACT.md` | H1… | Drafting; adopts AgentForge from day one. Its **M0** is its own lowest bar, and no milestone here aims at it |
+| TrendBot | `~/workspace/PlayTek/trendbot-monorepo/docs/AGENTFORGE_CONTRACT.md` | T1… | Draft, seeded from its specs. Runs today on its own [predecessor harness](lineage/predecessor-harness.md) — same name, not this — and refactors onto AgentForge when it adopts |
 
 **Both contracts are unvetted drafts, written before this design existed.** Neither consumer has built against AgentForge, so a requirement often describes the mechanism its author had in mind rather than the behavior it protects. The distilled set below is what AgentForge answers to; the contracts are its sources.
 
@@ -13,6 +13,7 @@ AgentForge exists for StrategyFoundry and TrendBot. They say what they need; Age
 
 - **Distil, never transcribe.** Take what a requirement protects. Where it names a mechanism, meet the behavior and raise the wording.
 - **AgentForge never edits a consumer's contract.** Anything unclear, infeasible, or in conflict with the other consumer is raised with the operator, in that consumer's repository.
+- **This set becomes the contract.** The H and T documents are pre-adoption drafts, and they drift the moment a consumer builds against AgentForge. As each adopts, its contract is retired into this set, which hardens into the versioned contract both follow — so a breaking change here is reviewed with the operator against both consumers rather than negotiated twice.
 - **Push back.** A requirement that costs more than it buys, encodes a workaround, or asks for something AgentForge cannot guarantee is renegotiated, not built.
 - **Every proposal traces to distilled ids (D#) and through them to sources.** A capability no consumer needs is not built.
 - **One consumer's need is met by configuration or a helper it calls** — never by a branch in the harness or the runtime.
@@ -75,7 +76,7 @@ AgentForge exists for StrategyFoundry and TrendBot. They say what they need; Age
 
 | | Requirement | Sources |
 |---|---|---|
-| **D22** | Every task records the seed as sent, the resolved options, where the transcript is, usage, timings and every identifier, correlated to the caller's own | H18, T36, T38 |
+| **D22** | Every task records the prompt as sent, the resolved options, where the transcript is, usage, timings and every identifier, correlated to the caller's own | H18, T36, T38 |
 | **D23** | Traces export over OpenTelemetry and are flushed before the container goes away | H19, T37 |
 | **D24** | No credential appears in anything AgentForge emits — log line, error, or recorded value | T35 |
 
@@ -114,6 +115,6 @@ Raised with the operator; each is a wording change in the source contract rather
 
 ## What each consumer brings
 
-**StrategyFoundry** — adopting from day one, local first and then AgentCore. Several Claude projects rather than one, with an isolation strategy still to settle; sessions resumable in any container; one image adding Python and NautilusTrader; a usage limit distinct with its reset time, so workflows wait rather than fail; every run's seed and transcript recorded, because its capital-bearing decisions must be reconstructible.
+**StrategyFoundry** — adopting from day one, local first and then AgentCore. Several Claude projects rather than one, with an isolation strategy still to settle; sessions resumable in any container; one image adding Python and NautilusTrader; a usage limit distinct with its reset time, so workflows wait rather than fail; every run's prompt and transcript recorded, because its capital-bearing decisions must be reconstructible.
 
-**TrendBot** — running in the cloud on the first AgentForge today ([lineage](lineage/first-agentforge.md)). Isolation by entity path or lane, with a session per phase inside it; three deployed agents; a git lifecycle around every run — sync before, commit and push after, nothing on failure — as its own side effect in AgentForge's before and after steps; runs of up to hours; composable fail-closed guardrails; concurrency bounded by the caller.
+**TrendBot** — running in the cloud on the predecessor harness today ([lineage](lineage/predecessor-harness.md)). Isolation by entity path or lane, with a session per phase inside it; three deployed agents; a git lifecycle around every run — sync before, commit and push after, nothing on failure — as its own side effect in AgentForge's before and after steps; runs of up to hours; composable fail-closed guardrails; concurrency bounded by the caller.

@@ -107,14 +107,14 @@ The contract hash travels in the envelope. A container whose image does not impl
 | Part | Does | Examples |
 |---|---|---|
 | **before** | Optional side effects before the run | Sync a working copy, verify a mount, reconcile after a lost attempt (D33) |
-| **the run** | The seed, the SDK options, the agent contract, and the function from agent output to outer output | |
+| **the run** | The prompt, the SDK options, the agent contract, and the function from agent output to outer output | |
 | **after** | Optional side effects on success and on failure | Commit and push, record, clean up (D33) |
 
 **Input and output are structured, always.** The outer input is validated against the contract before the run starts; the agent's output is validated against the agent contract before anything else sees it; the outer output is validated before it leaves. There is no unstructured path and no opt-in — a prose answer is not a contract (D3).
 
 **A task has exactly one time budget.** The procedure declares it; the envelope may override it per invocation, which is how a caller that sizes budgets per call rather than per declaration gets what it needs. The task enforces it and reports `TIMED_OUT`. A caller's own deadline — an activity's start-to-close, say — can only *cancel*; it is never a second authority on when a run ends, and the client reports the budget in force so a caller can size its deadline above it (D6).
 
-**Every option a procedure sets reaches the SDK, or the task is rejected** (D5). The options are the SDK's own type rather than a parallel schema, and a test asserts every resolved key reaches `query()` — which is how the first AgentForge's silently-dropped `maxTurns` is prevented. What that cannot prove is that the SDK then *binds* the option; that is **[OPEN §E]**.
+**Every option a procedure sets reaches the SDK, or the task is rejected** (D5). The options are the SDK's own type rather than a parallel schema, and a test asserts every resolved key reaches `query()` — which is how the predecessor harness's silently-dropped `maxTurns` is prevented. What that cannot prove is that the SDK then *binds* the option; that is **[OPEN §E]**.
 
 ### Side effects are the consumer's
 
@@ -225,13 +225,13 @@ Three levels, each a bundle of one or more of the next. **Where the lines fall i
 | | What it is | Named | Changes when |
 |---|---|---|---|
 | **Base image** | AgentForge's: Bun, the Claude CLI, and one bundled server — nothing the server does not need | `agentforge/a2a-claude`, namespaced so variants can follow | The server changes |
-| **Package image** | The consumer's layer over it, named for the package that vends it: the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share | `{consumer}/{package}` | Those capabilities change |
+| **Agentic base image** | The consumer's layer over it, named for the project that vends it: the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share | `{consumer}/{project}` | Those capabilities change |
 | **Agent's own build** | The consumer's procedures bundled with the harness they import from `@beruangai/agentforge` | — | Its procedures, or the AgentForge version it pins, change |
-| **Agent** | A deployed AgentCore runtime, extending its package image with its own procedures, card, mounts and stores | `{consumer}/{package}/{agent}` | Its own procedures or configuration change |
+| **Agent** | A deployed AgentCore runtime, extending its agentic base image with its own procedures, card, mounts and stores | `{consumer}/{project}/{agent}` | Its own procedures or configuration change |
 
-**One identity; AWS resource names are generated, not composed.** Several consumers, each with several packages and several agents, share a registry and an account, so the triple `{consumer}/{package}/{agent}` is the identity: it names the ECR repository, since slashes are what ECR namespaces with, and it is what a task's record and telemetry carry. It is *not* the AgentCore runtime name. `agentRuntimeName` is required, allows only letters, digits and underscores, and caps at 48 characters, so the construct generates it with CDK's [`Names.uniqueResourceName`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.Names.html) — bounded to 48, underscores as the only permitted special character — rather than composing a name that silently overflows. A caller addresses an agent by its ARN, resolved from the deployment rather than assembled: `@aws/nx-plugin` already does this through an AppConfig runtime configuration, with the ARN also available as a construct output for direct wiring and passed explicitly to the client in local development — so AgentForge publishes an agent's ARN the same way, keyed by the identity triple (D31, D32, [research](research/aws-nx-plugin.md)). Images are referenced by digest, never by a moving tag.
+**One identity; AWS resource names are generated, not composed.** Several consumers, each with several packages and several agents, share a registry and an account, so the triple `{consumer}/{project}/{agent}` is the identity: it names the ECR repository, since slashes are what ECR namespaces with, and it is what a task's record and telemetry carry. It is *not* the AgentCore runtime name. `agentRuntimeName` is required, allows only letters, digits and underscores, and caps at 48 characters, so the construct generates it with CDK's [`Names.uniqueResourceName`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.Names.html) — bounded to 48, underscores as the only permitted special character — rather than composing a name that silently overflows. A caller addresses an agent by its ARN, resolved from the deployment rather than assembled: `@aws/nx-plugin` already does this through an AppConfig runtime configuration, with the ARN also available as a construct output for direct wiring and passed explicitly to the client in local development — so AgentForge publishes an agent's ARN the same way, keyed by the identity triple (D31, D32, [research](research/aws-nx-plugin.md)). Images are referenced by digest, never by a moving tag.
 
-A package image serving one agent, or an agent serving one procedure, is the same shape with a count of one. A consumer that wants an agent isolated from every other capability extends the base image directly.
+An agentic base image serving one agent, or an agent serving one procedure, is the same shape with a count of one. A consumer that wants an agent isolated from every other capability extends the base image directly.
 
 **Two artifacts, versioned apart.** The base image carries the server and only the server; the harness travels with a consumer's procedures, bundled from the package they depend on. So an AgentForge server fix is a base image a consumer adopts when it chooses, and an AgentForge harness fix is a package bump that rebuilds only that consumer's agent images. The price is that the executor and the task process are independently versioned, which is why the task protocol opens with a version both sides must accept and refuses a mismatch before any work (§1).
 
@@ -260,7 +260,7 @@ The mirror is best-effort by design — three attempts, then the batch is droppe
 
 **A task's record carries the artifact version that ran it**, because while long sessions drain, two versions serve traffic at once.
 
-**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agents project, a package image, an agent and a procedure; a **sync generator** that keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching across two repositories; CDK constructs for an agent with its A2A configuration, its stores, its mounts and `grantInvokeAccess` for a caller's least-privilege role (D32); and the build-and-deploy path that updates only what changed **[OPEN §K]**.
+**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agentic project, an agentic base image, an agent and a procedure; a **sync generator** that keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching across two repositories; CDK constructs for an agent with its A2A configuration, its stores, its mounts and `grantInvokeAccess` for a caller's least-privilege role (D32); and the build-and-deploy path that updates only what changed **[OPEN §K]**.
 
 ## 7. The harness
 
@@ -291,7 +291,7 @@ The guardrail helpers serve TrendBot alone and wait for its contract to be confi
 
 ## 8. What every task records
 
-Written by AgentForge: the outcome, the attempt and the prior attempt's state, timings, admission and cancel events, every identifier of §2, and any transcript-mirror failure — correlated to the caller's own ids (D22). For an agent run, also the seed as sent, the resolved SDK options, where the transcript is, and usage: tokens, turns, cost (D22).
+Written by AgentForge: the outcome, the attempt and the prior attempt's state, timings, admission and cancel events, every identifier of §2, and any transcript-mirror failure — correlated to the caller's own ids (D22). For an agent run, also the prompt as sent, the resolved SDK options, where the transcript is, and usage: tokens, turns, cost (D22).
 
 ---
 
@@ -309,7 +309,7 @@ The stub in the middle tier replaces the SDK call *inside the kernel*. It is a t
 
 ## Failures reproduced as tests
 
-Each failure the first AgentForge paid for ([lineage](lineage/first-agentforge.md)), and each the new boundaries introduce. The last four are new:
+Each failure the predecessor harness paid for ([lineage](lineage/predecessor-harness.md)), and each the new boundaries introduce. The last four are new:
 
 | Failure | Layer |
 |---|---|
@@ -367,7 +367,8 @@ agentforge/
     │   ├── agent/             # the agent() helper and the kernel
     │   └── helpers/           # guardrails, telemetry
     ├── infra/
-    │   ├── constructs/        # CDK: agent, task store, object stores, caller policy
+    │   └── constructs/        # CDK: agent, task store, object stores, caller policy
+    ├── tooling/
     │   └── plugin/            # Nx generators, including sync
     └── temporal/
         └── activity/          # activity factory over the client

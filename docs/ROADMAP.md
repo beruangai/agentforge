@@ -19,22 +19,22 @@ Milestones deliver capability a consumer can actually run. Each is proposed thro
 The whole loop, in Docker, for a procedure a consumer would actually ship.
 
 - Task protocol: envelope, identifiers, events, outcome
-- Procedures: contracts and hashes, the run with its seed, options, agent contract and marshal, and the before and after steps (D1–D5, D33)
+- Procedures: contracts and hashes, the run with its prompt, options, agent contract and marshal, and the before and after steps (D1–D5, D33)
 - Kernel: structured input and output throughout, settlement, abort, session start, resume and fork (D3, D9, D17)
 - Guardrail hooks composing without loss, and telemetry (D8, D23)
 - Runtime: A2A server, gateway and executor, a process per task, filesystem task store behind the fenced interface, generated agent card
 - Caller-agnostic client and the Temporal activity factory: start, attach, await with heartbeat, cancel (D10, D13, D14)
 - Typed outcomes with their causes, and what every task records (D19, D22)
-- Base image, and one package image with an agent over it, built locally; the `SessionStore` adapter and the workspace sync helper against a local object store; credentials provisioned as §O decides (D17, D29)
+- Base image, and one agentic base image with an agent over it, built locally; the `SessionStore` adapter and the workspace sync helper against a local object store; credentials provisioned as §O decides (D17, D29)
 - Failure-injection tests for every layer-2 failure in `ARCHITECTURE.md` §9
 
-**Exit:** a StrategyFoundry workflow runs a real directive against a local container, gets validated structured output, and can cancel it, retry it, and resume its session — with the run's seed, options, transcript and usage recorded.
+**Exit:** a StrategyFoundry workflow runs a real directive against a local container, gets validated structured output, and can cancel it, retry it, and resume its session — with the run's prompt, options, transcript and usage recorded.
 
 ## A2 — The same agent on AgentCore
 
 - AgentCore spikes: busy-container reachability and concurrency (§B), cancellation (§C), task store lease and visibility (§A), session resume across containers (§F)
 - A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency, lease and loss; admission limits
-- The Nx plugin: generators for an agents project, a package image, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
+- The Nx plugin: generators for an agentic project, an agentic base image, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
 - CDK constructs and the deploy path: deterministic images, digest comparison, and an update only where the digest moved (§D)
 - Failure-injection tests for every layer-1 failure, on AgentCore
 

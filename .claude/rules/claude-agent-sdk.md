@@ -19,4 +19,4 @@ Do not rely on remembered rules for converting Zod schemas to the structured-out
 
 ## Settlement
 
-The first AgentForge's rules for deciding when a run is final — foreground-only agent work, recovering a dropped submission, background-task tracking — are evidence, not fact. `docs/DESIGN_OPTIONS.md` §E establishes what holds on the current SDK.
+the predecessor harness's rules for deciding when a run is final — foreground-only agent work, recovering a dropped submission, background-task tracking — are evidence, not fact. `docs/DESIGN_OPTIONS.md` §E establishes what holds on the current SDK.

@@ -8,7 +8,7 @@ AgentForge is that plumbing, owned in one place and shared. Its consumers are St
 
 ## What AgentForge is
 
-**A procedure wrapper for the Claude Agent SDK.** A consumer declares a **procedure**: its public contract, the agent's own contract and how one becomes the other, the seed the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** — on Bedrock AgentCore Runtime, or locally in Docker — and returns a typed, validated outcome to whatever called it.
+**A procedure wrapper for the Claude Agent SDK.** A consumer declares a **procedure**: its public contract, the agent's own contract and how one becomes the other, the prompt the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** — on Bedrock AgentCore Runtime, or locally in Docker — and returns a typed, validated outcome to whatever called it.
 
 It is not a pure agent wrapper. The contract a workflow depends on and the contract an agent fills in usually differ, and marshalling between them type-safely is a core concern rather than a consumer's afterthought.
 
@@ -16,7 +16,7 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 
 ## In scope
 
-- Declaring procedures: contracts, marshalling, seed composition, SDK configuration, side effects before and after the run
+- Declaring procedures: contracts, marshalling, prompt composition, SDK configuration, side effects before and after the run
 - Running a procedure to a settled, validated, typed outcome, with structured input and output throughout
 - Optional helpers for concerns more than one consumer shares
 - Asynchronous invocation by any caller: start, await, attach on retry, cancel — with a Temporal activity factory over it, first-class but not required
@@ -24,7 +24,7 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 - Task state that outlives the container: idempotency, loss detection, the outcome
 - Hosting on Bedrock AgentCore Runtime, and the same path locally in Docker
 - A base image consumers extend, layered into their own package and agent images, so a change deploys only what contains it
-- Delivery as an Nx plugin on `@aws/nx-plugin` conventions: generators for an agents project, a package image, an agent, a procedure and a caller's wiring, a sync generator that keeps a consumer current as AgentForge changes, CDK constructs for an agent with its stores, mounts and least-privilege access, and a deploy path that updates only what changed
+- Delivery as an Nx plugin on `@aws/nx-plugin` conventions: generators for an agentic project, an agentic base image, an agent, a procedure and a caller's wiring, a sync generator that keeps a consumer current as AgentForge changes, CDK constructs for an agent with its stores, mounts and least-privilege access, and a deploy path that updates only what changed
 - Recording what each task saw, did and produced
 
 ## Out of scope

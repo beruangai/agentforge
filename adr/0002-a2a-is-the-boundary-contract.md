@@ -12,7 +12,7 @@ A Temporal activity starts an agent run in a container, follows it for minutes t
 
 ## Considered Options
 
-* **A synchronous request held for the run** — the shape the first AgentForge had
+* **A synchronous request held for the run** — the shape the predecessor harness had
 * **Our own asynchronous envelope over AgentCore's HTTP protocol** — start, poll, fetch, all defined and maintained by us
 * **A2A, through the official `@a2a-js/sdk`**, on AgentCore's A2A protocol
 

@@ -16,7 +16,7 @@ No implementation yet. **The [ADRs](adr/README.md) were accepted on 2026-09-21 a
 6. [`adr/`](adr/README.md) — **read the relevant ADR before proposing to reverse a direction**
 7. [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terms
 
-Before relying on platform behavior, [`docs/research/`](docs/research/) — verified facts about AgentCore, A2A, and the Agent SDK, each with the date it was read. [`docs/lineage/`](docs/lineage/) is evidence from the first AgentForge, never a specification.
+Before relying on platform behavior, [`docs/research/`](docs/research/) — verified facts about AgentCore, A2A, and the Agent SDK, each with the date it was read. [`docs/lineage/`](docs/lineage/) is evidence from the predecessor harness, never a specification.
 
 ## Premise
 
@@ -30,7 +30,7 @@ Settled by the operator: consumers own the requirements; invocation is asynchron
 
 **The consumer owns isolation and side effects.** How runtime sessions, A2A contexts, Claude sessions and working directories relate is the consumer's, and may differ per procedure. AgentForge propagates them and enforces only mechanical invariants. A side effect's recovery is the consumer's too.
 
-**Settle platform behavior by testing it.** Where a question turns on what AgentCore, A2A's SDK, S3 Files, or the Agent SDK actually does, a spike against the real thing answers it — not documentation, not a search summary, not what the first AgentForge assumed.
+**Settle platform behavior by testing it.** Where a question turns on what AgentCore, A2A's SDK, S3 Files, or the Agent SDK actually does, a spike against the real thing answers it — not documentation, not a search summary, not what the predecessor harness assumed.
 
 **Every intermittent failure becomes a test, and so does every spike.** Reproduce a failure once, in the layer that owns it, and keep it covered. A spike lands in `integ/` rather than as a script, because a platform answer is not self-renewing.
 
@@ -68,7 +68,7 @@ Non-trivial changes go through OpenSpec (proposal → specs → design → tasks
 
 ## Related codebases
 
-- **The first AgentForge**, in `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`, runs TrendBot today. Evidence of what hurt, never a specification ([lineage](docs/lineage/first-agentforge.md)). Port with review; never copy its shape. TrendBot's own drafts are rough; do not take them as fact.
+- **TrendBot's predecessor harness**, in `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`, runs TrendBot today. Evidence of what hurt, never a specification ([lineage](docs/lineage/predecessor-harness.md)). Port with review; never copy its shape. TrendBot's own drafts are rough; do not take them as fact.
 - **`a2a-claude`, `claude-a2a` and `temporal-agent-harness`** wrap an agent SDK behind a protocol boundary. None is a dependency or a model; [`docs/research/harness-references.md`](docs/research/harness-references.md) records the mechanics worth borrowing from each, and why each differs.
 - **`@aws/nx-plugin`** is the convention AgentForge's own plugin follows; its `ts#agent` generator is built for Strands and is a reference, not a base ([ADR 0010](adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
 - **This workspace's April 2026 packages and research** are gone from the tree; their archived OpenSpec changes remain under `openspec/changes/archive/` as history.

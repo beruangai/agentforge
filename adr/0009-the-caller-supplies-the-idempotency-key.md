@@ -29,7 +29,7 @@ Chosen option: **a separate key**, because the server needs an index either way,
 
 ### Consequences
 
-* Good, because a retry after a timeout attaches to the run still in progress instead of starting a second expensive one — the first AgentForge's actual failure, and the case cancel-then-retry cannot cover when the container is unreachable
+* Good, because a retry after a timeout attaches to the run still in progress instead of starting a second expensive one — the predecessor harness's actual failure, and the case cancel-then-retry cannot cover when the container is unreachable
 * Good, because the caller needs no id arithmetic, no attempt number, and no memory of previous attempts
 * Bad, because there are two identifiers where a reader expects one, and the difference has to be explained each time
 * Bad, because the key's retention window bounds how long attaching works (`docs/DESIGN_OPTIONS.md` §H)
