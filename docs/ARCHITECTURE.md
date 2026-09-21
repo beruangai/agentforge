@@ -151,7 +151,7 @@ A **task** is one attempt at one procedure, ending in one **outcome**. It is an 
 
 ### Why the gateway exists
 
-The A2A SDK mints the task id and creates its event bus *before* the executor is reached, and `returnImmediately` resolves on the first event on that bus. An executor therefore cannot answer a request with a different, already-running task — so idempotency, admission and the contract-hash check cannot live in it. They live in a request handler wrapping the SDK's, which inspects the envelope and delegates only once it has decided this is a new task **[OPEN §I]**.
+The A2A SDK mints the task id and creates its event bus *before* the executor is reached, and `returnImmediately` resolves on the first event on that bus. An executor therefore cannot answer a request with a different, already-running task — so idempotency, admission and the contract-hash check cannot live in it. They live in a request handler wrapping the SDK's, which inspects the envelope and delegates only once it has decided this is a new task. Confirmed working: a duplicate idempotency key returned the already-running task with the executor started **once**, and a `submitted` event published synchronously made `returnImmediately` resolve in **8 ms** against a 6 000 ms run — while withholding that publish made it block for exactly the deferral ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), [research](research/a2a-server-assembly.md)).
 
 ### Task state, the lease, and loss
 
@@ -200,7 +200,7 @@ Typed; every failure carries its cause. Layer 1 reads only the kind and its retr
 
 ## 5. The container
 
-One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC on `POST /`, the card at `/.well-known/agent-card.json`, and `/ping` reporting the container's aggregate status. Whether it is assembled from `@a2a-js/sdk` directly or on the AgentCore SDK's `serveA2A` is **[OPEN §I]**, and it blocks the first slice rather than the first deployment.
+One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC on `POST /`, the card at `/.well-known/agent-card.json`, and `/ping` reporting the container's aggregate status. It is **assembled from `@a2a-js/sdk` and Express**, not built on the AgentCore SDK's `serveA2A`, whose options take an executor and offer no seam for the gateway ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md)). The card declares a v0.3 `JSONRPC` interface and the handlers enable the SDK's `legacyCompat`, because **an absent `A2A-Version` header means protocol 0.3** and AgentCore's documented card shape still speaks it.
 
 **The gateway** decides admission (§4). **The executor** spawns and supervises: one process per task, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md)). Measured: **65 ms** to a task process ready to serve with the Agent SDK imported — 0.054 % of a two-minute run — and `/ping` p95 unmoved by four running tasks, two of them saturating a core ([research](research/task-process-and-cost.md)). The channel is a **dedicated bidirectional socketpair on fd 3**, so a task's own logging cannot corrupt its outcome; `detached: true` gives it its own process group, and `kill(-pid)` is what makes cancellation reach a grandchild.
 
