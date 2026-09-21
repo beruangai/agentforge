@@ -16,7 +16,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§O** | What a credential broker looks like when it arrives | Later; the first slice keeps room | Nothing yet |
 | **§F** | The sync declaration's fields, and the key's derivation | Design in the first slice | Session resume and artifacts |
 | **§B** | Whether a busy container receives invocations | AgentCore spike — **blocked on `iam:PassRole`** (§B) | The await path on AgentCore |
-| **§D** | Image determinism and deploy granularity | Local spike | Deployment |
+| **§D** | Image determinism and deploy granularity | Layering **settled 2026-09-22** ([research](research/image-determinism.md)); bundler determinism open | Deployment |
 | ~~§G~~ | ~~Health and per-task cost~~ | **Settled 2026-09-22** ([research](research/task-process-and-cost.md)) — ADR 0004 confirmed | — |
 | **§H** | Container identity in the record | Design in the first slice | Loss detection on retry |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
@@ -68,17 +68,27 @@ The mechanism is decided: `CancelTask` reaches the gateway, which stops the task
 
 Three cases the implementation must cover whichever way the spike goes: a cancel arriving **before the task process exists** (settled above); a cancel from a caller that **attached to another caller's task**; and a cancel reaching a **freshly provisioned container**, whose A2A SDK would otherwise mark the task cancelled without consulting the executor that owns it.
 
-## §D — Image determinism and deploy granularity *(OPEN)*
+## §D — Image determinism and deploy granularity *(the layering question SETTLED 2026-09-22; the rest OPEN)*
 
-Layering keeps a change from spreading only if an unaffected agent rebuilds to a byte-identical image and is never updated ([ADR 0008](../adr/0008-code-ships-in-the-image.md)). Open:
+**Settled: [ADR 0008](../adr/0008-code-ships-in-the-image.md) holds.** Measured over a real three-level tree — one AgentForge base, one agentic base, three agents — on the **manifest digests a registry serves**. Findings in [`research/image-determinism.md`](research/image-determinism.md); spike in `spikes/images/`.
 
-- What reproducible builds take on this toolchain — pinned bases, bundler output, file ordering, timestamps — and whether Bun's bundler is deterministic enough unaided
-- Comparing digests before `UpdateAgentRuntime`, so an unchanged agent is never given a new version
-- How the task protocol's version is negotiated, and how long an executor supports an older task process, now that the base image and a consumer's harness move independently
-- Whether the agent card is generated as a build step from the image's own registry of procedures
-- Where `agentforge/a2a-claude` is published, how a consumer pins it, and whether the constructs assert a compatible package-and-image pairing at deploy rather than at first task
+- An unchanged rebuild is **byte-identical**: all five digests unmoved across two full rebuilds.
+- A change to one agent **does not spread**: `agent-a` moved; `agent-b`, `agent-c` and the agentic base were identical.
+- A change to the agentic base **moves all three agents and nothing below**: the AgentForge base image was identical.
 
-**Spike (local):** build one agentic base image and three agent images over it; change one agent's procedure; confirm the other two rebuild to identical digests and the deploy path skips them; then change the agentic base image and confirm all three move.
+So `UpdateAgentRuntime` can be driven by digest comparison, and an unaffected agent is never given a new version.
+
+**What determinism requires, isolated by experiment:** `SOURCE_DATE_EPOCH` **and** `rewrite-timestamp=true`. With both, identical; with `SOURCE_DATE_EPOCH` alone, **moved**. The epoch normalises the image config's `created` field and leaves file mtimes in the layers, so **a pipeline setting only `SOURCE_DATE_EPOCH` looks reproducible and is not**. Also required: `--provenance=false`, every parent pinned by digest, and no unpinned package installs.
+
+**Three obstacles the deploy path must account for**, none exotic and none obvious: the `docker` driver **cannot export OCI at all**; the `docker` *exporter* does not rewrite layer timestamps, so `docker image inspect --format '{{.Id}}'` **moves on every build** and is useless as a change signal (use buildx's `--metadata-file` `containerimage.digest`); and a `docker-container` builder **cannot see daemon images**, so a multi-level `FROM` chain needs a registry between levels — which is the real shape anyway.
+
+**Still open:**
+
+- **Bun's bundler determinism.** The fixtures copy plain files; nothing was bundled. Whether `bun build` emits byte-identical output — module ordering, chunk hashing, embedded paths — is the likelier source of non-determinism in a real agent image than anything Docker does.
+- Comparing digests before `UpdateAgentRuntime`, so an unchanged agent is never given a new version — the digest is available and stable; the deploy path is not written.
+- How the task protocol's version is negotiated, and how long an executor supports an older task process, now that the base image and a consumer's harness move independently.
+- Whether the agent card is generated as a build step from the image's own registry of procedures.
+- Where `agentforge/a2a-claude` is published, how a consumer pins it, and whether the constructs assert a compatible package-and-image pairing at deploy rather than at first task.
 
 ## §E — What the kernel still needs *(SETTLED 2026-09-22)*
 
@@ -213,7 +223,7 @@ Not open questions — deliberately not being worked until something asks for th
 | Task-process protocol, cancellation, group kill | §C, §G | Local — **done**, `spikes/task-process/` |
 | Procedure authoring against real procedures | §N | Local |
 | Credential provisioning and expiry | §O | Local |
-| Deterministic image builds and skipped deploys | §D | Local |
+| Deterministic image builds and skipped deploys | §D | Local — **done**, `spikes/images/` |
 | Busy-container reachability and concurrency | §B | AgentCore |
 | Cancellation on the platform | §C | AgentCore |
 | Task store lease and visibility | §A | AgentCore |

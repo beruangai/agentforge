@@ -1,0 +1,1 @@
+shared capability v1
