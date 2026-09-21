@@ -157,7 +157,11 @@ The A2A SDK mints the task id and creates its event bus *before* the executor is
 
 Task state lives in a store outside the microVM ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)), so an outcome survives the container, the caller's redeploy, and the connection that asked for it (D11). It is the A2A task store, extended with the idempotency index, the lease and the outcome payload — one record, read through A2A, so a caller needs no store access of its own (D32).
 
-**DynamoDB holds it**: conditional writes give attach-or-start atomically and lease renewal is a cheap update. Only a payload too large for an item goes to S3 — the exception, not the path. **An outcome is expected to be small**: status, identifiers, and references to what the run produced. A procedure that generates long-form work writes it to the working directory and returns where it is, which is what makes the record cheap to store, cheap to read on every poll, and readable in a task's history. AgentForge cannot prevent a consumer returning a novel, and does not try; it sizes for the common case and the large-payload path catches the rest. Remaining details are **[OPEN §A]**.
+**DynamoDB holds it**: conditional writes give attach-or-start atomically and lease renewal is a cheap update.
+
+**An outcome is capped at 256 KB, and a larger one fails.** Not offloaded to S3 — failed, with `OUTPUT_TOO_LARGE`, after a warning in the record at half that. The cap sits under DynamoDB's 400 KB item limit with room for the rest of the record, and at a size every other AWS transport a caller might put it through will also accept.
+
+Offloading instead would push the cost outward: a caller orchestrating on the outcome would have to fetch it, and since AgentForge cannot tell which field the workflow actually needs, the *whole* outcome would go to S3 and every read would pay for it. An outcome is status, identifiers and references; a procedure producing long-form work writes it to the working directory and returns where it is. A procedure that cannot fit 256 KB of actionable state is telling you its agent contract is wrong, and failing in development is where that should surface. Remaining store details are **[OPEN §A]**.
 
 **Writes are fenced.** A2A's `TaskStore.save` overwrites unconditionally, so the store implementation carries a **fencing token** — the lease generation — in the task's metadata and rejects a write from a stale holder. Without it, a container deriving `lost` and the original container finishing `succeeded` are two unordered writes, and whichever lands later wins.
 
@@ -180,6 +184,7 @@ Typed; every failure carries its cause. Layer 1 reads only the kind and its retr
 |---|---|
 | `SUCCEEDED` | — |
 | `OUTPUT_INVALID` — could not conform; payload preserved | Not blindly: a second identical run is not a correction |
+| `OUTPUT_TOO_LARGE` — conformed, but over the 256 KB cap | No; the procedure must return references instead |
 | `TURN_BUDGET_EXHAUSTED` | Consumer's decision |
 | `TIMED_OUT` — the procedure's own budget | Consumer's decision |
 | `DEADLINE_EXCEEDED` — the platform's 8-hour job cap, which no retry beats | No; the procedure must be split |
@@ -249,7 +254,7 @@ The mirror is best-effort by design — three attempts, then the batch is droppe
 
 **What AgentForge guarantees, whatever the strategy:** the sync is flushed and verified *before* the outcome is published, so a task never reports `SUCCEEDED` over unsynced files and a failed flush fails the task; the sync runs in the task's own process group, so cancelling the task takes it too and nothing it does touches the event loop answering `/ping`; and a sync failure is an outcome, never a log line.
 
-**A mount stays available per agent**, for a consumer that needs live shared POSIX: concurrent procedures reading each other's files mid-run, or a writer outside the agent. It is S3 Files or EFS, it requires `networkMode: VPC` with everything that implies — private subnets and a NAT gateway for `api.anthropic.com`, ECR, S3 and CloudWatch endpoints, subnets in allow-listed availability zones aligned with mount targets, paired rules on TCP 2049, DNS attributes enabled, no cross-account — and **AgentForge's constructs verify it at synth**, so a missing piece fails the synthesis rather than arriving as the 424 that also means a container kill. What the sync policy covers, and how the project key is namespaced, is **[OPEN §F]**.
+**No mount is supported**, and neither consumer needs one. A mount would mean `networkMode: VPC` and everything it drags in — NAT for `api.anthropic.com`, ECR, S3 and CloudWatch endpoints, subnets in allow-listed availability zones aligned with mount targets, paired rules on TCP 2049, ENIs outliving a deleted agent — so it is tabled until something asks for it (`DESIGN_OPTIONS.md`, Tabled). A consumer that wants one configures it in its own CDK. What the sync declaration covers, and how the project key is namespaced, is **[OPEN §F]**.
 
 **The agent card is generated at build time** from the procedures the image contains, and served from the image: a mount is readable only during an invocation, and the platform may fetch the card outside one.
 
@@ -290,7 +295,19 @@ Written by AgentForge: the outcome, the attempt and the prior attempt's state, t
 
 ---
 
-## 9. Failures reproduced as tests
+## 9. How this is tested
+
+Three tiers, and a rule: **a spike is written as an integration test, not a script.** The questions in `DESIGN_OPTIONS.md` are answered once and then keep being answered, because the platform moves and an answer that was true in September is not self-renewing.
+
+| Tier | Runs against | Covers |
+|---|---|---|
+| **Unit** | Nothing external | The procedure model, the outcome taxonomy, the store's fencing and index, event mapping — colocated with their source |
+| **Runtime integration** | A real AgentCore runtime, with the model call stubbed | Everything around the agent: admission, idempotency, the task-process protocol, cancellation, the lease, loss, mounts and sync, deploy behavior. Deterministic and cheap, because no model is called |
+| **End-to-end** | A real runtime and a real model | Structured output, settlement, in-turn correction, cancellation mid-turn, usage accounting — run after a change that could move them, not on every commit |
+
+The stub in the middle tier replaces the SDK call *inside the kernel*. It is a test seam, not a second kind of procedure and not something a consumer can reach — a procedure is still an agent run (§3).
+
+## Failures reproduced as tests
 
 Each failure the first AgentForge paid for ([lineage](lineage/first-agentforge.md)), and each the new boundaries introduce. The last four are new:
 

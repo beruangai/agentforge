@@ -40,7 +40,7 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 - Model providers other than Anthropic
 - Supporting agent frameworks other than the Claude Agent SDK
 - Procedures that invoke no agent — a consumer's plain work belongs in the consumer, not behind an agent runtime
-- Cloud infrastructure beyond what an agent needs — accounts, networking, secret storage and pipelines are the consumer's, including the VPC a consumer takes on if it chooses a mount, which AgentForge verifies at synth. Keeping a credential out of anything AgentForge emits is not (T35)
+- Cloud infrastructure beyond what an agent needs — accounts, networking, secret storage and pipelines are the consumer's. Mounted filesystems and the VPC they require are tabled: state persists through APIs, and a consumer that wants a mount configures it itself. Keeping a credential out of anything AgentForge emits is not ours to skip (T35)
 - Multi-tenancy — one operator per deployment
 - Public use — no API stability promise beyond what the consumers need
 

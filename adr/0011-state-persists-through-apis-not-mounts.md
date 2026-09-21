@@ -23,7 +23,7 @@ Chosen option: **state persists through APIs**. No mount is required, so an agen
 * **Transcripts** persist through the SDK's `SessionStore` adapter, which is the documented pattern for ephemeral containers that hydrate on start. `CLAUDE_CODE_PROJECT_DIR_NAME` pins the project key, so resume does not depend on reproducing an identical working-directory path — and the key is namespaced by AgentForge, because one store serves many agents.
 * **The rest of the config directory is baked into the image**: settings, skills, plugins and user-tier memory are capabilities, not state.
 * **Working directories persist by syncing to an object store**, under a strategy the consumer declares per agent and may override per procedure — direction, delete propagation, continuous or at the close, cadence, exclusions. AgentForge runs it and guarantees the parts that are not a matter of taste: the sync is flushed and verified *before* the outcome is published, so a task never reports `SUCCEEDED` over unsynced files; it lives in the task's process group, so cancellation takes it; and its failure is an outcome, not a log line.
-* **A mount remains available per agent** for a consumer that genuinely needs live shared POSIX — concurrent procedures reading each other's files mid-run, or an outside writer — and that consumer pays the VPC knowingly.
+* **No mount is supported.** Neither consumer needs live shared POSIX — nothing reads another procedure's files mid-run, subtrees are megabytes, and nothing outside the agent writes to them — so mounts and the VPC they require are tabled rather than built. A consumer that wants one configures it in its own CDK.
 * The mirror is best-effort by design, so AgentForge verifies rather than trusts: dedupe by entry id, check the transcript's last entry after the run, and fail the task on a dropped batch rather than logging it.
 
 ### Consequences
@@ -33,4 +33,4 @@ Chosen option: **state persists through APIs**. No mount is required, so an agen
 * Good, because continuous sync makes a lost container lose seconds of work rather than a run's worth
 * Bad, because a continuous strategy makes artifacts visible progressively rather than atomically, which is safe only while nothing reads another task's files mid-run — the reason the choice is the consumer's rather than ours
 * Bad, because the declaration is real surface a mount would not need, and a wrong delete policy can empty a vault the way a mount never would
-* Bad, because a consumer that later needs live shared POSIX changes network mode and adds a VPC, which is a deployment change even though the working directory is a path either way
+* Bad, because a consumer that later needs live shared POSIX has to add a VPC and a mount itself, and AgentForge has no construct for it until one is asked for

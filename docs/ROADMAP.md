@@ -12,7 +12,7 @@ Milestones deliver capability a consumer can actually run. Each is proposed thro
 - Local spikes: A2A server assembly and client signing (§I), kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), credential provisioning and expiry (§O), deterministic image builds (§D)
 - Procedure authoring settled against real procedures, not argument (§N)
 
-**Exit:** every local spike recorded in `docs/research/`, and the questions it answers closed.
+**Exit:** every spike landed as an integration test (`ARCHITECTURE.md` §9), its findings recorded in `docs/research/`, and the questions it answers closed.
 
 ## A1 — A working agent, locally
 

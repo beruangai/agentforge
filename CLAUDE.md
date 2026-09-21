@@ -32,7 +32,7 @@ Settled by the operator: consumers own the requirements; invocation is asynchron
 
 **Settle platform behavior by testing it.** Where a question turns on what AgentCore, A2A's SDK, S3 Files, or the Agent SDK actually does, a spike against the real thing answers it — not documentation, not a search summary, not what the first AgentForge assumed.
 
-**Every intermittent failure becomes a test.** Reproduce it once, in the layer that owns it, and keep it covered.
+**Every intermittent failure becomes a test, and so does every spike.** Reproduce a failure once, in the layer that owns it, and keep it covered. A spike lands in `integ/` rather than as a script, because a platform answer is not self-renewing.
 
 ## Conventions
 

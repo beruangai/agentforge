@@ -1,5 +1,11 @@
 # Testing Rules
 
+## Three tiers
+
+Unit tests run against nothing external. **Runtime integration tests** run against a real AgentCore runtime with the model call stubbed inside the kernel — deterministic and cheap, covering admission, idempotency, the task-process protocol, cancellation, the lease, loss and deployment. **End-to-end tests** call a real model and cover structured output, settlement, in-turn correction and usage; they run after a change that could move them, not on every commit.
+
+**A spike is written as an integration test, not a script.** Every question in `docs/DESIGN_OPTIONS.md` that a spike answers lands in `integ/`, so the answer is re-checked as the platform moves instead of being recorded once and trusted.
+
 ## No Placeholder Integration Tests
 
 Never create placeholder or deferred integration tests with `expect(true).toBe(true)` or `// TODO: implement` stubs.

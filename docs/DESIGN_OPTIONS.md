@@ -27,10 +27,9 @@ What is not yet decided. A question is worked here until it is settled; the outc
 
 ## §A — Task store details *(OPEN)*
 
-The interface is fixed and built in the first slice: a conditional insert for the idempotency index, and a fenced write that rejects a stale lease generation, because A2A's `TaskStore.save` overwrites unconditionally. DynamoDB holds the record, with S3 only for a payload too large for an item (`ARCHITECTURE.md` §4). Open:
+The interface is fixed and built in the first slice: a conditional insert for the idempotency index, and a fenced write that rejects a stale lease generation, because A2A's `TaskStore.save` overwrites unconditionally. DynamoDB holds the record, and an outcome over 256 KB fails rather than being offloaded (`ARCHITECTURE.md` §4). Open:
 
 - The item shape: what the A2A task, the index, the lease and the outcome look like as one record, and what a poll costs to read
-- The size at which a payload goes to S3, and how a caller reads one back through A2A without special-casing it
 - The lease interval — short enough that loss is noticed, cheap enough at the renewal rate a long run implies
 
 **Spike (AgentCore):** write and renew a lease from inside a microVM, read it from outside, and measure visibility latency and renewal cost at the chosen interval.
@@ -79,13 +78,11 @@ Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-thro
 - Exclusions, and whether AgentForge ships sensible ones (`.git`, `node_modules`, editor scratch) or leaves the list entirely to the consumer
 - Scope — what a procedure inherits from its agent, and how an override reads at the call site
 
-**The implementation.** Which sync does the work, since existing tools already have direction, delete, filters and cadence: a Go binary such as `s5cmd` or `rclone` in the base image, or the AWS SDK with our own walk. It affects image size, determinism, and whether bidirectional is even on the table.
+**The implementation.** Leading candidate is [`s7cmd`](https://github.com/nidor1998/s7cmd): a single static Rust binary with ARM64 Linux builds, Apache-2.0, bundling the `s3sync` engine — local-to-S3, S3-to-local and S3-to-S3, include and exclude patterns, filtering by `LastModifiedDate` and size, checksum verification, configurable concurrency and a dry run. The `LastModifiedDate` filter is also the quiescence heuristic: sync only what has been still for longer than a threshold, so a file mid-write is left for the next pass. Against it: a personal project whose dependencies are updated best-effort, shipped in our base image and running with credentials — so pin it by digest, and keep an AWS-SDK walk as the fallback if that risk stops being acceptable.
 
 **The project key.** `CLAUDE_CODE_PROJECT_DIR_NAME` pins it, which is what frees resume from reproducing an identical path — but one store serves many agents, so the namespace is AgentForge's: what it derives from, whether two agents may ever share one, and what a collision does.
 
 **The remaining edges**, whatever is declared: when a file is quiescent enough to upload so a half-written file is not published; how writes are coalesced so a tool loop is not a request storm; and what a caller sees when a run is lost mid-sync, which is partial artifacts already visible — consistent with `LOST` meaning side effects may have happened, but worth writing down rather than discovering.
-
-**If a consumer takes a mount instead:** which VPC preconditions the constructs assert at synth and which can only be checked at deploy — network mode, availability-zone overlap with mount targets, security-group rules on 2049, DNS attributes, account boundary, access-point POSIX identity, and the egress everything that is not the mount still needs.
 
 ## §G — Health and per-task cost *(OPEN)*
 
@@ -167,9 +164,17 @@ The Agent SDK reads the subscription token from the environment and offers no pr
 
 ---
 
+## Tabled
+
+Not open questions — deliberately not being worked until something asks for them.
+
+- **Mounted filesystems, and the VPC they require.** Both consumers are served by the sync mechanism, so AgentForge supports no mount today. A consumer that needs live shared POSIX configures one in its own CDK; making it first-class means the whole VPC surface — NAT, endpoints, allow-listed availability zones, mount-target alignment, paired 2049 rules, ENI lifecycle — and waits for an explicit requirement.
+
+---
+
 ## Spike plan
 
-Local spikes need only Bun, Docker and the SDK. AgentCore spikes run against a throwaway runtime, never a deployment.
+**Every spike lands as an integration test** (`ARCHITECTURE.md` §9), so its answer is re-checked as the platform moves rather than recorded once and trusted. Local spikes need only Bun, Docker and the SDK. AgentCore spikes run against a throwaway runtime, never a deployment, and stub the model call so they stay cheap and deterministic.
 
 | Spike | Answers | Needs |
 |---|---|---|
