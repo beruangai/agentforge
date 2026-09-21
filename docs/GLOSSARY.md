@@ -82,9 +82,9 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Agent card** — The A2A discovery document, generated at build time from the procedures an image contains, and served from the image.
 
-**Base image** — What AgentForge ships for consumers to extend, `agentforge/a2a-claude`: Bun, the Claude CLI, the runtime server and the harness. It changes when AgentForge releases.
+**Base image** — What AgentForge ships for consumers to extend, `agentforge/a2a-claude`: Bun, the Claude CLI, and one bundled server. It carries nothing the server does not need, so a change elsewhere in AgentForge does not produce a new one.
 
-**Entry point** — One of the package's exports, scoped to where it may be loaded: `/contract`, `/client`, `/temporal`, `/agent`, `/runtime`, `/infra`. AgentForge publishes one package with these, never a family of packages.
+**Entry point** — One of the package's exports, scoped to where it may be loaded: `/contract`, `/client`, `/temporal`, `/agent`, `/infra`. AgentForge publishes one package with these, never a family of packages. The server is not among them: it is bundled by AgentForge's own build and ships in the base image.
 
 ## Identity
 

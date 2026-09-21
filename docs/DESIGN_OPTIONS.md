@@ -42,6 +42,7 @@ Leaning C1, with C2 as the fallback when the container cannot be reached. **Spik
 Code ships in the image and layering is what keeps a change from spreading ([ADR 0008](../adr/0008-code-ships-in-the-image.md)). That only works if an unaffected agent rebuilds to a byte-identical image and is never updated.
 
 - How the layers are cut: what belongs in AgentForge's base, what in a consumer's package image, what in an agent's own
+- How the task protocol's version is negotiated and how long the executor supports an older task process, given that the base image and a consumer's harness move independently
 - What it takes to make the build reproducible on this toolchain — pinned bases, bundler output, file ordering and timestamps — and whether Bun's bundler is deterministic enough without help
 - Comparing digests before calling `UpdateAgentRuntime`, so an unchanged agent is never given a new version
 - What the build costs when a package image changes and every agent above it rebuilds

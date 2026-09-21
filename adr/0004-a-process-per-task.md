@@ -23,6 +23,7 @@ For the communication, given a process per task: **a JSON-RPC 2.0 stream over a 
 Chosen option: **a process per task, speaking JSON-RPC 2.0 over a dedicated pipe** — one message per line.
 
 * The process group is the unit of cancellation: `SIGTERM` for a graceful stop that flushes telemetry and records an outcome, then `SIGKILL` to the group, so no subprocess outlives its task. A cancel that arrives before the process exists is caught by a token set before the executor's first `await`
+* The stream opens with a **protocol version** both sides must accept, because the executor ships in AgentForge's base image while the task process runs a consumer's build of the harness; a mismatch is refused before any work rather than surfacing as a decode error mid-task
 * `run` and `cancel` go in; semantic status and artifact events and exactly one outcome come out, which the executor maps to A2A; the exit code is the backstop, and a process that exits without an outcome is recorded `failed` with its stderr tail
 * A dedicated pipe rather than stdout, because a stray `console.log` from consumer code or a library would otherwise corrupt the protocol; stdout and stderr stay logs
 * JSON-RPC rather than an ad-hoc frame or a runtime-specific IPC channel, because it is already the vocabulary at the outer boundary, it is trivially faked in tests, and it leaves a task process implementable in another language

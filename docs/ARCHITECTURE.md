@@ -53,7 +53,7 @@ Only two crossings are protocols: a contract between separately deployed, separa
 | Protocol | Between | Contract |
 |---|---|---|
 | **Wire** | Caller's client ↔ the agent's gateway | A2A JSON-RPC 2.0 over `InvokeAgentRuntime`, SigV4-signed, routed by the session header. `SendMessage` with `returnImmediately` starts or attaches; `GetTask` polls; `CancelTask` stops. Streaming and blocking sends are unused until a procedure needs them. The envelope is a data part; the outcome is an artifact ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md)) |
-| **Task process** | Executor ↔ task process | JSON-RPC 2.0, one message per line, over a dedicated pipe. `run` and `cancel` in; semantic events numbered per task, and exactly one outcome, out; the exit code is the backstop. `SIGTERM` then `SIGKILL` to the process group ([ADR 0004](../adr/0004-a-process-per-task.md)) |
+| **Task process** | Executor ↔ task process | JSON-RPC 2.0, one message per line, over a dedicated pipe, opening with a **protocol version** both sides must accept. `run` and `cancel` in; semantic events numbered per task, and exactly one outcome, out; the exit code is the backstop. `SIGTERM` then `SIGKILL` to the process group ([ADR 0004](../adr/0004-a-process-per-task.md)) |
 
 | Interface | Inside | Note |
 |---|---|---|
@@ -217,13 +217,16 @@ Three levels, each a bundle of one or more of the next. **Where the lines fall i
 
 | | What it is | Named | Changes when |
 |---|---|---|---|
-| **Base image** | AgentForge's: Bun, the Claude CLI, the runtime server and the harness | `agentforge/a2a-claude`, namespaced so variants can follow | AgentForge releases |
+| **Base image** | AgentForge's: Bun, the Claude CLI, and one bundled server — nothing the server does not need | `agentforge/a2a-claude`, namespaced so variants can follow | The server changes |
 | **Package image** | The consumer's layer over it, named for the package that vends it: the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share | `{consumer}/{package}` | Those capabilities change |
+| **Agent's own build** | The consumer's procedures bundled with the harness they import from `@beruangai/agentforge` | — | Its procedures, or the AgentForge version it pins, change |
 | **Agent** | A deployed AgentCore runtime, extending its package image with its own procedures, card, mounts and stores | `{consumer}/{package}/{agent}` | Its own procedures or configuration change |
 
 **One identity; AWS resource names are generated, not composed.** Several consumers, each with several packages and several agents, share a registry and an account, so the triple `{consumer}/{package}/{agent}` is the identity: it names the ECR repository, since slashes are what ECR namespaces with, and it is what a task's record and telemetry carry. It is *not* the AgentCore runtime name. `agentRuntimeName` is required, allows only letters, digits and underscores, and caps at 48 characters, so the construct generates it with CDK's [`Names.uniqueResourceName`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.Names.html) — bounded to 48, underscores as the only permitted special character — rather than composing a name that silently overflows. A caller addresses an agent by its ARN, resolved from the deployment rather than assembled: `@aws/nx-plugin` already does this through an AppConfig runtime configuration, with the ARN also available as a construct output for direct wiring and passed explicitly to the client in local development — so AgentForge publishes an agent's ARN the same way, keyed by the identity triple (D31, D32, [research](research/aws-nx-plugin.md)). Images are referenced by digest, never by a moving tag.
 
 A package image serving one agent, or an agent serving one procedure, is the same shape with a count of one. A consumer that wants an agent isolated from every other capability extends the base image directly.
+
+**Two artifacts, versioned apart.** The base image carries the server and only the server; the harness travels with a consumer's procedures, bundled from the package they depend on. So an AgentForge server fix is a base image a consumer adopts when it chooses, and an AgentForge harness fix is a package bump that rebuilds only that consumer's agent images. The price is that the executor and the task process are independently versioned, which is why the task protocol opens with a version both sides must accept and refuses a mismatch before any work (§1).
 
 **Code ships in the image** ([ADR 0008](../adr/0008-code-ships-in-the-image.md)). A deploy cannot interrupt a run: AgentCore keeps existing sessions on the artifact they started with and gives new sessions the new one. So nothing needs mounting to avoid churn — what a change must avoid is spreading, and layering is what stops it. A change to one agent's procedures rebuilds that agent's image alone; a change to shared capabilities rebuilds the images above it; a change to neither rebuilds nothing.
 
@@ -288,6 +291,7 @@ Each failure the first AgentForge paid for ([lineage](lineage/first-agentforge.m
 | A stale lease holder's write landing after a newer one | 1 |
 | A cancelled task leaving subprocesses behind | 1 |
 | A second live task admitted under one continuity key | 1 |
+| A task process whose protocol version the executor does not accept | 1 |
 | Admission beyond the container's memory, killing its neighbours | 1 |
 
 ---
@@ -301,11 +305,12 @@ Each failure the first AgentForge paid for ([lineage](lineage/first-agentforge.m
 | `/contract` | Anywhere, including a worker | Contract declaration and types. Zod only; never the Agent SDK |
 | `/client` | A caller | The A2A client, typed by an imported contract |
 | `/temporal` | A Temporal worker | The activity factory over the client |
-| `/agent` | Inside the container | Procedures, the `agent()` helper, the kernel, the helper library |
-| `/runtime` | The container's entrypoint | The A2A server, gateway, executor, task store |
+| `/agent` | A consumer's agent build | Procedures, the `agent()` helper, the kernel, the helper library — bundled into their image |
 | `/infra` | A CDK application | The constructs |
 
 The boundary is enforced, not documented: an import of `/agent` from a worker's build fails, because the contract half is the only thing both sides share ([ADR 0003](../adr/0003-procedures-are-type-safe-end-to-end.md)). The Nx generators ship in the same package, which is what makes the sync generator a version of AgentForge rather than a separate thing to upgrade.
+
+**The server is not one of these.** It is never imported by a consumer: AgentForge's own build bundles it, and the base image is where it ships. That is what keeps an unrelated change to the client, the constructs or a generator from producing a new base image.
 
 Internally the workspace is **organized by scope, never by type**, in the Nx grouped layout on `@aws/nx-plugin` defaults. Shape, not a commitment:
 
