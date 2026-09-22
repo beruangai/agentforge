@@ -79,7 +79,7 @@ A fifth, the **idempotency key**, is AgentForge's own: it names one logical exec
 
 **The invariants AgentForge enforces are mechanical, and none interprets a consumer's meaning:**
 
-- **At most one container at a time per runtime session** — the platform's property, not a policy **[OPEN §B]**.
+- **At most one container at a time per runtime session** — the platform's property, not a policy. Measured: six new session ids took six distinct containers, and a second round returned the same six, 6/6 ([research](research/agentcore-runtime-observed.md)).
 - **One live task per continuity key.** The envelope may carry an opaque **continuity key**; the gateway refuses a second live task under the same one, loudly. A consumer sets it to whatever must not be written twice at once — in practice the Claude session id, because a transcript has one writer. Layer 1 never interprets it.
 - **One process per task** (§5).
 - **No queueing.** Concurrent tasks are never serialized behind one another (D15). They are bounded instead: a container has 2 vCPU and 8 GB, and an out-of-memory kill takes the whole session with it, so an agent declares an **admission limit**, and a task beyond it is *rejected* rather than queued (§4).

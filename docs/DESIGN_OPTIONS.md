@@ -8,20 +8,22 @@ What is not yet decided. A question is worked here until it is settled; the outc
 
 | | Question | Settled by | Blocks |
 |---|---|---|---|
-| **§I** | How the A2A server is assembled | **Decided 2026-09-22** ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md)); AgentCore pass-through still open | The first slice |
-| **§A** | Task store details behind the fixed interface | Design in the first slice; one AgentCore spike | The first slice's store |
-| ~~§N~~ | ~~How a procedure is written~~ | **Decided 2026-09-22** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)) | — |
-| ~~§E~~ | ~~What the kernel still needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
-| **§C** | Cancellation on the platform | Local half **settled 2026-09-22**; platform half **blocked** with §B | Cancel on AgentCore |
-| **§O** | What a credential broker looks like when it arrives | Later; the first slice keeps room | Nothing yet |
-| **§F** | The sync declaration's fields, and the key's derivation | Design in the first slice | Session resume and artifacts |
-| **§B** | Whether a busy container receives invocations | AgentCore spike — **blocked on `iam:PassRole`** (§B) | The await path on AgentCore |
-| **§D** | Image determinism and deploy granularity | Determinism **settled 2026-09-22**, layering and bundler both ([research](research/image-determinism.md)); the deploy path open | Deployment |
-| ~~§G~~ | ~~Health and per-task cost~~ | **Settled 2026-09-22** ([research](research/task-process-and-cost.md)) — ADR 0004 confirmed | — |
-| **§H** | Container identity in the record | Design in the first slice | Loss detection on retry |
+| **§F** | The sync declaration's remaining fields | Design in the first slice | Session resume and artifacts |
+| **§A** | The item shape once a large outcome shares it | Design in the first slice | The first slice's store |
+| **§D** | The deploy path that compares digests | Design, with the constructs | Deployment |
+| **§O** | Rotation, and the broker when it arrives | Later; the first slice keeps room | Nothing yet |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
 | **§L** | Where the consumers still pull apart | **Operator**, with each consumer | A3 |
-| **§M** | Pausing for a human | **Operator** — whether to support it at all | Nothing yet |
+| ~~§B~~ | ~~Whether a busy container receives invocations~~ | **Settled 2026-09-22** — it receives everything, 3/3 ([research](research/agentcore-runtime-observed.md)) | — |
+| ~~§C~~ | ~~Cancellation, locally and on the platform~~ | **Settled 2026-09-22**, both halves; one question waits on a real agent in a container | — |
+| ~~§E~~ | ~~What the kernel needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
+| ~~§G~~ | ~~Health and per-task cost~~ | **Settled 2026-09-22** — [ADR 0004](../adr/0004-a-process-per-task.md) confirmed | — |
+| ~~§H~~ | ~~Container identity in the record~~ | **Decided 2026-09-22** — a uuid7 minted per container process | — |
+| ~~§I~~ | ~~How the A2A server is assembled, and which A2A version~~ | **Decided 2026-09-22** ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), [ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)) | — |
+| ~~§M~~ | ~~Pausing for a human~~ | **Shape decided 2026-09-22** (M2, park as a task state); not built, and no consumer asks | — |
+| ~~§N~~ | ~~How a procedure is written~~ | **Decided 2026-09-22** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)) | — |
+
+**Open questions are at the top; struck-through rows are closed and kept so a reader can see the answer without opening the section.** Every open row is a *design* question settled in the first slice or later — none is blocked on a platform answer, and none blocks starting.
 
 ---
 
@@ -162,7 +164,7 @@ The key, its two edges and its retention are settled: seven days, with the key s
 
   AgentCore's own identifiers were rejected because the runtime session id is **stable across container replacement**, which is precisely the case that must be detected. Relying on the lease alone was rejected because it bounds recovery below by the lease interval, which is the delay this exists to remove.
 
-## §I — How the server is assembled *(SETTLED 2026-09-22)*
+## §I — How the server is assembled, and which A2A version *(SETTLED 2026-09-22)*
 
 **Decided:** assemble directly from `@a2a-js/sdk` and Express, porting `serveA2A`'s AgentCore-contract mechanics rather than depending on it — [ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md). Findings in [`research/a2a-server-assembly.md`](research/a2a-server-assembly.md); the spike is `spikes/server-assembly/i1-gateway-wrap.ts`. **The first slice is unblocked.**
 
@@ -205,7 +207,7 @@ Most apparent divergence dissolved in the distillation ([CONSUMERS.md](CONSUMERS
 - **Holding a failed attempt (D21).** TrendBot holds one for operator review, today in its own activity code. Whether AgentForge does anything beyond making the failure observable is TrendBot's to say.
 - **Secrets (D29, §O).** Secret storage is the consumer's, but "each deployment reads only the secrets it declares" and "no credential in anything the harness emits" are partly ours.
 
-## §M — Pausing for a human *(SHAPE DECIDED 2026-09-22; not built)*
+## §M — Pausing for a human *(SHAPE DECIDED 2026-09-22; not built, and no consumer asks)*
 
 Neither consumer requires it, so nothing is built. It is here because the shape should be decided rather than fall out of whichever case ships first.
 
