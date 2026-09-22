@@ -65,6 +65,6 @@ What remains for AgentForge is the outer validation and the typed `output_invali
 | `CLAUDE.md` and `.claude/rules/*.md` | `<cwd>` and every parent |
 | skills, commands, subagents | `<cwd>` and every parent **up to the repository root** |
 
-So nested directories compose *capabilities* but not *settings*. Per-layer and per-procedure settings come from the **`settings` option** — an inline object, a file path or a JSON string populating the flag-settings layer in the precedence order — changeable at runtime with **`applyFlagSettings()`**.
+So nested directories compose *capabilities* but not *settings*. Per-layer and per-procedure settings come from the **`settings` option** — an inline object, a file path or a JSON string populating the flag-settings layer in the precedence order, passed per query.
 
 `additionalDirectories` is two different things with one name: **the SDK option** is passed to Claude Code as `--add-dir` and *does* load skills, commands and subagents (plus `enabledPlugins`/`extraKnownMarketplaces`, and `CLAUDE.md` only under `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`), while **`permissions.additionalDirectories`** in a settings file grants file access and loads nothing.

@@ -39,7 +39,7 @@ With a `.git` planted at the agent level, the agentic-project layer drops out of
 - **Skills, commands, subagents, `CLAUDE.md` and rules compose up the tree**, so the intended scheme works: the base image contributes at the user scope, the agentic project's image at its level, each agent's image at its own, a procedure below that. A nearer layer overrides a further one by name. No build-time composition step.
 - **`settings.json` and hooks do not.** An image layer **cannot grant itself permissions or install a hook from its own directory level** — only `<cwd>/.claude/` and the user scope are read. This is the constraint the first version of this note missed, and it decides where permissions come from.
 
-**So per-layer and per-procedure settings come from the SDK, not the filesystem.** The `settings` option takes an inline object, a file path or a JSON string and populates the flag-settings layer in the precedence order, and `applyFlagSettings()` changes it at runtime. That is the mechanism for scoping Read/Write permissions to the context a procedure was asked for — entity, user, strategy — and it is what the predecessor harness already does. **AgentForge composes the settings itself and passes them inline.**
+**So per-layer and per-procedure settings come from the SDK, not the filesystem.** The `settings` option takes an inline object, a file path or a JSON string and populates the flag-settings layer in the precedence order,; a run is one query, so it is passed once and nothing needs to change it mid-session. That is the mechanism for scoping Read/Write permissions to the context a procedure was asked for — entity, user, strategy — and it is what the predecessor harness already does. **AgentForge composes the settings itself and passes them inline.**
 
 **The repository boundary is a layout rule, not a bug.** Skills, commands and subagents stop at a repository root, so every capability layer must sit *below* any `.git` in the chain, or repositories must stay out of it. It is silent either way — a layer simply does not appear — which is worth a startup assertion that the expected layers actually loaded.
 
@@ -54,7 +54,7 @@ The earlier note said "`additionalDirectories` contributes capabilities". True o
 
 Skills, commands and subagents from a flag-added directory load through the **`project`** setting source, so excluding that source excludes them too.
 
-**A synced or mounted working directory is therefore a trust boundary only if it is added through the SDK option.** Data that must be readable without contributing capabilities belongs in `permissions.additionalDirectories` — which AgentForge can set through the inline `settings` layer above. That is a concrete mitigation, not a caveat.
+**In practice this does not arise: a working directory carries no nested `.claude/`.** That is a standing assumption rather than something to enforce — a use case wanting otherwise would be deliberate, and none exists. What *is* load-bearing is that an additional directory's **read and write permissions are declared explicitly in `settings`**, never implied.
 
 ## `cwd` is the capability root, not the data directory
 

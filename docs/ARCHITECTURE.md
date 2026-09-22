@@ -72,7 +72,8 @@ Four identifiers, from three systems. **The consumer decides how they relate; Ag
 | `runtimeSessionId` | AgentCore | One microVM: compute, memory, filesystem. **One container per id, measured** — six new session ids took six distinct containers and 6/6 stayed pinned on a later round | Routes to it; keeps it stable across attempts |
 | `contextId` | A2A | A conversation: related tasks on the wire | Supplied by the client, uuid7 when the caller gives none; returned on every task |
 | `sessionId` | Claude Agent SDK | One transcript, started, resumed or forked | Passed to the SDK as the procedure says; recorded |
-| Working directory | Claude Agent SDK | Where a run happens; with the project key, what scopes its transcript | Set per procedure; persisted by sync (§6) |
+| `cwd` | Claude Agent SDK | The **capability root** — which `.claude/` layers apply, and therefore what the agent is | Set per procedure; never the data directory |
+| Working directory | Claude Agent SDK | Where a run's files live. Reached through additional directories and explicit permissions | Set per procedure; persisted by sync (§6) |
 
 A fifth, the **idempotency key**, is AgentForge's own: it names one logical execution across its attempts, where a context names a conversation (§4).
 
@@ -245,22 +246,22 @@ An agentic base image serving one agent, or an agent serving one procedure, is t
 
 | State | How it persists | Whose |
 |---|---|---|
-| Session transcripts | The SDK's `SessionStore` adapter, over an object store's API, under a **project key scoped to the agent and its working directory** — see below (D17) | AgentForge |
+| Session transcripts | The SDK's `SessionStore` adapter, over an object store's API, under a **project key: an AgentForge prefix plus a part the procedure supplies** — see below (D17) | AgentForge |
 | The rest of the config directory | Baked into the image — settings, skills, plugins and user-tier memory are capabilities, not state | AgentForge |
 | Working directories | Synced to an object store under a strategy the consumer declares, per agent or per procedure | The consumer declares; AgentForge runs it |
 | Anything else | The consumer's own mechanism | The consumer |
 
 The mirror is best-effort by design — three attempts, then the batch is dropped with a `mirror_error` — so it is verified rather than trusted: entries deduped by id, the transcript's last entry checked after the run, and a dropped batch failing the task rather than appearing in a log.
 
-**The project key is derived, never supplied.** It is `{consumer}-{project}-{agent}` plus the working directory the run uses — **[OPEN §L]** on which directory that means, now that `cwd` (the capability root, which selects the agent's `.claude/` layers) is distinguished from the directories a run reads and writes — so continuity is scoped to an agent *and* the directory it works in: one agent's procedures working in different directories — per lane, per strategy — keep separate transcript scopes, rather than sharing one because they share an agent. A procedure that sets its own working directory moves its scope with it.
+**The project key is derived, never supplied, and it is composed in two parts.** AgentForge owns the prefix — `{consumer}_{agenticProject}_{agent}_` — and **the procedure supplies the final part**. So continuity is scoped to an agent *and* to whatever the procedure says distinguishes its runs — a lane, a strategy, an entity — stated explicitly rather than inferred from a directory. Two procedures of one agent that should share a transcript scope say so by supplying the same final part.
 
-`CLAUDE_CODE_PROJECT_DIR_NAME` carries it, which constrains the derivation: 1–64 characters of letters, digits, hyphens or underscores, no separators, and not a Windows device name. AgentForge sanitizes and, where the parts do not fit, truncates deterministically with a hash — the same treatment the runtime name gets (§6). It also sets `CLAUDE_CONFIG_DIR`, without which the name is ignored. **An invalid name does not fail; the SDK silently falls back to a path-derived one**, so the run asserts the transcript landed under the expected key and fails the task if it did not.
+`CLAUDE_CODE_PROJECT_DIR_NAME` carries it, which constrains the derivation: 1–64 characters of letters, digits, hyphens or underscores, no separators, and not a Windows device name. AgentForge sanitizes and, where the parts do not fit, truncates deterministically with a hash — the same treatment the runtime name gets (§6). Readability is preferred but not required; a deterministic short id derived from the full value is acceptable when the parts cannot fit. It also sets `CLAUDE_CONFIG_DIR`, without which the name is ignored. **An invalid name does not fail; the SDK silently falls back to a path-derived one**, so the run asserts the transcript landed under the expected key and fails the task if it did not.
 
 **The sync strategy is the consumer's, declared whole at the agentic project and overridden in part by a procedure**: direction, whether deletes propagate, whether it runs continuously or once at the close, how often, and what is excluded. **Every field is required where it is declared** — there is no implicit default, so nothing behaves a way nobody chose — and a procedure supplies only the fields it differs on. A procedure wanting atomic hand-off overrides the cadence; one producing a long narrative leaves it continuous.
 
 **What AgentForge guarantees, whatever the strategy:** the sync is flushed and verified *before* the outcome is published, so a task never reports `SUCCEEDED` over unsynced files and a failed flush fails the task; the sync runs in the task's own process group, so cancelling the task takes it too and nothing it does touches the event loop answering `/ping`; and a sync failure is an outcome, never a log line.
 
-**No mount is supported**, and neither consumer needs one. A mount would mean `networkMode: VPC` and everything it drags in — NAT for `api.anthropic.com`, ECR, S3 and CloudWatch endpoints, subnets in allow-listed availability zones aligned with mount targets, paired rules on TCP 2049, ENIs outliving a deleted agent — so it is tabled until something asks for it (`DESIGN_OPTIONS.md`, Tabled). A consumer that wants one configures it in its own CDK. What the sync declaration covers, and how the project key is namespaced, is **[OPEN §F]**.
+**No mount is supported**, and neither consumer needs one. A mount would mean `networkMode: VPC` and everything it drags in — NAT for `api.anthropic.com`, ECR, S3 and CloudWatch endpoints, subnets in allow-listed availability zones aligned with mount targets, paired rules on TCP 2049, ENIs outliving a deleted agent — so it is tabled until something asks for it (`DESIGN_OPTIONS.md`, Tabled). A consumer that wants one configures it in its own CDK. What the sync declaration covers is **[OPEN §F]**.
 
 **The agent card is generated at build time** from the procedures the image contains, and served from the image: a mount is readable only during an invocation, and the platform may fetch the card outside one.
 
@@ -342,8 +343,8 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | A part delivered with its content silently stripped, under the `SendMessage` method name | 1 |
 | A protocol version assumed rather than asserted, after a missing header allowlist entry downgraded the request | 1 |
 | A capability layer missing from the session because a repository root cut the chain | 2 |
-| A synced directory contributing skills or commands, because it was added through the SDK option rather than the settings key | 2 |
 | A layer's permissions assumed to load from its own `.claude/`, which reads only from `cwd` | 2 |
+| An additional directory readable but not writable, because the permission was implied rather than declared | 2 |
 | A caller whose content type the A2A handler refuses, surfacing as an opaque 424 | 1 |
 | Recovery attempted inside a stopped container, past the ~60-second kill | 1 |
 
