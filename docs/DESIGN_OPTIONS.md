@@ -14,13 +14,13 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§O** | Rotation, and the broker when it arrives | Later; the first slice keeps room | Nothing yet |
 | **§N** | The contract hash, the envelope-to-router mapping, and the card generator | Design in the first slice | The first slice |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
-| **§L** | Where the consumers still pull apart | **Operator**, with each consumer | A3 |
 | ~~§B~~ | ~~Whether a busy container receives invocations~~ | **Settled 2026-09-22** — it receives everything, 3/3 ([research](research/agentcore-runtime-observed.md)) | — |
 | ~~§C~~ | ~~Cancellation, locally and on the platform~~ | **Settled 2026-09-22**, both halves; one question waits on a real agent in a container | — |
 | ~~§E~~ | ~~What the kernel needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
 | ~~§G~~ | ~~Health and per-task cost~~ | **Settled 2026-09-22** — [ADR 0004](../adr/0004-a-process-per-task.md) confirmed | — |
 | ~~§H~~ | ~~Container identity in the record~~ | **Decided 2026-09-22** — a uuid7 minted per container process | — |
 | ~~§I~~ | ~~How the A2A server is assembled, and which A2A version~~ | **Decided 2026-09-22** ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), [ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)) | — |
+| ~~§L~~ | ~~Where the consumers still pull apart~~ | **Closed 2026-09-23** — D7 settled; the rest ends with the consumer drafts | — |
 | ~~§M~~ | ~~Pausing for a human~~ | **Shape decided 2026-09-22** (M2, park as a task state); not built, and no consumer asks | — |
 | ~~§N~~ | ~~How a procedure is written~~ | **Decided 2026-09-22** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)); three consequences open, above | — |
 
@@ -83,7 +83,7 @@ The mechanism is decided: `CancelTask` reaches the gateway, which stops the task
 
 - **The window is usable.** A container that writes to DynamoDB **from inside its `SIGTERM` handler** succeeded: the row was visible **3.5 s after the stop returned**, written **0 ms after `SIGTERM`**, with a 120-second task still running. Networking, credentials and the store client all survive the signal. So **a stopped run can record its own outcome** rather than being inferred `LOST` by a later reader — which is what makes "a side effect's recovery is the consumer's" implementable here, inside a budget of about a minute.
 
-**Still open, and it needs a real agent in the container:** whether the Agent SDK's own telemetry flushes inside that window, and whether a Claude session left mid-turn resumes cleanly. Running an agent on AgentCore means placing the operator's subscription token in a runtime's environment, which is **the operator's call to make** — see §O.
+**Closed 2026-09-23.** Whether the Agent SDK's telemetry flushes inside that window is **moot** — an OpenTelemetry flush on termination is best-effort by construction, and there is nothing AgentForge could do with the answer. D23 asks for a flush before the container goes away, which the cooperative cancel path delivers in 5 ms; the blunt stop is the path where best-effort is the only thing on offer, and that is stated rather than measured.
 
 Three cases the implementation must cover whichever way the spike goes: a cancel arriving **before the task process exists** (settled above); a cancel from a caller that **attached to another caller's task**; and a cancel reaching a **freshly provisioned container**, whose A2A SDK would otherwise mark the task cancelled without consulting the executor that owns it.
 
@@ -129,7 +129,7 @@ Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-thro
 **The declaration is settled in shape**: the agentic project declares it whole, with every field required so nothing is implicit, and a procedure overrides the fields it differs on. What remains is the fields themselves:
 
 - ~~Direction~~ **Decided 2026-09-22: phased, never concurrent.** A procedure may seed its working directory **down** from the object store before the run, and publish **up** during and at the close. Both directions are available; **both at once are not**, which removes conflict resolution rather than solving it. Last-writer-wins was rejected as a silent discard of work.
-- **Deferred, with the answer written down: an on-demand `sync()` callable mid-run.** Not built, because neither consumer asks for it — StrategyFoundry sets the working directory per directive (H15) and expects it persisted (H14), TrendBot's only working-copy requirement is T4 which AgentForge does not carry, and the phased declaration covers everything either states.
+- **Deferred, with the answer written down: an on-demand `sync()` callable mid-run.** Not built, because no requirement asks for it: D16 and D17 are met by setting the working directory per procedure and persisting it, and the phased declaration covers everything the register states.
 
   **The scenario it answers, recorded so it is not re-argued:** a tool that reads or writes the working directory *from outside the container* — another service, a job, a person — needs a push before it is called and a pull after. That is exactly the case the phased declaration cannot express, and it is the only one. Bidirectional continuous sync is still refused; this is a **barrier around a known point**, not concurrent replication, so it needs no conflict resolution.
 
@@ -193,9 +193,7 @@ Delivered as an Nx plugin with generators, constructs and a deploy path ([ADR 00
 - The AppConfig runtime configuration an agent's ARN is published into, following `@aws/nx-plugin` ([research](research/aws-nx-plugin.md)): its schema, what the identity triple keys, caching and refresh, and what a long-lived caller such as a Temporal worker pays to read it (D31, D32)
 - Whether the generated client factory mirrors its `.local()` / `.withIamAuth()` shape
 
-## §L — Where the consumers still pull apart *(D7 SETTLED 2026-09-22; the rest OPEN — operator)*
-
-Most apparent divergence dissolved in the distillation ([CONSUMERS.md](CONSUMERS.md)). What remains:
+## §L — What a session sees at its start *(SETTLED 2026-09-22; the rest CLOSED)*
 
 - **~~What a session sees at its start (D7).~~ DECIDED 2026-09-22 — capabilities compose by image layer; settings do not.** Each layer owns one `.claude/` at its own level and the Agent SDK composes **skills, commands, subagents, `CLAUDE.md` and rules** by walking up from `cwd`: the base image at the user scope, the agentic project's image at its level, each agent's image at its own, a procedure below that. A nearer layer overrides a further one by name; there is no build-time composition step. Both consumers become the same mechanism at different settings, with no branch in the harness. Each layer's code ships the filesystem it wants copied into the image it owns, and the Nx plugin generates that layer's scaffolding. Writing outside your own layer's area is discouraged, not prevented. ([research](research/capability-composition.md); established in the predecessor harness.)
 
@@ -205,8 +203,7 @@ Most apparent divergence dissolved in the distillation ([CONSUMERS.md](CONSUMERS
   - **Skills, commands and subagents stop at a repository root.** Every capability layer must sit below any `.git` in the chain, or repositories must stay out of it. A layer simply does not appear — which earns a startup assertion that the expected layers actually loaded.
   - **An additional directory's filesystem permissions are declared explicitly, in `settings`.** Read and write access for a working directory is load-bearing, so it is stated rather than implied — explicit wins. A working directory carries **no nested `.claude/`**: that is a standing assumption, not something to enforce or work around, and a use case that wants otherwise would be deliberate and does not exist yet.
 
-- **Holding a failed attempt (D21).** TrendBot holds one for operator review, today in its own activity code. Whether AgentForge does anything beyond making the failure observable is TrendBot's to say.
-- **Secrets (D29, §O).** Secret storage is the consumer's, but "each deployment reads only the secrets it declares" and "no credential in anything the harness emits" are partly ours.
+**The rest of this section is closed, 2026-09-23.** It tracked where the two consumer drafts still pulled apart — holding a failed attempt (D21), and the split on secrets (D29). Those drafts are closed and [`REQUIREMENTS.md`](REQUIREMENTS.md) is now AgentForge's own register: D21 and D29 stand as written there, and anything further enters through the operator as a requirement rather than as a divergence to reconcile.
 
 ## §M — Pausing for a human *(SHAPE DECIDED 2026-09-22; not built, and no consumer asks)*
 
@@ -243,7 +240,7 @@ Four rules hold whichever is chosen ([reference](research/harness-references.md)
 
 **On the hand-built comparison, the findings still hold.** All three styles caught all six composition mistakes under `tsc --strict`; the class has one unguarded hazard — `override guardrails() { return []; }` silently drops every house guardrail and `tsc` accepts it — which is why **guardrail composition stays additive** here regardless of framework.
 
-**Raised, not resolved — belongs in §L.** TrendBot **T4** requires procedures that invoke no agent; `ARCHITECTURE.md` §11 excludes them. T4's reason is **co-location** — the work needs the container's working copy — which "put it in the consumer" does not answer. Three shapes, the operator's call with TrendBot: hold the line and make TrendBot duplicate the sync machinery; admit a second procedure kind with the same contract, invocation, failure and phase machinery minus the run, which makes §11 false and needs a superseding decision; or pretend it is a procedure with a trivial run, which would burn a model call per vault read.
+**Closed, not open.** An earlier draft of this section reopened whether AgentForge should carry procedures that invoke no agent, on the grounds that co-location is a reason "put it in the consumer" does not answer. **It is settled and not reopened**: AgentForge runs agents (`ARCHITECTURE.md` §11, `SOLUTION_SPACE.md`). Co-location is a reason to want one, not a reason for AgentForge to grow a second procedure kind.
 
 ## §O — Credentials in the container *(the first slice DECIDED 2026-09-22; the broker OPEN)*
 

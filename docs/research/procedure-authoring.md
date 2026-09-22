@@ -87,9 +87,9 @@ Recorded at the time as ADR 0013; that ADR was re-decided on 2026-09-22 and is n
 
 ## Why the baseline has no agent-less procedure
 
-**TrendBot T4** asks for procedures that invoke no agent — vault reads, corpus scans, snapshot and publish composers, measurement runs of up to an hour — sharing a directive's contract, invocation, failure and side-effect phases, minus the run.
+**TrendBot's draft asked for procedures that invoke no agent** — vault reads, corpus scans, snapshot and publish composers, measurement runs of up to an hour — sharing a procedure's contract, invocation, failure and side-effect phases, minus the run.
 
-AgentForge **does not carry T4**, and this was already settled before the spike: `ARCHITECTURE.md` §11 lists agent-less procedures as deliberately absent, and [`CONSUMERS.md`](../CONSUMERS.md)'s "what AgentForge does not carry" table records the reason — "AgentForge runs agents. TrendBot's were a convenience around its git-based working copy and move to its own API layer when it adopts."
+AgentForge **does not carry agent-less procedures**, and this was settled before the spike: `ARCHITECTURE.md` §11 and `SOLUTION_SPACE.md` both list them as deliberately absent. AgentForge runs agents; a consumer's plain work belongs in the consumer.
 
 **Confirmed by the operator on 2026-09-22**, on being asked: §11 stands, and TrendBot uses another mechanism for its non-agentic work, which is trivial for it.
 

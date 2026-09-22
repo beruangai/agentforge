@@ -8,9 +8,7 @@ No implementation yet. **The [ADRs](adr/README.md) are accepted and the architec
 
 1. [`README.md`](README.md)
 2. [`docs/SOLUTION_SPACE.md`](docs/SOLUTION_SPACE.md) — the problem and the scope
-3. [`docs/CONSUMERS.md`](docs/CONSUMERS.md), **then both consumer contracts it points to** — the specification this workspace answers to:
-   - `~/workspace/beruangai/StrategyFoundry/docs/AGENTFORGE_CONTRACT.md`
-   - `~/workspace/PlayTek/trendbot-monorepo/docs/AGENTFORGE_CONTRACT.md`
+3. [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — the register this workspace answers to. **It is AgentForge's own.** The consumer contracts it began as are closed; do not read, track or enforce them
 4. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the layers, the contract at each boundary, procedures, tasks, runtime, harness
 5. [`docs/DESIGN_OPTIONS.md`](docs/DESIGN_OPTIONS.md) — **what is not decided**, and the spikes that decide it
 6. [`adr/`](adr/README.md) — **read the relevant ADR before proposing to reverse a direction**
@@ -22,7 +20,7 @@ Before relying on platform behavior, [`docs/research/`](docs/research/) — veri
 
 Settled by the operator: consumers own the requirements; invocation is asynchronous; authentication is the operator's Claude Max subscription, used as intended — not a topic to reopen. The rest is the working direction, proposed.
 
-**Consumers define the requirements; AgentForge owns the decisions.** A consumer states behavior it depends on, at the contract, in its own repository. AgentForge derives its requirements from theirs and decides everything about meeting them. A requirement only one consumer has is met by configuration or by a helper it calls — never by a branch in the harness or the runtime. A consumer contract is an unvetted draft: where a requirement states a mechanism, or asks for something AgentForge cannot meet, raise it rather than building it. A conflict between consumers is raised, not resolved silently.
+**AgentForge owns its requirements, and every decision about meeting them.** [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) is the register; a capability no D id asks for is not built. It began as a distillation of two consumer drafts and no longer tracks them — those drafts are closed, and a new need enters here through the operator rather than as a clause elsewhere this repository must chase. A requirement only one consumer has is met by configuration or by a helper it calls, never by a branch in the harness or the runtime.
 
 **Four layers, with a contract at every boundary.** Runtime, harness, consumer, SDK. Layers 1 and 2 never import each other; they share only the task protocol. Each layer is testable alone, and a failure is fixed in the layer that owns it.
 
@@ -55,7 +53,6 @@ The operator's standing conventions across projects:
 - **A new ADR is written `proposed`** and the operator accepts it. Never write one as `accepted` yourself, and never treat a proposed one as settled.
 - **An accepted ADR is mutated in place while no code depends on it**, when its reasoning stops holding — not superseded. Say what changed and why in the commit; the decision is still the operator's.
 - **An ADR records a decision, not a history.** A decision that stops being relevant is dropped; one that is replaced is superseded and marked.
-- **Consumer contracts are read, never edited here.** Raise anything unclear or conflicting with the operator, in that consumer's repository.
 - **[OPEN §x] means undecided.** Do not implement against an open section, and do not resolve one silently. Raise it, or use `AskUserQuestion`.
 - **Ask over assume.** The operator co-authors design decisions.
 - **Never pivot requirements to fix an issue.** If something is stuck, stop and say so.

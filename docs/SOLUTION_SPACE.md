@@ -39,8 +39,8 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 - Streaming a run's progress, and blocking sends — polling is the only way to wait until a procedure's latency warrants more
 - Model providers other than Anthropic
 - Supporting agent frameworks other than the Claude Agent SDK
-- Procedures that invoke no agent — a consumer's plain work belongs in the consumer, not behind an agent runtime
-- Cloud infrastructure beyond what an agent needs — accounts, networking, secret storage and pipelines are the consumer's. Mounted filesystems and the VPC they require are tabled: state persists through APIs, and a consumer that wants a mount configures it itself. Keeping a credential out of anything AgentForge emits is not ours to skip (T35)
+- **Procedures that invoke no agent** — AgentForge runs agents. A consumer's plain work belongs in the consumer, whatever its reason for wanting it co-located; this is settled and not reopened
+- Cloud infrastructure beyond what an agent needs — accounts, networking, secret storage and pipelines are the consumer's. Mounted filesystems and the VPC they require are tabled: state persists through APIs, and a consumer that wants a mount configures it itself. Keeping a credential out of anything AgentForge emits is not ours to skip (D24)
 - Multi-tenancy — one operator per deployment
 - Public use — no API stability promise beyond what the consumers need
 

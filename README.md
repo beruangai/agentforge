@@ -15,7 +15,7 @@ Built for its consumers, StrategyFoundry and TrendBot, not for public use.
 | Document | Holds |
 |---|---|
 | [docs/SOLUTION_SPACE.md](docs/SOLUTION_SPACE.md) | The problem, what AgentForge is, and what is out of scope |
-| [docs/CONSUMERS.md](docs/CONSUMERS.md) | The consumer contracts this workspace answers to, and the rules for them |
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | The register AgentForge answers to — its own, not a derivation of a consumer's |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The layers, the contract at each boundary, procedures, tasks, the runtime, the harness |
 | [docs/DESIGN_OPTIONS.md](docs/DESIGN_OPTIONS.md) | What is not decided, and the spikes that decide it |
 | [adr/](adr/README.md) | Why each significant decision went the way it did |
@@ -35,5 +35,7 @@ Four layers: **runtime** owns the wire and the task's execution host; **harness*
 
 ## Consumers
 
-- **StrategyFoundry** — `~/workspace/beruangai/StrategyFoundry`; contract in its `docs/AGENTFORGE_CONTRACT.md`
-- **TrendBot** — `~/workspace/PlayTek/trendbot-monorepo`; contract in its `docs/AGENTFORGE_CONTRACT.md`; migrates off the predecessor harness once its requirements are met
+- **StrategyFoundry** — `~/workspace/beruangai/StrategyFoundry`; adopts from day one
+- **TrendBot** — `~/workspace/PlayTek/trendbot-monorepo`; migrates off its predecessor harness once its requirements are met
+
+Their pre-adoption contract drafts are closed. What was settled from them is in [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md), which is now the contract.

@@ -35,5 +35,5 @@ Chosen option: **code always ships in the image**, with layering as the mechanis
 * Good, because code is versioned, immutable, rolled back as a unit, and signed by its digest — none of which a mount gives
 * Good, because the VPC requirement, the 424 mount failure and the shared writable path stop being code-delivery risks; they remain only where a consumer chooses to mount state
 * Good, because development and production run the same artifact, so "it worked locally" has one fewer cause
-* Bad, because the edit-to-run loop is a build, push and update rather than a publish, and StrategyFoundry's ask for a change to reach the next run without an image rebuild is not met (D27, withdrawn in `docs/CONSUMERS.md`)
+* Bad, because the edit-to-run loop is a build, push and update rather than a publish, and a change reaching the next run without an image rebuild is not supported — that ask was withdrawn, because layered images and affected-only rebuilds deploy only the agent that contains a change, and a deploy never interrupts a running session
 * Bad, because byte-identical rebuilds are real work: a non-deterministic build silently reintroduces the churn this decision exists to prevent

@@ -44,7 +44,7 @@ The whole loop, in Docker, for a procedure a consumer would actually ship.
 
 ## A3 — TrendBot
 
-- TrendBot's contract confirmed against the distilled set, and the items in [CONSUMERS.md](CONSUMERS.md)'s "not carried" table settled
+- TrendBot's needs met against [REQUIREMENTS.md](REQUIREMENTS.md); anything it still lacks enters that register through the operator rather than as a contract to chase
 - Its guardrail semantics as its own hooks, its git lifecycle in the before and after steps, its three agents deployed
 - The sync generator exercised on a real consumer across at least one AgentForge release
 

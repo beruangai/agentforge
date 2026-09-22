@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status.** The decisions this rests on are [accepted ADRs](../adr/README.md). **Until code exists, an accepted ADR is mutated in place when its reasoning stops holding** — the operator's standing rule, because there is nothing built on it to migrate. A superseding ADR is for after that. Either way the decision is the operator's to make. What is still undecided is in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md), marked inline as **[OPEN §x]**. Requirements come from the consumers, distilled in [CONSUMERS.md](CONSUMERS.md) — their contracts are unvetted drafts. Code sketches show shape, not signatures; there is no implementation yet.
+> **Status.** The decisions this rests on are [accepted ADRs](../adr/README.md). **Until code exists, an accepted ADR is mutated in place when its reasoning stops holding** — the operator's standing rule, because there is nothing built on it to migrate. A superseding ADR is for after that. Either way the decision is the operator's to make. What is still undecided is in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md), marked inline as **[OPEN §x]**. Requirements are in [REQUIREMENTS.md](REQUIREMENTS.md), which is AgentForge's own register. Code sketches show shape, not signatures; there is no implementation yet.
 
 AgentForge runs a consumer's **procedure** as an asynchronous **task**, in an isolated runtime, and returns a typed outcome to whatever called it. Temporal is the caller both consumers use and is supported first-class through an activity factory, but nothing below the client knows a caller exists.
 
