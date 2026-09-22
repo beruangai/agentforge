@@ -36,6 +36,8 @@ const STARTED_AT = Date.now();
 
 /** Live tasks. `/ping` reports HealthyBusy while any is running (§B). */
 const live = new Set<string>();
+/** Where to record an outcome if SIGTERM arrives (§C). Set by a task. */
+let outcomeTarget: { tableName: string; leaseId: string } | undefined;
 /** Every request's headers, for the pass-through questions (§I). */
 const seen: { at: number; path: string; headers: Record<string, unknown> }[] = [];
 let sigtermAt: number | undefined;
@@ -152,6 +154,7 @@ class SpikeExecutor implements AgentExecutor {
     const duration = Number(envelope.runMilliseconds ?? 1_000);
 
     live.add(taskId);
+    if (envelope.lease) outcomeTarget = { tableName: envelope.lease.tableName, leaseId: envelope.lease.leaseId };
 
     // Published BEFORE the first await, so returnImmediately resolves on it.
     eventBus.publish(
@@ -339,6 +342,31 @@ app.use(
 process.on('SIGTERM', () => {
   sigtermAt = Date.now();
   console.log(JSON.stringify({ event: 'sigterm', containerId: CONTAINER_ID, at: sigtermAt, liveTasks: live.size }));
+  // §C — is the grace period USABLE? Knowing a container has ~60 seconds is
+  // only half the answer; what matters is whether it can still reach the
+  // network and record an outcome in them. So the first thing the handler does
+  // is write one, and time it.
+  if (outcomeTarget) {
+    const startedAt = Date.now();
+    void dynamo
+      .send(
+        new PutItemCommand({
+          TableName: outcomeTarget.tableName,
+          Item: {
+            leaseId: { S: `${outcomeTarget.leaseId}#outcome` },
+            containerId: { S: CONTAINER_ID },
+            recordedAfterSigtermMs: { N: String(Date.now() - sigtermAt!) },
+            liveTasksAtSigterm: { N: String(live.size) },
+            outcome: { S: 'RECORDED_DURING_SHUTDOWN' },
+          },
+        }),
+      )
+      .then(
+        () => console.log(JSON.stringify({ event: 'shutdown-outcome', containerId: CONTAINER_ID, ok: true, tookMs: Date.now() - startedAt, afterSigtermMs: startedAt - sigtermAt! })),
+        (error) => console.log(JSON.stringify({ event: 'shutdown-outcome', containerId: CONTAINER_ID, ok: false, error: String(error?.name ?? error), message: String(error?.message ?? '').slice(0, 200) })),
+      );
+  }
+
   // Deliberately does NOT exit. The grace period between SIGTERM and the kill
   // is the number §C needs — it bounds what a cancelled run can finish, and
   // therefore whether side-effect recovery is possible at all. A heartbeat

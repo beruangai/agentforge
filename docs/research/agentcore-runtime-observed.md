@@ -142,6 +142,18 @@ Across three observations the window was 56.0 s, 61.0 s and 62.6 s — consisten
 
 **The number that matters to a consumer: a stopped run has about a minute, and then it is gone.** Side-effect recovery that cannot complete inside ~60 seconds must not be attempted in the container at all.
 
+### And the minute is usable
+
+Knowing a container has 60 seconds is only half an answer — what matters is whether it can still reach the network in them. It can. The container writes an outcome row to DynamoDB **from inside its `SIGTERM` handler**, and with a 120-second task still running:
+
+| | |
+|---|---|
+| outcome row visible | **3.5 s after `StopRuntimeSession` returned** |
+| written, measured from `SIGTERM` | **0 ms** — the handler's first action |
+| live tasks at that moment | 1 |
+
+So networking, credentials and the DynamoDB client all survive `SIGTERM`; nothing is torn down ahead of the process. **A stopped run can record its own outcome rather than being inferred `LOST` by a later reader** — which is what makes `ARCHITECTURE.md`'s "a side effect's recovery is the consumer's" implementable on this platform at all, inside a budget of about a minute.
+
 ---
 
 ## §A — the lease, written and renewed from inside a microVM

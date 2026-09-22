@@ -74,7 +74,9 @@ The mechanism is decided: `CancelTask` reaches the gateway, which stops the task
 
 **The consequence for the design is a budget, not a mechanism: a stopped run has about 60 seconds, then it is gone.** Anything whose recovery cannot finish inside that must not be attempted in the container. This is why `StopRuntimeSession` is the blunt fallback and `CancelTask` is the path — the cooperative cancel settles in 5 ms and keeps the process reachable, which a stop does not.
 
-**Still open:** whether telemetry flushes and an outcome is recorded inside that window, and whether a Claude session left mid-turn resumes cleanly — both need a container that runs a real agent, which is §F's spike rather than this one.
+- **The window is usable.** A container that writes to DynamoDB **from inside its `SIGTERM` handler** succeeded: the row was visible **3.5 s after the stop returned**, written **0 ms after `SIGTERM`**, with a 120-second task still running. Networking, credentials and the store client all survive the signal. So **a stopped run can record its own outcome** rather than being inferred `LOST` by a later reader — which is what makes "a side effect's recovery is the consumer's" implementable here, inside a budget of about a minute.
+
+**Still open, and it needs a real agent in the container:** whether the Agent SDK's own telemetry flushes inside that window, and whether a Claude session left mid-turn resumes cleanly. Running an agent on AgentCore means placing the operator's subscription token in a runtime's environment, which is **the operator's call to make** — see §O.
 
 Three cases the implementation must cover whichever way the spike goes: a cancel arriving **before the task process exists** (settled above); a cancel from a caller that **attached to another caller's task**; and a cancel reaching a **freshly provisioned container**, whose A2A SDK would otherwise mark the task cancelled without consulting the executor that owns it.
 
