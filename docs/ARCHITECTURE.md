@@ -341,8 +341,9 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | Admission beyond the container's memory, killing its neighbours | 1 |
 | A part delivered with its content silently stripped, under the `SendMessage` method name | 1 |
 | A protocol version assumed rather than asserted, after a missing header allowlist entry downgraded the request | 1 |
-| A `.git` directory between `cwd` and a capability layer, silently removing that layer from the session | 2 |
-| A synced working directory contributing skills or commands through `additionalDirectories` | 2 |
+| A capability layer missing from the session because a repository root cut the chain | 2 |
+| A synced directory contributing skills or commands, because it was added through the SDK option rather than the settings key | 2 |
+| A layer's permissions assumed to load from its own `.claude/`, which reads only from `cwd` | 2 |
 | A caller whose content type the A2A handler refuses, surfacing as an opaque 424 | 1 |
 | Recovery attempted inside a stopped container, past the ~60-second kill | 1 |
 

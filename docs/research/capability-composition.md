@@ -1,70 +1,63 @@
 # How the Agent SDK composes capabilities — measured
 
-**Measured 2026-09-22** against `@anthropic-ai/claude-agent-sdk@0.3.278`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §L / D7. Source: `spikes/capability-composition/l1-nested-scopes.ts`.
+**Measured 2026-09-22** against `@anthropic-ai/claude-agent-sdk@0.3.278`, then corrected the same day against the authoritative pages ([settings sources](https://code.claude.com/docs/en/agent-sdk/claude-code-features#control-filesystem-settings-with-settingsources), [additional directories](https://code.claude.com/docs/en/permissions#additional-directories-grant-file-access-not-configuration)). Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §L / D7. Source: `spikes/capability-composition/`.
 
-Measured rather than read, because **the documentation contradicts itself** on the load-bearing point:
+> **Correction.** The first version of this note measured slash commands only and generalised the result to all configuration. That was wrong: the three kinds follow three different rules, and the one that does *not* compose is the one that matters most. It also reported the repository boundary as an undocumented trap; it is documented behaviour, scoped to skills, commands and subagents.
 
-- the [TypeScript SDK reference](https://code.claude.com/docs/en/agent-sdk/typescript) says project settings are "discovered upward from `cwd`. Claude Code traverses up the directory tree."
-- the [`.claude` directory reference](https://code.claude.com/docs/en/claude-directory) says "Claude Code does **NOT** walk up parent directories. Discovery is strictly scoped."
+## Three kinds, three rules
 
-The probe needs no model reasoning: each directory level contributes a uniquely named slash command, and the SDK's `system` init message lists the commands it actually loaded.
+| Kind | Loads from |
+|---|---|
+| `settings.json` and **hooks** | **`<cwd>/.claude/` only — no parent fallback** |
+| `CLAUDE.md` and `.claude/rules/*.md` | `<cwd>` and **every** parent |
+| **skills, commands, subagents** | `<cwd>` and every parent **up to the repository root** |
 
-## Nested `.claude` directories do compose
+Measured with one marker of each kind at four levels — a user directory, an agentic-project directory, an agent directory, and `cwd` — using the `system` init message for skills, commands and subagents, and a `SessionStart` hook that writes a file for `settings.json`:
 
-A tree with one `.claude/` per intended image layer, `cwd` at the deepest:
-
-```
-<root>/home/.claude                                      user   (CLAUDE_CONFIG_DIR)
-<root>/agentic/.claude                                   agentic project
-<root>/agentic/agent/.claude                             agent
-<root>/agentic/agent/procedures/discovery/.claude        procedure   <- cwd
-```
-
-| `settingSources` | user | agentic project | agent | procedure |
+| | user | agentic project | agent | procedure (`cwd`) |
 |---|---|---|---|---|
-| `['user','project']` | ✓ | ✓ | ✓ | ✓ |
-| `['project']` | · | ✓ | ✓ | ✓ |
-| omitted (default) | ✓ | ✓ | ✓ | ✓ |
+| commands | ✓ | ✓ | ✓ | ✓ |
+| skills | ✓ | ✓ | ✓ | ✓ |
+| subagents | ✓ | ✓ | ✓ | ✓ |
+| **hooks / `settings.json`** | ✓ | **·** | **·** | ✓ |
 
-**Discovery walks up from `cwd`.** The SDK reference is correct and the `.claude` directory page is wrong. Every layer above `cwd` contributes, so the layered scheme — base image, agentic project, agent, optionally procedure, each owning one `.claude/` at its own level — works natively, with no composition step at build time.
+With a `.git` planted at the agent level, the agentic-project layer drops out of skills, commands and subagents — and nothing else changes:
 
-`['project']` excludes the user layer while keeping **all** nested levels, so the image's own `~/.claude` contribution can be turned off independently of the project chain.
-
-## Two hazards, both silent
-
-### A `.git` directory halts the walk
-
-With a repository at the agent level, the agentic-project layer above it **disappears**:
-
-| | user | agentic project | agent | procedure |
+| with `.git` at the agent level | user | agentic project | agent | procedure |
 |---|---|---|---|---|
-| `.git` at the agent level | ✓ | **·** | ✓ | ✓ |
+| commands / skills / subagents | ✓ | **·** | ✓ | ✓ |
+| hooks / `settings.json` | ✓ | · | · | ✓ |
 
-Nothing errors. The agent simply runs without the layer's skills, commands and instructions.
+`skills: 'all'` made no difference; discovered skills are listed without it.
 
-**This is a live risk, not a theoretical one:** an agent working against a git-based working copy is exactly the predecessor harness's shape. Any repository between `cwd` and a contributing layer takes that layer out silently. The layout must keep every capability layer **below** any repository root, or keep repositories out of the capability chain entirely.
+`CLAUDE.md` and rules were **not** measured here. The documented rule — every parent, with no repository limit — is taken as read rather than confirmed.
 
-### `additionalDirectories` contributes capabilities, not just read access
+## What this means for the layered design
 
-A directory passed as `additionalDirectories` **injects its `.claude/` commands into the agent**:
+**Capabilities layer natively; settings do not.**
 
-```
-additionalDirectories: [<mounted>]   ->   marker-mounted LOADED
-```
+- **Skills, commands, subagents, `CLAUDE.md` and rules compose up the tree**, so the intended scheme works: the base image contributes at the user scope, the agentic project's image at its level, each agent's image at its own, a procedure below that. A nearer layer overrides a further one by name. No build-time composition step.
+- **`settings.json` and hooks do not.** An image layer **cannot grant itself permissions or install a hook from its own directory level** — only `<cwd>/.claude/` and the user scope are read. This is the constraint the first version of this note missed, and it decides where permissions come from.
 
-The SDK reference does say this — with the `project` source enabled it loads "the directory's skills, commands, and subagents" — but it is easy to read `additionalDirectories` as read access with a permission attached, and it is not.
+**So per-layer and per-procedure settings come from the SDK, not the filesystem.** The `settings` option takes an inline object, a file path or a JSON string and populates the flag-settings layer in the precedence order, and `applyFlagSettings()` changes it at runtime. That is the mechanism for scoping Read/Write permissions to the context a procedure was asked for — entity, user, strategy — and it is what the predecessor harness already does. **AgentForge composes the settings itself and passes them inline.**
 
-**The consequence is a trust boundary.** A synced or mounted working directory is *data*, and data that can carry a `.claude/` directory can add skills, slash commands and subagents to the agent that reads it. Anything AgentForge syncs down before a run, or mounts from a consumer's store, must either be excluded from capability loading or be treated as trusted input.
+**The repository boundary is a layout rule, not a bug.** Skills, commands and subagents stop at a repository root, so every capability layer must sit *below* any `.git` in the chain, or repositories must stay out of it. It is silent either way — a layer simply does not appear — which is worth a startup assertion that the expected layers actually loaded.
+
+## `additionalDirectories` — two different things with the same name
+
+The earlier note said "`additionalDirectories` contributes capabilities". True of the SDK option, and the distinction matters because the mitigation lives in it:
+
+| | Grants file access | Loads configuration |
+|---|---|---|
+| The SDK's **`additionalDirectories`** option (passed to Claude Code as `--add-dir`) | yes | **yes** — skills (with live reload), commands, subagents; `enabledPlugins` and `extraKnownMarketplaces` only from `settings.json`; `CLAUDE.md` only when `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` |
+| **`permissions.additionalDirectories`** in a settings file | yes | **no** |
+
+Skills, commands and subagents from a flag-added directory load through the **`project`** setting source, so excluding that source excludes them too.
+
+**A synced or mounted working directory is therefore a trust boundary only if it is added through the SDK option.** Data that must be readable without contributing capabilities belongs in `permissions.additionalDirectories` — which AgentForge can set through the inline `settings` layer above. That is a concrete mitigation, not a caveat.
 
 ## `cwd` is the capability root, not the data directory
 
-The distinction these results force, and which AgentForge's documents have blurred:
+`cwd` selects which layers apply and therefore *what the agent is*; the directories a run reads and writes are data, reached through additional directories and permissions. They need not be the same path.
 
-| | |
-|---|---|
-| **`cwd`** | the bottom of the capability chain. It selects which `.claude/` layers apply, and therefore *what the agent is*. |
-| **the directories a run reads and writes** | data. Reached through `additionalDirectories` plus permissions, and — per above — able to contribute capabilities unless prevented. |
-
-They are not the same thing and need not be the same path. A procedure that "sets its own working directory" is doing one of two very different things depending on which is meant: changing the agent's capability set, or changing where files land.
-
-**`ARCHITECTURE.md`'s project-key derivation (D17) says "the working directory the run uses" without saying which**, and the answer changes what continuity is scoped to. Raised in `DESIGN_OPTIONS.md` §L rather than resolved here.
+**`ARCHITECTURE.md`'s project-key derivation (D17) says "the working directory the run uses" without saying which**, and the answer changes what transcript continuity is scoped to. Raised in `DESIGN_OPTIONS.md` §L rather than resolved here.

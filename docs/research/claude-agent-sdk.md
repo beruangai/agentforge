@@ -57,4 +57,14 @@ What remains for AgentForge is the outer validation and the typed `output_invali
 
 `settingSources?: ("user" | "project" | "local")[]`, default **all three**; `[]` loads none. Precedence lowest to highest is **user → project → local**, merged key by key; array settings such as `permissions.allow` combine across scopes rather than replacing.
 
-**Project-scope discovery walks UP the directory tree from `cwd`**, so several nested `.claude/` directories all contribute — measured, because the SDK reference and the `.claude` directory reference state the opposite of each other. Two behaviours that are easy to miss, both measured in [`capability-composition.md`](capability-composition.md): **a `.git` directory between `cwd` and a layer silently removes that layer**, and **`additionalDirectories` loads the directory's skills, commands and subagents** rather than granting read access alone.
+**Three kinds of configuration follow three different rules**, which is the thing to get right ([`capability-composition.md`](capability-composition.md)):
+
+| Kind | Loads from |
+|---|---|
+| `settings.json` and hooks | **`<cwd>/.claude/` only — no parent fallback** |
+| `CLAUDE.md` and `.claude/rules/*.md` | `<cwd>` and every parent |
+| skills, commands, subagents | `<cwd>` and every parent **up to the repository root** |
+
+So nested directories compose *capabilities* but not *settings*. Per-layer and per-procedure settings come from the **`settings` option** — an inline object, a file path or a JSON string populating the flag-settings layer in the precedence order — changeable at runtime with **`applyFlagSettings()`**.
+
+`additionalDirectories` is two different things with one name: **the SDK option** is passed to Claude Code as `--add-dir` and *does* load skills, commands and subagents (plus `enabledPlugins`/`extraKnownMarketplaces`, and `CLAUDE.md` only under `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`), while **`permissions.additionalDirectories`** in a settings file grants file access and loads nothing.
