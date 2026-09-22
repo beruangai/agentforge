@@ -113,7 +113,7 @@ Settled by spike against `@anthropic-ai/claude-agent-sdk@0.3.278` — findings, 
 
 **Still open, narrowly:** whether the base image sets `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`. It removes `run_in_background` from the Bash tool's schema outright — a real kill switch — but no procedure could then opt in, and closed input already kills background tasks at the result. Decided when a procedure asks for background work.
 
-## §F — The sync declaration and the project key *(OPEN)*
+## §F — The sync declaration and the project key *(the implementation checked 2026-09-22; the declaration OPEN)*
 
 Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)). Transcripts mirror through a `SessionStore`; the config directory is image content; working directories sync to an object store under **a strategy the consumer declares, per agent and overridable per procedure**. AgentForge guarantees the flush-and-verify barrier, the process-group lifetime, and that a sync failure is an outcome.
 
@@ -124,6 +124,10 @@ Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-thro
 - Cadence — once at the close, on an interval, or on change — and the quiescence threshold that keeps a file mid-write out of a continuous pass
 - Exclusions: whether AgentForge ships a starting list (`.git`, `node_modules`, editor scratch) that a project must still accept explicitly, or writes its own from nothing
 - How a partial override reads at the call site, and whether an override may relax something the project tightened
+
+**The implementation is checked and it holds** — [`research/working-directory-sync.md`](research/working-directory-sync.md), `spikes/sync/f1-s7cmd-semantics.sh`. `s7cmd` **1.8.3** publishes a **musl aarch64** build, which matters because the base image is Alpine and a glibc binary would not run in it; it is **statically linked**, 12.7 MB, and the archive **matched its published sha256**, so "pin it by digest" is actionable. All eight behavioural claims hold against a real bucket, including the three the design rests on: `--filter-mtime-before` **does** skip a file touched moments ago while uploading the settled ones, exclusions work, and **delete propagation is off unless asked for**. One detail with a consequence: the filter takes an **absolute timestamp**, so the quiescence threshold lives in the sync runner and is recomputed each pass rather than declared once to the tool.
+
+**None of that settles the declaration.** The tool can express every option below, so which ones AgentForge *offers* remains a design decision.
 
 **The implementation.** Leading candidate is [`s7cmd`](https://github.com/nidor1998/s7cmd): a single static Rust binary with ARM64 Linux builds, Apache-2.0, bundling the `s3sync` engine — local-to-S3, S3-to-local and S3-to-S3, include and exclude patterns, filtering by `LastModifiedDate` and size, checksum verification, configurable concurrency and a dry run. The `LastModifiedDate` filter is also the quiescence heuristic: sync only what has been still for longer than a threshold, so a file mid-write is left for the next pass. Against it: a personal project whose dependencies are updated best-effort, shipped in our base image and running with credentials — so pin it by digest, and keep an AWS-SDK walk as the fallback if that risk stops being acceptable.
 
