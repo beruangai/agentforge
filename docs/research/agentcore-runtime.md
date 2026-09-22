@@ -30,6 +30,18 @@ From [isolated sessions](https://docs.aws.amazon.com/bedrock-agentcore/latest/de
 - While a session is being provisioned or torn down, a second operation returns a retryable HTTP 409 `RetryableConflictException`. "Already-running sessions are not affected."
 - **Nothing in the documentation limits how many tasks may run inside one session, or says an invocation to a busy session is refused** — `DESIGN_OPTIONS.md` §B. The long-running guide describes the opposite pattern: start work, respond at once, and let the caller "check back later for results".
 
+## Request headers
+
+From [pass custom headers](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-header-allowlist.html), read 2026-09-22:
+
+- A runtime takes a **request header allowlist**, `requestHeaderConfiguration: { requestHeaderAllowlist: [...] }`, on `CreateAgentRuntime` and `UpdateAgentRuntime`. **Only allowlisted headers reach the container**; everything else is dropped.
+- **Up to 20 headers per runtime, 4 KB per value.** Names are case-insensitive; duplicates are rejected.
+- A published **restricted table** cannot be allowlisted — it includes `Content-Type`, `Content-Length`, `Accept`, `Host`, `Authorization`-adjacent headers, the CORS and security sets, and the proxy/forwarding set. Anything prefixed `x-amz-` or `x-amzn-` is refused **except** `X-Amzn-Bedrock-AgentCore-Runtime-Custom-`.
+- `Authorization` may be allowlisted only when the runtime has a `customJWTAuthorizer`.
+- `update_agent_runtime` is a **full PUT**: `roleArn`, `agentRuntimeArtifact` and `networkConfiguration` must be resent even when unchanged.
+
+**`A2A-Version` is allowlistable** — a valid header name, absent from the restricted table, not `x-amzn-`-prefixed. Measured working in [`agentcore-runtime-observed.md`](agentcore-runtime-observed.md), which is why that note's earlier claim that the header is "never forwarded" was a statement about the default rather than the platform.
+
 ## Health and long-running work
 
 From the [long-running agents guide](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-long-run.html):

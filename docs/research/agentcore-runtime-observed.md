@@ -18,29 +18,48 @@ An earlier commit (`70ff01b`, 2026-09-22) recorded that **`InvokeAgentRuntime` s
 
 ---
 
-## The headers that survive
+## The headers that survive — and the allowlist that decides
 
-Every request observed carried exactly these, and nothing else:
+**Corrected 2026-09-22, after the operator pointed at the [request header allowlist](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-header-allowlist.html).** An earlier version of this note said `A2A-Version` is *never* forwarded and that *no* custom header survives. Both were the **default** behaviour reported as the platform's, and both are wrong as stated.
+
+**By default**, exactly these arrive and nothing else:
 
 ```
 x-amzn-requestid, baggage, content-length, host,
 x-amzn-bedrock-agentcore-runtime-session-id, x-amzn-trace-id
-  (+ content-type and accept, only when the caller set them)
+  (+ content-type and accept, which are InvokeAgentRuntime's own parameters)
 ```
 
-- **The session header passes through verbatim.**
-- **No custom header survives.** Nothing can ride out-of-band alongside a request.
-- **`A2A-Version` is never forwarded.** The negotiated version, read off the SDK's own `ServerCallContext`, is **`0.3` on every request**.
+**But AgentCore forwards any header placed on a per-runtime allowlist**, configured as `requestHeaderConfiguration: { requestHeaderAllowlist: [...] }` on `CreateAgentRuntime` and `UpdateAgentRuntime` — up to 20 headers, 4 KB each, excluding a published restricted table and anything prefixed `x-amz-` / `x-amzn-` (except `X-Amzn-Bedrock-AgentCore-Runtime-Custom-`).
 
-This confirms [ADR 0012](../../adr/0012-the-server-is-assembled-not-inherited.md)'s requirement against the platform rather than against AWS's example: **the card must declare a `0.3` `JSONRPC` interface and `legacyCompat` must be enabled on both handlers**, or every call through AgentCore fails with `VERSION_NOT_SUPPORTED`.
+Measured with `A2A-Version` and `X-Agentforge-Probe` allowlisted (`spikes/agentcore/i2-header-allowlist.ts`):
 
-### A version-mismatched part is stripped in silence
+| Sent | Reached the container | SDK negotiated |
+|---|---|---|
+| nothing | — | **0.3** |
+| `A2A-Version: 0.3` | **yes** | 0.3 |
+| `A2A-Version: 1.0` | **yes** | **1.0** |
+| `X-Agentforge-Probe` (allowlisted) | **yes** | 0.3 |
+| `X-Not-Allowlisted` | **no — dropped** | 0.3 |
 
-A part written in the 1.0 protobuf shape — `{ content: { $case: 'data', value: {…} } }` — sent to a server that negotiated 0.3 arrives at the executor **with `filename` and `mediaType` intact and `content` gone**. No error is raised at any layer; the executor sees a part with no payload and, if it is written trustingly, falls through to its defaults.
+So: **the allowlist is a strict filter, and `A2A-Version` passes it.** `A2A-Version` is a valid header name, is absent from the restricted table, and is not `x-amzn-`-prefixed, so nothing blocks it.
 
-This is the §I finding with the sharpest consequence, and it is a **zero-silent-failures violation waiting to happen**: the harness must reject a part it cannot decode rather than treating an empty envelope as an empty request. `spikes/agentcore/server.ts` now throws, and the throw is what the production reader should do.
+**The design consequence is the opposite of what this note first recorded.** AgentForge is **not** pinned to protocol 0.3. It can allowlist `A2A-Version` and negotiate 1.0. What that buys and what it costs is a decision, not a measurement — see the open question below.
 
-The 0.3 wire shape — `{ kind: 'data', data: {…} }` with `role: 'user'` and `method: 'message/send'` — is delivered intact.
+### The part shape is a wire question, not a version question
+
+A related correction. The earlier note claimed "a part whose encoding does not match the negotiated protocol version is stripped of its content in silence". The **failure is real**; the **trigger was wrong**. Isolated by varying one thing at a time:
+
+| RPC method | Part shape | Result |
+|---|---|---|
+| `message/send` | `{ kind: 'data', data }` | **works**, under 0.3 *and* 1.0 |
+| `message/send` | `{ content: { $case: 'data', value } }` | rejected, `-32602` |
+| **`SendMessage`** | **`{ content: { $case: 'data', value } }`** | **accepted, content silently gone** |
+| `SendMessage` | `{ kind: 'data', data }` | works |
+
+**The silent strip is triggered by the 1.0 RPC method name `SendMessage`**, not by the negotiated version — it happens with `A2A-Version: 1.0` set and without it alike. Under `SendMessage` the parser accepts the message and drops a `content` oneof it does not recognise, with no error at any layer, and an executor reading the envelope trustingly falls through to its defaults.
+
+`{ kind: 'data', data }` is the wire shape in **both** protocol versions; `{ content: { $case } }` is the SDK's *internal* protobuf representation and was never a wire shape at all. So the practical rule is narrower than first written but no less sharp: **a part reader must throw on a part it cannot decode**, because one combination of method name and part shape delivers an empty envelope and calls it success.
 
 ## `GetAgentCard` — served verbatim, except the URLs
 

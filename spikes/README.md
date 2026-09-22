@@ -42,6 +42,7 @@ Every message of every run is written to `out/<spike>.jsonl`, and a machine-read
 | `agentcore/c2-grace-period.ts` | §C — is the post-`SIGTERM` window fixed, or tied to being busy | ″ |
 | `agentcore/c3-outcome-in-grace.ts` | §C — can a stopped container still record an outcome | ″ |
 | `agentcore/a1-lease-visibility.ts` | §A — lease write and renewal cost from inside a microVM | ″ |
+| `agentcore/i2-header-allowlist.ts` | §I — does the request header allowlist carry `A2A-Version`, and does 1.0 then negotiate | ″ |
 | `bundler/d2-bun-bundler-determinism.sh` | §D — is `bun build` byte-identical | [image-determinism.md](../docs/research/image-determinism.md) |
 | `sync/f1-s7cmd-semantics.sh` | §F — does `s7cmd` do what the design assumes | [working-directory-sync.md](../docs/research/working-directory-sync.md) |
 

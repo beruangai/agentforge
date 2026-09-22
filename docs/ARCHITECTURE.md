@@ -337,7 +337,8 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | A project key the SDK silently ignored, scattering transcripts | 2 |
 | A task process whose protocol version the executor does not accept | 1 |
 | Admission beyond the container's memory, killing its neighbours | 1 |
-| A part whose encoding does not match the negotiated protocol version, delivered with its content silently stripped | 1 |
+| A part delivered with its content silently stripped, under the `SendMessage` method name | 1 |
+| A protocol version assumed rather than asserted, after a missing header allowlist entry downgraded the request | 1 |
 | A caller whose content type the A2A handler refuses, surfacing as an opaque 424 | 1 |
 | Recovery attempted inside a stopped container, past the ~60-second kill | 1 |
 
