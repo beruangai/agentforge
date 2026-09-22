@@ -100,11 +100,13 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Session** — The Claude Agent SDK's: one transcript, started, resumed or forked by id. One live writer at a time.
 
-**Working directory** — Where a run happens. With the project key it scopes the run's transcript, and it persists by syncing to an object store rather than by being mounted ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)).
+**`cwd`** — The Claude Agent SDK's working directory, and the **capability root**: which `.claude/` layers compose into a session, and therefore what the agent *is*. Set per procedure; never the data directory.
 
-**Project key** — What scopes a session's transcript in the store: the agent and the working directory a run uses, derived by AgentForge and carried in `CLAUDE_CODE_PROJECT_DIR_NAME`, whose alphabet it must fit. Continuity is per agent *and* directory, so one agent's procedures working in different directories keep separate scopes.
+**Working directory** — Where a run's files live, reached through additional directories with explicit permissions. It persists by syncing to an object store rather than by being mounted ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)), and it carries no nested `.claude/`. Distinct from **`cwd`**, and it does not scope the transcript — the project key does.
 
-**Sync strategy** — What a consumer declares about a working directory's persistence: direction, delete propagation, cadence, exclusions. Declared per agent, overridable per procedure; AgentForge runs it and guarantees the flush before an outcome.
+**Project key** — What scopes a session's transcript in the store, in two parts: an AgentForge prefix, `{consumer}_{agenticProject}_{agent}_`, and a final part **the procedure supplies**. Carried in `CLAUDE_CODE_PROJECT_DIR_NAME`, whose alphabet it must fit. Never inferred from a directory: two procedures of one agent that should share a transcript scope say so by supplying the same final part.
+
+**Sync strategy** — What a consumer declares about a working directory's persistence: which phases run (**down** before the run, **up** during and at the close — never both at once), delete propagation, cadence, exclusions. Declared per agent, overridable per procedure; AgentForge runs it and guarantees the flush before an outcome.
 
 How these relate is the consumer's choice ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
 

@@ -2,7 +2,7 @@
 
 **AgentForge** is a procedure wrapper for the Claude Agent SDK, built for its consumers — StrategyFoundry and TrendBot — not for public use. Consumers declare procedures; AgentForge runs each as an asynchronous task over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
 
-No implementation yet. **The [ADRs](adr/README.md) were accepted on 2026-09-21 and the architecture rests on them** — reversing one is a superseding ADR, not an edit. A new decision is still written `proposed` until the operator accepts it, and everything in `docs/DESIGN_OPTIONS.md` is open.
+No implementation yet. **The [ADRs](adr/README.md) are accepted and the architecture rests on them.** **Until code exists, an accepted ADR is mutated in place when its reasoning stops holding** — the operator's standing rule, because there is nothing built on it to migrate. A superseding ADR is for after that. Either way the decision is the operator's to make. A new decision is still written `proposed` until the operator accepts it, and everything in `docs/DESIGN_OPTIONS.md` is open.
 
 ## Read first
 
@@ -53,6 +53,7 @@ The operator's standing conventions across projects:
 ## Working rules
 
 - **A new ADR is written `proposed`** and the operator accepts it. Never write one as `accepted` yourself, and never treat a proposed one as settled.
+- **An accepted ADR is mutated in place while no code depends on it**, when its reasoning stops holding — not superseded. Say what changed and why in the commit; the decision is still the operator's.
 - **An ADR records a decision, not a history.** A decision that stops being relevant is dropped; one that is replaced is superseded and marked.
 - **Consumer contracts are read, never edited here.** Raise anything unclear or conflicting with the operator, in that consumer's repository.
 - **[OPEN §x] means undecided.** Do not implement against an open section, and do not resolve one silently. Raise it, or use `AskUserQuestion`.

@@ -80,7 +80,7 @@ On macOS, Docker's keychain credential helper blocks without an interactive unlo
 
 §D asks more than the layering question, and the rest is untouched:
 
-- **Bun's bundler determinism.** The fixtures copy plain files; nothing was bundled. Whether `bun build` emits byte-identical output across runs — module ordering, hashed chunk names, embedded paths — is a separate measurement and is the likelier source of non-determinism in a real agent image than anything Docker does.
+- ~~**Bun's bundler determinism.**~~ **Closed the same day** — see below. The fixtures copied plain files and nothing was bundled, which made bundling the likelier source of non-determinism in a real agent image. It was then measured and is not.
 - **Comparing digests before `UpdateAgentRuntime`.** The digest is available and stable; the deploy path that reads the current runtime's digest and skips the update is not written.
 - **Task-protocol version negotiation** between an executor and a task process built from different artifacts — how long an executor supports an older task process.
 - **Whether the agent card is generated as a build step** from the image's own registry of procedures.

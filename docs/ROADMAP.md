@@ -6,13 +6,15 @@ Milestones deliver capability a consumer can actually run. Each is proposed thro
 
 ## A0 — Scaffold, blocking decisions, local spikes
 
+**The local spikes are done.** What A0 still owes is the workspace itself.
+
 - Nx workspace in the grouped layout on current `@aws/nx-plugin` defaults; Bun, Biome, catalog versions
 - Read `@aws/nx-plugin`'s `ts#agent` and its sync machinery for what to extend rather than rebuild (§K)
-- **Blocking decisions, before any server code:** how the A2A request handler is assembled (§I), and the task-store interface — conditional index insert, fenced write (§A)
-- Local spikes: A2A server assembly and client signing (§I), kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), credential provisioning and expiry (§O), deterministic image builds (§D)
-- Procedure authoring settled against a baseline set of procedures inferred from both consumers, not against argument (§N)
+- **The blocking decisions are made**: the A2A server is assembled rather than inherited ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), §I), it speaks 1.0 only ([ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)), a procedure is an oRPC contract ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md), §N), and the task store is one task item plus a tiny index item (§A)
+- **Landed:** kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), deterministic image builds (§D), the procedure framework (§N), capability composition (§L/D7), and the AgentCore behaviour §A, §B, §C and §I rested on
+- **Still owed as a spike:** credential provisioning and expiry (§O)
 
-**Exit:** every spike landed as an integration test (`ARCHITECTURE.md` §9), its findings recorded in `docs/research/`, and the questions it answers closed.
+**Exit:** the workspace builds; every A0 question is closed or explicitly deferred with its reason; each spike whose answer can drift is an integration test and each that settled a decision once is an ADR or a dated research note (`ARCHITECTURE.md` §9).
 
 ## A1 — A working agent, locally
 

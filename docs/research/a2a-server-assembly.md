@@ -52,7 +52,7 @@ Its ~80 lines of AgentCore-contract mechanics are the valuable part, and they ar
 - **`/ping` defaults to `'Healthy'`, and a throwing custom handler degrades to `'Healthy'`** rather than failing the probe. So the A2A path does **no** busy tracking: `HealthyBusy` is entirely AgentForge's to implement, confirming `ARCHITECTURE.md` §4.
 - **Authentication is terminated by AgentCore in front of the container**, so inside it uses `UserBuilder.noAuthentication`. AgentForge does the same; the microVM boundary is the trust boundary.
 - **`bedrockCallContextBuilder`** mirrors the AgentCore-injected headers into `ServerCallContext.state`, so an executor reads them without ambient state.
-- **`legacyCompat: { enabled: true }` on both the card handler and the JSON-RPC handler**, because "AgentCore's documented card shape still speaks A2A v0.3".
+- **`legacyCompat: { enabled: true }` on both the card handler and the JSON-RPC handler**, because "AgentCore's documented card shape still speaks A2A v0.3". *(What `buildA2AApp` does — not what AgentForge does; see the withdrawal below.)*
 
 ---
 
@@ -74,7 +74,7 @@ const requestedVersion = req.header(A2A_VERSION_HEADER) || A2A_LEGACY_PROTOCOL_V
 Two consequences, both concrete:
 
 1. **Whatever strips or fails to forward `A2A-Version` downgrades the request to 0.3.** Whether `InvokeAgentRuntime` forwards it is the single most important thing to check against AgentCore, because a silent downgrade presents as a blanket `VERSION_NOT_SUPPORTED` on every call.
-2. **AgentForge's card must declare a v0.3 `JSONRPC` interface in `supportedInterfaces` and enable `legacyCompat`** on both the card handler and the JSON-RPC handler — which is exactly what AWS's own `buildA2AApp` does, and for the stated reason that AgentCore's documented card shape is v0.3.
+2. ~~**AgentForge's card must declare a v0.3 `JSONRPC` interface and enable `legacyCompat`**~~ — **withdrawn 2026-09-22.** That followed AWS's own `buildA2AApp`, which does exactly this for the stated reason that AgentCore's documented card shape is v0.3. It was written before the header allowlist was known: once `A2A-Version` can be forwarded, 0.3 is support for nobody and `legacyCompat` turns a configuration mistake into a silent downgrade. AgentForge declares **one 1.0 interface with `legacyCompat` off** ([ADR 0014](../../adr/0014-agentforge-speaks-a2a-1-0-only.md), measured in [`agentcore-runtime-observed.md`](agentcore-runtime-observed.md)).
 
 ---
 

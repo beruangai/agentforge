@@ -6,7 +6,7 @@ A consumer declares a **procedure** — its public contract, the agent's own con
 
 It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
 
-**Status:** design settled, no implementation yet. The [ADRs](adr/README.md) were accepted on 2026-09-21; what remains open is in [docs/DESIGN_OPTIONS.md](docs/DESIGN_OPTIONS.md), each question with the spike that closes it.
+**Status:** design settled, no implementation yet. The [ADRs](adr/README.md) are accepted — the first eleven on 2026-09-21, the rest as they were decided. Until code exists an accepted ADR is mutated in place rather than superseded, because there is nothing built on it to migrate. What remains open is in [docs/DESIGN_OPTIONS.md](docs/DESIGN_OPTIONS.md), each question with the spike that closes it.
 
 Built for its consumers, StrategyFoundry and TrendBot, not for public use.
 

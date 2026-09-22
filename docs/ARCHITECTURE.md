@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status.** The decisions this rests on are [accepted ADRs](../adr/README.md); reversing one is a superseding ADR, not an edit. What is still undecided is in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md), marked inline as **[OPEN §x]**. Requirements come from the consumers, distilled in [CONSUMERS.md](CONSUMERS.md) — their contracts are unvetted drafts. Code sketches show shape, not signatures; there is no implementation yet.
+> **Status.** The decisions this rests on are [accepted ADRs](../adr/README.md). **Until code exists, an accepted ADR is mutated in place when its reasoning stops holding** — the operator's standing rule, because there is nothing built on it to migrate. A superseding ADR is for after that. Either way the decision is the operator's to make. What is still undecided is in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md), marked inline as **[OPEN §x]**. Requirements come from the consumers, distilled in [CONSUMERS.md](CONSUMERS.md) — their contracts are unvetted drafts. Code sketches show shape, not signatures; there is no implementation yet.
 
 AgentForge runs a consumer's **procedure** as an asynchronous **task**, in an isolated runtime, and returns a typed outcome to whatever called it. Temporal is the caller both consumers use and is supported first-class through an activity factory, but nothing below the client knows a caller exists.
 
@@ -52,7 +52,7 @@ Only two crossings are protocols: a contract between separately deployed, separa
 
 | Protocol | Between | Contract |
 |---|---|---|
-| **Wire** | Caller's client ↔ the agent's gateway | A2A JSON-RPC 2.0 over `InvokeAgentRuntime`, SigV4-signed, routed by the session header. `SendMessage` with `returnImmediately` starts or attaches; `GetTask` polls; `CancelTask` stops. Streaming and blocking sends are unused until a procedure needs them. The envelope is a data part; the outcome is an artifact ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md)) |
+| **Wire** | Caller's client ↔ the agent's gateway | A2A **1.0 only** over `InvokeAgentRuntime`, SigV4-signed, routed by the session header ([ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)). `SendMessage` with `returnImmediately` starts or attaches; `GetTask` polls; `CancelTask` stops — the protobuf RPC names 1.0 uses. Streaming and blocking sends are unused until a procedure needs them. The envelope is a data part; the outcome is an artifact ([ADR 0002](../adr/0002-a2a-is-the-boundary-contract.md)) |
 | **Task process** | Executor ↔ task process | JSON-RPC 2.0, one message per line, over a dedicated pipe, opening with a **protocol version** both sides must accept. `run` and `cancel` in; semantic events numbered per task, and exactly one outcome, out; the exit code is the backstop. `SIGTERM` then `SIGKILL` to the process group ([ADR 0004](../adr/0004-a-process-per-task.md)) |
 
 | Interface | Inside | Note |
@@ -123,16 +123,23 @@ The contract hash travels in the envelope. A container whose image does not impl
 
 **A consumer owns its side effects and how to recover when one may have partly happened.** Every step receives the idempotency key, the attempt number, and the prior attempt's recorded state — none, `FAILED`, `CANCELLED`, or `LOST`. Because the *after* step runs inside the task process before the outcome leaves it, **`LOST` always means side effects may have happened**; a consumer whose source of truth is its own state reconciles against it. AgentForge never infers, retries or compensates a consumer's side effect.
 
-### Reuse
+### How one is written
 
-Cross-cutting behavior — guardrail hooks, telemetry, a house style of options — is a function a procedure calls, shipped in a package. Composite options are **additive**: contributions to hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering (D8). AgentForge ships a small library (§7); nothing is wired by default.
-
-**A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)). Cross-cutting behavior is **middleware that contributes to a typed context**: a house helper resolves something and adds it, and every later middleware and the handler see it typed without the procedure having declared it. Hand-built authoring could not offer that; it was compared on its own terms and the finding still holds — a class's `override guardrails()` can silently drop the house contribution with the compiler's blessing ([research](research/procedure-authoring.md)), which is why guardrail composition stays additive.
+**A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)). A consumer declares the contract; a utility derives the typed `submit`/`result` pair; an implementation registers against it.
 
 **A procedure never names its transport.** The same declaration executes in-process in the container and travels over a custom client link from a caller ([research](research/procedure-framework.md)). Two things are the link's to do rather than the framework's:
 
 - **A caller's cancellation is mapped, never dropped.** A signal reaches middleware and the handler, and a handler that races its work against it returns promptly — but a signal cannot travel with an `InvokeAgentRuntime` call, so the link turns a caller's abort into the out-of-band `CancelTask` invocation. Accepting a signal and ignoring it would be a silent failure.
-- **A stream's wire encoding is ours.** oRPC's event iterator carries event *objects*; the SSE encoding lives in its HTTP handler, which AgentForge does not use. A streaming link serialises each event itself and must throw on a body that ends mid-frame rather than dropping the tail.
+- **A stream's wire encoding is ours.** oRPC's event iterator carries event *objects*; the SSE encoding lives in its HTTP handler, which AgentForge does not use. A streaming link serialises each event itself and must throw on a body that ends mid-frame rather than dropping the tail. Nothing streams today (§4); this is what it would cost.
+
+### Reuse
+
+Cross-cutting behavior — guardrail hooks, telemetry, a house style of options — is shared rather than repeated. It takes one of two shapes, and which one is not a matter of taste:
+
+- **Middleware, where the behavior wraps the run or needs to contribute something.** A house middleware resolves a value and adds it to the **execution context**; every later middleware and the handler see it *typed*, without the procedure having declared it. This is what an object literal could not express and the reason for adopting a framework rather than building one.
+- **A plain function, where the behavior only produces a value.** `writeScope` and `stopGuard` contribute SDK options and hooks; they compute a contribution and the procedure composes it.
+
+**Composite contributions are additive**, whichever shape produced them: hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering (D8). The hazard this guards against is measured rather than assumed — under `tsc --strict` a class's `override guardrails()` silently drops the house contribution with the compiler's blessing ([research](research/procedure-authoring.md)). AgentForge ships a small library (§7); nothing is wired by default.
 
 ---
 
@@ -212,7 +219,7 @@ Typed; every failure carries its cause. Layer 1 reads only the kind and its retr
 
 ## 5. The container
 
-One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC on `POST /`, the card at `/.well-known/agent-card.json`, and `/ping` reporting the container's aggregate status. It is **assembled from `@a2a-js/sdk` and Express**, not built on the AgentCore SDK's `serveA2A`, whose options take an executor and offer no seam for the gateway ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md)). The card declares a v0.3 `JSONRPC` interface and the handlers enable the SDK's `legacyCompat`, because **an absent `A2A-Version` header means protocol 0.3** and AgentCore's documented card shape still speaks it.
+One server: an A2A server on AgentCore's contract — `0.0.0.0:9000`, JSON-RPC on `POST /`, the card at `/.well-known/agent-card.json`, and `/ping` reporting the container's aggregate status. It is **assembled from `@a2a-js/sdk` and Express**, not built on the AgentCore SDK's `serveA2A`, whose options take an executor and offer no seam for the gateway ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md)). **It speaks A2A 1.0 and nothing else** ([ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)): the card declares one interface at `protocolVersion: '1.0'`, `legacyCompat` is disabled on both handlers, and the runtime allowlists the `A2A-Version` header the client sends. **An absent header means 0.3**, not "unspecified", so a missing allowlist entry would otherwise downgrade every call silently; with `legacyCompat` off it is refused on the first invocation instead. AgentCore reports that refusal as an opaque 424, which is why the client asserts the version it negotiated rather than inferring success from a 200.
 
 **The gateway** decides admission (§4). **The executor** spawns and supervises: one process per task, in its own process group ([ADR 0004](../adr/0004-a-process-per-task.md)). Measured: **65 ms** to a task process ready to serve with the Agent SDK imported — 0.054 % of a two-minute run — and `/ping` p95 unmoved by four running tasks, two of them saturating a core ([research](research/task-process-and-cost.md)). The channel is a **dedicated bidirectional socketpair on fd 3**, so a task's own logging cannot corrupt its outcome; `detached: true` gives it its own process group, and `kill(-pid)` is what makes cancellation reach a grandchild.
 
@@ -249,7 +256,7 @@ An agentic base image serving one agent, or an agent serving one procedure, is t
 
 **Code ships in the image** ([ADR 0008](../adr/0008-code-ships-in-the-image.md)). A deploy cannot interrupt a run: AgentCore keeps existing sessions on the artifact they started with and gives new sessions the new one. So nothing needs mounting to avoid churn — what a change must avoid is spreading, and layering is what stops it. A change to one agent's procedures rebuilds that agent's image alone; a change to shared capabilities rebuilds the images above it; a change to neither rebuilds nothing.
 
-**That only holds if builds are deterministic, and it does hold.** Measured over one base, one agentic base and three agents: an unchanged rebuild is byte-identical, a change to one agent moves that agent alone, and a change to the agentic base moves all three above it and nothing below ([research](research/image-determinism.md)). Nx's affected graph decides what to rebuild; the **manifest** digest decides what to deploy — buildx's `--metadata-file` reports it, and `docker image inspect`'s image id must not be used, because the `docker` exporter leaves layer timestamps in place and its id moves on every build. Determinism needs `SOURCE_DATE_EPOCH` **and** `rewrite-timestamp=true` — the epoch alone normalises the config and leaves the layers moving — plus `--provenance=false`, every parent pinned by digest, and no unpinned package installs. Whether Bun's bundler output is itself byte-identical is **[OPEN §D]**, and is the likelier remaining source of drift.
+**That only holds if builds are deterministic, and it does hold.** Measured over one base, one agentic base and three agents: an unchanged rebuild is byte-identical, a change to one agent moves that agent alone, and a change to the agentic base moves all three above it and nothing below ([research](research/image-determinism.md)). Nx's affected graph decides what to rebuild; the **manifest** digest decides what to deploy — buildx's `--metadata-file` reports it, and `docker image inspect`'s image id must not be used, because the `docker` exporter leaves layer timestamps in place and its id moves on every build. Determinism needs `SOURCE_DATE_EPOCH` **and** `rewrite-timestamp=true` — the epoch alone normalises the config and leaves the layers moving — plus `--provenance=false`, every parent pinned by digest, and no unpinned package installs. **`bun build` is not a source of drift either** — byte-identical across runs, across a different absolute path, across changed source mtimes and under `--minify`, measured on a real 2.26 MB bundle. Determinism therefore rests entirely on the Docker-level requirements above. What remains **[OPEN §D]** is the deploy path that compares digests, not the builds it compares.
 
 **State persists through APIs, not mounts** ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)), so an agent runs in public network mode and no consumer pays for a VPC to run one.
 
@@ -366,7 +373,7 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | Entry point | For | Carries |
 |---|---|---|
 | `/contract` | Anywhere, including a worker | Contract declaration and types. oRPC and Zod only; never the Agent SDK |
-| `/client` | A caller | The A2A client, typed by an imported contract |
+| `/client` | A caller | The A2A client — the link over `InvokeAgentRuntime`, typed by an imported contract |
 | `/temporal` | A Temporal worker | The activity factory over the client |
 | `/agent` | A consumer's agent build | Procedures, the `agent()` helper, the kernel, the helper library — bundled into their image |
 | `/infra` | A CDK application | The constructs |
