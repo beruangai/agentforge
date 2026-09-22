@@ -155,7 +155,9 @@ The A2A SDK mints the task id and creates its event bus *before* the executor is
 
 ### Task state, the lease, and loss
 
-Task state lives in a store outside the microVM ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)), so an outcome survives the container, the caller's redeploy, and the connection that asked for it (D11). It is the A2A task store, extended with the idempotency index, the lease and the outcome payload — one record, read through A2A, so a caller needs no store access of its own (D32).
+Task state lives in a store outside the microVM ([ADR 0006](../adr/0006-task-state-is-durable-outside-the-session.md)), so an outcome survives the container, the caller's redeploy, and the connection that asked for it (D11). It is the A2A task store, extended with the lease and the outcome payload — **one task item**, read through A2A, so a caller needs no store access of its own (D32). The **idempotency index is a second, tiny item** keyed by the idempotency key and holding only a pointer, because one item cannot be keyed two ways and a GSI is eventually consistent and so cannot back a conditional insert. A poll reads the task item alone: one `GetItem`, 1 RCU under 4 KB.
+
+**A container names itself.** Each container process mints a **uuid7 at start** and writes it with the lease, so a later container serving the same runtime session sees a different id and declares the task lost *immediately* rather than waiting out the lease. The runtime session id cannot do this job — it is stable across container replacement, which is exactly the case being detected.
 
 **DynamoDB holds it**: conditional writes give attach-or-start atomically and lease renewal is a cheap update.
 

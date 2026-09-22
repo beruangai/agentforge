@@ -25,7 +25,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 
 ---
 
-## §A — Task store details *(the lease measured 2026-09-22; the item shape OPEN)*
+## §A — Task store details *(the lease and the item shape SETTLED 2026-09-22)*
 
 The interface is fixed and built in the first slice: a conditional insert for the idempotency index, and a fenced write that rejects a stale lease generation, because A2A's `TaskStore.save` overwrites unconditionally. DynamoDB holds the record, and an outcome over 256 KB fails rather than being offloaded (`ARCHITECTURE.md` §4). Open:
 
@@ -42,7 +42,11 @@ The interface is fixed and built in the first slice: a conditional insert for th
 
 A first attempt polled from a laptop and produced "≈322 ms", which conflated the write, propagation, a 241 ms external read RTT and a 333 ms apparent clock offset. It is recorded in the research note as discarded, not as a figure. **What it does show is that an external reader's own RTT dominates the lease mechanics by more than twenty times**, so where the reader runs matters more than anything the store does.
 
-**Still open:** the item shape — what the A2A task, the index, the lease and the outcome look like as one record, and what a poll costs to read *that*, rather than the lease alone.
+**Decided 2026-09-22: one task item, plus a tiny index item.** The task item carries the A2A task, the lease and the outcome together, so a poll is a single `GetItem` — 1 RCU while the item stays under 4 KB. A separate small item keyed by the **idempotency key** holds only a pointer to the task id, so the conditional insert is cheap and never contends with the task item. Two keys, one of them on the poll path.
+
+A single item for everything was rejected because the index must be keyed by the idempotency key while the task is keyed by task id: one item cannot be both, and a GSI is eventually consistent and so cannot back a conditional insert. Several items under one partition key were rejected as a Query per poll and the loss of single-item atomicity across the lease and the task.
+
+**Still open:** what a poll costs once a large outcome shares the item, and whether the outcome moves to its own item above a threshold.
 
 ## §B — Whether a busy container receives invocations *(SETTLED 2026-09-22)*
 
@@ -115,13 +119,14 @@ Settled by spike against `@anthropic-ai/claude-agent-sdk@0.3.278` — findings, 
 
 **Still open, narrowly:** whether the base image sets `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`. It removes `run_in_background` from the Bash tool's schema outright — a real kill switch — but no procedure could then opt in, and closed input already kills background tasks at the result. Decided when a procedure asks for background work.
 
-## §F — The sync declaration and the project key *(the implementation checked 2026-09-22; the declaration OPEN)*
+## §F — The sync declaration and the project key *(direction DECIDED 2026-09-22; the rest of the declaration OPEN)*
 
 Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)). Transcripts mirror through a `SessionStore`; the config directory is image content; working directories sync to an object store under **a strategy the consumer declares, per agent and overridable per procedure**. AgentForge guarantees the flush-and-verify barrier, the process-group lifetime, and that a sync failure is an outcome.
 
 **The declaration is settled in shape**: the agentic project declares it whole, with every field required so nothing is implicit, and a procedure overrides the fields it differs on. What remains is the fields themselves:
 
-- Direction — up only, down only, or both — and, if both, what wins a conflict, which is the one genuinely hard case and may be reason enough not to offer it
+- ~~Direction~~ **Decided 2026-09-22: phased, never concurrent.** A procedure may seed its working directory **down** from the object store before the run, and publish **up** during and at the close. Both directions are available; **both at once are not**, which removes conflict resolution rather than solving it. Last-writer-wins was rejected as a silent discard of work.
+- **Decided with it: sync is also callable on demand, from an execution context.** A declaration covers the common case, but a procedure sometimes knows what the declaration cannot — a tool it is about to call needs a file published first, or a tool it just called changed the working directory and the next step needs it pulled. So the harness passes an **execution context** object into side-effect phases, hooks and the run, carrying a `sync(options)` it can invoke mid-turn. **This is a new surface**: AgentForge has no execution context today, and what else belongs on it is now an open question of its own (below).
 - Delete propagation, as an explicit choice rather than a default
 - Cadence — once at the close, on an interval, or on change — and the quiescence threshold that keeps a file mid-write out of a continuous pass
 - Exclusions: whether AgentForge ships a starting list (`.git`, `node_modules`, editor scratch) that a project must still accept explicitly, or writes its own from nothing
@@ -135,6 +140,8 @@ Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-thro
 
 **The project key is decided** (`ARCHITECTURE.md` §6): derived from the agent and its working directory, carried in `CLAUDE_CODE_PROJECT_DIR_NAME`, sanitized to the 1–64 character alphabet that variable allows, and asserted after the run because an invalid name fails silently. What remains is the derivation's details — how the working directory reduces to a segment, and how truncation stays stable when a lane name changes length.
 
+**Newly open: the execution context object.** `sync(options)` is its first member and the reason it exists. What else belongs on it — the task id and idempotency key, the lease, a way to record a side effect, a logger, the procedure's own contract — is undesigned, and it is a consumer-facing surface, so it earns its own decision rather than accreting.
+
 **The remaining edges**, whatever is declared: when a file is quiescent enough to upload so a half-written file is not published; how writes are coalesced so a tool loop is not a request storm; and what a caller sees when a run is lost mid-sync, which is partial artifacts already visible — consistent with `LOST` meaning side effects may have happened, but worth writing down rather than discovering.
 
 ## §G — Health and per-task cost *(SETTLED 2026-09-22)*
@@ -145,11 +152,13 @@ Measured; [ADR 0004](../adr/0004-a-process-per-task.md) confirmed. Findings in [
 - **A process per task costs 65 ms** ready-to-serve with the Agent SDK imported (15 ms without) — **0.054 %** of a 120-second run.
 - **Per-task fixed memory is tens of megabytes**, ≈ 61 MB RSS, so the admission limit will be governed by what an agent run costs rather than by the process-per-task decision. The limit itself is **not** derived from this number: the fixture does not spawn the Claude Code CLI a real task spawns, and a limit set from a harness floor would err in the unsafe direction. Measured properly on AgentCore.
 
-## §H — Container identity *(OPEN)*
+## §H — Container identity *(SETTLED 2026-09-22)*
 
 The key, its two edges and its retention are settled: seven days, with the key scoped to the caller's run so nothing re-sends it afterwards ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md), `ARCHITECTURE.md` §4). What remains:
 
-- **Container instance identity** — how a container names itself in the record, so a later one in the same runtime session recognizes a dead one's task as lost without waiting for the lease.
+- **Decided 2026-09-22: a uuid7 minted per container process.** Each container mints an id at start and writes it with the lease. A later container serving the same runtime session sees a different id and declares the task lost **immediately**, without waiting for the lease to expire. Measured support: one runtime session maps to exactly one container and stays pinned, and a stopped session's next invocation lands on a **fresh** container with no memory of the task — so an id mismatch is a reliable signal rather than a heuristic ([research](research/agentcore-runtime-observed.md)).
+
+  AgentCore's own identifiers were rejected because the runtime session id is **stable across container replacement**, which is precisely the case that must be detected. Relying on the lease alone was rejected because it bounds recovery below by the lease interval, which is the delay this exists to remove.
 
 ## §I — How the server is assembled *(SETTLED 2026-09-22)*
 
@@ -169,9 +178,9 @@ Two constraints found along the way, both recorded in the research note: **`@a2a
 - **1.0 only, with no 0.3 anywhere — the operator's direction on 2026-09-22, and it is achievable.** A2A is AgentForge's transport and is never exposed to a consumer or an agent, so there is no caller to stay compatible with. Measured: a card declaring a single 1.0 interface with `legacyCompat` **off** answers every 0.3 request with `-32009 … version '0.3' is not supported`, and answers `A2A-Version: 1.0` + `SendMessage` correctly. The SDK's own client, built from that card, sends the header and the 1.0 method name **by itself** — so it is configuration at both ends, not code. **The misconfiguration mode is the right way round:** with `legacyCompat` off a missing allowlist entry fails on the first invocation instead of silently running 0.3. (An earlier version of this bullet argued for keeping `legacyCompat` on as a safety net. That was backwards and is withdrawn.) Confirmed end to end through AgentCore, not inferred from two halves. Three consequences: **1.0 uses the protobuf RPC names** — `SendMessage`, `GetTask`, `CancelTask` — and a different wire encoding (`role: "ROLE_USER"`, a data part as `{ data: {…} }` with no `kind`), so every spike written before this used 0.3 shapes; **the part-reader guard matters more, not less**, because the silent strip below is triggered by `SendMessage` itself; and **the rejection a 0.3 caller sees is opaque** — AgentCore wraps the container's `-32009` as HTTP 424 `-32055`, indistinguishable from a crash. That argues for the client asserting the negotiated version it got back rather than inferring success from a 200.
 - **The caller must set `contentType: 'application/json'`.** AgentCore forwards the caller's content type unchanged; `@aws-sdk/client-bedrock-agentcore` defaults to `application/octet-stream`, which `jsonRpcHandler` rejects. An earlier note claiming AgentCore *strips* content-type was wrong and is corrected in the research note.
 
-## §K — The plugin and construct surface *(OPEN)*
+## §K — The plugin and construct surface *(DEFERRED 2026-09-22 — until the first agent exists)*
 
-Delivered as an Nx plugin with generators, constructs and a deploy path ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)). Designed once the first real agent exists to show what they should write. Open:
+Delivered as an Nx plugin with generators, constructs and a deploy path ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)). **Confirmed deferred 2026-09-22:** the first real agent is built by hand against the runtime and harness, and the generators then encode what it actually needed rather than what was guessed. One input is already fixed by §L — each image layer owns a `.claude/` directory, and the plugin generates that layer's scaffolding. Open:
 
 - Which generators exist and what each writes: an agentic project, an agentic base image, an agent over it, a procedure, a caller's wiring
 - **The sync generator** — what it keeps current as AgentForge changes (wiring, construct props, the caller's client, image pins), how it reports a change it cannot make automatically, and how much of `@aws/nx-plugin`'s own sync machinery is reused
@@ -179,7 +188,7 @@ Delivered as an Nx plugin with generators, constructs and a deploy path ([ADR 00
 - The AppConfig runtime configuration an agent's ARN is published into, following `@aws/nx-plugin` ([research](research/aws-nx-plugin.md)): its schema, what the identity triple keys, caching and refresh, and what a long-lived caller such as a Temporal worker pays to read it (D31, D32)
 - Whether the generated client factory mirrors its `.local()` / `.withIamAuth()` shape
 
-## §L — Where the consumers still pull apart *(OPEN — operator)*
+## §L — Where the consumers still pull apart *(D7 SETTLED 2026-09-22; the rest OPEN — operator)*
 
 Most apparent divergence dissolved in the distillation ([CONSUMERS.md](CONSUMERS.md)). What remains:
 
@@ -193,7 +202,7 @@ Most apparent divergence dissolved in the distillation ([CONSUMERS.md](CONSUMERS
 - **Holding a failed attempt (D21).** TrendBot holds one for operator review, today in its own activity code. Whether AgentForge does anything beyond making the failure observable is TrendBot's to say.
 - **Secrets (D29, §O).** Secret storage is the consumer's, but "each deployment reads only the secrets it declares" and "no credential in anything the harness emits" are partly ours.
 
-## §M — Pausing for a human *(OPEN — operator)*
+## §M — Pausing for a human *(SHAPE DECIDED 2026-09-22; not built)*
 
 Neither consumer requires it, so nothing is built. It is here because the shape should be decided rather than fall out of whichever case ships first.
 
@@ -202,6 +211,8 @@ Neither consumer requires it, so nothing is built. It is here because the shape 
 - **M1 — Block in place.** The interrupt blocks while `/ping` reports `HealthyBusy`. Keeps the turn's context and the pending tool call; costs a held process and session, and cannot outlive the 8-hour job cap.
 - **M2 — Park as a task state.** The task moves to `input-required` carrying the request and the schema of its answer; the run ends at a step boundary; the answer arrives on a later send against the same task. Unbounded and cheap; loses the in-flight tool call, and resumes through session resume rather than mid-turn.
 - **M3 — Both**, per pause point.
+
+**Decided 2026-09-22: M2, park as a task state.** It fits the asynchronous premise, costs no held process or session, and is unbounded. It loses the in-flight tool call and resumes through session resume rather than mid-turn, which is the price. M1 was rejected on measurement as much as principle: a container is killed about sixty seconds after a stop whatever it is doing, `HealthyBusy` does not extend that, and nothing can outlive the eight-hour job cap — so a long human delay would fail rather than wait. M3 is two mechanisms for a feature no consumer has asked for. **Still not built** — the shape is decided, the work waits for a requirement.
 
 Four rules hold whichever is chosen ([reference](research/harness-references.md)): the request carries the **schema of the answer**, validated at the boundary; a malformed answer is rejected **without consuming the pause**; pending pauses appear in the task's own state as well as on the stream; and the surface that resolves a pause is **not on the agent card** beside ordinary procedure calls.
 
@@ -218,12 +229,13 @@ Four rules hold whichever is chosen ([reference](research/harness-references.md)
 
 **Raised, not resolved — belongs in §L.** TrendBot **T4** requires procedures that invoke no agent; `ARCHITECTURE.md` §11 excludes them. T4's reason is **co-location** — the work needs the container's working copy — which "put it in the consumer" does not answer. Three shapes, the operator's call with TrendBot: hold the line and make TrendBot duplicate the sync machinery; admit a second procedure kind with the same contract, invocation, failure and phase machinery minus the run, which makes §11 false and needs a superseding decision; or pretend it is a procedure with a trivial run, which would burn a model call per vault read.
 
-## §O — Credentials in the container *(OPEN — operator)*
+## §O — Credentials in the container *(the first slice DECIDED 2026-09-22; the broker OPEN)*
 
 The Agent SDK reads the subscription token from the environment and offers no provider interface, so that token stays there. The question is everything else: the provider API keys a procedure's tools need, which arrive from a secret store through AgentCore Identity and would otherwise sit in the same environment the agent's own shell can read.
 
 - **Decided: the environment now, a proxy later.** The subscription token and a procedure's provider keys reach the container from a secret store through AgentCore Identity and live in the environment, where the agent's own shell can read them. That exposure is recorded rather than mitigated in the first slice; the base image keeps room for a broker in the shape of something like Infisical's agent-vault. Open is what the broker would look like when it arrives, and what the first slice must avoid doing to keep it cheap.
-- How expiry surfaces as `CREDENTIAL_EXPIRED` rather than as a transient provider failure
+- **Decided 2026-09-22 — the first slice classifies expiry and nothing more.** `CREDENTIAL_EXPIRED` is a distinct outcome so an expired token never surfaces as a transient provider failure, which the zero-silent-failures rule requires and which is cheap. The in-microVM exposure and the broker's eventual shape are recorded rather than mitigated. Rotation and the broker stay open.
+- How expiry is detected in practice, given the SDK surfaces it as an ordinary error
 - Rotation, and how a new key reaches a task that started before it changed
 - What a compromised or prompt-injected procedure can reach inside the microVM, and what is therefore not defensible by scrubbing an environment
 
