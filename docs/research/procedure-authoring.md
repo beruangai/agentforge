@@ -1,5 +1,7 @@
 # How a procedure is written — spike findings
 
+> **Superseded as a decision, retained as evidence.** §N was re-decided on 2026-09-22 in favour of adopting oRPC rather than hand-building an authoring style ([`procedure-framework.md`](procedure-framework.md), [ADR 0013](../../adr/0013-a-procedure-is-an-orpc-contract.md)). What is measured below still holds and two findings remain load-bearing: the class's silent `override guardrails()` hazard, which is why guardrail composition stays additive; and the decorator gate, which is verified platform behaviour whatever is built on it.
+
 **Measured on 2026-09-22.** TypeScript 5 standard decorators on Bun 1.4.0, `tsc` with `--strict`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §N. No model spend.
 
 Source: `spikes/procedure-authoring/` — a baseline inferred from both consumers, the same five procedures authored in all three candidate styles, and a judge that runs `tsc` over deliberately-wrong variants rather than arguing about them.

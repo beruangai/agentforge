@@ -94,8 +94,10 @@ A **procedure** is what a consumer declares and AgentForge runs.
 
 Two halves, in separate modules ([ADR 0003](../adr/0003-procedures-are-type-safe-end-to-end.md)):
 
-- **Contract** — the name, the outer input and output schemas, and a hash. Zod alone, so a caller imports it without the implementation or the Agent SDK.
+- **Contract** — the name, the outer input and output schemas, and a hash. An oRPC contract over Zod, so a caller imports it without the implementation or the Agent SDK.
 - **Implementation** — what runs in the container, registered against that contract.
+
+**Every procedure is two.** Invocation is asynchronous, so a `submit` call returns a task handle — the same shape for every procedure — and a separate `result` call returns the declared output. A consumer declares one contract and a utility derives the typed pair, so the two cannot drift.
 
 The **outer contract** is what the caller sends and receives; the **agent contract** is what the agent fills in, given to the SDK as its output schema. They differ whenever the outer output carries computed fields the model must not be asked for (D2). The step between them is an ordinary function.
 
@@ -125,7 +127,9 @@ The contract hash travels in the envelope. A container whose image does not impl
 
 Cross-cutting behavior — guardrail hooks, telemetry, a house style of options — is a function a procedure calls, shipped in a package. Composite options are **additive**: contributions to hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering (D8). AgentForge ships a small library (§7); nothing is wired by default.
 
-**A procedure is an object literal** ([ADR 0013](../adr/0013-a-procedure-is-an-object-literal.md)), settled against a baseline inferred from both consumers rather than by argument. All three candidate styles proved equally safe against six composition mistakes under `tsc --strict`; the literal wins because its declaration *is* the resolved object, and because a class's `override guardrails()` can silently drop the house contribution with the compiler's blessing ([research](research/procedure-authoring.md)).
+**A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)). Cross-cutting behavior is **middleware that contributes to a typed context**: a house helper resolves something and adds it, and every later middleware and the handler see it typed without the procedure having declared it. Hand-built authoring could not offer that; it was compared on its own terms and the finding still holds — a class's `override guardrails()` can silently drop the house contribution with the compiler's blessing ([research](research/procedure-authoring.md)), which is why guardrail composition stays additive.
+
+**A procedure never names its transport.** The same declaration executes in-process in the container and travels over a custom client link from a caller ([research](research/procedure-framework.md)).
 
 ---
 
@@ -356,7 +360,7 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 
 | Entry point | For | Carries |
 |---|---|---|
-| `/contract` | Anywhere, including a worker | Contract declaration and types. Zod only; never the Agent SDK |
+| `/contract` | Anywhere, including a worker | Contract declaration and types. oRPC and Zod only; never the Agent SDK |
 | `/client` | A caller | The A2A client, typed by an imported contract |
 | `/temporal` | A Temporal worker | The activity factory over the client |
 | `/agent` | A consumer's agent build | Procedures, the `agent()` helper, the kernel, the helper library — bundled into their image |

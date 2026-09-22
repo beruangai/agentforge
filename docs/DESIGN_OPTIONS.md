@@ -8,9 +8,9 @@ What is not yet decided. A question is worked here until it is settled; the outc
 
 | | Question | Settled by | Blocks |
 |---|---|---|---|
-| **§I** | How the A2A server is assembled | **Decided 2026-09-22** ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), proposed); AgentCore pass-through still open | The first slice |
+| **§I** | How the A2A server is assembled | **Decided 2026-09-22** ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md)); AgentCore pass-through still open | The first slice |
 | **§A** | Task store details behind the fixed interface | Design in the first slice; one AgentCore spike | The first slice's store |
-| ~~§N~~ | ~~How a procedure is written~~ | **Decided 2026-09-22** ([ADR 0013](../adr/0013-a-procedure-is-an-object-literal.md), proposed) | — |
+| ~~§N~~ | ~~How a procedure is written~~ | **Decided 2026-09-22** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)) | — |
 | ~~§E~~ | ~~What the kernel still needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
 | **§C** | Cancellation on the platform | Local half **settled 2026-09-22**; platform half **blocked** with §B | Cancel on AgentCore |
 | **§O** | What a credential broker looks like when it arrives | Later; the first slice keeps room | Nothing yet |
@@ -164,7 +164,7 @@ The key, its two edges and its retention are settled: seven days, with the key s
 
 ## §I — How the server is assembled *(SETTLED 2026-09-22)*
 
-**Decided:** assemble directly from `@a2a-js/sdk` and Express, porting `serveA2A`'s AgentCore-contract mechanics rather than depending on it — [ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), status `proposed`. Findings in [`research/a2a-server-assembly.md`](research/a2a-server-assembly.md); the spike is `spikes/server-assembly/i1-gateway-wrap.ts`. **The first slice is unblocked.**
+**Decided:** assemble directly from `@a2a-js/sdk` and Express, porting `serveA2A`'s AgentCore-contract mechanics rather than depending on it — [ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md). Findings in [`research/a2a-server-assembly.md`](research/a2a-server-assembly.md); the spike is `spikes/server-assembly/i1-gateway-wrap.ts`. **The first slice is unblocked.**
 
 `serveA2A` was excluded on two independent grounds: its options take an **executor and no request handler**, and `buildA2AApp` constructs `DefaultRequestHandler` itself — so there is no seam for a gateway, which does not change when it publishes; and it is not in `bedrock-agentcore@0.4.4`, the latest published version. The gateway shape itself was confirmed in full: `returnImmediately` resolved in 8 ms against a 6 000 ms run on a synchronously published `submitted`, and blocked for exactly the deferral when the publish was withheld; a duplicate idempotency key returned the running task with the executor started once; a uuid7 `contextId` returned verbatim; cancel reached the executor; admission refused rather than queued; and a client built from a known card signed through `JsonRpcTransportFactory`'s `fetchImpl` without fetching a card.
 
@@ -221,14 +221,15 @@ Four rules hold whichever is chosen ([reference](research/harness-references.md)
 
 ## §N — How a procedure is written *(DECIDED 2026-09-22)*
 
-**Decided: the object literal (N1)** — [ADR 0013](../adr/0013-a-procedure-is-an-object-literal.md), status `proposed`. Settled by writing a baseline inferred from both consumers in all three styles and running the compiler over deliberately-wrong variants, not by argument. Findings in [`research/procedure-authoring.md`](research/procedure-authoring.md); spike in `spikes/procedure-authoring/`.
+**Decided: oRPC, contract-first** — [ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md). Findings in [`research/procedure-framework.md`](research/procedure-framework.md); spikes in `spikes/procedure-framework/`. The earlier comparison of three hand-built styles stands as evidence ([`research/procedure-authoring.md`](research/procedure-authoring.md), `spikes/procedure-authoring/`) but not as the decision: it asked which shape to build, never whether to build at all.
 
-- **On safety the three are equal.** Six real composition mistakes, written in all three styles and fed to `tsc --strict`: **all three caught all six**. The builder's one claimed advantage — `.build()` reachable only on a complete builder — is matched by the literal's own parameter type, without the machinery.
-- **On inspectability the literal wins**: the declaration *is* the resolved object. The class needs `new Draft().resolve()` — instantiation and a method call — so the card generator would have to construct objects to read procedures.
-- **The class has an unguarded hazard**, which is what rejects it: `override guardrails() { return []; }` **silently drops every house guardrail and `tsc` accepts it**. In the literal and the builder that mistake is not expressible.
-- **N2 is not foreclosed.** Both resolve to the same object, so a builder can be added later as sugar if verbosity becomes a real problem. It is rejected as unearned, not as wrong.
+- **The crux is the split, and it holds.** A consumer declares one contract; a utility derives `submit` (returning a task handle) and `result` (returning the declared output), each typed with that procedure's own shapes. Proved under `tsc --strict` with five `@ts-expect-error` probes plus a negative control.
+- **The transport stays ours.** A custom client link carries a call over A2A with no HTTP anywhere, and the client is still typed from the contract alone — three probes plus a control.
+- **Typed context is the thing hand-built authoring could not give us.** Middleware contributes a value; every later middleware and the handler see it typed, with no cast and no declaration on the procedure. This is the tRPC capability TrendBot relies on and the reason to adopt rather than build.
+- **Errors keep their fidelity.** Message, structured `data` and the original stack survive a serialising transport, so nothing is marshalled behind a developer's back.
+- **Open in the adoption, not in the decision**: streaming over a custom link, cancellation propagation, the link's own typing, and whether the `Locking` helper has anything to say to idempotency (D3). None blocks the first slice.
 
-**The gate is clean.** Standard TypeScript 5 decorators run on Bun 1.4.0 and **preserve inference through the decorated member** (proved with `@ts-expect-error`). `Symbol.metadata` is undefined and needs the one-line polyfill `Symbol.metadata ??= Symbol('Symbol.metadata')`. So decorators were available on merit and were not chosen: registration at module load is all they buy, and an exported literal is already discoverable through the same import graph.
+**On the hand-built comparison, the findings still hold.** All three styles caught all six composition mistakes under `tsc --strict`; the class has one unguarded hazard — `override guardrails() { return []; }` silently drops every house guardrail and `tsc` accepts it — which is why **guardrail composition stays additive** here regardless of framework.
 
 **Raised, not resolved — belongs in §L.** TrendBot **T4** requires procedures that invoke no agent; `ARCHITECTURE.md` §11 excludes them. T4's reason is **co-location** — the work needs the container's working copy — which "put it in the consumer" does not answer. Three shapes, the operator's call with TrendBot: hold the line and make TrendBot duplicate the sync machinery; admit a second procedure kind with the same contract, invocation, failure and phase machinery minus the run, which makes §11 false and needs a superseding decision; or pretend it is a procedure with a trivial run, which would burn a model call per vault read.
 
@@ -261,7 +262,7 @@ Not open questions — deliberately not being worked until something asks for th
 | A2A server assembly, the wrapping gateway, client signing | §I | Local |
 | Kernel settlement and structured output | §E | Local — **done**, `spikes/kernel-settlement/` |
 | Task-process protocol, cancellation, group kill | §C, §G | Local — **done**, `spikes/task-process/` |
-| Procedure authoring against an inferred baseline | §N | Local — **done**, `spikes/procedure-authoring/` |
+| Procedure framework: contract split, custom link, typed context | §N | Local — **done**, `spikes/procedure-framework/` |
 | Credential provisioning and expiry | §O | Local |
 | Deterministic image builds and skipped deploys | §D | Local — **done**, `spikes/images/` |
 | Busy-container reachability and concurrency | §B | AgentCore |

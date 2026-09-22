@@ -8,7 +8,7 @@ Not "is oRPC nice", but one crux that decides it, and which the operator identif
 
 **Every AgentForge procedure is really two.** Invocation is asynchronous and `returnImmediately` is always set, so a submit call returns a *handle*, never an outcome — which means **the submit-side output schema is identical for every procedure**, and a second, separately typed call fetches the result. End-to-end type safety needs a start/fetch pair per declaration **whatever framework is used**. The current design solves this implicitly and untyped.
 
-So: can one agentic contract be split by a utility into two typed procedures, with the types flowing end to end through a transport that is not HTTP? If the type flow breaks at the split, nothing else about oRPC matters.
+So: can one contract be split by a utility into two typed procedures, with the types flowing end to end through a transport that is not HTTP? If the type flow breaks at the split, nothing else about oRPC matters.
 
 ## What was proved
 

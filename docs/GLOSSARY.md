@@ -18,7 +18,7 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Procedure** — What a consumer declares and AgentForge runs: a contract and an implementation.
 
-**Contract** — A procedure's name, outer input and output schemas, and hash. Zod alone, so a caller imports it without the implementation.
+**Contract** — A procedure's name, outer input and output schemas, and hash. An oRPC contract over Zod, so a caller imports it without the implementation. One declaration derives the typed `submit`/`result` pair.
 
 **Implementation** — What runs in the container: an optional *before* step, a required *run* step, an optional *after* step.
 
@@ -27,6 +27,12 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 **Outer contract** — What a procedure's caller sends and receives.
 
 **Agent contract** — What the agent fills in, given to the SDK as its output schema. Often differs from the outer output; an ordinary function maps one to the other.
+
+**Submit / result** — The two oRPC procedures derived from one contract. `submit` takes the declared input and returns a task handle; `result` takes a task query and returns the declared output. The pair exists because invocation is asynchronous.
+
+**Middleware** — A function wrapping a procedure that may contribute to the **execution context**. What it adds is typed for every later middleware and for the handler, without the procedure declaring it.
+
+**Execution context** — The accumulated, typed values a procedure's handler receives beyond its input: the caller, the attempt, the lease, and whatever middleware has added.
 
 **Step** — One part of an implementation: before, run, after. A function, not a framework phase.
 

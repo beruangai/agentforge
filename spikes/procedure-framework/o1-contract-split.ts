@@ -8,7 +8,7 @@
  * separately typed call fetches the result. End-to-end type safety therefore
  * needs a start/fetch pair per declaration, whatever framework is used.
  *
- * So the question is not "is oRPC nice" but: can ONE agentic contract
+ * So the question is not "is oRPC nice" but: can ONE contract
  * (input -> outcome) be split by a utility into TWO typed procedures, with the
  * types flowing end to end through a custom transport? If the type flow breaks
  * at the split, nothing else about oRPC matters.
@@ -40,7 +40,7 @@ const taskHandle = z.object({ taskId: z.string(), contextId: z.string(), state: 
 const taskQuery = z.object({ taskId: z.string() });
 
 /**
- * The utility under test: one agentic contract in, two typed procedures out.
+ * The utility under test: one contract in, two typed procedures out.
  * `submit` takes the procedure's own input and returns the common handle;
  * `result` takes a handle and returns the procedure's OWN output type.
  */
