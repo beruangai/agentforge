@@ -4,32 +4,32 @@ date: 2026-09-22
 decision-makers: Jeremy Jonas
 ---
 
-# A procedure is an oRPC contract, split into submit and fetch
+# A procedure is an oRPC contract, split into create, status and cancel
 
 ## Context and Problem Statement
 
 A procedure is the layer a consumer touches most, so how it is written is a requirement rather than a preference. The original question compared three **hand-built** authoring styles — an object literal, a chained builder, or a class whose methods are its steps — and chose the literal, partly because the alternatives were machinery to build and maintain.
 
-That comparison never asked whether the machinery had to be built at all. It also predated the realisation that **every procedure is really two**: because invocation is asynchronous, a submit call returns a handle and a separate call fetches the outcome, so the submit-side output schema is identical for every procedure.
+That comparison never asked whether the machinery had to be built at all. It also predated the realisation that **every procedure is really several**: because invocation is asynchronous, a start returns a handle and the caller then polls and may cancel — which is exactly the three task RPCs A2A already has, and the start's output schema is identical for every procedure.
 
 ## Considered Options
 
-* **A hand-built object literal** — `procedure({ … })`, with the submit/fetch pair handled implicitly and untyped
+* **A hand-built object literal** — `procedure({ … })`, with the asynchronous call pattern handled implicitly and untyped
 * **A hand-built chained builder or class**
-* **oRPC, contract-first** — declare the contract, derive the pair
+* **oRPC, contract-first** — declare the contract, derive the calls
 
 ## Decision Outcome
 
 Chosen option: **oRPC, contract-first**. A consumer declares one contract; a utility derives the two typed procedures.
 
-* **The split is a utility, not a convention.** One contract in, `submit` and `result` out, each typed with the procedure's own shapes rather than a shared opaque one
+* **The split is a utility, not a convention.** One contract in; `create`, `status` and `cancel` out, mapped onto A2A's own task RPCs and typed with the procedure's own shapes rather than a shared opaque one. `status` returns a **discriminated union on the task state**, so a poll answers a non-terminal task and the declared output is reachable only where it exists
 * **Cross-cutting behaviour is middleware that contributes to a typed context.** A house helper resolves something and adds it; every later middleware and the handler see it typed, without the procedure declaring it. This is what the hand-built literal could not offer
 * **Composite contributions stay additive** — hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering
 * **A procedure never names its transport.** The same declaration runs in-process and over a custom link
 
 ## Consequences
 
-* Good, because the submit/fetch pair cannot drift from the contract — it is derived from it
+* Good, because the three calls cannot drift from the contract, or from each other — they are derived from it
 * Good, because typed context composition is a solved problem taken off the shelf rather than a generics exercise maintained here
 * Good, because the same procedures execute directly in-process, which is what a container answering a task needs
 * Bad, because a consumer's declaration is now shaped by a third-party builder, and a major version of it is a migration

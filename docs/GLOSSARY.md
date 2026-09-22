@@ -10,15 +10,17 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Caller** — Whatever starts a task through the client. A Temporal activity in both consumers, through the activity factory, but the runtime never knows that.
 
-**Client** — The caller-agnostic API over the wire: `start`, `await`, `cancel`, typed by the contract the caller imports.
+**Client** — The caller-agnostic API over the wire. Per procedure, the three calls derived from its contract — **`create`**, **`status`**, **`cancel`** — plus an `await` helper that polls `status` to a terminal state. Built on an oRPC client over a link that speaks A2A, so it is typed from the imported contract and nothing else.
+
+**Task handle** — What `create` returns: `taskId`, `contextId` and `SUBMITTED`. The same shape for every procedure, and what `status` and `cancel` are called with.
 
 **Activity factory** — The Temporal adapter over the client: heartbeats while awaiting, and maps cancellation and outcomes to activity terms. First-class, never required.
 
 ## Procedures
 
-**Procedure** — What a consumer declares and AgentForge runs: a contract and an implementation.
+**Procedure** — What a consumer declares and AgentForge runs: a contract and an implementation. One contract derives three calls — `create`, `status`, `cancel` — because invocation is asynchronous.
 
-**Contract** — A procedure's name, outer input and output schemas, and hash. An oRPC contract over Zod, so a caller imports it without the implementation. One declaration derives the typed `submit`/`result` pair.
+**Contract** — A procedure's name, outer input and output schemas, and hash. An oRPC contract over Zod, so a caller imports it without the implementation. One declaration derives the typed `create`/`status`/`cancel` calls.
 
 **Implementation** — What runs in the container: an optional *before* step, a required *run* step, an optional *after* step.
 
@@ -28,7 +30,7 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Agent contract** — What the agent fills in, given to the SDK as its output schema. Often differs from the outer output; an ordinary function maps one to the other.
 
-**Submit / result** — The two oRPC procedures derived from one contract. `submit` takes the declared input and returns a task handle; `result` takes a task query and returns the declared output. The pair exists because invocation is asynchronous.
+**`create` / `status` / `cancel`** — The three oRPC procedures derived from one contract, mapping to A2A's `SendMessage`, `GetTask` and `CancelTask`. `status` returns a discriminated union on the task's state, so the declared output is reachable only on the `SUCCEEDED` branch; `cancel` is derived for symmetry but is not typed by the procedure.
 
 **Middleware** — A function wrapping a procedure that may contribute to the **execution context**. What it adds is typed for every later middleware and for the handler, without the procedure declaring it.
 

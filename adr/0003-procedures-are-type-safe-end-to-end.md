@@ -10,7 +10,7 @@ decision-makers: Jeremy Jonas
 
 A workflow calls a procedure by name with an input and gets an output back. Both consumers require that a wrong name or a mismatched shape fails at compile time, with no per-procedure client wiring (H1, H2, T1). The output the agent produces is often not the output the caller needs. And the container answering a call may be running code older than the worker's.
 
-**Invocation is asynchronous, which shapes the answer.** A submit call returns a task handle, never an outcome, so the submit-side output is the *same* for every procedure and a second call fetches the result. End-to-end type safety therefore needs **two typed procedures per declaration**, however they are produced.
+**Invocation is asynchronous, which shapes the answer.** A start returns a task handle, never an outcome, so its output is the *same* for every procedure; a caller then polls, and may cancel. End-to-end type safety therefore needs **several typed procedures per declaration**, however they are produced — which is what the wire already has.
 
 ## Considered Options
 
@@ -22,7 +22,7 @@ A workflow calls a procedure by name with an input and gets an output back. Both
 
 Chosen option: **an RPC framework — oRPC, contract-first** — retaining the two halves as the packaging.
 
-* A consumer declares **one contract**: a name, an input schema and an output schema, in Zod. A utility **splits it into two typed oRPC procedures**, `submit` and `result`, so the pair is derived rather than written twice
+* A consumer declares **one contract**: a name, an input schema and an output schema, in Zod. A utility **derives three typed oRPC procedures** — `create`, `status` and `cancel`, onto A2A's `SendMessage`, `GetTask` and `CancelTask` — so they are derived rather than written out
 * The **contract** half is what a caller imports; the **implementation** half registers against it in the container, and an import of the implementation from a worker's build fails
 * **Outer and agent contracts stay separate**, with a marshal step between them: computed fields and identifiers are added there, never asked of the model (T18)
 * The **contract hash** travels in the envelope; a container that does not implement it refuses the task before any work (H3, T3)
@@ -31,7 +31,8 @@ Chosen option: **an RPC framework — oRPC, contract-first** — retaining the t
 
 ## Consequences
 
-* Good, because the submit/fetch pair is generated from one declaration instead of being two hand-written things that can drift
+* Good, because the three calls are generated from one declaration instead of being hand-written things that can drift from it or from each other
+* Good, because `status` returns a discriminated union on the task's state, so a caller reads a non-terminal state and reaches the output only where it exists
 * Good, because typed middleware and an accumulating typed context come with the framework rather than being built and maintained here
 * Good, because errors are the link's business: nothing is marshalled behind the caller's back, so a raw error and its stack reach a developer
 * Bad, because the contract half now depends on `@orpc/contract` and `@orpc/client` rather than on Zod alone, which a consumer must keep in step

@@ -6,7 +6,7 @@
 
 Not "is oRPC nice", but one crux that decides it, and which the operator identified:
 
-**Every AgentForge procedure is really two.** Invocation is asynchronous and `returnImmediately` is always set, so a submit call returns a *handle*, never an outcome — which means **the submit-side output schema is identical for every procedure**, and a second, separately typed call fetches the result. End-to-end type safety needs a start/fetch pair per declaration **whatever framework is used**. The current design solves this implicitly and untyped.
+**Every AgentForge procedure is really several.** Invocation is asynchronous and `returnImmediately` is always set, so a start returns a *handle*, never an outcome — which means **the start's output schema is identical for every procedure** — and the caller then polls, and may cancel. End-to-end type safety needs those calls typed per declaration **whatever framework is used**. The current design solves this implicitly and untyped.
 
 So: can one contract be split by a utility into two typed procedures, with the types flowing end to end through a transport that is not HTTP? If the type flow breaks at the split, nothing else about oRPC matters.
 
@@ -14,7 +14,7 @@ So: can one contract be split by a utility into two typed procedures, with the t
 
 | Question | Result |
 |---|---|
-| One contract split into typed `submit` + `result` | **yes** — a 6-line utility over `oc.input().output()` |
+| One contract split into typed procedures | **yes** — a small utility over `oc.input().output()` |
 | Types flow through the split | **yes** — 5 `@ts-expect-error` probes, all genuine |
 | A custom link over a non-HTTP transport | **yes** — envelope is exactly `{ path, input }` |
 | The client is typed **through** that link | **yes** — 3 further probes, all genuine |
@@ -83,6 +83,28 @@ an `InvokeAgentRuntime` call — AgentForge cancels by a separate `CancelTask`
 invocation ([ADR 0002](../../adr/0002-a2a-is-the-boundary-contract.md)). So the
 link **must** map a caller abort onto that out-of-band cancel; accepting a
 signal and dropping it would be a silent failure.
+
+## The split, corrected — 2026-09-23
+
+The first spike derived a `submit`/`result` **pair**. The operator rejected it on a point the spike had not tested: a caller polling a running task needs its **non-terminal state**, and a procedure that answers only when settled gives a heartbeating activity nothing to read. Cancellation had nowhere to live either.
+
+**The wire settles the shape, and it is three.** A2A 1.0 has exactly three task RPCs, and `GetTaskRequest` is `{ id, historyLength? }` returning the whole `Task` — status *and* artifacts, with **no artifact filter**. So a fourth `outcome` procedure would be a second name over one wire call returning identical bytes.
+
+| Derived | A2A | Typed by the procedure? |
+|---|---|---|
+| `create` | `SendMessage` | input yes; output is the shared task handle |
+| `status` | `GetTask` | yes — a discriminated union on the task state |
+| `cancel` | `CancelTask` | **no** — a task id in, a state out, identically for every procedure |
+
+`cancel` is a separate invocation carrying the id `create` returned; nothing is held open between them.
+
+Proved in `o6-task-centric-split.ts`, `tsc --strict` clean with its directives verified live:
+
+- **Narrowing flows through the link.** `task.output` is a compile error before the `state === 'SUCCEEDED'` check and typed inside it; a failure's `cause` is absent from the success branch.
+- **Each procedure's `status` carries its own output type.** Reading `reviewStrategy`'s `verdict` off `summariseCorpus`'s status does not compile — the union is built from that contract's output, not a shared one.
+- **`cancel` rejects a procedure input**, because it is not shaped by the contract.
+
+**On the naming.** `create`/`status`/`cancel` are the operator's, chosen to stay task-centric rather than invent. A2A's own verbs are `SendMessage`/`GetTask`/`CancelTask`; `create` and `status` are a step from those toward the resource they act on. Strict borrowing would have given `get` rather than `status`.
 
 ## `Locking` does not answer idempotency
 
