@@ -226,6 +226,13 @@ class SpikeExecutor implements AgentExecutor {
 }
 
 const url = process.env.AGENTCORE_RUNTIME_URL ?? `http://0.0.0.0:${PORT}/`;
+/**
+ * §I — refuse 0.3 entirely. With STRICT_10 the card declares ONE interface,
+ * 1.0, and `legacyCompat` is off on both handlers. The operator's question is
+ * whether AgentForge can run 1.0 only and never carry a legacy version; this
+ * is the switch that answers it.
+ */
+const STRICT_10 = process.env.A2A_STRICT_10 === '1';
 const agentCard: any = {
   protocolVersion: '1.0',
   name: 'agentforge-spike',
@@ -235,10 +242,12 @@ const agentCard: any = {
   preferredTransport: 'JSONRPC',
   // Both versions declared: AgentCore's documented card shape speaks 0.3, and
   // an absent A2A-Version header is treated as 0.3 by the SDK (§I).
-  supportedInterfaces: [
-    { url, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '1.0' },
-    { url, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '0.3' },
-  ],
+  supportedInterfaces: STRICT_10
+    ? [{ url, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '1.0' }]
+    : [
+        { url, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '1.0' },
+        { url, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '0.3' },
+      ],
   capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: false },
   defaultInputModes: ['application/json'],
   defaultOutputModes: ['application/json'],
@@ -335,7 +344,7 @@ app.use(
     // AgentCore terminates SigV4 in front of the container (serveA2A does the
     // same); inside, requests are trusted.
     userBuilder: UserBuilder.noAuthentication,
-    legacyCompat: { enabled: true },
+    legacyCompat: { enabled: !STRICT_10 },
   }),
 );
 
@@ -380,5 +389,5 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => console.log(JSON.stringify({ event: 'sigint', containerId: CONTAINER_ID, at: Date.now() })));
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(JSON.stringify({ event: 'listening', containerId: CONTAINER_ID, port: PORT }));
+  console.log(JSON.stringify({ event: 'listening', containerId: CONTAINER_ID, port: PORT, strict10: STRICT_10 }));
 });

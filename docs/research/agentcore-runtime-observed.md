@@ -46,6 +46,31 @@ So: **the allowlist is a strict filter, and `A2A-Version` passes it.** `A2A-Vers
 
 **The design consequence is the opposite of what this note first recorded.** AgentForge is **not** pinned to protocol 0.3. It can allowlist `A2A-Version` and negotiate 1.0. What that buys and what it costs is a decision, not a measurement — see the open question below.
 
+### 1.0 only is achievable, and it fails better than 1.0-with-0.3
+
+**Asked by the operator on 2026-09-22: can AgentForge run 1.0 and never carry 0.3?** A2A is AgentForge's transport, never exposed to a consumer or to an agent, so there is no caller to stay compatible with. Measured with two servers side by side (`spikes/agentcore/i3-strict-10.ts`) — one declaring a single 1.0 interface with `legacyCompat` off, one declaring both:
+
+| Request | Strict (1.0 card, `legacyCompat` off) | Permissive |
+|---|---|---|
+| no `A2A-Version` | **`-32009` version '0.3' is not supported** | OK, negotiates 0.3 |
+| `A2A-Version: 0.3` | **`-32009`** | OK, negotiates 0.3 |
+| `A2A-Version: 1.0` + `message/send` | `-32601 Invalid method` | OK |
+| **`A2A-Version: 1.0` + `SendMessage`** | **OK, negotiates 1.0** | OK, negotiates 1.0 |
+
+**Yes, and it is the better failure mode.** Earlier in this session I argued for keeping `legacyCompat` enabled as a safety net against a missing allowlist entry. That was backwards: with it **on**, a missing or misspelt `A2A-Version` entry downgrades every call to 0.3 and the system *appears to work* on the wrong protocol. With it **off**, the same mistake fails on the first invocation with `-32009`. Zero silent failures wants it off.
+
+What 1.0-only requires, all of it configuration:
+
+1. the card declares **one** interface, `protocolVersion: '1.0'`;
+2. `legacyCompat: { enabled: false }` on both handlers;
+3. the runtime allowlists **`A2A-Version`**;
+4. **nothing on the client.** The SDK's own `ClientFactory` over `JsonRpcTransportFactory`, built from the 1.0-only card, sends `A2A-Version: 1.0` and the `SendMessage` method **by itself** — measured end to end, server negotiated 1.0.
+
+Two things that change with it, and both matter:
+
+- **The method names change.** 1.0 uses the protobuf RPC names — `SendMessage`, `GetTask`, `CancelTask` — not `message/send`, `tasks/get`, `tasks/cancel`. Every spike written before this used the 0.3 names.
+- **The part-reader guard becomes *more* important, not less.** The silent strip below is triggered by `SendMessage` — which is precisely the 1.0 method name. Choosing 1.0 does not remove that failure; it puts AgentForge permanently on the method name that exhibits it.
+
 ### The part shape is a wire question, not a version question
 
 A related correction. The earlier note claimed "a part whose encoding does not match the negotiated protocol version is stripped of its content in silence". The **failure is real**; the **trigger was wrong**. Isolated by varying one thing at a time:
