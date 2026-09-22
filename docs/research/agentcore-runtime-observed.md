@@ -66,6 +66,28 @@ What 1.0-only requires, all of it configuration:
 3. the runtime allowlists **`A2A-Version`**;
 4. **nothing on the client.** The SDK's own `ClientFactory` over `JsonRpcTransportFactory`, built from the 1.0-only card, sends `A2A-Version: 1.0` and the `SendMessage` method **by itself** — measured end to end, server negotiated 1.0.
 
+**Confirmed end to end on the real platform**, not inferred from two halves: a strict 1.0 runtime (`A2A_STRICT_10=1`, `requestHeaderAllowlist: ["A2A-Version"]`) answered `A2A-Version: 1.0` + `SendMessage` with `negotiated=1.0`, and refused the same call without the header.
+
+### The 1.0 wire shape, captured from the SDK's own client
+
+Neither shape used in the earlier spikes. Taken off the wire by intercepting `fetchImpl`:
+
+| | 0.3 | **1.0** |
+|---|---|---|
+| method | `message/send` | **`SendMessage`** |
+| `role` | `"user"` | **`"ROLE_USER"`** |
+| a data part | `{ kind: 'data', data: {…} }` | **`{ data: {…} }`** — no `kind`, no `content` |
+
+`{ content: { $case: 'data', value } }` is the SDK's **internal** type and is not a wire shape in either version — writing it by hand is what produced the "silently stripped" part. A client must be handed the SDK's typed object and allowed to serialise it; a server must read `part.data`.
+
+Under a 1.0 negotiation the server accepted a 0.3-shaped part too, so **the version gate is the header, not the part encoding**.
+
+### The one cost of strict 1.0: the rejection is opaque
+
+A 0.3 caller against a strict runtime does *not* receive the useful `-32009`. AgentCore wraps any non-2xx container response, so the caller sees **HTTP 424 `-32055 "Runtime client error - Please check your CloudWatch logs"`** — the same opaque error as a crash or a bad content type.
+
+The failure is loud but **undiagnosable from the outside**. That is not a reason to keep 0.3; it is a reason for the client to **assert the negotiated version it got back** rather than infer success from a 200, and for the gateway to surface the request id.
+
 Two things that change with it, and both matter:
 
 - **The method names change.** 1.0 uses the protobuf RPC names — `SendMessage`, `GetTask`, `CancelTask` — not `message/send`, `tasks/get`, `tasks/cancel`. Every spike written before this used the 0.3 names.
