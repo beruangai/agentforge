@@ -109,7 +109,7 @@ The session held **one container across the `CREATING` → `READY` transition**.
 
 ### Deleting is far slower than creating
 
-`CreateAgentRuntime` reaches `READY` in **~10 seconds**. `DeleteAgentRuntime` returns immediately but the runtime sat in `DELETING` for **more than four minutes**, and the workload identity AgentCore mints alongside it stays listed until the runtime is gone — `DeleteWorkloadIdentity` refuses it with *"WorkloadIdentity is linked to a service and cannot be deleted by the caller"*.
+`CreateAgentRuntime` reaches `READY` in **~10 seconds**. `DeleteAgentRuntime` returns immediately but the runtime sat in `DELETING` for **about five minutes**, and the workload identity AgentCore mints alongside it stays listed until the runtime is gone — `DeleteWorkloadIdentity` refuses it with *"WorkloadIdentity is linked to a service and cannot be deleted by the caller"*.
 
 Two consequences for the deploy path: **a teardown cannot be treated as synchronous**, and a CI job that creates a runtime, tests it and deletes it must either wait or tolerate the leftover. Re-creating a runtime with the same name while the old one is still `DELETING` was not tested.
 
