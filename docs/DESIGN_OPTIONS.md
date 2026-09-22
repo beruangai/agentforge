@@ -12,6 +12,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§A** | The item shape once a large outcome shares it | Design in the first slice | The first slice's store |
 | **§D** | The deploy path that compares digests | Design, with the constructs | Deployment |
 | **§O** | Rotation, and the broker when it arrives | Later; the first slice keeps room | Nothing yet |
+| **§N** | The contract hash, the envelope-to-router mapping, and the card generator | Design in the first slice | The first slice |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
 | **§L** | Where the consumers still pull apart | **Operator**, with each consumer | A3 |
 | ~~§B~~ | ~~Whether a busy container receives invocations~~ | **Settled 2026-09-22** — it receives everything, 3/3 ([research](research/agentcore-runtime-observed.md)) | — |
@@ -21,7 +22,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | ~~§H~~ | ~~Container identity in the record~~ | **Decided 2026-09-22** — a uuid7 minted per container process | — |
 | ~~§I~~ | ~~How the A2A server is assembled, and which A2A version~~ | **Decided 2026-09-22** ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), [ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)) | — |
 | ~~§M~~ | ~~Pausing for a human~~ | **Shape decided 2026-09-22** (M2, park as a task state); not built, and no consumer asks | — |
-| ~~§N~~ | ~~How a procedure is written~~ | **Decided 2026-09-22** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)) | — |
+| ~~§N~~ | ~~How a procedure is written~~ | **Decided 2026-09-22** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)); three consequences open, above | — |
 
 **Open questions are at the top; struck-through rows are closed and kept so a reader can see the answer without opening the section.** Every open row is a *design* question settled in the first slice or later — none is blocked on a platform answer, and none blocks starting.
 
@@ -221,7 +222,7 @@ Neither consumer requires it, so nothing is built. It is here because the shape 
 
 Four rules hold whichever is chosen ([reference](research/harness-references.md)): the request carries the **schema of the answer**, validated at the boundary; a malformed answer is rejected **without consuming the pause**; pending pauses appear in the task's own state as well as on the stream; and the surface that resolves a pause is **not on the agent card** beside ordinary procedure calls.
 
-## §N — How a procedure is written *(DECIDED 2026-09-22)*
+## §N — How a procedure is written *(DECIDED 2026-09-22; three consequences OPEN)*
 
 **Decided: oRPC, contract-first** — [ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md). Findings in [`research/procedure-framework.md`](research/procedure-framework.md); spikes in `spikes/procedure-framework/`. The earlier comparison of three hand-built styles stands as evidence ([`research/procedure-authoring.md`](research/procedure-authoring.md), `spikes/procedure-authoring/`) but not as the decision: it asked which shape to build, never whether to build at all.
 
@@ -233,6 +234,12 @@ Four rules hold whichever is chosen ([reference](research/harness-references.md)
 - **Streaming and cancellation both work over a custom link** (spiked 2026-09-23). Three events crossed a real byte boundary interleaved rather than buffered; a signal reached middleware and handler as the same object and a 5 000 ms run returned in 64 ms. Two things are AgentForge's rather than the framework's: the **wire encoding** for a stream, and mapping a caller's abort onto the out-of-band `CancelTask` (`ARCHITECTURE.md` §3).
 - **Client context is where the idempotency key belongs.** `ClientLink<T>` types what a caller supplies per call, separately from the input, so the compiler requires a key on every submit without any procedure declaring one (`ARCHITECTURE.md` §4). The requirement is carried by the **client's** type, so AgentForge vends that type and a consumer never writes it.
 - **`Locking` is not adopted.** `@orpc/experimental-lock` is a mutex that stores no result, so a repeat does not get the first answer back; AgentForge needs the same *task* returned across containers after the first has died, which is the conditional insert already in the design (D3). Its non-memory adapters are all Redis-family, which AgentForge does not have.
+
+**Three things the adoption opens, none blocking, none previously written down:**
+
+- **How the contract hash is derived from an oRPC contract.** It was to be computed over the Zod schemas; the contract is now an oRPC object wrapping them. The hash must cover exactly what a container must implement — the input and output schemas and the procedure name — and must be stable across an oRPC patch version, or every bump refuses every task. It is load-bearing: an unknown hash is a `REFUSED` task (`ARCHITECTURE.md` §4).
+- **How an A2A envelope reaches an oRPC handler.** The gateway decides admission from the envelope *before* a task id exists (`ARCHITECTURE.md` §4); the oRPC router then executes the procedure in the task process. Where the router sits relative to the gateway, and how the envelope's procedure name becomes a router path, is unwritten. `call()` in-process is the mechanism; the mapping is the design.
+- **What the agent card is generated from.** It is built from the procedures an image contains (`ARCHITECTURE.md` §6). That registry is now an oRPC router, which can be walked — but the card is A2A, not OpenAPI, so the generator is ours.
 
 **On the hand-built comparison, the findings still hold.** All three styles caught all six composition mistakes under `tsc --strict`; the class has one unguarded hazard — `override guardrails() { return []; }` silently drops every house guardrail and `tsc` accepts it — which is why **guardrail composition stays additive** here regardless of framework.
 
