@@ -86,8 +86,6 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 
 ---
 
----
-
 ## Who it serves
 
 Two consumers, both TypeScript on Bun and orchestrated by Temporal.

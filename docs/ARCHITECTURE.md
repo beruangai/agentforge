@@ -65,17 +65,17 @@ Only two crossings are protocols: a contract between separately deployed, separa
 
 ## 2. Identity and isolation
 
-Four identifiers, from three systems. **The consumer decides how they relate; AgentForge carries, propagates and records them, and never imposes a mapping** ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
+**Five identifiers, from three systems.** **The consumer decides how they relate; AgentForge carries, propagates and records them, and never imposes a mapping** ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
 
 | Identifier | System | Isolates or continues | AgentForge's part |
 |---|---|---|---|
-| `runtimeSessionId` | AgentCore | One microVM: compute, memory, filesystem. **One container per id, measured** — six new session ids took six distinct containers and 6/6 stayed pinned on a later round | Routes to it; keeps it stable across attempts |
+| `runtimeSessionId` | AgentCore | One microVM: compute, memory, filesystem — and one container per id | Routes to it; keeps it stable across attempts |
 | `contextId` | A2A | A conversation: related tasks on the wire | Supplied by the client, uuid7 when the caller gives none; returned on every task |
 | `sessionId` | Claude Agent SDK | One transcript, started, resumed or forked | Passed to the SDK as the procedure says; recorded |
 | `cwd` | Claude Agent SDK | The **capability root** — which `.claude/` layers apply, and therefore what the agent is | Set per procedure; never the data directory |
 | Working directory | Claude Agent SDK | Where a run's files live. Reached through additional directories and explicit permissions | Set per procedure; persisted by sync (§6) |
 
-A fifth, the **idempotency key**, is AgentForge's own: it names one logical execution across its attempts, where a context names a conversation (§4).
+A sixth, the **idempotency key**, is AgentForge's own: it names one logical execution across its attempts, where a context names a conversation (§4).
 
 **The invariants AgentForge enforces are mechanical, and none interprets a consumer's meaning:**
 
@@ -292,7 +292,7 @@ An agentic base image serving one agent, or an agent serving one procedure, is t
 
 The mirror is best-effort by design — three attempts, then the batch is dropped with a `mirror_error` — so it is verified rather than trusted: entries deduped by id, the transcript's last entry checked after the run, and a dropped batch failing the task rather than appearing in a log.
 
-**The project key is derived, never supplied, and it is composed in two parts.** AgentForge owns the prefix — `{consumer}_{agenticProject}_{agent}_` — and **the procedure supplies the final part**. So continuity is scoped to an agent *and* to whatever the procedure says distinguishes its runs — a lane, a strategy, an entity — stated explicitly rather than inferred from a directory. Two procedures of one agent that should share a transcript scope say so by supplying the same final part.
+**The project key is derived, never supplied, and it is composed in two parts.** AgentForge owns the prefix — `{consumer}_{agenticProject}_{agent}_` — and **the procedure supplies the final part**. So continuity is scoped to an agent *and* to whatever the procedure says distinguishes its runs — whatever the consumer's unit of work is — stated explicitly rather than inferred from a directory. Two procedures of one agent that should share a transcript scope say so by supplying the same final part.
 
 `CLAUDE_CODE_PROJECT_DIR_NAME` carries it, which constrains the derivation: 1–64 characters of letters, digits, hyphens or underscores, no separators, and not a Windows device name. AgentForge sanitizes and, where the parts do not fit, truncates deterministically with a hash — the same treatment the runtime name gets (§6). Readability is preferred but not required; a deterministic short id derived from the full value is acceptable when the parts cannot fit. It also sets `CLAUDE_CONFIG_DIR`, without which the name is ignored. **An invalid name does not fail; the SDK silently falls back to a path-derived one**, so the run asserts the transcript landed under the expected key and fails the task if it did not.
 
@@ -333,7 +333,7 @@ Optional functions a procedure calls, each serving a stated requirement:
 
 Every helper that installs a `PreToolUse` matcher **asserts at startup that `init.tools` contains the tool it names**, because a matcher naming a tool that does not exist fires zero times and reports nothing. A helper that can compute the correct value repairs the submission through `updatedInput` rather than denying it: repair costs no additional model turn, and a denial whose reason contradicts the declared contract is refused by the model as an injected instruction ([research](research/kernel-settlement.md)).
 
-The guardrail helpers serve TrendBot alone and wait for its contract to be confirmed; their *semantics* may belong in TrendBot's own package, with AgentForge carrying only the hooks (**[OPEN §L]**).
+**AgentForge carries the hooks; a consumer defines what they enforce** (D8). So `writeScope` takes the paths it is given and `stopGuard` the artifact it is told to require — neither knows why. A rule about *which* paths or *which* artifact is the consumer's own hook, in the consumer's own package, composed additively with these.
 
 ---
 
@@ -357,7 +357,7 @@ The stub in the middle tier replaces the SDK call *inside the kernel*. It is a t
 
 ## Failures reproduced as tests
 
-Each failure the predecessor harness paid for ([lineage](lineage/predecessor-harness.md)), and each the new boundaries introduce. The last seven are new; the final three were found by running against AgentCore on 2026-09-22 ([research](research/agentcore-runtime-observed.md)).
+Each failure the predecessor harness paid for ([lineage](lineage/predecessor-harness.md)), and each the new boundaries introduce. Several were found by spike rather than by suffering them — against [AgentCore](research/agentcore-runtime-observed.md), the [Agent SDK](research/kernel-settlement.md) and [capability composition](research/capability-composition.md) — and those are the ones a test is most owed, because nothing else would have caught them.
 
 | Failure | Layer |
 |---|---|
@@ -439,7 +439,7 @@ Internal libraries are never published on their own; they are composed into the 
 
 ## 11. Deliberately absent
 
-- **Any mapping between the four identifiers** — the consumer's, procedure by procedure (§2)
+- **Any mapping between the identifiers of §2** — the consumer's, procedure by procedure
 - **Queueing, and any concurrency ceiling that is not about memory** — the caller's (D15)
 - **Recovery of a consumer's side effect** — the consumer's (§3)
 - **Rate limiting or durability for the tools an agent calls** — a consumer-hosted MCP server owns its limits and whatever backs them
@@ -448,4 +448,4 @@ Internal libraries are never published on their own; they are composed into the 
 - **Procedures that invoke no agent** — AgentForge runs agents; a consumer's plain work belongs in the consumer
 - **Synchronous invocation, streaming and blocking sends** — polling is the only way to wait until a procedure needs otherwise
 - **Any second server in the container**
-- **Consumer vocabulary** — no directive, entity, vault, or strategy
+- **Consumer vocabulary** — a consumer's domain nouns never name anything here. A *directive* is a **procedure**, a *vault* is a **working directory**. (The ordinary words are not banned: a *sync strategy* and an *isolation strategy* are this document's own.)

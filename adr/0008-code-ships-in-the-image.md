@@ -8,7 +8,7 @@ decision-makers: Jeremy Jonas
 
 ## Context and Problem Statement
 
-Changing a prompt or a schema means changing code that runs in a container. In the predecessor harness that meant rebuilding one image serving every agent, so a one-line change to one directive produced a new artifact for all of them. The instinct is to take code out of the image and mount it, so a change lands without a deploy. But a mount gives up versioning, and the cost of a deploy turns out not to be what it looked like. How is code delivered, and what is mounted?
+Changing a prompt or a schema means changing code that runs in a container. In the predecessor harness that meant rebuilding one image serving every agent, so a one-line change to one procedure produced a new artifact for all of them. The instinct is to take code out of the image and mount it, so a change lands without a deploy. But a mount gives up versioning, and the cost of a deploy turns out not to be what it looked like. How is code delivered, and what is mounted?
 
 ## Considered Options
 

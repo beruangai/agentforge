@@ -1,14 +1,30 @@
 # Spikes
 
-Throwaway programs that answer a question in [`../docs/DESIGN_OPTIONS.md`](../docs/DESIGN_OPTIONS.md) by running against the real thing. **These are not the final home.** They live here until the Nx workspace exists.
+Programs that answer a question in [`../docs/DESIGN_OPTIONS.md`](../docs/DESIGN_OPTIONS.md) by running against the real thing. **This directory is temporary.** It sits at the repository root, outside the Nx grouped layout, and it does not survive A0: when the workspace is scaffolded, every spike here is either **carried into a capability's `integ/`** or **deleted**.
 
-**Which of them become integration tests is a judgement, not a rule.** A spike whose answer depends on something that moves — the Agent SDK's behaviour, AgentCore's contract, what a registry serves — lands in a capability's `integ/`, because a later version can quietly change it. A spike that settles a decision once — the procedure authoring style, whether `s7cmd` runs on ARM64 musl — is finished when its finding is recorded with its date. A test that can only pass is maintenance without information.
+**Which, is decided by whether its answer can drift** (`../.claude/rules/testing.md`). A spike whose answer depends on something that moves — the Agent SDK's behaviour, AgentCore's contract, an oRPC beta, what a registry serves — is not self-renewing, so it keeps being checked. A spike that settled a decision once is finished the moment its finding is recorded with its date, and a test that can only pass is maintenance without information.
+
+**The disposition is decided now rather than at the scaffold**, while the reasoning is fresh:
+
+| Directory | At A0 | Why |
+|---|---|---|
+| `kernel-settlement/` | **carry** → `libs/harness/agent/` | Every finding is Agent SDK behaviour, and the SDK moves fast. These are `e2e` — they call a real model |
+| `agentcore/` | **carry** → the runtime's `integ/` | AgentCore's contract, observed. The header allowlist, the silent part strip, the ~60-second kill and the lease are all things a platform change could move silently |
+| `procedure-framework/` | **carry** → `libs/harness/procedure/` | oRPC v2 is **in beta**. The `@ts-expect-error` probes are exactly what a version bump breaks, so they run as a typecheck target rather than a runtime one |
+| `capability-composition/` | **carry** → `libs/harness/agent/` | Which `.claude/` layers compose is SDK behaviour, and it already changed once during this design |
+| `images/`, `bundler/` | **carry** → the deploy path's `integ/` | Determinism depends on BuildKit, buildx and Bun versions. A pipeline that silently stops being reproducible is the failure this prevents |
+| `sync/` | **carry** → the sync helper's `integ/` | `s7cmd` is a personal project whose dependencies are updated best-effort, and it is pinned by digest — so the pin is exactly what needs re-checking |
+| `task-process/` | **delete** | It proved [ADR 0004](../adr/0004-a-process-per-task.md) against Bun and POSIX. The real executor's own tests cover the same ground against real code, so porting the fixture would test the fixture |
+| `server-assembly/` | **delete** | Its mechanics become the real gateway, and the gateway's tests replace it. The AgentCore half already lives in `agentcore/` |
+| `procedure-authoring/` | **delete** | It settled a decision that has since been re-decided. [The research note](../docs/research/procedure-authoring.md) keeps what still matters |
+
+**Nothing here is load-bearing in the meantime.** No published artifact depends on this directory, and deleting it early would cost only the ability to re-run a measurement by hand.
 
 Findings go to [`../docs/research/`](../docs/research/) with the date and the version they were read against. A negative result is recorded as precisely as a positive one.
 
 ## Running
 
-Needs `../.env.local` (gitignored) with `CLAUDE_CODE_OAUTH_TOKEN`, and for the AgentCore spikes `AWS_PROFILE=agentforge`, `AWS_REGION=us-west-2`.
+Needs `../.env.local` (gitignored) with `CLAUDE_CODE_OAUTH_TOKEN` — `TEMP_CLAUDE_CODE_OAUTH_TOKEN` is preferred if present, which is how a short-lived token was supplied for one session and revoked afterwards. The AgentCore spikes also need `AWS_PROFILE=agentforge` and `AWS_REGION=us-west-2`; **the spikes that call a model cost money, the rest do not.**
 
 ```bash
 bun install

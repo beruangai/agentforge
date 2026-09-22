@@ -32,5 +32,5 @@ Chosen option: **state persists through APIs**. No mount is required, so an agen
 * Good, because local development uses the same mechanism: an object store is reachable from Docker, an S3 Files mount is not
 * Good, because continuous sync makes a lost container lose seconds of work rather than a run's worth
 * Bad, because a continuous strategy makes artifacts visible progressively rather than atomically, which is safe only while nothing reads another task's files mid-run — the reason the choice is the consumer's rather than ours
-* Bad, because the declaration is real surface a mount would not need, and a wrong delete policy can empty a vault the way a mount never would
+* Bad, because the declaration is real surface a mount would not need, and a wrong delete policy can empty a working directory the way a mount never would
 * Bad, because a consumer that later needs live shared POSIX has to add a VPC and a mount itself, and AgentForge has no construct for it until one is asked for

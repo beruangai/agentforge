@@ -12,14 +12,14 @@ AgentForge is that plumbing, owned in one place and shared. Its consumers are St
 
 It is not a pure agent wrapper. The contract a workflow depends on and the contract an agent fills in usually differ, and marshalling between them type-safely is a core concern rather than a consumer's afterthought.
 
-It is not an opinion about how a consumer isolates its work. AgentCore runtime sessions, A2A contexts, Claude sessions and working directories are four different mechanisms; AgentForge carries them and enforces only what is mechanically necessary ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
+It is not an opinion about how a consumer isolates its work. AgentCore runtime sessions, A2A contexts, Claude sessions, the capability root and working directories are different mechanisms; AgentForge carries them and enforces only what is mechanically necessary ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
 
 ## In scope
 
 - Declaring procedures: contracts, marshalling, prompt composition, SDK configuration, side effects before and after the run
 - Running a procedure to a settled, validated, typed outcome, with structured input and output throughout
 - Optional helpers for concerns more than one consumer shares
-- Asynchronous invocation by any caller: start, await, attach on retry, cancel — with a Temporal activity factory over it, first-class but not required
+- Asynchronous invocation by any caller: starting a task, waiting on it, attaching to one already running on a retry, cancelling it — with a Temporal activity factory over it, first-class but not required
 - A2A as the contract between the caller and the runtime
 - Task state that outlives the container: idempotency, loss detection, the outcome
 - Hosting on Bedrock AgentCore Runtime, and the same path locally in Docker
@@ -31,7 +31,7 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 
 - Anything domain-specific — prompts, schemas and context are the consumer's
 - Orchestration — the consumer's workflows own sequencing, retries and gating; Temporal is a supported caller, never a dependency of the runtime or the harness
-- How a consumer isolates its work, and any mapping between the four identifiers
+- How a consumer isolates its work, and any mapping between the identifiers
 - The side effects of a consumer's procedures, and their recovery
 - A concurrency ceiling — the caller's
 - Rate limiting, queueing or durability for the tools an agent calls — a consumer-hosted MCP server owns its limits and whatever backs them, and the agent knows nothing about what is behind the tool
