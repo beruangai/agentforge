@@ -75,7 +75,7 @@ n3 also costs on criterion 3 directly: knowing a procedure's full guardrail set 
 
 **N1, the object literal.** It ties on safety, wins on inspectability, and is the only one of the three where losing a guardrail to composition is unexpressible rather than merely discouraged.
 
-Recorded as [ADR 0013](../../adr/0013-a-procedure-is-an-object-literal.md), status `proposed`.
+Recorded at the time as ADR 0013; that ADR was re-decided on 2026-09-22 and is now [a procedure is an oRPC contract](../../adr/0013-a-procedure-is-an-orpc-contract.md).
 
 **N2 is not wrong, it is unearned.** Its one claimed advantage — making an invalid composition a compile error — is matched by n1 without the machinery. If a procedure with many parts ever reads badly as a literal, a builder can be added later as sugar over the same declaration type, because both resolve to the same object. Nothing about choosing n1 now forecloses it.
 
