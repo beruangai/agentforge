@@ -28,6 +28,7 @@ import {
 import { jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 import { TaskState } from '@a2a-js/sdk';
 import { randomUUID } from 'node:crypto';
+import { DynamoDBClient, PutItemCommand, GetItemCommand } from '@aws-sdk/client-dynamodb';
 
 const PORT = Number(process.env.A2A_PORT ?? 9000);
 const CONTAINER_ID = randomUUID();
@@ -44,7 +45,70 @@ type Envelope = {
   idempotencyKey?: string;
   /** How long the "task" should take. A timer, never a model call. */
   runMilliseconds?: number;
+  /** §A — write and renew a lease from inside the microVM while the task runs. */
+  lease?: { tableName: string; leaseId: string; renewMilliseconds: number; renewals: number };
 };
+
+const dynamo = new DynamoDBClient({});
+
+/**
+ * §A — writes a lease generation and returns how long the write took on the
+ * CONTAINER's clock. The item carries `writeIssuedAt` on that same clock, so a
+ * reader outside the microVM can report visibility latency in the container's
+ * frame: the driver measures the clock offset separately and converts.
+ */
+async function writeLease(lease: NonNullable<Envelope['lease']>, generation: number, taskId: string) {
+  const startedAt = Date.now();
+  await dynamo.send(
+    new PutItemCommand({
+      TableName: lease.tableName,
+      Item: {
+        leaseId: { S: lease.leaseId },
+        generation: { N: String(generation) },
+        containerId: { S: CONTAINER_ID },
+        taskId: { S: taskId },
+        // The only honest timestamp available: the item is composed before the
+        // write completes, so it cannot carry its own completion time. A reader
+        // outside the microVM therefore measures ISSUE-to-visible, which is the
+        // operationally meaningful figure anyway — it includes the write.
+        writeIssuedAt: { N: String(startedAt) },
+      },
+      ReturnConsumedCapacity: 'TOTAL',
+    }),
+  );
+  const writeLatencyMs = Date.now() - startedAt;
+
+  // Read it back FROM INSIDE the microVM until the new generation appears.
+  // Measuring visibility from outside AWS conflates four things — the write,
+  // DynamoDB's own propagation, the reader's network RTT, and the skew between
+  // two unsynchronised clocks. A first attempt from a laptop reported ~322ms
+  // with a 239ms read RTT and a 333ms apparent clock offset, which is not a
+  // platform figure. Polling here uses ONE clock and one network.
+  let polls = 0;
+  const sawAt = await (async () => {
+    for (;;) {
+      polls += 1;
+      const read = await dynamo.send(
+        new GetItemCommand({ TableName: lease.tableName, Key: { leaseId: { S: lease.leaseId } } }),
+      );
+      if (Number(read.Item?.generation?.N ?? 0) >= generation) return Date.now();
+      if (Date.now() - startedAt > 10_000) return -1;
+    }
+  })();
+
+  console.log(
+    JSON.stringify({
+      event: 'lease',
+      containerId: CONTAINER_ID,
+      generation,
+      writeLatencyMs,
+      visibleAfterMs: sawAt < 0 ? null : sawAt - startedAt,
+      readBackPolls: polls,
+      startedAt,
+    }),
+  );
+  return { writeLatencyMs, visibleAfterMs: sawAt < 0 ? null : sawAt - startedAt, readBackPolls: polls };
+}
 
 /**
  * FINDING (§I, 2026-09-22): a part whose encoding does not match the NEGOTIATED
@@ -106,13 +170,33 @@ class SpikeExecutor implements AgentExecutor {
           // The version the SDK negotiated for this request. Behind AgentCore
           // this is always 0.3, because no A2A-Version header is forwarded (§I).
           negotiatedVersion: (requestContext as any).context?._requestedVersion ?? null,
+          // The container's clock at the moment it answered, so a driver
+          // outside the microVM can compute the offset NTP-style and report
+          // visibility latency in the container's frame rather than its own.
+          containerNow: Date.now(),
         },
       }),
     );
 
     const deadline = Date.now() + duration;
+    // §A — renew a lease on an interval for as long as the task runs.
+    let generation = 0;
+    let nextRenewalAt = Date.now();
+    const leaseLatencies: { writeLatencyMs: number; visibleAfterMs: number | null; readBackPolls: number }[] = [];
     while (Date.now() < deadline && !this.cancelled.has(taskId)) {
-      await new Promise((r) => setTimeout(r, 100));
+      if (envelope.lease && generation < envelope.lease.renewals && Date.now() >= nextRenewalAt) {
+        generation += 1;
+        nextRenewalAt = Date.now() + envelope.lease.renewMilliseconds;
+        try {
+          leaseLatencies.push(await writeLease(envelope.lease, generation, taskId));
+        } catch (error: any) {
+          // Zero silent failures: a lease that cannot be written is the whole
+          // point of the spike, so it is reported, not swallowed.
+          console.log(JSON.stringify({ event: 'lease-failed', containerId: CONTAINER_ID, generation, error: String(error?.name ?? error), message: String(error?.message ?? '').slice(0, 300) }));
+          break;
+        }
+      }
+      await new Promise((r) => setTimeout(r, 25));
     }
 
     const cancelled = this.cancelled.has(taskId);
@@ -127,7 +211,7 @@ class SpikeExecutor implements AgentExecutor {
           timestamp: new Date().toISOString(),
         },
         final: true,
-        metadata: { containerId: CONTAINER_ID, cancelled },
+        metadata: { containerId: CONTAINER_ID, cancelled, leaseGenerations: generation, leaseLatencies },
       }),
     );
     eventBus.finished();

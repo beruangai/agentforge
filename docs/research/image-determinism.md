@@ -89,3 +89,23 @@ On macOS, Docker's keychain credential helper blocks without an interactive unlo
 ## Teardown
 
 `spikes/images/teardown.sh` removes the throwaway registry container, the buildx builder and the spike images. Nothing was created in AWS for this spike.
+
+---
+
+## `bun build` is deterministic — measured 2026-09-22
+
+The section above measured determinism over fixtures that **copy plain files**. Nothing was bundled, and bundling was named as the likelier source of non-determinism in a real agent image: module ordering, chunk hashing and embedded absolute paths are all things a bundler can vary between runs.
+
+Measured on **Bun 1.4.0** against a real 2.26 MB bundle — the AgentCore spike server with Express, `@a2a-js/sdk` and two AWS SDK clients (`spikes/bundler/d2-bun-bundler-determinism.sh`):
+
+| Variation | Result |
+|---|---|
+| same input, same directory, twice | **byte-identical** |
+| same input, built from a **different absolute path** | **byte-identical** — no build path is embedded |
+| same input, **every source mtime changed** | **byte-identical** — the bundler does not read file times |
+| `--minify`, twice | **byte-identical** |
+| **negative control:** one line added to a source file | **digest moved** |
+
+The negative control is the point: four passes prove nothing unless the comparison can fail, and it does.
+
+**So the bundler is not a source of image drift.** Determinism for an agent image rests entirely on the Docker-level requirements above — `SOURCE_DATE_EPOCH` *and* `rewrite-timestamp=true`, `--provenance=false`, parents pinned by digest, no unpinned package installs — and nothing needs to be done about `bun build` itself.

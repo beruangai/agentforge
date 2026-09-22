@@ -88,13 +88,14 @@ Three cases the implementation must cover whichever way the spike goes: a cancel
 
 So `UpdateAgentRuntime` can be driven by digest comparison, and an unaffected agent is never given a new version.
 
+**`bun build` is not a source of drift either** (measured 2026-09-22, Bun 1.4.0, on a real 2.26 MB bundle): byte-identical across runs, across a **different absolute path**, across **changed source mtimes**, and under `--minify` — with a negative control confirming the comparison can fail. Determinism therefore rests entirely on the Docker-level requirements below.
+
 **What determinism requires, isolated by experiment:** `SOURCE_DATE_EPOCH` **and** `rewrite-timestamp=true`. With both, identical; with `SOURCE_DATE_EPOCH` alone, **moved**. The epoch normalises the image config's `created` field and leaves file mtimes in the layers, so **a pipeline setting only `SOURCE_DATE_EPOCH` looks reproducible and is not**. Also required: `--provenance=false`, every parent pinned by digest, and no unpinned package installs.
 
 **Three obstacles the deploy path must account for**, none exotic and none obvious: the `docker` driver **cannot export OCI at all**; the `docker` *exporter* does not rewrite layer timestamps, so `docker image inspect --format '{{.Id}}'` **moves on every build** and is useless as a change signal (use buildx's `--metadata-file` `containerimage.digest`); and a `docker-container` builder **cannot see daemon images**, so a multi-level `FROM` chain needs a registry between levels — which is the real shape anyway.
 
 **Still open:**
 
-- **Bun's bundler determinism.** The fixtures copy plain files; nothing was bundled. Whether `bun build` emits byte-identical output — module ordering, chunk hashing, embedded paths — is the likelier source of non-determinism in a real agent image than anything Docker does.
 - Comparing digests before `UpdateAgentRuntime`, so an unchanged agent is never given a new version — the digest is available and stable; the deploy path is not written.
 - How the task protocol's version is negotiated, and how long an executor supports an older task process, now that the base image and a consumer's harness move independently.
 - Whether the agent card is generated as a build step from the image's own registry of procedures.
