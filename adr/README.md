@@ -7,7 +7,7 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 - **[`docs/DESIGN_OPTIONS.md`](../docs/DESIGN_OPTIONS.md) is the drafting log.** A question decided there moves to the owning document, and earns an ADR when a future reader would plausibly propose the rejected option again.
 - **A decision that stops being relevant is dropped**, not kept as a record of a road not taken. A decision that is *replaced* is superseded: the old ADR stays, marked, and is never edited into agreement with its replacement.
 - **A new ADR is written `proposed`** and becomes `accepted` only when the operator accepts it. Never write one as accepted yourself, and never treat a proposed one as settled — raise it.
-- **The set below was accepted by the operator on 2026-09-21.** Reversing one of these is a superseding ADR, not an edit.
+- **0001–0011 were accepted by the operator on 2026-09-21, and 0012–0014 on 2026-09-22.** Reversing one of these is a superseding ADR, not an edit.
 
 | ADR | Title | Status |
 |-----|-------|--------|
@@ -24,5 +24,6 @@ Numbers are stable ids; 0005 was dropped when its decision — that the executor
 | [0009](0009-the-caller-supplies-the-idempotency-key.md) | The caller supplies the idempotency key; a task id is a wire handle | accepted |
 | [0010](0010-agentforge-is-consumed-as-an-nx-plugin.md) | AgentForge is consumed as an Nx plugin, and agents nest in one project | accepted |
 | [0011](0011-state-persists-through-apis-not-mounts.md) | State persists through APIs, not mounts | accepted |
-| [0012](0012-the-server-is-assembled-not-inherited.md) | The A2A server is assembled from `@a2a-js/sdk`, not inherited from the AgentCore SDK | **proposed** |
-| [0013](0013-a-procedure-is-an-object-literal.md) | A procedure is an object literal | **proposed** |
+| [0012](0012-the-server-is-assembled-not-inherited.md) | The A2A server is assembled from `@a2a-js/sdk`, not inherited from the AgentCore SDK | accepted |
+| [0013](0013-a-procedure-is-an-object-literal.md) | A procedure is an object literal | accepted |
+| [0014](0014-agentforge-speaks-a2a-1-0-only.md) | AgentForge speaks A2A 1.0 only | accepted |
