@@ -38,7 +38,8 @@ The operator's standing conventions across projects:
 
 - **Organize by scope, never by type.** Nx grouped layout on `@aws/nx-plugin` defaults: thin deployables in `apps/{scope}/{deployable}`, the code they run in `libs/{scope}/{capability}`. A capability owns its code, schemas, and tests together; file names carry the type. Never a `schemas/`, `types/`, or `utils/` tree collecting one kind across scopes.
 - **Verbose, unambiguous names.** `timestamp`, not `ts`; `configuration`, not `cfg`.
-- **Borrow terms before inventing them** — the Agent SDK's, AgentCore's, or A2A's first, then this glossary's, then a new one. No consumer's domain vocabulary.
+- **Borrow terms before inventing them, and never shorten one** — the Agent SDK's, AgentCore's, or A2A's first, **verbatim**, then this glossary's, then a new one. If a call gets a task and the protocol calls that `GetTask`, it is `GetTask`, not `get` or `status`. Clarity and specificity over brevity. No consumer's domain vocabulary.
+- **Leaf procedure names are `PascalCase`; namespaces are `camelCase`.** `reviewStrategy.SendMessage`, not `reviewStrategy.sendMessage`.
 - **Binary state is a boolean.** An enum only where a third state is genuinely foreseeable, and its values are `SCREAMING_SNAKE_CASE`.
 - **One published package.** AgentForge vends `@beruangai/agentforge` with entry points per environment; internal libraries are never published on their own.
 - **uuid7 for every id AgentForge mints.** Never uuid4. Ids minted by a dependency are opaque and not reformatted.

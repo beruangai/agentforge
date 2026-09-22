@@ -90,13 +90,13 @@ The first spike derived a `submit`/`result` **pair**. The operator rejected it o
 
 **The wire settles the shape, and it is three.** A2A 1.0 has exactly three task RPCs, and `GetTaskRequest` is `{ id, historyLength? }` returning the whole `Task` — status *and* artifacts, with **no artifact filter**. So a fourth `outcome` procedure would be a second name over one wire call returning identical bytes.
 
-| Derived | A2A | Typed by the procedure? |
+| Derived | Where | Typed by the procedure? |
 |---|---|---|
-| `create` | `SendMessage` | input yes; output is the shared task handle |
-| `status` | `GetTask` | yes — a discriminated union on the task state |
-| `cancel` | `CancelTask` | **no** — a task id in, a state out, identically for every procedure |
+| `SendMessage` | per procedure | input yes; output is the shared task handle |
+| `GetTask` | per procedure | yes — a discriminated union on the task state |
+| `CancelTask` | **root, once** | **no** — a task id in, a state out, identically for every task |
 
-`cancel` is a separate invocation carrying the id `create` returned; nothing is held open between them.
+`CancelTask` is a separate invocation carrying the id `SendMessage` returned; nothing is held open between them.
 
 Proved in `o6-task-centric-split.ts`, `tsc --strict` clean with its directives verified live:
 
@@ -104,7 +104,16 @@ Proved in `o6-task-centric-split.ts`, `tsc --strict` clean with its directives v
 - **Each procedure's `status` carries its own output type.** Reading `reviewStrategy`'s `verdict` off `summariseCorpus`'s status does not compile — the union is built from that contract's output, not a shared one.
 - **`cancel` rejects a procedure input**, because it is not shaped by the contract.
 
-**On the naming.** `create`/`status`/`cancel` are the operator's, chosen to stay task-centric rather than invent. A2A's own verbs are `SendMessage`/`GetTask`/`CancelTask`; `create` and `status` are a step from those toward the resource they act on. Strict borrowing would have given `get` rather than `status`.
+**On the naming — A2A's verbs, verbatim.** A first pass named these `create`/`status`/`cancel`. The operator rejected it: the wire is A2A, so a translation layer over terms that already exist buys ambiguity and nothing else, and `status` was actively misleading once it carried the outcome. The rule is now in `CLAUDE.md` — borrow verbatim, never shorten, clarity over brevity. **Leaf procedures are `PascalCase`, namespaces `camelCase`**, so `reviewStrategy.SendMessage` and `CancelTask` at the root.
+
+## Per-call context is enforced per call — 2026-09-23
+
+Two values ride beside a call's input and neither is any procedure's to declare: `runtimeSessionId`, which becomes the AgentCore session header, and `idempotencyKey`. They are **not required on the same calls** — only a start is idempotent, and demanding a key on a poll would make a caller invent a value that means nothing.
+
+`RouterContractClient<TContract, TClientContext>` distributes **one** context type over every leaf, so this does not come for free. It works because AgentForge writes the client type rather than deriving it wholesale: a mapped type applies `Starting = { runtimeSessionId, idempotencyKey }` to `SendMessage` and `Routed = { runtimeSessionId }` to `GetTask` and `CancelTask`. The link itself takes the looser `Routed & { idempotencyKey?: string }`, which is sound — the **client's** annotation is the gate, which is exactly the hazard recorded above working in our favour, and the reason a consumer must never write that type.
+
+Proved in `o7-a2a-verbs-and-per-call-context.ts`, `tsc --strict` clean with its directives verified live: a `SendMessage` with no key does not compile, nor one with no session to route to; a `GetTask` must still be routed and is **not** asked for a key; `CancelTask` rejects a procedure's input; and each namespace's `GetTask` still carries its own output type.
+
 
 ## `Locking` does not answer idempotency
 

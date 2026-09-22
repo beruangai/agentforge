@@ -1,6 +1,6 @@
 # Glossary
 
-Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore's, or A2A's term first, then a term here with the same intent, and only then a new one. A term names a thing or a state, not a command. No consumer's vocabulary enters — a StrategyFoundry *directive* and a TrendBot *directive* are both a **procedure**; a *vault* is a working directory.
+Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agent SDK's, AgentCore's, or A2A's term first, verbatim — if a call gets a task and the protocol calls that `GetTask`, it is `GetTask` — then a term here with the same intent, and only then a new one. Clarity and specificity over brevity. A term names a thing or a state, not a command. No consumer's vocabulary enters — a StrategyFoundry *directive* and a TrendBot *directive* are both a **procedure**; a *vault* is a working directory.
 
 ## Layers
 
@@ -10,17 +10,17 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Caller** — Whatever starts a task through the client. A Temporal activity in both consumers, through the activity factory, but the runtime never knows that.
 
-**Client** — The caller-agnostic API over the wire. Per procedure, the three calls derived from its contract — **`create`**, **`status`**, **`cancel`** — plus an `await` helper that polls `status` to a terminal state. Built on an oRPC client over a link that speaks A2A, so it is typed from the imported contract and nothing else.
+**Client** — The caller-agnostic API over the wire: **`SendMessage`** and **`GetTask`** per procedure, **`CancelTask`** at the root, plus an `await` helper that polls `GetTask` to a terminal state. Built on an oRPC client over a link that speaks A2A, so it is typed from the imported contract and nothing else.
 
-**Task handle** — What `create` returns: `taskId`, `contextId` and `SUBMITTED`. The same shape for every procedure, and what `status` and `cancel` are called with.
+**Task handle** — What `SendMessage` returns: `taskId`, `contextId` and `SUBMITTED`. The same shape for every procedure, and what `GetTask` and `CancelTask` are called with.
 
 **Activity factory** — The Temporal adapter over the client: heartbeats while awaiting, and maps cancellation and outcomes to activity terms. First-class, never required.
 
 ## Procedures
 
-**Procedure** — What a consumer declares and AgentForge runs: a contract and an implementation. One contract derives three calls — `create`, `status`, `cancel` — because invocation is asynchronous.
+**Procedure** — What a consumer declares and AgentForge runs: a contract and an implementation. One contract derives `SendMessage` and `GetTask`, because invocation is asynchronous.
 
-**Contract** — A procedure's name, outer input and output schemas, and hash. An oRPC contract over Zod, so a caller imports it without the implementation. One declaration derives the typed `create`/`status`/`cancel` calls.
+**Contract** — A procedure's name, outer input and output schemas, and hash. An oRPC contract over Zod, so a caller imports it without the implementation. One declaration derives the typed `SendMessage` and `GetTask` calls.
 
 **Implementation** — What runs in the container: an optional *before* step, a required *run* step, an optional *after* step.
 
@@ -30,7 +30,11 @@ Canonical terms. **Borrow before inventing**: the Claude Agent SDK's, AgentCore'
 
 **Agent contract** — What the agent fills in, given to the SDK as its output schema. Often differs from the outer output; an ordinary function maps one to the other.
 
-**`create` / `status` / `cancel`** — The three oRPC procedures derived from one contract, mapping to A2A's `SendMessage`, `GetTask` and `CancelTask`. `status` returns a discriminated union on the task's state, so the declared output is reachable only on the `SUCCEEDED` branch; `cancel` is derived for symmetry but is not typed by the procedure.
+**`SendMessage` / `GetTask`** — The two oRPC procedures derived from one contract, named as A2A names them. `SendMessage` takes the declared input and returns a task handle; `GetTask` takes a task id and returns a discriminated union on the task's state, so the declared output is reachable only on the `SUCCEEDED` branch.
+
+**`CancelTask`** — One root-level procedure, not derived per contract: a task id in, a state out, identically whatever the task was running.
+
+**Call context** — What a caller supplies beside a call's input, and no procedure declares: `runtimeSessionId` on every call, `idempotencyKey` on `SendMessage` alone. Enforced by the client type AgentForge vends.
 
 **Middleware** — A function wrapping a procedure that may contribute to the **execution context**. What it adds is typed for every later middleware and for the handler, without the procedure declaring it.
 

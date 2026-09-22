@@ -22,7 +22,7 @@ A workflow calls a procedure by name with an input and gets an output back. Both
 
 Chosen option: **an RPC framework — oRPC, contract-first** — retaining the two halves as the packaging.
 
-* A consumer declares **one contract**: a name, an input schema and an output schema, in Zod. A utility **derives three typed oRPC procedures** — `create`, `status` and `cancel`, onto A2A's `SendMessage`, `GetTask` and `CancelTask` — so they are derived rather than written out
+* A consumer declares **one contract**: a name, an input schema and an output schema, in Zod. A utility **derives the typed calls** — `SendMessage` and `GetTask` per procedure, `CancelTask` once at the root — named as A2A names them, so they are derived rather than written out
 * The **contract** half is what a caller imports; the **implementation** half registers against it in the container, and an import of the implementation from a worker's build fails
 * **Outer and agent contracts stay separate**, with a marshal step between them: computed fields and identifiers are added there, never asked of the model (T18)
 * The **contract hash** travels in the envelope; a container that does not implement it refuses the task before any work (H3, T3)
@@ -32,7 +32,7 @@ Chosen option: **an RPC framework — oRPC, contract-first** — retaining the t
 ## Consequences
 
 * Good, because the three calls are generated from one declaration instead of being hand-written things that can drift from it or from each other
-* Good, because `status` returns a discriminated union on the task's state, so a caller reads a non-terminal state and reaches the output only where it exists
+* Good, because `GetTask` returns a discriminated union on the task's state, so a caller reads a non-terminal state and reaches the output only where it exists
 * Good, because typed middleware and an accumulating typed context come with the framework rather than being built and maintained here
 * Good, because errors are the link's business: nothing is marshalled behind the caller's back, so a raw error and its stack reach a developer
 * Bad, because the contract half now depends on `@orpc/contract` and `@orpc/client` rather than on Zod alone, which a consumer must keep in step

@@ -24,5 +24,5 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0010](0010-agentforge-is-consumed-as-an-nx-plugin.md) | AgentForge is consumed as an Nx plugin, and agents nest in one project | accepted |
 | [0011](0011-state-persists-through-apis-not-mounts.md) | State persists through APIs, not mounts | accepted |
 | [0012](0012-the-server-is-assembled-not-inherited.md) | The A2A server is assembled from `@a2a-js/sdk`, not inherited from the AgentCore SDK | accepted |
-| [0013](0013-a-procedure-is-an-orpc-contract.md) | A procedure is an oRPC contract, split into create, status and cancel | accepted |
+| [0013](0013-a-procedure-is-an-orpc-contract.md) | A procedure is an oRPC contract, split into A2A's own task calls | accepted |
 | [0014](0014-agentforge-speaks-a2a-1-0-only.md) | AgentForge speaks A2A 1.0 only | accepted |

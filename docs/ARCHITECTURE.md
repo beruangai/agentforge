@@ -57,7 +57,7 @@ Only two crossings are protocols: a contract between separately deployed, separa
 
 | Interface | Inside | Note |
 |---|---|---|
-| Client API | Layer 1 | `create`, `status` and `cancel` per procedure, derived from the contract the caller imports, plus an `await` helper that polls `status` to a terminal state. Caller-agnostic; the Temporal activity factory sits over it |
+| Client API | Layer 1 | `SendMessage` and `GetTask` per procedure and `CancelTask` at the root, derived from the contract the caller imports, plus an `await` helper that polls `GetTask` to a terminal state. Caller-agnostic; the Temporal activity factory sits over it |
 | Task store | Layer 1 | A2A's `TaskStore`, extended with an index by idempotency key and a fencing token (§4) |
 | Image | Deployment | What a task process runs, guarded by the contract hash (§6) |
 
@@ -97,17 +97,30 @@ Two halves, in separate modules ([ADR 0003](../adr/0003-procedures-are-type-safe
 - **Contract** — the name, the outer input and output schemas, and a hash. An oRPC contract over Zod, so a caller imports it without the implementation or the Agent SDK.
 - **Implementation** — what runs in the container, registered against that contract.
 
-**One contract, three procedures.** Invocation is asynchronous, so a consumer declares one contract and a utility derives what a caller actually calls — the derivation is mechanical, so the three cannot drift from the contract or from each other:
+**One contract, three calls, named as A2A names them.** Invocation is asynchronous, so a consumer declares one contract and a utility derives what a caller actually calls. **The verbs are A2A's own, verbatim** — the wire is A2A, so a translation layer over terms that already exist would be ambiguity bought with nothing:
 
-| Derived | A2A | Takes | Returns |
+| Derived | Where | Takes | Returns |
 |---|---|---|---|
-| `create` | `SendMessage` | the declared input | a **task handle** — `taskId`, `contextId`, `SUBMITTED`; the same shape for every procedure |
-| `status` | `GetTask` | a task id | a **discriminated union on the task's state**: nothing while `SUBMITTED` or `WORKING`, the declared output on `SUCCEEDED`, the typed cause on a failure (§4) |
-| `cancel` | `CancelTask` | a task id | the resulting state |
+| `SendMessage` | per procedure | the declared input | a **task handle** — `taskId`, `contextId`, `SUBMITTED`; the same shape for every procedure |
+| `GetTask` | per procedure | a task id | a **discriminated union on the task's state**: nothing while `SUBMITTED` or `WORKING`, the declared output on `SUCCEEDED`, the typed cause on a failure (§4) |
+| `CancelTask` | **once, at the root** | a task id | the resulting state |
 
-**`status` is one call, not two.** A caller polling a task needs its non-terminal state as much as its outcome, and `GetTask` answers both: it takes `{ id, historyLength? }` and returns the whole task, with **no way to ask for it without its artifacts**. A separate `outcome` procedure would be a second name over the same wire call returning identical bytes. The union is what makes it typed — a caller reaches the output only inside the `SUCCEEDED` branch, and the compiler refuses it anywhere else ([research](research/procedure-framework.md)).
+**`GetTask` is one call, not two.** A caller polling a task needs its non-terminal state as much as its outcome, and `GetTask` answers both: it takes `{ id, historyLength? }` and returns the whole task, with **no way to ask for it without its artifacts**. A separate `outcome` call would be a second name over the same wire call returning identical bytes. The union is what makes it typed — a caller reaches the output only inside the `SUCCEEDED` branch, and the compiler refuses it anywhere else.
 
-**`cancel` is not typed by the procedure.** Its input is a task id and its output a task state, identically for every procedure, so it is derived for symmetry rather than shaped by the contract. It is a separate invocation carrying the id that `create` returned — nothing is held open between them.
+**`CancelTask` is not derived per procedure, because nothing about it is the procedure's.** It needs a task id and a runtime session id to reach the right container; both are the caller's ([ADR 0007](../adr/0007-identity-is-the-consumers.md)) and neither comes from a contract, so a per-procedure copy would be one signature repeated once per procedure. It sits at the router's root, and it is a separate invocation carrying the id `SendMessage` returned — nothing is held open between them.
+
+**Naming.** Leaf procedures are **PascalCase**, because they are the protocol's own names; namespaces are **camelCase**. So `reviewStrategy.SendMessage`, `reviewStrategy.GetTask`, and `CancelTask` at the root.
+
+### What a caller must supply per call
+
+Two values ride beside the input, in the client's **call context**, and neither is any procedure's to declare ([research](research/procedure-framework.md)):
+
+| | Required on | Why it is not input |
+|---|---|---|
+| `runtimeSessionId` | **every** call | Transport routing — it becomes the AgentCore session header that reaches the right container |
+| `idempotencyKey` | **`SendMessage` only** | Only a start is idempotent. Demanding one on a poll or a cancel would make a caller invent a value that means nothing (§4) |
+
+`ContractRouterClient` applies one context to a whole router, so **AgentForge applies it per call instead**, in the client type it vends. That type is what enforces the difference, which is why a consumer never writes it.
 
 The **outer contract** is what the caller sends and receives; the **agent contract** is what the agent fills in, given to the SDK as its output schema. They differ whenever the outer output carries computed fields the model must not be asked for (D2). The step between them is an ordinary function.
 
@@ -135,7 +148,7 @@ The contract hash travels in the envelope. A container whose image does not impl
 
 ### How one is written
 
-**A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)). A consumer declares the contract; a utility derives the typed `create`/`status`/`cancel` trio above; an implementation registers against it.
+**A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)). A consumer declares the contract; a utility derives the typed calls above; an implementation registers against it.
 
 **A procedure never names its transport.** The same declaration executes in-process in the container and travels over a custom client link from a caller ([research](research/procedure-framework.md)). Two things are the link's to do rather than the framework's:
 
@@ -201,7 +214,7 @@ Offloading instead would push the cost outward: a caller orchestrating on the ou
 - **Concurrent — guaranteed.** Attempts carry the same runtime session id and reach the same container, whose gateway is that session's single authority; a start whose key names a live task returns that task. The index insert is conditional, so two starts racing cannot both admit.
 - **Later — within the record's retention**, which is **seven days**. The key includes the caller's *run* identity — for the Temporal factory, the workflow run id with the activity id — so a key belongs to one workflow run and nothing re-sends it afterwards; a reset, which re-executes with the same activity ids under a new run id, therefore runs fresh rather than attaching to the old outcome. Retention is a storage bound rather than a correctness one, and a repeated start after it runs again, with `start` reporting that it started rather than attached.
 
-**The key rides in the client's call context, not in a procedure's input.** oRPC types what a caller supplies per call separately from the input, so the compiler requires a key on every `create` without any procedure having declared one. That requirement is carried by the client's own type, which is therefore AgentForge's to vend rather than a consumer's to write: a link may legally be typed more loosely and would simply ignore the key ([research](research/procedure-framework.md)).
+**The key rides in the client's call context, not in a procedure's input.** oRPC types what a caller supplies per call separately from the input, so the compiler requires a key on every `SendMessage` — and on nothing else — without any procedure having declared one. That requirement is carried by the client's own type, which is therefore AgentForge's to vend rather than a consumer's to write: a link may legally be typed more loosely and would simply ignore the key ([research](research/procedure-framework.md)).
 
 A cancel from one caller ends a task other callers attached to, so the outcome distinguishes who asked: a caller that did not ask should treat it as retryable.
 
