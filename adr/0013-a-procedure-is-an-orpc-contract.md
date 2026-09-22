@@ -23,7 +23,7 @@ That comparison never asked whether the machinery had to be built at all. It als
 Chosen option: **oRPC, contract-first**. A consumer declares one contract; a utility derives the two typed procedures.
 
 * **The split is a utility, not a convention.** One contract in; **`SendMessage`** and **`GetTask`** out, named as A2A names them and typed with the procedure's own shapes rather than a shared opaque one. `GetTask` returns a **discriminated union on the task state**, so a poll answers a non-terminal task and the declared output is reachable only where it exists. **`CancelTask` is root-level**, not derived: a task id and a runtime session are the caller's, so nothing about it is the procedure's
-* **A caller's per-call values are the client's context, not any procedure's input** — `runtimeSessionId` on every call, `idempotencyKey` on `SendMessage` alone, enforced by the client type AgentForge vends
+* **A caller's per-call values are the client context, not any procedure's input** — `runtimeSessionId` on every call, `idempotencyKey` on `SendMessage` alone, enforced by the client type AgentForge vends
 * **Cross-cutting behaviour is middleware that contributes to a typed context.** A house helper resolves something and adds it; every later middleware and the handler see it typed, without the procedure declaring it. This is what the hand-built literal could not offer
 * **Composite contributions stay additive** — hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering
 * **A procedure never names its transport.** The same declaration runs in-process and over a custom link

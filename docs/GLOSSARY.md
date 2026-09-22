@@ -34,11 +34,11 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 **`CancelTask`** — One root-level procedure, not derived per contract: a task id in, a state out, identically whatever the task was running.
 
-**Call context** — What a caller supplies beside a call's input, and no procedure declares: `runtimeSessionId` on every call, `idempotencyKey` on `SendMessage` alone. Enforced by the client type AgentForge vends.
+**Client context** — oRPC's term, kept: what a **caller** supplies beside a call's input, and no procedure declares — `runtimeSessionId` on every call, `idempotencyKey` on `SendMessage` alone. Enforced by the client type AgentForge vends. Distinct from the **execution context**, which is the container's side.
 
 **Middleware** — A function wrapping a procedure that may contribute to the **execution context**. What it adds is typed for every later middleware and for the handler, without the procedure declaring it.
 
-**Execution context** — The accumulated, typed values a procedure's handler receives beyond its input: the caller, the attempt, the lease, and whatever middleware has added.
+**Execution context** — The accumulated, typed values a procedure's handler receives beyond its input, inside the **container**: the caller, the attempt, the lease, and whatever middleware has added. Distinct from the **client context**, which is what the caller supplies from outside.
 
 **Step** — One part of an implementation: before, run, after. A function, not a framework phase.
 

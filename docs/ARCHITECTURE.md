@@ -113,7 +113,7 @@ Two halves, in separate modules ([ADR 0003](../adr/0003-procedures-are-type-safe
 
 ### What a caller must supply per call
 
-Two values ride beside the input, in the client's **call context**, and neither is any procedure's to declare ([research](research/procedure-framework.md)):
+Two values ride beside the input, in the **client context** — oRPC's own term — and neither is any procedure's to declare ([research](research/procedure-framework.md)):
 
 | | Required on | Why it is not input |
 |---|---|---|
@@ -214,7 +214,7 @@ Offloading instead would push the cost outward: a caller orchestrating on the ou
 - **Concurrent — guaranteed.** Attempts carry the same runtime session id and reach the same container, whose gateway is that session's single authority; a start whose key names a live task returns that task. The index insert is conditional, so two starts racing cannot both admit.
 - **Later — within the record's retention**, which is **seven days**. The key includes the caller's *run* identity — for the Temporal factory, the workflow run id with the activity id — so a key belongs to one workflow run and nothing re-sends it afterwards; a reset, which re-executes with the same activity ids under a new run id, therefore runs fresh rather than attaching to the old outcome. Retention is a storage bound rather than a correctness one, and a repeated start after it runs again, with `start` reporting that it started rather than attached.
 
-**The key rides in the client's call context, not in a procedure's input.** oRPC types what a caller supplies per call separately from the input, so the compiler requires a key on every `SendMessage` — and on nothing else — without any procedure having declared one. That requirement is carried by the client's own type, which is therefore AgentForge's to vend rather than a consumer's to write: a link may legally be typed more loosely and would simply ignore the key ([research](research/procedure-framework.md)).
+**The key rides in the client context, not in a procedure's input.** oRPC types what a caller supplies per call separately from the input, so the compiler requires a key on every `SendMessage` — and on nothing else — without any procedure having declared one. That requirement is carried by the client's own type, which is therefore AgentForge's to vend rather than a consumer's to write: a link may legally be typed more loosely and would simply ignore the key ([research](research/procedure-framework.md)).
 
 A cancel from one caller ends a task other callers attached to, so the outcome distinguishes who asked: a caller that did not ask should treat it as retryable.
 

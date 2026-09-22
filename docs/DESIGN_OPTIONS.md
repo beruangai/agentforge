@@ -1,6 +1,6 @@
 # Design Options
 
-What is not yet decided. A question is worked here until it is settled; the outcome then moves to [`ARCHITECTURE.md`](ARCHITECTURE.md), or [`GLOSSARY.md`](GLOSSARY.md) for a term, and an [ADR](../adr/README.md) records the reasoning where it is worth keeping. Sections are marked **[OPEN §x]** at their points of use, except §L. Do not build against one, and do not resolve one silently.
+What is not yet decided. A question is worked here until it is settled; the outcome then moves to [`ARCHITECTURE.md`](ARCHITECTURE.md), or [`GLOSSARY.md`](GLOSSARY.md) for a term, and an [ADR](../adr/README.md) records the reasoning where it is worth keeping. An open section is marked **[OPEN §x]** where it bites. Do not build against one, and do not resolve one silently.
 
 **Platform behavior is settled by testing it** — a spike against the real thing, recorded in [`research/`](research/) before the decision leaves this file. Nothing here is settled by reading documentation.
 
@@ -15,7 +15,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 | **§N** | The contract hash, the envelope-to-router mapping, and the card generator | Design in the first slice | The first slice |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
 | ~~§B~~ | ~~Whether a busy container receives invocations~~ | **Settled 2026-09-22** — it receives everything, 3/3 ([research](research/agentcore-runtime-observed.md)) | — |
-| ~~§C~~ | ~~Cancellation, locally and on the platform~~ | **Settled 2026-09-22**, both halves; one question waits on a real agent in a container | — |
+| ~~§C~~ | ~~Cancellation, locally and on the platform~~ | **Settled 2026-09-22**, both halves ([research](research/agentcore-runtime-observed.md)) | — |
 | ~~§E~~ | ~~What the kernel needs to settle a run~~ | **Settled 2026-09-22** ([research](research/kernel-settlement.md)) | — |
 | ~~§G~~ | ~~Health and per-task cost~~ | **Settled 2026-09-22** — [ADR 0004](../adr/0004-a-process-per-task.md) confirmed | — |
 | ~~§H~~ | ~~Container identity in the record~~ | **Decided 2026-09-22** — a uuid7 minted per container process | — |
