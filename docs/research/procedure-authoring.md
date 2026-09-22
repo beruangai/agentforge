@@ -83,18 +83,12 @@ Recorded as [ADR 0013](../../adr/0013-a-procedure-is-an-object-literal.md), stat
 
 ---
 
-## A conflict to raise, not design around
+## Why the baseline has no agent-less procedure
 
-**TrendBot T4 asks for procedures that invoke no agent**, and `ARCHITECTURE.md` §11 excludes them:
+**TrendBot T4** asks for procedures that invoke no agent — vault reads, corpus scans, snapshot and publish composers, measurement runs of up to an hour — sharing a directive's contract, invocation, failure and side-effect phases, minus the run.
 
-> **T4 (migration)** — "Procedures that invoke no agent — vault reads, corpus scans, snapshot and publish composers, measurement runs of up to an hour — run in the agent container, because it owns the vault working copy. They share the directive's contract, invocation, failure, and side-effect phases, minus the agent run."
+AgentForge **does not carry T4**, and this was already settled before the spike: `ARCHITECTURE.md` §11 lists agent-less procedures as deliberately absent, and [`CONSUMERS.md`](../CONSUMERS.md)'s "what AgentForge does not carry" table records the reason — "AgentForge runs agents. TrendBot's were a convenience around its git-based working copy and move to its own API layer when it adopts."
 
-> **`ARCHITECTURE.md` §11, deliberately absent** — "Procedures that invoke no agent — AgentForge runs agents; a consumer's plain work belongs in the consumer."
+**Confirmed by the operator on 2026-09-22**, on being asked: §11 stands, and TrendBot uses another mechanism for its non-agentic work, which is trivial for it.
 
-This is a live conflict between a consumer contract and an accepted decision, so it was **left out of the baseline and is raised** rather than resolved here. It is not a small one: T4's stated reason is *co-location* — the work needs the container's working copy — not convenience, and that reason is not answered by "put it in the consumer". Three shapes are available and the choice is the operator's with TrendBot:
-
-1. **Hold the line.** TrendBot's mechanical work moves to its own container with its own working-copy sync. The cost lands entirely on TrendBot, and duplicates the sync machinery.
-2. **Admit a second procedure kind** with the same contract, invocation, failure and phase machinery, minus the run. Cheap to build — the baseline's shapes already separate the run from the phases — but it makes "AgentForge runs agents" false, and §11 would need a superseding decision.
-3. **Treat it as a procedure whose run is trivial.** Dishonest, and it would burn a model call per vault read.
-
-Belongs in `DESIGN_OPTIONS.md` §L, where the consumers pull apart.
+So the baseline covers agent runs only, and the five shapes above are the whole surface a procedure has.

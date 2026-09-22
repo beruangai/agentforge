@@ -57,4 +57,4 @@ The judge is promoted into the procedure capability's `integ/` (`ARCHITECTURE.md
 
 ## More Information
 
-The spike surfaced a conflict it deliberately did not resolve: **TrendBot's T4 requires procedures that invoke no agent**, and `ARCHITECTURE.md` §11 excludes them. T4's reason is co-location — the work needs the container's working copy — which is not answered by "put it in the consumer". The three available shapes are recorded in [the research note](../docs/research/procedure-authoring.md) and the question belongs to `DESIGN_OPTIONS.md` §L, with the operator and TrendBot.
+The baseline covers **agent runs only**. TrendBot's T4 asks for procedures that invoke no agent; AgentForge does not carry it, which `ARCHITECTURE.md` §11 and [`CONSUMERS.md`](../docs/CONSUMERS.md)'s "does not carry" table already recorded, and which the operator confirmed on 2026-09-22 when the spike re-raised it. TrendBot's non-agentic work moves to its own API layer. So the five shapes the styles were judged against are the whole surface a procedure has.
