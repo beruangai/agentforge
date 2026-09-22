@@ -111,6 +111,15 @@ Two halves, in separate modules ([ADR 0003](../adr/0003-procedures-are-type-safe
 
 **Naming.** Leaf procedures are **PascalCase**, because they are the protocol's own names; namespaces are **camelCase**. So `reviewStrategy.SendMessage`, `reviewStrategy.GetTask`, and `CancelTask` at the root.
 
+### How one is written
+
+**A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)). A consumer declares the contract; a utility derives the typed calls above; an implementation registers against it.
+
+**A procedure never names its transport.** The same declaration executes in-process in the container and travels over a custom client link from a caller ([research](research/procedure-framework.md)). Two things are the link's to do rather than the framework's:
+
+- **A caller's cancellation is mapped, never dropped.** A signal reaches middleware and the handler, and a handler that races its work against it returns promptly — but a signal cannot travel with an `InvokeAgentRuntime` call, so the link turns a caller's abort into the out-of-band `CancelTask` invocation. Accepting a signal and ignoring it would be a silent failure.
+- **A stream's wire encoding is ours.** oRPC's event iterator carries event *objects*; the SSE encoding lives in its HTTP handler, which AgentForge does not use. A streaming link serialises each event itself and must throw on a body that ends mid-frame rather than dropping the tail. Nothing streams today (§4); this is what it would cost.
+
 ### What a caller must supply per call
 
 Two values ride beside the input, in the **client context** — oRPC's own term — and neither is any procedure's to declare ([research](research/procedure-framework.md)):
@@ -145,15 +154,6 @@ The contract hash travels in the envelope. A container whose image does not impl
 ### Side effects are the consumer's
 
 **A consumer owns its side effects and how to recover when one may have partly happened.** Every step receives the idempotency key, the attempt number, and the prior attempt's recorded state — none, `FAILED`, `CANCELLED`, or `LOST`. Because the *after* step runs inside the task process before the outcome leaves it, **`LOST` always means side effects may have happened**; a consumer whose source of truth is its own state reconciles against it. AgentForge never infers, retries or compensates a consumer's side effect.
-
-### How one is written
-
-**A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)). A consumer declares the contract; a utility derives the typed calls above; an implementation registers against it.
-
-**A procedure never names its transport.** The same declaration executes in-process in the container and travels over a custom client link from a caller ([research](research/procedure-framework.md)). Two things are the link's to do rather than the framework's:
-
-- **A caller's cancellation is mapped, never dropped.** A signal reaches middleware and the handler, and a handler that races its work against it returns promptly — but a signal cannot travel with an `InvokeAgentRuntime` call, so the link turns a caller's abort into the out-of-band `CancelTask` invocation. Accepting a signal and ignoring it would be a silent failure.
-- **A stream's wire encoding is ours.** oRPC's event iterator carries event *objects*; the SSE encoding lives in its HTTP handler, which AgentForge does not use. A streaming link serialises each event itself and must throw on a body that ends mid-frame rather than dropping the tail. Nothing streams today (§4); this is what it would cost.
 
 ### Reuse
 
@@ -306,7 +306,7 @@ The mirror is best-effort by design — three attempts, then the batch is droppe
 
 **A task's record carries the artifact version that ran it**, because while long sessions drain, two versions serve traffic at once.
 
-**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agentic project, an agentic base image, an agent and a procedure; a **sync generator** that keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching across two repositories; CDK constructs for an agent with its A2A configuration, its stores, its mounts and `grantInvokeAccess` for a caller's least-privilege role (D32); and the build-and-deploy path that updates only what changed **[OPEN §K]**.
+**AgentForge ships the delivery tooling as an Nx plugin** on `@aws/nx-plugin`'s conventions: generators for an agentic project, an agentic base image, an agent and a procedure; a **sync generator** that keeps a consumer's wiring current as AgentForge changes, so iteration is a sync rather than ad-hoc patching across two repositories; CDK constructs for an agent with its A2A configuration, its stores and `grantInvokeAccess` for a caller's least-privilege role (D32); and the build-and-deploy path that updates only what changed **[OPEN §K]**.
 
 ## 7. The harness
 
@@ -345,17 +345,17 @@ Written by AgentForge: the outcome, the attempt and the prior attempt's state, t
 
 ## 9. How this is tested
 
-Three tiers, and a rule about what earns a test: **a spike becomes an integration test when its answer can drift.** An answer that depends on a platform or a dependency — the Agent SDK's settlement behaviour, AgentCore's contract, what a registry serves — is not self-renewing, so it lands in `integ/` and keeps being checked. An answer that settles a decision once, such as which authoring style a procedure uses or whether a binary runs on this architecture, is recorded in an ADR or a research note with its date. A test that can only pass is maintenance without information.
+Three tiers, and a rule about what earns a test: **a spike becomes an integration test when its answer can drift.** An answer that depends on a platform or a dependency — the Agent SDK's settlement behaviour, AgentCore's contract, what a registry serves — is not self-renewing, so it lands in `integ/` and keeps being checked. An answer that settles a decision once, such as which authoring style a procedure uses or whether a binary runs on this architecture, is recorded in an ADR or a research note with its date. A test that can only pass is maintenance without information. Each existing spike's disposition is already decided in [`spikes/README.md`](../spikes/README.md); that directory does not survive A0.
 
 | Tier | Runs against | Covers |
 |---|---|---|
 | **Unit** | Nothing external | The procedure model, the outcome taxonomy, the store's fencing and index, event mapping — colocated with their source |
-| **Runtime integration** | A real AgentCore runtime, with the model call stubbed | Everything around the agent: admission, idempotency, the task-process protocol, cancellation, the lease, loss, mounts and sync, deploy behavior. Deterministic and cheap, because no model is called |
+| **Runtime integration** | A real AgentCore runtime, with the model call stubbed | Everything around the agent: admission, idempotency, the task-process protocol, cancellation, the lease, loss, working-directory sync, deploy behavior. Deterministic and cheap, because no model is called |
 | **End-to-end** | A real runtime and a real model | Structured output, settlement, in-turn correction, cancellation mid-turn, usage accounting — run after a change that could move them, not on every commit |
 
 The stub in the middle tier replaces the SDK call *inside the kernel*. It is a test seam, not a second kind of procedure and not something a consumer can reach — a procedure is still an agent run (§3).
 
-## Failures reproduced as tests
+### Failures reproduced as tests
 
 Each failure the predecessor harness paid for ([lineage](lineage/predecessor-harness.md)), and each the new boundaries introduce. Several were found by spike rather than by suffering them — against [AgentCore](research/agentcore-runtime-observed.md), the [Agent SDK](research/kernel-settlement.md) and [capability composition](research/capability-composition.md) — and those are the ones a test is most owed, because nothing else would have caught them.
 

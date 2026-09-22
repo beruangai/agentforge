@@ -86,7 +86,7 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 ## Agents and delivery
 
-**Agent** (deployed) — One AgentCore runtime: an image extending an agentic base image, the procedures it contains, its card, its mounts and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
+**Agent** (deployed) — One AgentCore runtime: an image extending an agentic base image, the procedures it contains, its card and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
 
 **Agentic project** — One Nx project holding an agentic base image and the agents that extend it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
 
