@@ -69,7 +69,7 @@ Four identifiers, from three systems. **The consumer decides how they relate; Ag
 
 | Identifier | System | Isolates or continues | AgentForge's part |
 |---|---|---|---|
-| `runtimeSessionId` | AgentCore | One microVM: compute, memory, filesystem. At most one container at a time per id **[OPEN §B]** | Routes to it; keeps it stable across attempts |
+| `runtimeSessionId` | AgentCore | One microVM: compute, memory, filesystem. **One container per id, measured** — six new session ids took six distinct containers and 6/6 stayed pinned on a later round | Routes to it; keeps it stable across attempts |
 | `contextId` | A2A | A conversation: related tasks on the wire | Supplied by the client, uuid7 when the caller gives none; returned on every task |
 | `sessionId` | Claude Agent SDK | One transcript, started, resumed or forked | Passed to the SDK as the procedure says; recorded |
 | Working directory | Claude Agent SDK | Where a run happens; with the project key, what scopes its transcript | Set per procedure; persisted by sync (§6) |
@@ -132,14 +132,14 @@ Cross-cutting behavior — guardrail hooks, telemetry, a house style of options 
 
 A **task** is one attempt at one procedure, ending in one **outcome**. It is an A2A task on the wire and an asynchronous job to AgentCore.
 
-**`/ping` manages the session's lifecycle; it does not gate delivery.** `HealthyBusy` means work is in progress, so the session is kept alive and must not be reaped; `Healthy` means idle, and fifteen minutes of it ends the session. Neither status stops an invocation arriving — a container can receive a start, a poll or a cancel whatever it last reported. So the policy is simply: `HealthyBusy` while any task is running, `Healthy` when none is. **Concurrency is the server's own business**, enforced by the gateway's admission limit and answered with a refusal, never signalled through `/ping`. The A2A SDK does no busy tracking of its own — its handler defaults to `Healthy` — so this is ours to implement, where the HTTP path tracks it automatically because it serves one task at a time.
+**`/ping` manages the session's lifecycle; it does not gate delivery.** `HealthyBusy` means work is in progress, so the session is kept alive and must not be reaped; `Healthy` means idle, and fifteen minutes of it ends the session. Neither status stops an invocation arriving — a container can receive a start, a poll or a cancel whatever it last reported. **Measured on 2026-09-22**: with a 25-second task live and `/ping` answering `HealthyBusy`, a second start, a poll and a cancel were all delivered, 3/3, at idle latency, and the two tasks ran concurrently in one container ([research](research/agentcore-runtime-observed.md)). So the policy is simply: `HealthyBusy` while any task is running, `Healthy` when none is. **Concurrency is the server's own business**, enforced by the gateway's admission limit and answered with a refusal, never signalled through `/ping`. The A2A SDK does no busy tracking of its own — its handler defaults to `Healthy` — so this is ours to implement, where the HTTP path tracks it automatically because it serves one task at a time.
 
 ### Lifecycle
 
 1. **Start.** The caller sends the envelope — procedure name, contract hash, outer input, idempotency key, the identifiers of §2, correlation ids — as an A2A message with `returnImmediately`. The **gateway** handles it before a task id is minted: it validates the envelope, looks up the idempotency key, and either returns the task already running or admits a new one. The **executor** then publishes `submitted` synchronously, before its first `await`, and spawns the task process.
 2. **Await.** The caller polls `GetTask` and heartbeats whatever it answers to. **Polling is the only supported way to wait.** Streaming is capped at 60 minutes and A2A has no replay across a reconnect, and both consumers are long-running workflow steps where latency is not a concern. A subscription, and a blocking send, are added if a procedure ever appears whose latency warrants them — not before.
 3. **Outcome.** A completed task carries the outer output as its artifact; every failure is a failed task whose artifact carries the typed cause, because A2A has one failed state and a caller needs the reason.
-4. **Cancel.** `CancelTask` reaches the gateway, which cancels over the task protocol: the run aborts, flushes telemetry, records `CANCELLED`, and after a grace period its process group is killed so nothing it started outlives it. A cancel arriving before the process exists is caught by a token the executor sets before its first `await`. **A cancel never falls through to the A2A SDK's default path**, which would mark a task cancelled without consulting the executor — including from a container freshly provisioned to answer it while the original still runs. `StopRuntimeSession` is the blunt fallback and takes every other task in the session with it **[OPEN §C]**.
+4. **Cancel.** `CancelTask` reaches the gateway, which cancels over the task protocol: the run aborts, flushes telemetry, records `CANCELLED`, and after a grace period its process group is killed so nothing it started outlives it. A cancel arriving before the process exists is caught by a token the executor sets before its first `await`. **A cancel never falls through to the A2A SDK's default path**, which would mark a task cancelled without consulting the executor — including from a container freshly provisioned to answer it while the original still runs. `StopRuntimeSession` is the blunt fallback and takes every other task in the session with it. **It is blunter than it looks, and the difference is a budget.** Measured on 2026-09-22: the call returns in ~390 ms, the container gets a real `SIGTERM` ~400 ms later, and it is killed **about 60 seconds after that whatever it is doing** — being busy does not extend the window, and finishing early does not release it. The next invocation on that session id lands on a **fresh container with an empty task store**, so the stopped task is unreachable the moment the stop returns. Anything whose recovery cannot finish inside ~60 seconds must not be attempted in the container ([research](research/agentcore-runtime-observed.md)).
 
 | Task state | A2A |
 |---|---|
@@ -315,7 +315,7 @@ The stub in the middle tier replaces the SDK call *inside the kernel*. It is a t
 
 ## Failures reproduced as tests
 
-Each failure the predecessor harness paid for ([lineage](lineage/predecessor-harness.md)), and each the new boundaries introduce. The last four are new:
+Each failure the predecessor harness paid for ([lineage](lineage/predecessor-harness.md)), and each the new boundaries introduce. The last seven are new; the final three were found by running against AgentCore on 2026-09-22 ([research](research/agentcore-runtime-observed.md)).
 
 | Failure | Layer |
 |---|---|
@@ -337,6 +337,9 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | A project key the SDK silently ignored, scattering transcripts | 2 |
 | A task process whose protocol version the executor does not accept | 1 |
 | Admission beyond the container's memory, killing its neighbours | 1 |
+| A part whose encoding does not match the negotiated protocol version, delivered with its content silently stripped | 1 |
+| A caller whose content type the A2A handler refuses, surfacing as an opaque 424 | 1 |
+| Recovery attempted inside a stopped container, past the ~60-second kill | 1 |
 
 ---
 

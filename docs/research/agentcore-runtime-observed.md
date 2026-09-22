@@ -141,3 +141,27 @@ The first run could not distinguish a fixed window from "killed once it stops re
 Across three observations the window was 56.0 s, 61.0 s and 62.6 s — consistent with a nominal 60 seconds plus a few seconds of jitter, not tied to the workload.
 
 **The number that matters to a consumer: a stopped run has about a minute, and then it is gone.** Side-effect recovery that cannot complete inside ~60 seconds must not be attempted in the container at all.
+
+---
+
+## §A — the lease, written and renewed from inside a microVM
+
+`agentforge-spike-lease`, on-demand DynamoDB in the same region, a 236-byte item, six renewals at a 2-second interval, written by the container while a task ran.
+
+| | |
+|---|---|
+| **write latency, inside the microVM** | **median 7 ms** (range 6–67 ms; the 67 ms is the SDK's first call) |
+| **write → visible to an eventually-consistent read** | **median 11 ms** (range 9–72 ms) |
+| read-backs needed to see a renewal | **1, every time — 6/6** |
+| lease item, as returned | 236 bytes, 1 RCU |
+| renewals implied by a 1-hour run at 2 s | 1,800 writes |
+
+**An eventually-consistent read never once failed to see a just-written lease.** DynamoDB's propagation is not a factor to design around at this item size and rate; a strongly-consistent read buys nothing here and costs double.
+
+**A renewal costs the task about 7 ms.** A 2-second interval is affordable: 1,800 writes an hour of a 236-byte item is roughly a fifth of a cent per hour on-demand, and the interval could go well below 2 seconds before the write cost became visible against the work it is guarding.
+
+### Why the first attempt at this number was thrown away
+
+The first version polled DynamoDB **from a laptop** and reported "visibility ≈ 322 ms". That figure conflated four things — the write, DynamoDB's propagation, a **241 ms read RTT from outside AWS**, and a **333 ms apparent clock offset** between two unsynchronised clocks, itself of the same order as the invoke round trip and therefore mostly asymmetric latency rather than skew. None of it was a platform number.
+
+The measurement above uses **one clock and one network**: the container writes and reads back itself. The laptop figure is kept only as the contrast it is — **an external reader's own RTT dominates the lease mechanics by more than twenty times**, so where the reader runs matters far more than anything DynamoDB does.

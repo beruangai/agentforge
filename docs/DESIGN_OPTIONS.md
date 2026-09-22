@@ -25,38 +25,36 @@ What is not yet decided. A question is worked here until it is settled; the outc
 
 ---
 
-## §A — Task store details *(OPEN)*
+## §A — Task store details *(the lease measured 2026-09-22; the item shape OPEN)*
 
 The interface is fixed and built in the first slice: a conditional insert for the idempotency index, and a fenced write that rejects a stale lease generation, because A2A's `TaskStore.save` overwrites unconditionally. DynamoDB holds the record, and an outcome over 256 KB fails rather than being offloaded (`ARCHITECTURE.md` §4). Open:
 
 - The item shape: what the A2A task, the index, the lease and the outcome look like as one record, and what a poll costs to read
 - The lease interval — short enough that loss is noticed, cheap enough at the renewal rate a long run implies
 
-**Spike (AgentCore):** write and renew a lease from inside a microVM, read it from outside, and measure visibility latency and renewal cost at the chosen interval.
+**Measured** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md) §A, `spikes/agentcore/a1-lease-visibility.ts`. From inside a microVM, on a 236-byte item at a 2-second renewal interval:
 
-## §B — Whether a busy container receives invocations *(OPEN — BLOCKED on IAM, 2026-09-22)*
+- **A write costs the task ~7 ms** (median; 6–67 ms, the outlier being the SDK's first call).
+- **A renewal is visible to an eventually-consistent read ~11 ms later**, and the read-back saw it **on the first poll, 6 times out of 6**. DynamoDB's propagation is not something to design around at this size and rate, and a strongly-consistent read buys nothing while costing double.
+- **1,800 writes an hour** at 2 s — roughly a fifth of a cent on-demand. The interval could go well below 2 s before the write cost registered against the work it guards.
 
-> **Blocked, not unanswered.** The AgentCore half of the spike plan — §B, §C's platform half and §A's lease measurement — could not run on 2026-09-22. `CreateAgentRuntime` requires `--role-arn`, and the `agentforge` SSO profile is `AWSReservedSSO_PowerUserAccess`, which denies both `iam:CreateRole` and, decisively, **`iam:PassRole`**:
->
-> ```
-> AccessDeniedException: User: …/AWSReservedSSO_PowerUserAccess_…/jeremy is not authorized to
-> perform: iam:PassRole on resource: arn:aws:iam::913756569129:role/agentforge-spike-agentcore-execution
-> ```
->
-> The execution role itself exists (the operator created it out of band); passing it is the block, so creating more roles does not help. ECR, DynamoDB and S3 are all reachable under the same profile — AgentCore alone is gated.
->
-> **`iam:PassRole` is the only permission missing.** Every denial observed was `iam:*`; `bedrock-agentcore-control:ListAgentRuntimes` succeeded, which rules out an SCP on the namespace, and `AWSPowerUserAccess` is `NotAction: ["iam:*", "organizations:*", "account:*"]`, so ECR, DynamoDB, S3, CloudWatch Logs and the rest of `bedrock-agentcore*` are already granted.
->
-> **Remediation, operator's choice:** attach `spikes/agentcore-passrole-policy.json` to the PowerUser permission set — `iam:PassRole` on that one role ARN, conditioned on `iam:PassedToService: bedrock-agentcore.amazonaws.com` — or run the AgentCore spikes from the admin identity that created the role.
->
-> **Before starting any AgentCore spike, run `bash spikes/verify-agentcore-access.sh`.** It walks the whole path to a real `CreateAgentRuntime` and creates nothing. It exists because the first probe on 2026-09-22 checked `iam:CreateRole`, found it denied, and asked for a role — while the blocking permission was `iam:PassRole`, never probed.
+**So the lease interval is not constrained by the store.** It is constrained by how quickly loss must be noticed, which is a design choice rather than a measurement.
 
+A first attempt polled from a laptop and produced "≈322 ms", which conflated the write, propagation, a 241 ms external read RTT and a 333 ms apparent clock offset. It is recorded in the research note as discarded, not as a figure. **What it does show is that an external reader's own RTT dominates the lease mechanics by more than twenty times**, so where the reader runs matters more than anything the store does.
 
-`/ping` is a lifecycle signal, not admission control, so a container should receive a start, a poll or a cancel whatever it last reported (`ARCHITECTURE.md` §4). That is inference from the contract's silence, and the whole await path rests on it.
+**Still open:** the item shape — what the A2A task, the index, the lease and the outcome look like as one record, and what a poll costs to read *that*, rather than the lease alone.
 
-**Spike (AgentCore):** hold a long task while reporting `HealthyBusy`; send a second `SendMessage`, a `GetTask` and a `CancelTask` to the same session; record delivery, latency and what the container sees. Confirm two tasks can run in one container, that no second container appears for one session id — including in the provisioning window that returns 409 — and what the startup window for the first `Healthy` response actually is.
+## §B — Whether a busy container receives invocations *(SETTLED 2026-09-22)*
 
-## §C — Cancellation on the platform *(the local half SETTLED 2026-09-22; the platform half BLOCKED with §B)*
+`/ping` is a lifecycle signal, not admission control, so a container should receive a start, a poll or a cancel whatever it last reported (`ARCHITECTURE.md` §4). That was inference from the contract's silence, and the whole await path rested on it. **It is now measured** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `spikes/agentcore/b1-session-and-busy.ts`, `b2-container-per-session.ts`, `b3-provisioning-window.ts`.
+
+- **A busy container receives everything.** With a 25-second task live and `/ping` answering `HealthyBusy`, a second `message/send`, a `tasks/get` and a `tasks/cancel` were all delivered — **3/3, at latencies indistinguishable from an idle session**. The second task ran concurrently in the same container, which reported `liveTasks: 2`.
+- **A runtime session id maps 1:1 to a container and stays put.** Six new sessions took six distinct containers; fired again, **6/6** returned the same one. One session's eight calls over ~35 s, spanning an idle gap and a task boundary, all hit one container.
+- **Containers are pre-warmed, not started per session** — up 28–212 s at a session's first call, replenished in batches. This confirms the untested reading of eleven `listening` events after `CreateAgentRuntime`.
+- **A session's first call costs ~1.2 s; every call after ~355 ms** — so establishment is ~850 ms. An earlier ~2.66 s figure was the SDK's own start-up, not the platform, and is discarded.
+- **The provisioning window produced no 409.** The first invoke, issued 2.9 s after `CreateAgentRuntime` while the control plane still said `CREATING`, **blocked for ~5.8 s and then succeeded**; `READY` was reported at 10.0 s. One session held one container across the transition. **One observation** — enough to say a caller must tolerate a slow first call, not enough to say the documented `RetryableConflictException` never happens, so a client should still retry it.
+
+## §C — Cancellation on the platform *(SETTLED 2026-09-22)*
 
 The mechanism is decided: `CancelTask` reaches the gateway, which stops the task gracefully and then kills its process group, with `StopRuntimeSession` as the blunt fallback (`ARCHITECTURE.md` §4).
 
@@ -68,7 +66,15 @@ The mechanism is decided: `CancelTask` reaches the gateway, which stops the task
 - **`SIGKILL` of the process group takes a grandchild the task started**; the negative control, killing the process alone, left it running. `detached: true` (`setsid`) plus `kill(-pid)` is what makes this true.
 - **A cancel arriving before the task process exists** is caught by a token set before the executor's first `await`.
 
-**Not settled, and not attemptable on 2026-09-22** — blocked with §B on `iam:PassRole`: whether the container receives `SIGTERM` under `StopRuntimeSession` and how long before the kill; whether telemetry flushes and an outcome is recorded inside the grace period; whether a Claude session left mid-turn resumes cleanly; and the third of the three cases below, which is inherently a platform question.
+**Settled on the platform** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `spikes/agentcore/c1-stop-runtime-session.ts`, `c2-grace-period.ts`:
+
+- **`StopRuntimeSession` returns 200 in ~390 ms and the container receives a real `SIGTERM` ~400 ms later**, mid-task, with work still in flight.
+- **The grace period is fixed at about a minute, and being busy does not extend it.** Two sessions stopped at the same instant — one holding a 4-second task, one a 240-second task — had their containers killed **62.6 s and 61.0 s** after `SIGTERM`. The idle one lived 58 s past the end of its work; the busy one was killed with work still running **while answering `HealthyBusy`**. Across three observations: 56.0 s, 61.0 s, 62.6 s.
+- **A stop is not a cancel.** The next invocation on that session id lands on a **fresh container with an empty task store**, so the in-flight task is unreachable from the caller the moment the stop returns — `tasks/get` answered `Task not found` for as long as it was polled.
+
+**The consequence for the design is a budget, not a mechanism: a stopped run has about 60 seconds, then it is gone.** Anything whose recovery cannot finish inside that must not be attempted in the container. This is why `StopRuntimeSession` is the blunt fallback and `CancelTask` is the path — the cooperative cancel settles in 5 ms and keeps the process reachable, which a stop does not.
+
+**Still open:** whether telemetry flushes and an outcome is recorded inside that window, and whether a Claude session left mid-turn resumes cleanly — both need a container that runs a real agent, which is §F's spike rather than this one.
 
 Three cases the implementation must cover whichever way the spike goes: a cancel arriving **before the task process exists** (settled above); a cancel from a caller that **attached to another caller's task**; and a cancel reaching a **freshly provisioned container**, whose A2A SDK would otherwise mark the task cancelled without consulting the executor that owns it.
 
@@ -138,7 +144,7 @@ The key, its two edges and its retention are settled: seven days, with the key s
 
 - **Container instance identity** — how a container names itself in the record, so a later one in the same runtime session recognizes a dead one's task as lost without waiting for the lease.
 
-## §I — How the server is assembled *(DECIDED 2026-09-22 — the AgentCore half remains)*
+## §I — How the server is assembled *(SETTLED 2026-09-22)*
 
 **Decided:** assemble directly from `@a2a-js/sdk` and Express, porting `serveA2A`'s AgentCore-contract mechanics rather than depending on it — [ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), status `proposed`. Findings in [`research/a2a-server-assembly.md`](research/a2a-server-assembly.md); the spike is `spikes/server-assembly/i1-gateway-wrap.ts`. **The first slice is unblocked.**
 
@@ -146,12 +152,14 @@ The key, its two edges and its retention are settled: seven days, with the key s
 
 Two constraints found along the way, both recorded in the research note: **`@a2a-js/sdk@1.2.0` is protobuf-typed**, so a part written the way the specification documents it serializes to an empty part with no error; and **an absent `A2A-Version` header means protocol 0.3**, so anything that drops it downgrades the request.
 
-**Still open — needs AgentCore:**
+**Answered against AgentCore** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `spikes/agentcore/server.ts`:
 
-- Whether `InvokeAgentRuntime` forwards `A2A-Version`. A silent downgrade presents as a blanket `VERSION_NOT_SUPPORTED`, so this is checked first.
-- Whether a client-supplied `contextId` (uuid7) survives the pass-through and returns on every task. It survives the SDK; the pass-through is untested.
-- AgentCore's real 409 and 424 as errors the client can act on, and retrying the retryable 409 with backoff, which A2A clients do not do on their own.
-- Whether `GetAgentCard` validates what it returns.
+- **`A2A-Version` is never forwarded.** The negotiated version is **`0.3` on every request**. ADR 0012's `legacyCompat` requirement now rests on the platform rather than on AWS's example, and a card declaring only 1.0 would refuse every call.
+- **A version-mismatched part is stripped of its content in silence.** A 1.0-shaped part sent to a 0.3-negotiated server arrives with `filename` and `mediaType` intact and `content` gone, with no error at any layer — a trusting executor falls through to its defaults. **The reader must throw**, which is a zero-silent-failures requirement on the harness, not a nicety.
+- **A client-supplied uuid7 `contextId` survives the pass-through verbatim.**
+- **`GetAgentCard` serves the container's own card**, not a synthesised one — except `url` and every `supportedInterfaces[].url`, which the platform **rewrites** to the invocations endpoint. So the container must not be relied on to declare its own public URL.
+- **424 is what a container-side error looks like from outside**, carrying `-32055 "Runtime client error - Please check your CloudWatch logs"` and naming neither the header nor the cause — so the client must surface the request id and the caller must be told to read the logs. **No 409 was observed** even when invoking through the provisioning window (§B), though the documented retry is still worth keeping.
+- **The caller must set `contentType: 'application/json'`.** AgentCore forwards the caller's content type unchanged; `@aws-sdk/client-bedrock-agentcore` defaults to `application/octet-stream`, which `jsonRpcHandler` rejects. An earlier note claiming AgentCore *strips* content-type was wrong and is corrected in the research note.
 
 ## §K — The plugin and construct surface *(OPEN)*
 
