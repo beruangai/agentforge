@@ -46,13 +46,33 @@ type Envelope = {
   runMilliseconds?: number;
 };
 
-function readEnvelope(params: any): Envelope {
-  const parts = params?.message?.parts ?? params?.request?.parts ?? [];
+/**
+ * FINDING (§I, 2026-09-22): a part whose encoding does not match the NEGOTIATED
+ * protocol version is stripped of its content and delivered anyway — `filename`
+ * and `mediaType` survive, `content` does not, and nothing errors. AgentCore
+ * forwards no `A2A-Version` header, so the negotiated version is always 0.3 and
+ * a client sending the 1.0 protobuf part shape loses its whole payload in
+ * silence. So this refuses a part it cannot decode rather than returning {}.
+ */
+function readEnvelope(source: any): Envelope {
+  // The executor is handed a RequestContext; the gateway is handed raw params.
+  const parts =
+    source?.request?.message?.parts ??
+    source?.message?.parts ??
+    source?.request?.parts ??
+    source?.parts;
+  if (!Array.isArray(parts) || parts.length === 0) {
+    throw new Error(`no parts in ${Object.keys(source ?? {}).join(',')}`);
+  }
   for (const part of parts) {
     if (part?.content?.$case === 'data') return part.content.value ?? {};
     if (part?.kind === 'data') return part.data ?? {};
+    if (part?.data && typeof part.data === 'object') return part.data;
   }
-  return {};
+  throw new Error(
+    `a part carries no decodable content — keys ${parts.map((p: any) => Object.keys(p ?? {}).join('+')).join(' | ')}. ` +
+      'A 1.0-shaped part sent to a 0.3-negotiated server is stripped in transit.',
+  );
 }
 
 class SpikeExecutor implements AgentExecutor {
@@ -60,7 +80,11 @@ class SpikeExecutor implements AgentExecutor {
 
   async execute(requestContext: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
     const { taskId, contextId } = requestContext;
-    const envelope = readEnvelope(requestContext.request as any);
+    // Dump the RequestContext shape once, so readEnvelope is written against
+    // what the SDK actually hands the executor rather than against the wire.
+    console.log(JSON.stringify({ event: 'requestContext', keys: Object.keys(requestContext as any),
+      dump: JSON.parse(JSON.stringify(requestContext, (_k, v) => (typeof v === 'bigint' ? String(v) : v))) }));
+    const envelope = readEnvelope(requestContext as any);
     const duration = Number(envelope.runMilliseconds ?? 1_000);
 
     live.add(taskId);
@@ -79,6 +103,9 @@ class SpikeExecutor implements AgentExecutor {
           liveTasks: live.size,
           idempotencyKey: envelope.idempotencyKey ?? null,
           runMilliseconds: duration,
+          // The version the SDK negotiated for this request. Behind AgentCore
+          // this is always 0.3, because no A2A-Version header is forwarded (§I).
+          negotiatedVersion: (requestContext as any).context?._requestedVersion ?? null,
         },
       }),
     );
@@ -228,7 +255,17 @@ app.use(
 process.on('SIGTERM', () => {
   sigtermAt = Date.now();
   console.log(JSON.stringify({ event: 'sigterm', containerId: CONTAINER_ID, at: sigtermAt, liveTasks: live.size }));
+  // Deliberately does NOT exit. The grace period between SIGTERM and the kill
+  // is the number §C needs — it bounds what a cancelled run can finish, and
+  // therefore whether side-effect recovery is possible at all. A heartbeat
+  // makes it measurable: the last one logged is the moment the process died.
+  const since = () => Date.now() - sigtermAt!;
+  const beat = setInterval(() => {
+    console.log(JSON.stringify({ event: 'post-sigterm', containerId: CONTAINER_ID, msSinceSigterm: since(), liveTasks: live.size }));
+    if (since() > 180_000) clearInterval(beat);
+  }, 500);
 });
+process.on('SIGINT', () => console.log(JSON.stringify({ event: 'sigint', containerId: CONTAINER_ID, at: Date.now() })));
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(JSON.stringify({ event: 'listening', containerId: CONTAINER_ID, port: PORT }));
