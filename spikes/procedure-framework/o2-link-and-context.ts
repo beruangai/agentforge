@@ -18,6 +18,7 @@ import { oc } from '@orpc/contract';
 import { implement, call, createRouterClient } from '@orpc/server';
 import { createORPCClient } from '@orpc/client';
 import type { ContractRouterClient } from '@orpc/contract';
+import type { ClientLink } from '@orpc/client';
 import { z } from 'zod';
 
 const taskHandle = z.object({ taskId: z.string(), state: z.literal('SUBMITTED') });
@@ -76,8 +77,8 @@ async function invokeAgentRuntime(payload: string): Promise<string> {
 }
 
 /** The whole link. This is the seam AgentForge would own. */
-const agentCoreLink = {
-  async call(path: readonly string[], input: unknown, _options: unknown) {
+const agentCoreLink: ClientLink<Record<never, never>> = {
+  async call(path, input, _options) {
     const response = await invokeAgentRuntime(JSON.stringify({ path, input }));
     return JSON.parse(response).output;
   },
@@ -85,7 +86,7 @@ const agentCoreLink = {
 
 // Typed from the CONTRACT, over a link that knows nothing about HTTP. If this
 // is not typed, oRPC buys AgentForge nothing a plain function would not.
-const client: ContractRouterClient<typeof contract, Record<never, never>> = createORPCClient(agentCoreLink as any);
+const client: ContractRouterClient<typeof contract, Record<never, never>> = createORPCClient(agentCoreLink);
 
 const handle = await client.reviewStrategy.submit({ strategyId: 'alpha', depth: 5 });
 console.log('  through the link, submit ->', JSON.stringify(handle));

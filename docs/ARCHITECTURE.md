@@ -129,7 +129,10 @@ Cross-cutting behavior — guardrail hooks, telemetry, a house style of options 
 
 **A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)). Cross-cutting behavior is **middleware that contributes to a typed context**: a house helper resolves something and adds it, and every later middleware and the handler see it typed without the procedure having declared it. Hand-built authoring could not offer that; it was compared on its own terms and the finding still holds — a class's `override guardrails()` can silently drop the house contribution with the compiler's blessing ([research](research/procedure-authoring.md)), which is why guardrail composition stays additive.
 
-**A procedure never names its transport.** The same declaration executes in-process in the container and travels over a custom client link from a caller ([research](research/procedure-framework.md)).
+**A procedure never names its transport.** The same declaration executes in-process in the container and travels over a custom client link from a caller ([research](research/procedure-framework.md)). Two things are the link's to do rather than the framework's:
+
+- **A caller's cancellation is mapped, never dropped.** A signal reaches middleware and the handler, and a handler that races its work against it returns promptly — but a signal cannot travel with an `InvokeAgentRuntime` call, so the link turns a caller's abort into the out-of-band `CancelTask` invocation. Accepting a signal and ignoring it would be a silent failure.
+- **A stream's wire encoding is ours.** oRPC's event iterator carries event *objects*; the SSE encoding lives in its HTTP handler, which AgentForge does not use. A streaming link serialises each event itself and must throw on a body that ends mid-frame rather than dropping the tail.
 
 ---
 
@@ -180,6 +183,8 @@ Offloading instead would push the cost outward: a caller orchestrating on the ou
 
 - **Concurrent — guaranteed.** Attempts carry the same runtime session id and reach the same container, whose gateway is that session's single authority; a start whose key names a live task returns that task. The index insert is conditional, so two starts racing cannot both admit.
 - **Later — within the record's retention**, which is **seven days**. The key includes the caller's *run* identity — for the Temporal factory, the workflow run id with the activity id — so a key belongs to one workflow run and nothing re-sends it afterwards; a reset, which re-executes with the same activity ids under a new run id, therefore runs fresh rather than attaching to the old outcome. Retention is a storage bound rather than a correctness one, and a repeated start after it runs again, with `start` reporting that it started rather than attached.
+
+**The key rides in the client's call context, not in a procedure's input.** oRPC types what a caller supplies per call separately from the input, so the compiler requires a key on every submit without any procedure having declared one. That requirement is carried by the client's own type, which is therefore AgentForge's to vend rather than a consumer's to write: a link may legally be typed more loosely and would simply ignore the key ([research](research/procedure-framework.md)).
 
 A cancel from one caller ends a task other callers attached to, so the outcome distinguishes who asked: a caller that did not ask should treat it as retryable.
 

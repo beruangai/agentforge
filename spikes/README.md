@@ -51,6 +51,8 @@ Every message of every run is written to `out/<spike>.jsonl`, and a machine-read
 | `procedure-framework/o1-contract-split.ts` | oRPC — one contract split into typed `submit` + `result` | [procedure-framework.md](../docs/research/procedure-framework.md) |
 | `procedure-framework/o2-link-and-context.ts` | oRPC — a custom non-HTTP link, and middleware-contributed typed context | ″ |
 | `procedure-framework/o3-error-fidelity.ts` | oRPC — what survives a serialising transport | ″ |
+| `procedure-framework/o4-streaming.ts` | oRPC — an event stream across a byte boundary, interleaved | ″ |
+| `procedure-framework/o5-cancellation-and-typed-link.ts` | oRPC — a `ClientLink` with no cast; cancellation to the handler | ″ |
 
 `agentcore/` needs the AWS environment: **`bash agentcore/setup.sh`** builds it from nothing in about two minutes — access check, ECR, the lease table, an ARM64 image, the runtime — and **`bash agentcore/teardown.sh`** removes every piece and then lists whatever is still tagged `agentforge:spike=true`, so the check is the tag rather than anyone's memory. `agentcore/build-and-push.sh <tag>` rebuilds and redeploys the image alone.
 

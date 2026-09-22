@@ -34,14 +34,89 @@ function split<I extends z.ZodTypeAny, O extends z.ZodTypeAny>(c: { input: I; ou
 
 **Error fidelity is the link's choice, not the framework's.** Across a serialising transport the message, the structured `data` and the original stack all arrived — because the link carries them. oRPC does not marshal errors behind the caller's back, so the `Rethrow` plugin is an HTTP-adapter concern and not needed when the link is ours. This was the stated pain point with tRPC.
 
-## What was not tested
+## The gaps, closed — 2026-09-23
 
-Recorded as gaps, not as risks discounted:
+The four gaps left open above were spiked. `o4-streaming.ts` and
+`o5-cancellation-and-typed-link.ts`, both `tsc --strict` clean with their
+`@ts-expect-error` directives verified live by flipping one to a valid line and
+confirming TS2578.
 
-- **Streaming and cancellation** over a custom link. The proposal flags both; neither was exercised.
-- **The link's own typing.** The client type is proved; the link object itself was passed with a cast, because a full `ClientLink` was not implemented.
-- **The `Locking` helper** against the idempotency requirement, and the rest of the plugin surface.
-- **Worker threads.** oRPC ships a worker-threads adapter, but threads share a heap and do not give what [ADR 0004](../../adr/0004-a-process-per-task.md) buys — a process group whose `SIGKILL` takes a grandchild, measured in `task-process-and-cost.md`. oRPC does not require it: `call()` in-process works, and AgentForge keeps spawning its own process. The adapter is not a substitute.
+| Question | Result |
+|---|---|
+| A stream survives a non-HTTP link | **yes** — 3 events, 3 byte frames, 156 bytes |
+| It is streamed, not buffered | **yes** — `encode:BEFORE receive:BEFORE encode:RUN receive:RUN …` |
+| A `ClientLink` needs no cast | **yes** — `ClientLink<T>` is one method; o2's `as any` was avoidable |
+| Client context is compiler-enforced per call | **yes** — a submit with no idempotency key does not compile |
+| A signal reaches middleware and handler | **yes**, and it is the same object in both |
+| A running procedure can be cancelled | **yes** — a 5000 ms run returned in 64 ms, `finished: false` |
+
+**The wire encoding is AgentForge's to write.** `eventIteratorToStream` yields
+the **event objects**, not encoded bytes — its name suggests otherwise and the
+first attempt at this spike was wrong because of it. oRPC's SSE encoding lives
+in its HTTP handler, which AgentForge does not use. So a streaming link
+serialises each event itself; `RPCSerializer` plus one JSON line per event is
+enough and keeps `Date`/`BigInt` fidelity:
+
+```ts
+`${JSON.stringify(serializer.serialize(event))}\n`   // {"json":{"phase":"BEFORE",…}}
+```
+
+The decoder must buffer partial lines and **throw on a stream that ends
+mid-frame** rather than dropping the tail.
+
+**Client context is the right home for the idempotency key.** `ClientLink<T>`
+types what a caller supplies *per call*, separately from the input, so the key
+is required by the compiler without any procedure declaring it — which is what
+`ARCHITECTURE.md` wants and what the object literal could not express.
+
+**One hazard, stated rather than probed.** A link may declare a *looser*
+context than the client requires; that is ordinary contravariance and sound —
+the link just ignores what it is handed. The requirement is enforced by the
+**client's own type annotation**, so that annotation is AgentForge's to vend
+and not a consumer's to write. The opposite direction is caught: a link
+demanding more than the client promises is rejected at `createORPCClient`.
+
+**Cancellation is out of band, and the link must say so.** oRPC threads an
+`AbortSignal` from the call to middleware and handler, and a handler that races
+its work against it returns promptly. But a caller's signal cannot travel with
+an `InvokeAgentRuntime` call — AgentForge cancels by a separate `CancelTask`
+invocation ([ADR 0002](../../adr/0002-a2a-is-the-boundary-contract.md)). So the
+link **must** map a caller abort onto that out-of-band cancel; accepting a
+signal and dropping it would be a silent failure.
+
+## `Locking` does not answer idempotency
+
+Read from [the Lock helper's documentation](https://orpc.dev/docs/helpers/lock)
+on 2026-09-23. `@orpc/experimental-lock` is **a mutex, not a dedupe store**:
+
+```ts
+lock(key, callback, { ttl?, timeout?, signal? }): Promise<T>
+```
+
+It holds a key while a callback runs and releases it afterwards. It does not
+store the result, so a repeat does not get the first answer back — the docs say
+so explicitly and leave result-checking to the caller. Its adapters are memory,
+Redis, Upstash, Bun Redis and Durable Objects; the memory one is per-container
+and therefore blind to the rest of the fleet, and AgentForge has no Redis.
+
+AgentForge's requirement is different in kind: an idempotency key must return
+**the same task** on a repeat, across containers, after the first container has
+died. That is a durable conditional insert keyed on the idempotency key — the
+DynamoDB write already in the design (D3) — and a mutex adds nothing to it. The
+package is also `experimental-`. **Not adopted.**
+
+## What was still not tested
+
+- **The rest of the plugin surface.** `RequestLimitHandlerPlugin`,
+  `TimeoutHandlerPlugin` and the CORS/compression plugins are all handler-level
+  and HTTP-shaped, so they do not apply to a custom link. Unexamined, not
+  discounted.
+- **Worker threads.** oRPC ships a worker-threads adapter, but threads share a
+  heap and do not give what [ADR 0004](../../adr/0004-a-process-per-task.md)
+  buys — a process group whose `SIGKILL` takes a grandchild, measured in
+  `task-process-and-cost.md`. oRPC does not require it: `call()` in-process
+  works, and AgentForge keeps spawning its own process. The adapter is not a
+  substitute.
 
 ## Standing considerations
 
@@ -51,6 +126,6 @@ Recorded as gaps, not as risks discounted:
 
 ## What this does to the existing decisions
 
-[ADR 0013](../../adr/0013-a-procedure-is-an-object-literal.md) compared three **hand-built** authoring styles. It never compared building against adopting, and the object literal was chosen partly because the alternative was machinery to build and maintain. That premise no longer holds, so the decision is open again on its own terms rather than being reversed.
+[ADR 0013](../../adr/0013-a-procedure-is-an-orpc-contract.md) compared three **hand-built** authoring styles. It never compared building against adopting, and the object literal was chosen partly because the alternative was machinery to build and maintain. That premise did not hold, and the ADR was rewritten in place on 2026-09-22.
 
-[ADR 0003](../../adr/0003-procedures-are-type-safe-end-to-end.md) says an asynchronous call "leaves an RPC framework's request-response typing with nothing to type". That reasoning does not survive the two-procedure realisation: there are two things to type, and contract-first types both.
+[ADR 0003](../../adr/0003-procedures-are-type-safe-end-to-end.md) says an asynchronous call "leaves an RPC framework's request-response typing with nothing to type". That reasoning does not survive the two-procedure realisation: there are two things to type, and contract-first types both. The ADR was rewritten in place on 2026-09-22; its rejected "RPC framework" option is now the chosen one.
