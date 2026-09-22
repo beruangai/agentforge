@@ -1,6 +1,8 @@
 # Spikes
 
-Throwaway programs that answer a question in [`../docs/DESIGN_OPTIONS.md`](../docs/DESIGN_OPTIONS.md) by running against the real thing. **These are not the final home.** `ARCHITECTURE.md` §9 requires every spike to land as an integration test in a capability's `integ/`, so its answer is re-checked as the platform moves rather than recorded once and trusted. They live here only until the Nx workspace exists to hold them.
+Throwaway programs that answer a question in [`../docs/DESIGN_OPTIONS.md`](../docs/DESIGN_OPTIONS.md) by running against the real thing. **These are not the final home.** They live here until the Nx workspace exists.
+
+**Which of them become integration tests is a judgement, not a rule.** A spike whose answer depends on something that moves — the Agent SDK's behaviour, AgentCore's contract, what a registry serves — lands in a capability's `integ/`, because a later version can quietly change it. A spike that settles a decision once — the procedure authoring style, whether `s7cmd` runs on ARM64 musl — is finished when its finding is recorded with its date. A test that can only pass is maintenance without information.
 
 Findings go to [`../docs/research/`](../docs/research/) with the date and the version they were read against. A negative result is recorded as precisely as a positive one.
 

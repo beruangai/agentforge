@@ -4,7 +4,12 @@
 
 Unit tests run against nothing external. **Runtime integration tests** run against a real AgentCore runtime with the model call stubbed inside the kernel — deterministic and cheap, covering admission, idempotency, the task-process protocol, cancellation, the lease, loss and deployment. **End-to-end tests** call a real model and cover structured output, settlement, in-turn correction and usage; they run after a change that could move them, not on every commit.
 
-**A spike is written as an integration test, not a script.** Every question in `docs/DESIGN_OPTIONS.md` that a spike answers lands in `integ/`, so the answer is re-checked as the platform moves instead of being recorded once and trusted.
+**A spike earns an integration test when its answer can drift.** Not every spike does. Ask what the answer depends on:
+
+- **It depends on a platform or dependency that moves** — an SDK's behaviour, AgentCore's contract, what a registry serves. Write it as an integration test in `integ/`, because the answer is not self-renewing and a later version can quietly change it.
+- **It settles a decision once** — which of three authoring styles, whether a tool runs on this architecture. A grounded ADR or research note stating the finding and its date is enough. A test that can only pass adds maintenance, not information.
+
+The question is *would we want to be told when this changes*, not *did a spike produce it*.
 
 Each tier is its own target and its own vitest config, so the guard is the target rather than a conditional inside a test:
 

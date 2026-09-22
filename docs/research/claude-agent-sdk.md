@@ -51,3 +51,10 @@ What remains for AgentForge is the outer validation and the typed `output_invali
 - The working directory is not cosmetic: it keys the project, the transcript location, and the store lookup. A procedure that changes it changes where its session lives (H15).
 - Cross-container resume (H14) has two candidate mechanisms — the store adapter or a persistent mount — which differ in what the base image and the CDK constructs must provide. Decided by spike, `DESIGN_OPTIONS.md` §F.
 - Mirror failure is a real failure mode to surface rather than swallow: `mirror_error` must reach the task record, not be logged and forgotten.
+
+
+## Settings sources and capability composition — verified 2026-09-22
+
+`settingSources?: ("user" | "project" | "local")[]`, default **all three**; `[]` loads none. Precedence lowest to highest is **user → project → local**, merged key by key; array settings such as `permissions.allow` combine across scopes rather than replacing.
+
+**Project-scope discovery walks UP the directory tree from `cwd`**, so several nested `.claude/` directories all contribute — measured, because the SDK reference and the `.claude` directory reference state the opposite of each other. Two behaviours that are easy to miss, both measured in [`capability-composition.md`](capability-composition.md): **a `.git` directory between `cwd` and a layer silently removes that layer**, and **`additionalDirectories` loads the directory's skills, commands and subagents** rather than granting read access alone.

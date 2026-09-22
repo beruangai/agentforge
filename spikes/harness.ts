@@ -20,8 +20,14 @@ export function loadEnvironment(): void {
     if (!match) continue;
     process.env[match[1]!] = match[2]!;
   }
+  // The operator may supply a short-lived token for a spike session and revoke
+  // it afterwards. Prefer it when present, so a spike never uses the standing
+  // one by accident.
+  if (process.env.TEMP_CLAUDE_CODE_OAUTH_TOKEN) {
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = process.env.TEMP_CLAUDE_CODE_OAUTH_TOKEN;
+  }
   if (!process.env.CLAUDE_CODE_OAUTH_TOKEN?.startsWith('sk-ant-')) {
-    throw new Error('CLAUDE_CODE_OAUTH_TOKEN missing or malformed in .env.local');
+    throw new Error('no usable token: set TEMP_CLAUDE_CODE_OAUTH_TOKEN or CLAUDE_CODE_OAUTH_TOKEN in .env.local');
   }
 }
 

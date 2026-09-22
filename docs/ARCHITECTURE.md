@@ -250,7 +250,7 @@ An agentic base image serving one agent, or an agent serving one procedure, is t
 
 The mirror is best-effort by design — three attempts, then the batch is dropped with a `mirror_error` — so it is verified rather than trusted: entries deduped by id, the transcript's last entry checked after the run, and a dropped batch failing the task rather than appearing in a log.
 
-**The project key is derived, never supplied.** It is `{consumer}-{project}-{agent}` plus the working directory the run uses, so continuity is scoped to an agent *and* the directory it works in: one agent's procedures working in different directories — per lane, per strategy — keep separate transcript scopes, rather than sharing one because they share an agent. A procedure that sets its own working directory moves its scope with it.
+**The project key is derived, never supplied.** It is `{consumer}-{project}-{agent}` plus the working directory the run uses — **[OPEN §L]** on which directory that means, now that `cwd` (the capability root, which selects the agent's `.claude/` layers) is distinguished from the directories a run reads and writes — so continuity is scoped to an agent *and* the directory it works in: one agent's procedures working in different directories — per lane, per strategy — keep separate transcript scopes, rather than sharing one because they share an agent. A procedure that sets its own working directory moves its scope with it.
 
 `CLAUDE_CODE_PROJECT_DIR_NAME` carries it, which constrains the derivation: 1–64 characters of letters, digits, hyphens or underscores, no separators, and not a Windows device name. AgentForge sanitizes and, where the parts do not fit, truncates deterministically with a hash — the same treatment the runtime name gets (§6). It also sets `CLAUDE_CONFIG_DIR`, without which the name is ignored. **An invalid name does not fail; the SDK silently falls back to a path-derived one**, so the run asserts the transcript landed under the expected key and fails the task if it did not.
 
@@ -303,7 +303,7 @@ Written by AgentForge: the outcome, the attempt and the prior attempt's state, t
 
 ## 9. How this is tested
 
-Three tiers, and a rule: **a spike is written as an integration test, not a script.** The questions in `DESIGN_OPTIONS.md` are answered once and then keep being answered, because the platform moves and an answer that was true in September is not self-renewing.
+Three tiers, and a rule about what earns a test: **a spike becomes an integration test when its answer can drift.** An answer that depends on a platform or a dependency — the Agent SDK's settlement behaviour, AgentCore's contract, what a registry serves — is not self-renewing, so it lands in `integ/` and keeps being checked. An answer that settles a decision once, such as which authoring style a procedure uses or whether a binary runs on this architecture, is recorded in an ADR or a research note with its date. A test that can only pass is maintenance without information.
 
 | Tier | Runs against | Covers |
 |---|---|---|
@@ -339,6 +339,8 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | Admission beyond the container's memory, killing its neighbours | 1 |
 | A part delivered with its content silently stripped, under the `SendMessage` method name | 1 |
 | A protocol version assumed rather than asserted, after a missing header allowlist entry downgraded the request | 1 |
+| A `.git` directory between `cwd` and a capability layer, silently removing that layer from the session | 2 |
+| A synced working directory contributing skills or commands through `additionalDirectories` | 2 |
 | A caller whose content type the A2A handler refuses, surfacing as an opaque 424 | 1 |
 | Recovery attempted inside a stopped container, past the ~60-second kill | 1 |
 
