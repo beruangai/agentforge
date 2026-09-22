@@ -34,6 +34,18 @@ Every message of every run is written to `out/<spike>.jsonl`, and a machine-read
 | `images/d1-deterministic-builds.sh` | §D — deterministic builds and deploy granularity | [image-determinism.md](../docs/research/image-determinism.md) |
 | `procedure-authoring/n0-decorators-on-bun.ts` | §N — do TypeScript 5 decorators work on Bun | [procedure-authoring.md](../docs/research/procedure-authoring.md) |
 | `procedure-authoring/n4-judge.ts` | §N — the three styles, judged by `tsc` | ″ |
+| `agentcore/server.ts` | the container the AgentCore spikes drive: the §I gateway, a container id per process, `/ping` from live task count, request headers to stdout, a lease writer and a `SIGTERM` handler that records an outcome | [agentcore-runtime-observed.md](../docs/research/agentcore-runtime-observed.md) |
+| `agentcore/b1-session-and-busy.ts` | §B — does a busy container receive a start, a poll and a cancel | ″ |
+| `agentcore/b2-container-per-session.ts` | §B — one container per session, or a pool | ″ |
+| `agentcore/b3-provisioning-window.ts` | §B — the window between `CreateAgentRuntime` and a working invoke | ″ |
+| `agentcore/c1-stop-runtime-session.ts` | §C — `StopRuntimeSession`, and §I's `GetAgentCard` | ″ |
+| `agentcore/c2-grace-period.ts` | §C — is the post-`SIGTERM` window fixed, or tied to being busy | ″ |
+| `agentcore/c3-outcome-in-grace.ts` | §C — can a stopped container still record an outcome | ″ |
+| `agentcore/a1-lease-visibility.ts` | §A — lease write and renewal cost from inside a microVM | ″ |
+| `bundler/d2-bun-bundler-determinism.sh` | §D — is `bun build` byte-identical | [image-determinism.md](../docs/research/image-determinism.md) |
+| `sync/f1-s7cmd-semantics.sh` | §F — does `s7cmd` do what the design assumes | [working-directory-sync.md](../docs/research/working-directory-sync.md) |
+
+`agentcore/` needs the AWS environment: **`bash agentcore/setup.sh`** builds it from nothing in about two minutes — access check, ECR, the lease table, an ARM64 image, the runtime — and **`bash agentcore/teardown.sh`** removes every piece and then lists whatever is still tagged `agentforge:spike=true`, so the check is the tag rather than anyone's memory. `agentcore/build-and-push.sh <tag>` rebuilds and redeploys the image alone.
 
 `images/` needs `bash images/setup.sh` first (a throwaway registry, a `docker-container` builder, and a `DOCKER_CONFIG` without the macOS keychain helper), and `bash images/teardown.sh` after.
 
