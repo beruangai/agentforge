@@ -45,7 +45,11 @@ The interface is fixed and built in the first slice: a conditional insert for th
 >
 > The execution role itself exists (the operator created it out of band); passing it is the block, so creating more roles does not help. ECR, DynamoDB and S3 are all reachable under the same profile — AgentCore alone is gated.
 >
-> **Remediation, operator's choice:** add `iam:PassRole` on that role ARN, conditioned on `iam:PassedToService: bedrock-agentcore.amazonaws.com`, to the PowerUser permission set; or run the AgentCore spikes from the admin identity that created the role. `spikes/agentcore/` holds everything else ready to go.
+> **`iam:PassRole` is the only permission missing.** Every denial observed was `iam:*`; `bedrock-agentcore-control:ListAgentRuntimes` succeeded, which rules out an SCP on the namespace, and `AWSPowerUserAccess` is `NotAction: ["iam:*", "organizations:*", "account:*"]`, so ECR, DynamoDB, S3, CloudWatch Logs and the rest of `bedrock-agentcore*` are already granted.
+>
+> **Remediation, operator's choice:** attach `spikes/agentcore-passrole-policy.json` to the PowerUser permission set — `iam:PassRole` on that one role ARN, conditioned on `iam:PassedToService: bedrock-agentcore.amazonaws.com` — or run the AgentCore spikes from the admin identity that created the role.
+>
+> **Before starting any AgentCore spike, run `bash spikes/verify-agentcore-access.sh`.** It walks the whole path to a real `CreateAgentRuntime` and creates nothing. It exists because the first probe on 2026-09-22 checked `iam:CreateRole`, found it denied, and asked for a role — while the blocking permission was `iam:PassRole`, never probed.
 
 
 `/ping` is a lifecycle signal, not admission control, so a container should receive a start, a poll or a cancel whatever it last reported (`ARCHITECTURE.md` §4). That is inference from the contract's silence, and the whole await path rests on it.

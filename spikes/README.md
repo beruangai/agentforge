@@ -39,6 +39,13 @@ Every message of every run is written to `out/<spike>.jsonl`, and a machine-read
 
 ## AWS
 
-`create-execution-role.sh` creates the AgentCore execution role the AgentCore spikes need. It requires IAM rights that the `agentforge` PowerUser SSO profile **does not have**, so an operator runs it. `delete-execution-role.sh` removes it.
+**Run `bash verify-agentcore-access.sh` first**, before asking for anything and before anyone walks away. It walks every permission the AgentCore spikes need to the end of the path — ending in a real `CreateAgentRuntime` against a deliberately nonexistent image, which fails on the image when IAM is correct and on authorization when it is not — and creates nothing. It exists because on 2026-09-22 a probe checked `iam:CreateRole`, found it denied, and asked for a role, when the permission that actually blocks `CreateAgentRuntime` is **`iam:PassRole`**. Half a fix cost the whole AgentCore half of a night.
+
+Two pieces the `agentforge` PowerUser SSO profile cannot supply itself, both needing an admin identity:
+
+- `create-execution-role.sh` creates the execution role AgentCore assumes. `delete-execution-role.sh` removes it.
+- `agentcore-passrole-policy.json` grants the **caller** `iam:PassRole` on that role, conditioned on `iam:PassedToService: bedrock-agentcore.amazonaws.com`. Without it `CreateAgentRuntime` is refused no matter what the role allows.
+
+`AWSPowerUserAccess` is `NotAction: ["iam:*", "organizations:*", "account:*"]`, so everything else the spikes need — `bedrock-agentcore*`, ECR, DynamoDB, S3, CloudWatch Logs — is already granted. `iam:PassRole` is the only addition.
 
 Everything a spike creates in AWS is tagged `agentforge:spike=true` and deleted when that spike is done.
