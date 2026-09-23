@@ -12,8 +12,7 @@ Milestones deliver capability a consumer can actually run. Each is proposed thro
 - Read `@aws/nx-plugin`'s `ts#agent` and its sync machinery for what to extend rather than rebuild (§K)
 - **The blocking decisions are made**: the A2A server is assembled rather than inherited ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), §I), it speaks 1.0 only ([ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)), a procedure is an oRPC contract ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md), §N), and the task store is one task item plus a tiny index item (§A)
 - **Landed:** kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), deterministic image builds (§D), the procedure framework (§N), capability composition (§L/§REQ203), and the AgentCore behaviour §A, §B, §C and §I rested on
-- **Still owed as a spike:** credential provisioning and expiry (§O)
-
+- **No spike is outstanding.** §O's first slice classifies `CREDENTIAL_EXPIRED` and does nothing more, which needs no measurement; the one unrun spike — session resume across containers (§F) — needs an agent that does not exist until A1
 - **`spikes/` is triaged and removed.** It sits outside the Nx layout and does not survive this milestone: each spike is carried into a capability's `integ/` or deleted, per the disposition already decided in [`spikes/README.md`](../spikes/README.md)
 
 **Exit:** the workspace builds; `spikes/` is gone; every A0 question is closed or explicitly deferred with its reason; each spike whose answer can drift is an integration test and each that settled a decision once is an ADR or a dated research note (`ARCHITECTURE.md` §9).

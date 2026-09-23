@@ -278,15 +278,19 @@ Not open questions — deliberately not being worked until something asks for th
 
 **A spike lands as an integration test when its answer can drift** (`ARCHITECTURE.md` §9) — a platform or dependency behaviour is not self-renewing, so it keeps being checked; a question settled once is recorded in an ADR or a research note with its date. Local spikes need only Bun, Docker and the SDK. AgentCore spikes run against a throwaway runtime, never a deployment, and stub the model call so they stay cheap and deterministic.
 
-| Spike | Answers | Needs |
+| Spike | Answers | State |
 |---|---|---|
-| A2A server assembly, the wrapping gateway, client signing | §I | Local |
-| Kernel settlement and structured output | §E | Local — **done**, `spikes/kernel-settlement/` |
-| Task-process protocol, cancellation, group kill | §C, §G | Local — **done**, `spikes/task-process/` |
-| Procedure framework: contract split, custom link, typed context | §N | Local — **done**, `spikes/procedure-framework/` |
-| Credential provisioning and expiry | §O | Local |
-| Deterministic image builds and skipped deploys | §D | Local — **done**, `spikes/images/` |
-| Busy-container reachability and concurrency | §B | AgentCore |
-| Cancellation on the platform | §C | AgentCore |
-| Task store lease and visibility | §A | AgentCore |
-| Session resume across containers, and workspace sync | §F | Local, then AgentCore |
+| Kernel settlement and structured output | §E | **done** — `spikes/kernel-settlement/` |
+| Task-process protocol, cancellation, group kill | §C, §G | **done** — `spikes/task-process/` |
+| Procedure framework: the split, custom link, typed context, streaming, cancellation | §N | **done** — `spikes/procedure-framework/` |
+| A2A server assembly, the wrapping gateway, client signing | §I | **done** — `spikes/server-assembly/` |
+| Image layering and bundler determinism | §D | **done** — `spikes/images/`, `spikes/bundler/` |
+| Capability composition up the image chain | §L | **done** — `spikes/capability-composition/` |
+| Working-directory sync semantics | §F | **done** — `spikes/sync/` |
+| Busy-container reachability, concurrency, container-per-session | §B | **done** — `spikes/agentcore/` |
+| Cancellation, the stop grace period, the outcome inside it | §C | **done** — `spikes/agentcore/` |
+| Task store lease and visibility, from inside a microVM | §A | **done** — `spikes/agentcore/` |
+| Header allowlist, 1.0-only negotiation, the silent part strip | §I | **done** — `spikes/agentcore/` |
+| **Session resume across containers** | §F | **not run** — needs a real agent in a container, so it waits for A1 |
+
+**Everything else is answered.** Credential provisioning was on this list and is not a spike: §O's first slice classifies `CREDENTIAL_EXPIRED` and does nothing more, which needs no measurement. The one outstanding spike needs an agent that does not exist yet, so **no spike blocks A0**.
