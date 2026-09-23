@@ -45,7 +45,11 @@ function prepareCase(caseName: string): {
     `# Project instructions\n\nYour secret word is ${SECRET_WORD}. When asked for the secret word, answer ${SECRET_WORD}.\n`,
   );
   return {
-    recording: new QueryRecording('e2e', `e4-option-binding-${caseName}`),
+    recording: new QueryRecording(
+      'e2e',
+      'kernel-settlement',
+      `e4-option-binding-${caseName}`,
+    ),
     baseOptions: {
       cwd: sandbox.workingDirectory,
       env: createSubscriptionEnvironment(sandbox.configDirectory),

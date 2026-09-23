@@ -58,7 +58,11 @@ async function discoveredCommandNames(
   tree: CapabilityLayerTree,
   options: Partial<Options>,
 ): Promise<string[]> {
-  const recording = new QueryRecording('integ', `l1-nested-scopes-${testName}`);
+  const recording = new QueryRecording(
+    'integ',
+    'capability-composition',
+    `l1-nested-scopes-${testName}`,
+  );
   const { initializationResult } = await readSessionStartWithoutATurn(
     {
       cwd: tree.workingDirectory,

@@ -11,20 +11,73 @@
     "build": {
       "dependsOn": ["lint", "typecheck", "bundle", "test"]
     },
-    "format": {
+    "typecheck": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["biome"],
-      "options": {
-        "command": "biome format {projectRoot}"
-      },
-      "configurations": {
-        "fix": {
-          "command": "biome format --write {projectRoot}"
-        },
-        "skip-lint": {
-          "command": "node -e \"\""
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/integ/**/*",
+        "{projectRoot}/e2e/**/*",
+        "{projectRoot}/*.mts",
+        "{projectRoot}/*.ts",
+        "{projectRoot}/tsconfig*.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        {
+          "externalDependencies": ["typescript"]
         }
+      ],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/typecheck"],
+      "options": {
+        "commands": ["tsc -p tsconfig.lib.json", "tsc -p tsconfig.spec.json"],
+        "parallel": false,
+        "cwd": "{projectRoot}"
+      }
+    },
+    "bundle": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "production",
+        {
+          "externalDependencies": ["tsdown"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/bundle"],
+      "options": {
+        "command": "tsdown && publint run ../../dist/packages/agentforge/bundle --strict --pack npm",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/package.json",
+        "{projectRoot}/vitest.config.mts",
+        "{projectRoot}/tsconfig*.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        "sharedGlobals",
+        {
+          "externalDependencies": ["vitest", "typescript"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/test"],
+      "options": {
+        "configFile": "{projectRoot}/vitest.config.mts"
+      }
+    },
+    "integ": {
+      "executor": "@nx/vitest:test",
+      "cache": false,
+      "options": {
+        "configFile": "{projectRoot}/vitest.integ.mts"
+      }
+    },
+    "e2e": {
+      "executor": "@nx/vitest:test",
+      "cache": false,
+      "options": {
+        "configFile": "{projectRoot}/vitest.e2e.mts"
       }
     },
     "lint": {
@@ -44,51 +97,20 @@
         }
       }
     },
-    "bundle": {
+    "format": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "production",
-        {
-          "externalDependencies": ["tsdown"]
+      "inputs": ["biome"],
+      "options": {
+        "command": "biome format {projectRoot}"
+      },
+      "configurations": {
+        "fix": {
+          "command": "biome format --write {projectRoot}"
+        },
+        "skip-lint": {
+          "command": "node -e \"\""
         }
-      ],
-      "outputs": ["{workspaceRoot}/dist/{projectRoot}/package"],
-      "options": {
-        "command": "tsdown && publint run ../../dist/packages/agentforge/package --strict --pack npm",
-        "cwd": "{projectRoot}"
-      }
-    },
-    "test": {
-      "executor": "@nx/vitest:test",
-      "inputs": [
-        "{projectRoot}/src/**/*",
-        "{projectRoot}/package.json",
-        "{projectRoot}/vitest.config.mts",
-        "{projectRoot}/tsconfig*.json",
-        "{workspaceRoot}/tsconfig.base.json",
-        "sharedGlobals",
-        {
-          "externalDependencies": ["vitest", "typescript"]
-        }
-      ],
-      "outputs": ["{workspaceRoot}/dist/{projectRoot}/coverage"],
-      "options": {
-        "configFile": "{projectRoot}/vitest.config.mts"
-      }
-    },
-    "integ": {
-      "executor": "@nx/vitest:test",
-      "cache": false,
-      "options": {
-        "configFile": "{projectRoot}/vitest.integ.mts"
-      }
-    },
-    "e2e": {
-      "executor": "@nx/vitest:test",
-      "cache": false,
-      "options": {
-        "configFile": "{projectRoot}/vitest.e2e.mts"
       }
     }
   }

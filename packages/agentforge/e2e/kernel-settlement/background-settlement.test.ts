@@ -116,6 +116,7 @@ describe('E2 — background work and the resumed turn', () => {
 
     const recording = new QueryRecording(
       'e2e',
+      'kernel-settlement',
       `e2-background-settlement-${scenario.name}`,
     );
     await recording.drain(

@@ -20,7 +20,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { pinnedBunBaseImageReference } from '../../__fixtures__/pinned-base-image.ts';
-import { testOutputDirectory } from '../../__fixtures__/test-output-directory.ts';
+import { taskOutputDirectory } from '../../__fixtures__/task-output-directory.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -47,11 +47,16 @@ export const baseImagePlatform = 'linux/arm64';
 export const s7cmdTargetTriple = 'aarch64-unknown-linux-musl';
 
 /**
- * Under the gitignored output root (`dist/packages/agentforge/test-output/`). Only a verified archive is ever renamed into
+ * Under the gitignored output root (`dist/packages/agentforge/integ/`). Only a verified archive is ever renamed into
  * it, so a digest mismatch at rest means something changed the file after it
  * was verified — which is reported, never repaired by re-downloading.
  */
-const s7cmdCacheDirectory = join(testOutputDirectory, 's7cmd', s7cmdVersion);
+const s7cmdCacheDirectory = join(
+  taskOutputDirectory('integ'),
+  'filesystem-s3-sync',
+  's7cmd',
+  s7cmdVersion,
+);
 
 const containerArchivePath = '/opt/s7cmd/s7cmd.tar.gz';
 

@@ -122,6 +122,7 @@ describe('L2 — which kinds of configuration compose, and where each stops', ()
 
     const recording = new QueryRecording(
       'integ',
+      'capability-composition',
       `l2-what-composes-${scenario.name}`,
     );
     const { initializationResult, sessionStartHookResponses } =

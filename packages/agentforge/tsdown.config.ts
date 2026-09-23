@@ -4,10 +4,10 @@ import { defineConfig } from 'tsdown';
 
 /**
  * The published package is assembled under the workspace's one output root,
- * `dist/packages/agentforge/package/`, so the source directory stays clean
+ * `dist/packages/agentforge/bundle/` — named for the task that builds it —, so the source directory stays clean
  * and everything built sits beside everything else produced.
  */
-const packageDirectory = '../../dist/packages/agentforge/package';
+const bundleDirectory = '../../dist/packages/agentforge/bundle';
 
 /**
  * One package, five entry points. Code shared between entry points is split
@@ -28,7 +28,7 @@ export default defineConfig({
   tsconfig: 'tsconfig.lib.json',
   dts: true,
   sourcemap: true,
-  outDir: packageDirectory,
+  outDir: bundleDirectory,
   clean: true,
   fixedExtension: false,
   copy: ['README.md'],
@@ -65,7 +65,7 @@ async function writePublishedManifest(): Promise<void> {
     }
   }
   await writeFile(
-    join(packageDirectory, 'package.json'),
+    join(bundleDirectory, 'package.json'),
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
 }

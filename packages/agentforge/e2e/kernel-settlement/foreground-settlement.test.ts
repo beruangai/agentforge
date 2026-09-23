@@ -112,6 +112,7 @@ describe('E1 — a final submission survives dispatched work in the foreground',
 
     const recording = new QueryRecording(
       'e2e',
+      'kernel-settlement',
       `e1-foreground-settlement-${scenario.name}`,
     );
     await recording.drain(

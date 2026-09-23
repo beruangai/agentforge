@@ -32,7 +32,7 @@ import {
 } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { testOutputDirectory } from '../__fixtures__/test-output-directory.ts';
+import { taskOutputDirectory } from '../__fixtures__/task-output-directory.ts';
 import {
   type BaseImageRun,
   containerWorkspacePath,
@@ -106,7 +106,11 @@ describe('s7cmd, pinned, in the base image, against a real bucket', () => {
     const archivePath = await resolveVerifiedS7cmdArchive();
     aws = await resolveAwsForContainer();
     const runId = randomUUIDv7();
-    runHostDirectory = join(testOutputDirectory, 'filesystem-s3-sync', runId);
+    runHostDirectory = join(
+      taskOutputDirectory('integ'),
+      'filesystem-s3-sync',
+      runId,
+    );
     await mkdir(runHostDirectory, { recursive: true });
     bucketName = await createScratchBucket(aws, runId);
     suite = {

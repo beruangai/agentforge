@@ -24,9 +24,7 @@ import {
   type SDKSystemMessage,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { testOutputDirectory } from './test-output-directory.ts';
-
-export type TestTier = 'integ' | 'e2e';
+import { type TestTier, taskOutputDirectory } from './task-output-directory.ts';
 
 /**
  * The operator's subscription token. `TEMP_CLAUDE_CODE_OAUTH_TOKEN` is
@@ -128,15 +126,15 @@ export type ToolResult = {
 
 /**
  * Every message of one run, appended to
- * `dist/packages/agentforge/test-output/<tier>/<name>.jsonl` as it arrives, so the evidence survives
+ * `dist/packages/agentforge/<tier>/<concept>/<name>.jsonl` as it arrives, so the evidence survives
  * a throw or a timeout.
  */
 export class QueryRecording {
   readonly messages: SDKMessage[] = [];
   readonly logPath: string;
 
-  constructor(tier: TestTier, name: string) {
-    const directory = join(testOutputDirectory, tier);
+  constructor(tier: TestTier, concept: string, name: string) {
+    const directory = join(taskOutputDirectory(tier), concept);
     mkdirSync(directory, { recursive: true });
     this.logPath = join(directory, `${name}.jsonl`);
     writeFileSync(this.logPath, '');

@@ -231,6 +231,7 @@ async function runScenario(scenario: Scenario) {
 
   const recording = new QueryRecording(
     'e2e',
+    'kernel-settlement',
     `e3-in-turn-correction-${scenario.name}`,
   );
   await recording.drain(

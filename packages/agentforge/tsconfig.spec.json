@@ -1,7 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "../../dist/packages/agentforge/vitest",
     "types": [
       "node",
       "vitest/importMeta"
@@ -17,10 +16,5 @@
     "src/**/*.spec.ts",
     "integ/**/*.ts",
     "e2e/**/*.ts"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
-    }
   ]
 }

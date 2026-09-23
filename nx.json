@@ -21,16 +21,6 @@
     "sharedGlobals": [],
     "biome": ["default", "{workspaceRoot}/biome.json"]
   },
-  "plugins": [
-    {
-      "plugin": "@nx/js/typescript",
-      "options": {
-        "typecheck": {
-          "targetName": "typecheck"
-        }
-      }
-    }
-  ],
   "parallel": 8,
   "targetDefaults": {
     "test": {
