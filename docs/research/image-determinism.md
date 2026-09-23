@@ -68,7 +68,9 @@ sha256:d4637161a29b210e36af6a37a51ca39e8a7007f1769ec8a76028f11f76d21607
 
 A pipeline that compares `docker image inspect --format '{{.Id}}'` will conclude every image changed, every time, and redeploy everything. **The comparison must be on the manifest digest**, which buildx reports as `containerimage.digest` in `--metadata-file` — authoritative, and free.
 
-**3. A `docker-container` builder cannot see images in the daemon.** A multi-level `FROM` chain therefore needs a registry between the levels; `--load`ing a parent and referencing it by tag fails to resolve. This is not a workaround so much as the real shape: in production each level *is* pushed to ECR and referenced by digest, so the spike models the deploy path rather than shortcutting it. A throwaway `registry:2` on `host.docker.internal:5001` served, with a two-line buildkitd config trusting it over http.
+**3. A `docker-container` builder cannot see images in the daemon.** `--load`ing a parent and referencing it by tag fails to resolve, so a multi-level `FROM` chain needs something between the levels. A throwaway `registry:2` on `host.docker.internal:5001` served, with a two-line buildkitd config trusting it over http.
+
+> **The interpretation here was wrong and is withdrawn (2026-09-23).** This originally read "not a workaround so much as the real shape: in production each level *is* pushed to ECR". It is not: the levels are built locally from `@beruangai/agentforge` and **only the leaf agent image reaches ECR** (`ARCHITECTURE.md` §6). The measurement stands exactly as recorded — the builder genuinely cannot see daemon images — but it is a **constraint on the local build**, not a description of the deploy path. A build-time local registry remains one answer, and `--build-context oci-layout://` is an untried other; `DESIGN_OPTIONS.md` §D carries it.
 
 ### And one that is environmental, not architectural
 

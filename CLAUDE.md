@@ -47,6 +47,8 @@ The operator's standing conventions across projects:
 - **No legacy support.** Latest stable toolchain; no shims or compatibility bridges.
 - **Minimal public surface.** Expose what consumers need; nothing internal leaks.
 - **Seams, not speculative abstractions.** An interface earns its place when a second implementation exists or two consumers need different ones.
+- **Minimize what a consumer must declare, and never add friction to what it may declare.** A broader scope sets a **default**, not a ceiling: an agentic project's settings are what its procedures start from, and a procedure overrides any of them without ceremony. Do not invent tiers, permissions to override, or distinct verbs for widening — that is load on the consumer for a problem nobody has. **The one exception is where losing a contribution is silent**: guardrail hooks, MCP servers and denied tools stay additive, because a dropped guardrail looks exactly like a passing run.
+- **An overridable default is overridable by value or by callback.** A field with a house default takes `T | ((current: T) => T)` — pass a value to replace it, or a function receiving the default and returning the final, so appending to a list does not mean retyping it. Simple case stays simple; the composing case needs no second field.
 - **TypeScript on Bun.**
 
 ## Working rules
