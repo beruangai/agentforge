@@ -1,0 +1,62 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "analytics": false,
+  "namedInputs": {
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals",
+      {
+        "dependentTasksOutputFiles": "!{reports,coverage}/**",
+        "transitive": true
+      }
+    ],
+    "production": [
+      "default",
+      "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
+      "!{projectRoot}/tsconfig.spec.json",
+      "!{projectRoot}/vitest.*.mts",
+      "!{projectRoot}/integ/**",
+      "!{projectRoot}/e2e/**"
+    ],
+    "sharedGlobals": [],
+    "biome": ["default", "{workspaceRoot}/biome.json"]
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/js/typescript",
+      "options": {
+        "typecheck": {
+          "targetName": "typecheck"
+        }
+      }
+    },
+    {
+      "plugin": "@nx/vitest",
+      "options": {
+        "testTargetName": "test",
+        "ciTargetName": "test-ci",
+        "testMode": "watch"
+      }
+    }
+  ],
+  "parallel": 8,
+  "targetDefaults": {
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["default"]
+    },
+    "@nx/vitest:test": {
+      "cache": true,
+      "inputs": ["default", "^production"],
+      "configurations": {
+        "update-snapshot": {
+          "args": "--update"
+        }
+      }
+    },
+    "build": {
+      "cache": true,
+      "inputs": ["default"]
+    }
+  }
+}

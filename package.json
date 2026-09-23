@@ -1,0 +1,72 @@
+{
+  "name": "@beruangai/source",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "nx run-many --target dev",
+    "build": "nx run-many --target build",
+    "lint": "nx run-many --target lint --configuration=fix",
+    "test": "nx run-many --target test --all",
+    "trivy": "nx run-many --target trivy --all",
+    "build:skip-lint": "nx run-many --target build --configuration=skip-lint",
+    "build:all": "nx run-many --target build --all",
+    "affected:all": "nx affected --target build"
+  },
+  "private": true,
+  "dependencies": {
+    "@aws/nx-plugin": "catalog:"
+  },
+  "devDependencies": {
+    "@aws/nx-plugin-mcp": "catalog:",
+    "@biomejs/biome": "catalog:",
+    "@nx/js": "catalog:",
+    "@nx/vitest": "catalog:",
+    "@nx/workspace": "catalog:",
+    "@swc/helpers": "~0.5.18",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "nx": "catalog:",
+    "publint": "catalog:",
+    "tsdown": "catalog:",
+    "tslib": "^2.3.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "catalog": {
+    "@a2a-js/sdk": "1.2.0",
+    "@anthropic-ai/claude-agent-sdk": "0.3.280",
+    "@aws-sdk/client-bedrock-agentcore": "3.1138.0",
+    "@aws-sdk/client-bedrock-agentcore-control": "3.1138.0",
+    "@aws-sdk/client-cloudwatch-logs": "3.1138.0",
+    "@aws-sdk/client-dynamodb": "3.1138.0",
+    "@aws-sdk/client-ecr": "3.1138.0",
+    "@aws-sdk/client-iam": "3.1138.0",
+    "@aws-sdk/client-s3": "3.1138.0",
+    "@aws-sdk/client-sts": "3.1138.0",
+    "@aws/nx-plugin": "1.0.3",
+    "@aws/nx-plugin-mcp": "^1.0.3",
+    "@biomejs/biome": "2.5.14",
+    "@nx/js": "23.2.1",
+    "@nx/vitest": "23.2.1",
+    "@nx/workspace": "23.2.1",
+    "@orpc/client": "2.0.0-beta.39",
+    "@orpc/contract": "2.0.0-beta.39",
+    "@orpc/server": "2.0.0-beta.39",
+    "@types/express": "5.0.6",
+    "@types/node": "26.6.2",
+    "@vitest/coverage-v8": "4.1.11",
+    "express": "5.2.1",
+    "nx": "23.2.1",
+    "publint": "0.3.24",
+    "tsdown": "0.23.0",
+    "typescript": "~6.0.3",
+    "vite": "8.3.0",
+    "vitest": "4.1.11",
+    "zod": "4.6.5"
+  }
+}

@@ -40,6 +40,9 @@ Thumbs.db
 
 .nx/cache
 .nx/workspace-data
+.nx/migrate-runs
+.nx/polygraph
+.grit
 .claude/worktrees
 .claude/settings.local.json
 
