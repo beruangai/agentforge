@@ -12,7 +12,7 @@ export default defineConfig({
     passWithNoTests: true,
     reporters: ['default'],
     coverage: {
-      reportsDirectory: '../../coverage/packages/agentforge',
+      reportsDirectory: '../../dist/packages/agentforge/coverage',
       provider: 'v8' as const,
     },
   },

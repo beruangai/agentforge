@@ -48,8 +48,6 @@ Thumbs.db
 
 vitest.config.*.timestamp*
 
-# Test output
-test-output/
 
 # Local environment
 *.local

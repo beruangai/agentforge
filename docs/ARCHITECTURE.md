@@ -450,6 +450,8 @@ agentforge/
         └── e2e/                    # kernel-settlement/
 ```
 
+**Everything built lands under one output root, `dist/packages/agentforge/`**, never in the source tree: `package/` is the published package — the bundle, its declarations, the manifest without its workspace-only fields, the README, and from A1 the base image's `Dockerfile` and the bundled server — alongside `tsc/`, `vitest/`, `coverage/` and `test-output/`. One place to inspect, one to clean, and a source directory that holds only source. The package targets Node 26: `engines.node` declares it, the bundle's syntax target follows from it, and the compiler settings extend `@tsconfig/node26`.
+
 `server/runtime` and `server/harness` both import `core` and never each other (§1). **A filesystem is a concept of its own**: the working directory is one use of an AgentForge-managed filesystem, and sync is a capability of the S3 kind. Git — which TrendBot uses today — and S3 Files follow as siblings with the same sync semantics; no abstraction over them is built until the second one exists.
 
 ---

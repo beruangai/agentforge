@@ -53,9 +53,9 @@
           "externalDependencies": ["tsdown"]
         }
       ],
-      "outputs": ["{projectRoot}/dist"],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/package"],
       "options": {
-        "command": "tsdown",
+        "command": "tsdown && publint run ../../dist/packages/agentforge/package --strict --pack npm",
         "cwd": "{projectRoot}"
       }
     },

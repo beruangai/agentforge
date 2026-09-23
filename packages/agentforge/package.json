@@ -4,31 +4,31 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "files": [
-    "dist"
-  ],
+  "engines": {
+    "node": ">=26"
+  },
   "exports": {
     "./contract": {
-      "types": "./dist/contract.d.ts",
-      "default": "./dist/contract.js"
+      "types": "./contract.d.ts",
+      "default": "./contract.js"
     },
     "./client": {
-      "types": "./dist/client.d.ts",
-      "default": "./dist/client.js"
+      "types": "./client.d.ts",
+      "default": "./client.js"
     },
     "./temporal": {
-      "types": "./dist/temporal.d.ts",
-      "default": "./dist/temporal.js"
+      "types": "./temporal.d.ts",
+      "default": "./temporal.js"
     },
     "./agent": {
       "agentforge-agent": {
-        "types": "./dist/agent.d.ts",
-        "default": "./dist/agent.js"
+        "types": "./agent.d.ts",
+        "default": "./agent.js"
       }
     },
     "./infra": {
-      "types": "./dist/infra.d.ts",
-      "default": "./dist/infra.js"
+      "types": "./infra.d.ts",
+      "default": "./infra.js"
     },
     "./package.json": "./package.json"
   },

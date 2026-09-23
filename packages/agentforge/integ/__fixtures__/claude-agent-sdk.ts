@@ -4,6 +4,7 @@
  * and working directory, and records every SDK message so a failing assertion
  * points at evidence rather than a recollection.
  */
+
 import {
   appendFileSync,
   mkdirSync,
@@ -23,8 +24,7 @@ import {
   type SDKSystemMessage,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-
-const packageRoot = join(import.meta.dirname, '..', '..');
+import { testOutputDirectory } from './test-output-directory.ts';
 
 export type TestTier = 'integ' | 'e2e';
 
@@ -128,7 +128,7 @@ export type ToolResult = {
 
 /**
  * Every message of one run, appended to
- * `test-output/<tier>/<name>.jsonl` as it arrives, so the evidence survives
+ * `dist/packages/agentforge/test-output/<tier>/<name>.jsonl` as it arrives, so the evidence survives
  * a throw or a timeout.
  */
 export class QueryRecording {
@@ -136,7 +136,7 @@ export class QueryRecording {
   readonly logPath: string;
 
   constructor(tier: TestTier, name: string) {
-    const directory = join(packageRoot, 'test-output', tier);
+    const directory = join(testOutputDirectory, tier);
     mkdirSync(directory, { recursive: true });
     this.logPath = join(directory, `${name}.jsonl`);
     writeFileSync(this.logPath, '');

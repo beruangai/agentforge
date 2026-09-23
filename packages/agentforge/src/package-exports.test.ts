@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -37,7 +38,26 @@ function exportTargets(value: unknown): string[] {
   throw new Error(`unexpected export target: ${JSON.stringify(value)}`);
 }
 
+/** The `types` target an entry point declares, under an optional condition. */
+function declarationsTarget(subpath: string, condition?: string): string {
+  const entry = packageJson.exports[subpath] as Record<string, unknown>;
+  const conditioned = (condition ? entry[condition] : entry) as
+    | Record<string, unknown>
+    | undefined;
+  const types = conditioned?.types;
+  if (typeof types !== 'string') {
+    throw new Error(`exports["${subpath}"] declares no types target`);
+  }
+  return types;
+}
+
 let consumer: string;
+
+function installedFile(target: string): string {
+  return realpathSync(
+    join(consumer, 'node_modules', ...packageJson.name.split('/'), target),
+  );
+}
 
 beforeAll(() => {
   consumer = mkdtempSync(join(tmpdir(), 'agentforge-exports-'));
@@ -129,7 +149,7 @@ describe('/agent', () => {
   it('resolves for TypeScript under the agent condition, to its declarations', () => {
     expect(
       typescriptResolve(specifier, [agentCondition])?.resolvedFileName,
-    ).toMatch(/dist\/agent\.d\.ts$/);
+    ).toBe(installedFile(declarationsTarget('./agent', agentCondition)));
   });
 
   it('does not bundle with Bun without the agent condition', () => {
@@ -155,8 +175,8 @@ describe.each(openEntryPoints)('/%s', (entryPoint) => {
   });
 
   it('resolves for TypeScript with no condition, to its declarations', () => {
-    expect(typescriptResolve(specifier, [])?.resolvedFileName).toMatch(
-      new RegExp(`dist/${entryPoint}\\.d\\.ts$`),
+    expect(typescriptResolve(specifier, [])?.resolvedFileName).toBe(
+      installedFile(declarationsTarget(`./${entryPoint}`)),
     );
   });
 });
