@@ -42,7 +42,7 @@ This document defines the layers, what crosses between them, and the two places 
 | **3. Consumer** | Its procedures, its identifiers, its side effects and their recovery; which agents it deploys and what each serves | How 1 and 2 work internally |
 | **4. SDK** | The agent loop | — |
 
-**Layers 1 and 2 never import each other.** Each is testable alone: the harness runs a procedure against a fixture with no container and no caller; the runtime runs a task whose process is a stub. They share one library, the **task protocol** — the envelope, the identifiers, the process messages, and the outcome — which depends on Zod alone.
+**Layers 1 and 2 never import each other.** Each is testable alone: the harness runs a procedure against a fixture with no container and no caller; the runtime runs a task whose process is a stub. They share two things, both schemas and types rather than an implementation of either layer: the **task protocol** — the envelope, the identifiers, the process messages, and the outcome — and the **procedure contract**, an oRPC contract over Zod that is the single source of truth every seam is typed by: a caller's client derives its calls from it, the gateway checks its hash, and an implementation registers against it (§3). Inside the one package this is a folder rule — `server/runtime` and `server/harness` import `core`, never each other — and it is not enforced by tooling.
 
 **Delivery — the Nx plugin, its generators, the CDK constructs and the build-and-deploy path — is tooling, not a layer.** It is how a consumer gets a deployed agent and stays in step with AgentForge as it changes (§6).
 
@@ -417,39 +417,40 @@ Each failure the predecessor harness paid for ([lineage](lineage/predecessor-har
 | `/agent` | A consumer's agent build | Procedures, the `agent()` helper, the kernel, the helper library — bundled into their image |
 | `/infra` | A CDK application | The constructs |
 
-The boundary is enforced, not documented: an import of `/agent` from a worker's build fails, because the contract half is the only thing both sides share ([ADR 0003](../adr/0003-procedures-are-type-safe-end-to-end.md)). The Nx generators ship in the same package, which is what makes the sync generator a version of AgentForge rather than a separate thing to upgrade.
+The boundary is enforced, not documented: an import of `/agent` from a worker's build fails, because the contract half is the only thing both sides share ([ADR 0003](../adr/0003-procedures-are-type-safe-end-to-end.md)). **The mechanism is an export condition.** `/agent` resolves only under `agentforge-agent`, which an agent build sets — `--conditions=agentforge-agent` for Bun and Node, `customConditions` for TypeScript — and nothing else does, so a worker's build fails to resolve it: `ERR_PACKAGE_PATH_NOT_EXPORTED` in Node, `Could not resolve` in Bun, `TS2307` in the compiler. The package root exports nothing, so every import names its environment. A unit test resolves each entry point through the real export map, both ways, under all three. The Nx generators ship in the same package, which is what makes the sync generator a version of AgentForge rather than a separate thing to upgrade.
+
+**The entry points share code; they do not duplicate it.** The package is bundled by tsdown, and a module two entry points use lands in a common chunk both import, never copied into each. Every dependency stays external, and the package declares `sideEffects: false`, so a consumer's bundler keeps only what its imports reach.
+
+**A dependency only one environment needs is an optional peer.** The Agent SDK alone installs a native binary of about 208 MB per platform; a Temporal worker installing `@beruangai/agentforge` must not pay for it. So what only `/agent` imports — the Agent SDK first — and what only a caller or a CDK application imports — Temporal, `aws-cdk-lib` — are optional `peerDependencies`, and each environment installs what its entry point imports; the generators add the right ones to what they scaffold. What every entry point needs, oRPC and Zod, is a plain dependency. The server's own dependencies — the A2A SDK, Express, the task store's clients — are bundled into the server and are not the package's dependencies at all.
 
 **The server is not one of these.** It is never imported by a consumer: AgentForge's own build bundles it, and the base image is where it ships. That is what keeps an unrelated change to the client, the constructs or a generator from producing a new base image.
 
-Internally the workspace is **organized by scope, never by type**, in the Nx grouped layout on `@aws/nx-plugin` defaults. Shape, not a commitment:
+**The workspace is one Nx project, and it is the package.** Concepts are sub-module folders inside it, never separate projects — a new project needs a reason a folder cannot serve — and they are **organized by concept, never by type**, on `@aws/nx-plugin` defaults:
 
 ```
 agentforge/
 ├── adr/  docs/  openspec/
-├── apps/
-│   └── runtime/
-│       └── base-image/        # agentforge/a2a-claude, the image consumers extend
-└── libs/
-    ├── agentforge/            # the single published package: entry points, generators, build
-    ├── task/
-    │   └── protocol/          # envelope, identifiers, process messages, outcome — Zod only
-    ├── runtime/
-    │   ├── server/            # A2A server, gateway, executor, card, /ping
-    │   ├── client/            # A2A client: AgentCore and local
-    │   └── task-store/        # fenced store, idempotency index, lease
-    ├── harness/
-    │   ├── procedure/         # contracts, implementations, marshalling
-    │   ├── agent/             # the agent() helper and the kernel
-    │   └── helpers/           # guardrails, telemetry
-    ├── infra/
-    │   └── constructs/        # CDK: agent, task store, object stores, caller policy
-    ├── tooling/
-    │   └── plugin/            # Nx generators, including sync
-    └── temporal/
-        └── activity/          # activity factory over the client
+└── packages/
+    └── agentforge/                 # @beruangai/agentforge
+        ├── src/
+        │   ├── core/               # shared by every seam
+        │   │   ├── contract/       # the oRPC contract, derived calls, client context, hash → /contract
+        │   │   └── task-protocol/  # envelope, identifiers, process messages, outcome
+        │   ├── server/             # everything that runs in the container
+        │   │   ├── runtime/        # A2A server, gateway, executor, task store, card, /ping — layer 1
+        │   │   ├── harness/        # procedures, agent() and the kernel, session, helpers → /agent — layer 2
+        │   │   └── filesystem/
+        │   │       └── s3/         # the S3-backed working directory, and its sync
+        │   ├── client/             # the A2A client, AgentCore and local → /client
+        │   │   └── temporal/       # the activity factory → /temporal
+        │   └── infra/              # CDK constructs → /infra
+        ├── integ/                  # per concept: agentcore/, a2a-version-negotiation/,
+        │                           #   procedure-framework/, capability-composition/,
+        │                           #   filesystem-s3-sync/, image-determinism/
+        └── e2e/                    # kernel-settlement/
 ```
 
-Internal libraries are never published on their own; they are composed into the one package.
+`server/runtime` and `server/harness` both import `core` and never each other (§1). **A filesystem is a concept of its own**: the working directory is one use of an AgentForge-managed filesystem, and sync is a capability of the S3 kind. Git — which TrendBot uses today — and S3 Files follow as siblings with the same sync semantics; no abstraction over them is built until the second one exists.
 
 ---
 

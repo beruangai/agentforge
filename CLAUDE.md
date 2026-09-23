@@ -22,7 +22,7 @@ Settled by the operator and not to be reopened: **AgentForge owns its requiremen
 
 **The register is [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)**, and a capability no `REQ` id asks for is not built. **Ids are blocked by category a hundred at a time and are permanent** — a new requirement takes the next free number in its own block, a withdrawn one keeps its number forever, and prose references carry the section mark (`§REQ304`). It began as a distillation of two consumer drafts and no longer tracks them — those drafts are closed, and a new need enters here through the operator, who negotiates it with the consumer, rather than as a clause elsewhere this repository must chase. A requirement only one consumer has is met by configuration or by a helper it calls, never by a branch in the harness or the runtime.
 
-**Four layers, with a contract at every boundary.** Runtime, harness, consumer, SDK. Layers 1 and 2 never import each other; they share only the task protocol. Each layer is testable alone, and a failure is fixed in the layer that owns it.
+**Four layers, with a contract at every boundary.** Runtime, harness, consumer, SDK. Layers 1 and 2 never import each other; they share only the task protocol and the procedure contract — the oRPC contract every seam is typed by. Each layer is testable alone, and a failure is fixed in the layer that owns it.
 
 **The caller is outside the boundary.** The client is caller-agnostic and the Temporal activity factory sits over it. Nothing below the client knows a caller exists, and Temporal is never a dependency of the runtime or the harness.
 
@@ -36,7 +36,7 @@ Settled by the operator and not to be reopened: **AgentForge owns its requiremen
 
 The operator's standing conventions across projects:
 
-- **Organize by scope, never by type.** Nx grouped layout on `@aws/nx-plugin` defaults: thin deployables in `apps/{scope}/{deployable}`, the code they run in `libs/{scope}/{capability}`. A capability owns its code, schemas, and tests together; file names carry the type. Never a `schemas/`, `types/`, or `utils/` tree collecting one kind across scopes.
+- **Organize by concept, never by type — and in folders, not projects.** One Nx project, `packages/agentforge`, on `@aws/nx-plugin` defaults, which is the one published package. Inside it, sub-module folders by concept: `core/` (shared), `server/` (the container: `runtime/`, `harness/`, `filesystem/`), `client/` (with `temporal/`), `infra/`. A concept owns its code, schemas and tests together; file names carry the type. A new Nx project needs a reason a folder cannot serve. Never a `schemas/`, `types/`, or `utils/` tree collecting one kind across concepts.
 - **Verbose, unambiguous names.** `timestamp`, not `ts`; `configuration`, not `cfg`.
 - **Borrow terms before inventing them, and never shorten one** — the Agent SDK's, AgentCore's, or A2A's first, **verbatim**, then this glossary's, then a new one. If a call gets a task and the protocol calls that `GetTask`, it is `GetTask`, not `get` or `status`. Clarity and specificity over brevity. No consumer's domain vocabulary.
 - **Leaf procedure names are `PascalCase`; namespaces are `camelCase`.** `reviewStrategy.SendMessage`, not `reviewStrategy.sendMessage`.

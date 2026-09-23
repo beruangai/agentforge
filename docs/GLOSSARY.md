@@ -20,7 +20,7 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 **Procedure** — What a consumer declares and AgentForge runs: a contract and an implementation. One contract derives `SendMessage` and `GetTask`, because invocation is asynchronous.
 
-**Contract** — A procedure's name, outer input and output schemas, and hash. An oRPC contract over Zod, so a caller imports it without the implementation. One declaration derives the typed `SendMessage` and `GetTask` calls.
+**Contract** — A procedure's name, outer input and output schemas, and hash. An oRPC contract over Zod, so a caller imports it without the implementation. One declaration derives the typed `SendMessage` and `GetTask` calls. The single source of truth every seam is typed by, and with the task protocol the only thing layers 1 and 2 share.
 
 **Implementation** — What runs in the container: an optional *before* step, a required *run* step, an optional *after* step.
 
@@ -70,7 +70,7 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 **Task process** — The process spawned for one task, in its own process group, where the consumer's entrypoint runs the procedure through the harness.
 
-**Task protocol** — The contract between executor and task process: the envelope, events, and the outcome. Shared by layers 1 and 2; Zod alone.
+**Task protocol** — The contract between executor and task process: the envelope, events, and the outcome. Shared by layers 1 and 2, with the procedure contract; Zod.
 
 **Task store** — Durable state outside the microVM: A2A's task store, extended with the idempotency index, the lease, and the outcome payload.
 
@@ -96,7 +96,7 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 **Base image** — What AgentForge ships for consumers to extend, `agentforge/a2a-claude`: Bun, the Claude CLI, and one bundled server. It carries nothing the server does not need, so a change elsewhere in AgentForge does not produce a new one.
 
-**Entry point** — One of the package's exports, scoped to where it may be loaded: `/contract`, `/client`, `/temporal`, `/agent`, `/infra`. AgentForge publishes one package with these, never a family of packages. The server is not among them: it is bundled by AgentForge's own build and ships in the base image.
+**Entry point** — One of the package's exports, scoped to where it may be loaded: `/contract`, `/client`, `/temporal`, `/agent`, `/infra`. AgentForge publishes one package with these, never a family of packages. `/agent` resolves only under the `agentforge-agent` export condition, which an agent build sets and nothing else does. The server is not among them: it is bundled by AgentForge's own build and ships in the base image.
 
 ## Identity
 

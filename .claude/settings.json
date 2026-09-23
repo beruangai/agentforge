@@ -25,7 +25,7 @@
     "baseRef": "head",
     "symlinkDirectories": ["node_modules", ".nx", ".local"]
   },
-  "claudeMdExcludes": ["apps/**", "libs/**"],
+  "claudeMdExcludes": ["packages/**"],
   "permissions": {
     "defaultMode": "auto",
     "allow": ["Bash(openspec *)", "Bash(ls *)", "Edit(./**)"],

@@ -25,3 +25,13 @@ Three mechanisms, in the plugin's own order of preference:
 - Constructs exposing `grantInvokeAccess` for least-privilege invocation (§REQ708).
 
 The exact AppConfig schema, its caching and refresh behavior, and what a non-Lambda caller such as a Temporal worker pays to read it are confirmed when the constructs are built — `DESIGN_OPTIONS.md` §K.
+
+## The workspace preset and its toolchain
+
+**Read and run on 2026-09-23**, `@aws/nx-plugin@1.0.3` with `create-nx-workspace@23.2.1 --pm=bun`, when A0 scaffolded this workspace.
+
+- **The preset writes Biome, not ESLint and Prettier** — one `biome.json` whose only lint rule is `noUndeclaredDependencies`, and per-project `format` and `lint` targets over it. Workspaces are `packages/*`, and versions live in the package manager's **catalog** (bun's top-level `catalog` field) by default.
+- **The catalog pins TypeScript `~6.0.3`, not 7.** TypeScript 7.0.2 is the latest stable release, but it ships the native compiler with no classic compiler API — its package exports only `./unstable/*` — and **Nx 23.2.1's project graph fails outright on it** ("Failed to process project graph"), because `@nx/js/typescript` reads tsconfig files through that API. Measured by swapping 7.0.2 into a fresh preset workspace. TypeScript 6 is therefore the latest that works, and moving to 7 waits on Nx.
+- **Vitest is 4.1.11, not 5.** `@nx/vitest@23.2.1` declares `vitest: ^3.0.0 || ^4.0.0`.
+- **`ts#project` generates** a `compile` target (`tsc --build`), `format` and `lint` over Biome, a vitest config with `environment: 'jsdom'` and `passWithNoTests: true`, and adds a `paths` alias plus an `@<scope>/source` custom condition to `tsconfig.base.json`. AgentForge keeps the Biome targets and drops the rest: one project bundled by tsdown needs no `tsc` emit, tests run in `node`, and a `paths` alias would bypass the package's own export map.
+- **It generates no `integ` or `e2e` tier.** Those are this repository's (`.claude/rules/testing.md`).

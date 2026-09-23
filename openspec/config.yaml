@@ -3,13 +3,13 @@ schema: spec-driven
 context: |
   AgentForge: a procedure wrapper for the Claude Agent SDK, built for StrategyFoundry and
   TrendBot, not for public use.
-  Tech stack: TypeScript on Bun, Nx grouped layout on @aws/nx-plugin, Vitest, Zod, oRPC, AWS CDK.
+  Tech stack: TypeScript on Bun, one Nx project (packages/agentforge) on @aws/nx-plugin, Vitest, Zod, oRPC, AWS CDK.
 
   Four layers with a contract at every boundary (docs/ARCHITECTURE.md §1):
   1 runtime (A2A server and client, gateway, executor, durable task store, deployment constructs),
   2 harness (procedures, the agent() helper and kernel, optional helpers), 3 consumer,
   4 Claude Agent SDK. Layers 1 and 2 never import each other; they share only the task protocol
-  library. Only two crossings are protocols: the A2A wire, and the pipe to a task process.
+  and the procedure contract. Only two crossings are protocols: the A2A wire, and the pipe to a task process.
 
   A2A — version 1.0 only — is the contract between a caller and the runtime; the client is
   caller-agnostic and a Temporal activity factory sits over it. A procedure is an oRPC contract
