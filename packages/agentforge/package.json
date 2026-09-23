@@ -1,0 +1,58 @@
+{
+  "name": "@beruangai/agentforge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./contract": {
+      "types": "./dist/contract.d.ts",
+      "default": "./dist/contract.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./temporal": {
+      "types": "./dist/temporal.d.ts",
+      "default": "./dist/temporal.js"
+    },
+    "./agent": {
+      "agentforge-agent": {
+        "types": "./dist/agent.d.ts",
+        "default": "./dist/agent.js"
+      }
+    },
+    "./infra": {
+      "types": "./dist/infra.d.ts",
+      "default": "./dist/infra.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "@a2a-js/sdk": "catalog:",
+    "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@aws-sdk/client-bedrock-agentcore": "catalog:",
+    "@aws-sdk/client-bedrock-agentcore-control": "catalog:",
+    "@aws-sdk/client-cloudwatch-logs": "catalog:",
+    "@aws-sdk/client-dynamodb": "catalog:",
+    "@aws-sdk/client-ecr": "catalog:",
+    "@aws-sdk/client-iam": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/client-sts": "catalog:",
+    "@orpc/client": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/server": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "express": "catalog:",
+    "publint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  }
+}

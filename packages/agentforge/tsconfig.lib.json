@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../dist/packages/agentforge/tsc",
+    "tsBuildInfoFile": "../../dist/packages/agentforge/tsc/tsconfig.lib.tsbuildinfo",
+    "emitDeclarationOnly": false,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
+  ]
+}
