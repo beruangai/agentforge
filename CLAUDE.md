@@ -42,6 +42,7 @@ The operator's standing conventions across projects:
 - **Leaf procedure names are `PascalCase`; namespaces are `camelCase`.** `reviewStrategy.SendMessage`, not `reviewStrategy.sendMessage`.
 - **Binary state is a boolean.** An enum only where a third state is genuinely foreseeable, and its values are `SCREAMING_SNAKE_CASE`.
 - **One published package.** AgentForge vends `@beruangai/agentforge` with entry points per environment; internal libraries are never published on their own.
+- **Nx owns the build graph, and AgentForge never duplicates it.** Every build — bundles, images, deploys — is an Nx task with its real inputs declared, so staleness and ordering are Nx's. Write no second dependency graph, content hash or digest comparison. A build run outside the task graph is a consumer's or developer's mistake, not a case to detect, prevent or support.
 - **uuid7 for every id AgentForge mints.** Never uuid4. Ids minted by a dependency are opaque and not reformatted.
 - **Zero silent failures.** Throw and handle. No empty-result fallbacks, no swallowed exceptions, no defaults papering over missing data, no option accepted and dropped.
 - **No legacy support.** Latest stable toolchain; no shims or compatibility bridges.

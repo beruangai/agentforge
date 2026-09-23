@@ -70,7 +70,7 @@ A pipeline that compares `docker image inspect --format '{{.Id}}'` will conclude
 
 **3. A `docker-container` builder cannot see images in the daemon.** `--load`ing a parent and referencing it by tag fails to resolve, so a multi-level `FROM` chain needs something between the levels. A throwaway `registry:2` on `host.docker.internal:5001` served, with a two-line buildkitd config trusting it over http.
 
-> **The interpretation here was wrong and is withdrawn (2026-09-23).** This originally read "not a workaround so much as the real shape: in production each level *is* pushed to ECR". It is not: the levels are built locally from `@beruangai/agentforge` and **only the leaf agent image reaches ECR** (`ARCHITECTURE.md` §6). The measurement stands exactly as recorded — the builder genuinely cannot see daemon images — but it is a **constraint on the local build**, not a description of the deploy path. A build-time local registry remains one answer, and `--build-context oci-layout://` is an untried other; `DESIGN_OPTIONS.md` §D carries it.
+> **The measurement stands; what was concluded from it does not (2026-09-23).** This originally read "not a workaround so much as the real shape: in production each level *is* pushed to ECR". Both that, and a later revision calling it a constraint AgentForge must design around, assumed AgentForge compares image digests to decide what to deploy. **It does not.** The levels are built locally from `@beruangai/agentforge`, only the leaf agent image reaches ECR, and **Nx's affected graph decides what is rebuilt and therefore deployed** (`ARCHITECTURE.md` §6, [ADR 0008](../../adr/0008-code-ships-in-the-image.md)). The chain therefore builds on the ordinary driver against daemon images — no registry between levels, no OCI layout — and this finding constrains only a build that wants `rewrite-timestamp`, which none does.
 
 ### And one that is environmental, not architectural
 
@@ -83,10 +83,10 @@ On macOS, Docker's keychain credential helper blocks without an interactive unlo
 §D asks more than the layering question, and the rest is untouched:
 
 - ~~**Bun's bundler determinism.**~~ **Closed the same day** — see below. The fixtures copied plain files and nothing was bundled, which made bundling the likelier source of non-determinism in a real agent image. It was then measured and is not.
-- **Comparing digests before `UpdateAgentRuntime`.** The digest is available and stable; the deploy path that reads the current runtime's digest and skips the update is not written.
-- **Task-protocol version negotiation** between an executor and a task process built from different artifacts — how long an executor supports an older task process.
+- ~~**Comparing digests before `UpdateAgentRuntime`.**~~ **Not AgentForge's mechanism (2026-09-23).** Nx's affected graph decides what is rebuilt and therefore deployed; AgentForge builds no digest comparison of its own. What the deploy path actually does at publish is `DESIGN_OPTIONS.md` §D.
+- ~~**Task-protocol version negotiation** between an executor and a task process built from different artifacts.~~ **Moot (2026-09-23).** There is one artifact: the server and the harness both come from `@beruangai/agentforge`, so they cannot be built from different releases. The handshake remains as an assertion.
+- ~~**Where `agentforge/a2a-claude` is published**, and whether the constructs assert a package-and-image pairing.~~ **It is not published (2026-09-23).** The package ships the bundled server and its `Dockerfile`; the consumer builds it, and only the leaf agent image reaches ECR.
 - **Whether the agent card is generated as a build step** from the image's own registry of procedures.
-- **Where `agentforge/a2a-claude` is published**, how a consumer pins it, and whether the constructs assert a compatible package-and-image pairing at deploy.
 
 ## Teardown
 

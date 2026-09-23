@@ -39,7 +39,7 @@ The whole loop, in Docker, for a procedure a consumer would actually ship.
 - The one AgentCore question left: session resume across containers (§F). Reachability (§B), cancellation (§C) and the store's lease (§A) were answered in A0
 - A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency, lease and loss; admission limits
 - The Nx plugin: generators for an agentic project, an agentic base image, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
-- CDK constructs and the deploy path: deterministic images, digest comparison, and an update only where the digest moved (§D)
+- CDK constructs and the deploy path: the local `FROM` chain as Nx tasks, and an update only for the agents Nx rebuilt (§D)
 - Failure-injection tests for every layer-1 failure, on AgentCore
 
 **Exit:** the same procedure, unchanged, runs against a deployed agent; it survives a container kill and a caller redeploy; and changing one agent deploys that agent alone.

@@ -10,7 +10,7 @@ What is not yet decided. A question is worked here until it is settled; the outc
 |---|---|---|---|
 | **§F** | Sync cadence and the quiescence threshold; the project-key sanitiser | Design in the first slice | Session resume and artifacts |
 | **§A** | The item shape once a large outcome shares it | Design in the first slice | The first slice's store |
-| **§D** | How the local `FROM` chain is built, and the deploy path that compares digests | **One spike**, then design with the constructs | Deployment |
+| **§D** | The deploy path: what publishes the leaf image, and what updates only the agents Nx rebuilt | Design, with the constructs | Deployment |
 | **§O** | Rotation, and the broker when it arrives | Later; the first slice keeps room | Nothing yet |
 | **§N** | The contract hash, the envelope-to-router mapping, and the card generator | Design in the first slice | The first slice |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
@@ -91,7 +91,7 @@ The mechanism is decided: `CancelTask` reaches the gateway, which stops the task
 
 Three cases the implementation must cover whichever way the spike goes: a cancel arriving **before the task process exists** (settled above); a cancel from a caller that **attached to another caller's task**; and a cancel reaching a **freshly provisioned container**, whose A2A SDK would otherwise mark the task cancelled without consulting the executor that owns it.
 
-## §D — Image determinism and deploy granularity *(DETERMINISM SETTLED 2026-09-22; the deploy path OPEN)*
+## §D — Image layering and deploy granularity *(LAYERING AND THE BUILD CHAIN SETTLED; the deploy path OPEN)*
 
 **Settled: [ADR 0008](../adr/0008-code-ships-in-the-image.md) holds.** Measured over a real three-level tree — one AgentForge base, one agentic base, three agents — on the **manifest digests a registry serves**. Findings in [`research/image-determinism.md`](research/image-determinism.md); spike in `spikes/images/`.
 
@@ -99,9 +99,11 @@ Three cases the implementation must cover whichever way the spike goes: a cancel
 - A change to one agent **does not spread**: `agent-a` moved; `agent-b`, `agent-c` and the agentic base were identical.
 - A change to the agentic base **moves all three agents and nothing below**: the AgentForge base image was identical.
 
-So `UpdateAgentRuntime` can be driven by digest comparison, and an unaffected agent is never given a new version.
+So layering behaves as [ADR 0008](../adr/0008-code-ships-in-the-image.md) intended. **What keeps an unaffected agent from being given a new version is Nx, not this** — it is never rebuilt, so nothing about it can move. Digest comparison was the mechanism this section originally proposed and is not AgentForge's to build.
 
-**`bun build` is not a source of drift either** (measured 2026-09-22, Bun 1.4.0, on a real 2.26 MB bundle): byte-identical across runs, across a **different absolute path**, across **changed source mtimes**, and under `--minify` — with a negative control confirming the comparison can fail. Determinism therefore rests entirely on the Docker-level requirements below.
+**`bun build` is not a source of drift either** (measured 2026-09-22, Bun 1.4.0, on a real 2.26 MB bundle): byte-identical across runs, across a **different absolute path**, across **changed source mtimes**, and under `--minify` — with a negative control confirming the comparison can fail.
+
+**None of this is load-bearing any more**, and it is worth being clear about that rather than leaving a reader to infer it. Deploy granularity rests on Nx's affected graph (above), not on byte-identity. Reproducibility is still worth having — an image that rebuilds identically from identical inputs is easier to audit and to trust — so the requirements below are kept because they are cheap once known, not because anything breaks without them.
 
 **What determinism requires, isolated by experiment:** `SOURCE_DATE_EPOCH` **and** `rewrite-timestamp=true`. With both, identical; with `SOURCE_DATE_EPOCH` alone, **moved**. The epoch normalises the image config's `created` field and leaves file mtimes in the layers, so **a pipeline setting only `SOURCE_DATE_EPOCH` looks reproducible and is not**. Also required: `--provenance=false`, every parent pinned by digest, and no unpinned package installs.
 
@@ -113,7 +115,9 @@ So `UpdateAgentRuntime` can be driven by digest comparison, and an unaffected ag
 - How the task protocol's version is negotiated, and how long an executor supports an older task process, now that the base image and a consumer's harness move independently.
 - Whether the agent card is generated as a build step from the image's own registry of procedures.
 - ~~Where `agentforge/a2a-claude` is published and how a consumer pins it~~ **Decided 2026-09-23: it is not published.** `@beruangai/agentforge` ships the bundled server and its `Dockerfile`; the consumer builds the base image from `node_modules` as an Nx task, the agentic base is `FROM` it, each agent is `FROM` that, and **only the leaf agent image reaches ECR** — one workspace-wide repository, a CDK construct per agent, following `@aws/nx-plugin` (`ARCHITECTURE.md` §6). There is no package-and-image pairing to assert, because there is one artifact: the server and the harness come from the same package version and cannot drift.
-- **How the local `FROM` chain is built, given determinism needs a builder that cannot see daemon images.** The sharp edge of the decision above, and **measured, not suspected**: `rewrite-timestamp=true` requires a `docker-container` builder, and such a builder cannot resolve a `FROM` against a `--load`ed parent; the `docker` driver resolves it but leaves layer timestamps moving, which makes digest comparison useless and redeploys every agent every build. Two candidates, neither tried: a **build-time local registry** between levels — a build detail rather than a publication, with nothing extra reaching ECR, and the shape the spike already ran — or **`--build-context oci-layout://`**, which may remove the registry entirely. This is a spike, and it is the last thing standing between the layering decision and a working deploy path.
+- ~~How the local `FROM` chain is built, given determinism needs a builder that cannot see daemon images~~ **Not a conflict — the premise was wrong (2026-09-23).** It assumed AgentForge compares digests to decide what to deploy, which made byte-identity load-bearing and made the `docker-container` builder mandatory. **Nx already decides staleness**: each image is a task depending on the task that bundles what it bakes in, an unaffected agent is never rebuilt, and a static local `FROM` tag cannot be stale because the dependency edge guarantees its parent just ran. So the chain builds on the ordinary driver against daemon images, with no registry between levels and no OCI layout. The `docker-container` constraint is real and still recorded; it simply does not apply, because nothing here needs `rewrite-timestamp` to decide a deploy.
+
+  **AgentForge builds no dependency graph, hashing or digest comparison of its own.** Duplicating Nx is how two mechanisms drift, and a build outside the task graph is a consumer's or developer's mistake rather than a case to detect or support.
 
 ## §E — What the kernel still needs *(SETTLED 2026-09-22)*
 
