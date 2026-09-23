@@ -63,7 +63,7 @@ Every message of every run is written to `out/<spike>.jsonl`, and a machine-read
 | `agentcore/i2-header-allowlist.ts` | §I — does the request header allowlist carry `A2A-Version`, and does 1.0 then negotiate | ″ |
 | `bundler/d2-bun-bundler-determinism.sh` | §D — is `bun build` byte-identical | [image-determinism.md](../docs/research/image-determinism.md) |
 | `sync/f1-s7cmd-semantics.sh` | §F — does `s7cmd` do what the design assumes | [working-directory-sync.md](../docs/research/working-directory-sync.md) |
-| `capability-composition/l1-nested-scopes.ts`, `l2-what-composes.ts` | §L/D7 — which configuration composes up the tree, and where each kind stops | [capability-composition.md](../docs/research/capability-composition.md) |
+| `capability-composition/l1-nested-scopes.ts`, `l2-what-composes.ts` | §L/§REQ203 — which configuration composes up the tree, and where each kind stops | [capability-composition.md](../docs/research/capability-composition.md) |
 | `procedure-framework/o1-contract-split.ts` | oRPC — one contract split into typed procedures (first shape; superseded by o6) | [procedure-framework.md](../docs/research/procedure-framework.md) |
 | `procedure-framework/o2-link-and-context.ts` | oRPC — a custom non-HTTP link, and middleware-contributed typed context | ″ |
 | `procedure-framework/o3-error-fidelity.ts` | oRPC — what survives a serialising transport | ″ |

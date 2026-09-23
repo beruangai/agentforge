@@ -133,7 +133,7 @@ and therefore blind to the rest of the fleet, and AgentForge has no Redis.
 AgentForge's requirement is different in kind: an idempotency key must return
 **the same task** on a repeat, across containers, after the first container has
 died. That is a durable conditional insert keyed on the idempotency key — the
-DynamoDB write already in the design (D3) — and a mutex adds nothing to it. The
+DynamoDB write already in the design (§REQ103) — and a mutex adds nothing to it. The
 package is also `experimental-`. **Not adopted.**
 
 ## What was still not tested

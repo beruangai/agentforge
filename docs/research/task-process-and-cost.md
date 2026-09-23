@@ -45,7 +45,7 @@ Source: `spikes/task-process/`, an executor and a task process speaking the real
 | idle | 0.52 ms | 1.32 ms | 1.75 ms |
 | 4 tasks running, **2 of them saturating a core** | 0.16 ms | 0.18 ms | 0.27 ms |
 
-Busy was *faster* than idle — warm-up, not an effect. What matters is that two CPU-saturating tasks moved p95 not at all. **D31 holds because the tasks are separate processes**, not because of anything the executor does. This is the strongest single argument for ADR 0004: a task cannot stall the health check and get a busy session reaped, by construction.
+Busy was *faster* than idle — warm-up, not an effect. What matters is that two CPU-saturating tasks moved p95 not at all. **§REQ707 holds because the tasks are separate processes**, not because of anything the executor does. This is the strongest single argument for ADR 0004: a task cannot stall the health check and get a busy session reaped, by construction.
 
 ### A process per task is close to free
 

@@ -47,9 +47,9 @@ Three scenarios, each with a known-answer fixture (3 files of 10/20/30 bytes) so
 
 Cost $0.52. Exactly one `StructuredOutput` call per run; exactly one result per run.
 
-**What this does not prove.** It does not prove dispatched work is *safe* generally — only that foreground dispatch does not cost the submission. The risk D9 recorded has moved to E2, not disappeared.
+**What this does not prove.** It does not prove dispatched work is *safe* generally — only that foreground dispatch does not cost the submission. The risk §REQ206 recorded has moved to E2, not disappeared.
 
-## E2 — Background work: the D9 failure changed shape rather than going away
+## E2 — Background work: the §REQ206 failure changed shape rather than going away
 
 **Answer: a resumed turn no longer cancels its tool calls. It does something quieter and worse — it publishes a second, contradictory outcome.**
 
@@ -166,7 +166,7 @@ rather than yielding a result message with `subtype: 'error_max_turns'`. `SDKRes
 
 **The kernel must catch around the iterator and classify the thrown error**, not only the result message. `TURN_BUDGET_EXHAUSTED` and a budget outcome are reachable only that way.
 
-### D5's failure mode is live
+### §REQ201's failure mode is live
 
 `thisOptionDoesNotExist: 'surely-this-throws'` produced a completely normal successful run. **The SDK does not reject unknown option keys.** `ARCHITECTURE.md` §3 promises "every option a procedure sets reaches the SDK, or the task is rejected" — nothing in the SDK provides that, so AgentForge must provide it itself: validate the resolved option object against the SDK's own `Options` type at the boundary and refuse an unknown key. This is precisely the predecessor harness's silently-dropped `maxTurns`, still available to be repeated.
 

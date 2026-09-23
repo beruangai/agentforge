@@ -119,3 +119,5 @@ How these relate is the consumer's choice ([ADR 0007](../adr/0007-identity-is-th
 ## Consumers
 
 **Consumer** — A project that declares procedures and states requirements AgentForge must meet: StrategyFoundry, TrendBot.
+
+**Requirement** — One numbered behavior AgentForge answers to, in [`REQUIREMENTS.md`](REQUIREMENTS.md). Referenced as `§REQ304`: blocked by category a hundred at a time, permanent, never reused. Distinct from an **ADR**, which records why a decision went a particular way, and from a **`DESIGN_OPTIONS.md` section** (`§F`), which is a question still open.

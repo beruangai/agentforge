@@ -1,6 +1,6 @@
 # How the Agent SDK composes capabilities — measured
 
-**Measured 2026-09-22** against `@anthropic-ai/claude-agent-sdk@0.3.278`, then corrected the same day against the authoritative pages ([settings sources](https://code.claude.com/docs/en/agent-sdk/claude-code-features#control-filesystem-settings-with-settingsources), [additional directories](https://code.claude.com/docs/en/permissions#additional-directories-grant-file-access-not-configuration)). Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §L / D7. Source: `spikes/capability-composition/`.
+**Measured 2026-09-22** against `@anthropic-ai/claude-agent-sdk@0.3.278`, then corrected the same day against the authoritative pages ([settings sources](https://code.claude.com/docs/en/agent-sdk/claude-code-features#control-filesystem-settings-with-settingsources), [additional directories](https://code.claude.com/docs/en/permissions#additional-directories-grant-file-access-not-configuration)). Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §L / §REQ203. Source: `spikes/capability-composition/`.
 
 > **Correction.** The first version of this note measured slash commands only and generalised the result to all configuration. That was wrong: the three kinds follow three different rules, and the one that does *not* compose is the one that matters most. It also reported the repository boundary as an undocumented trap; it is documented behaviour, scoped to skills, commands and subagents.
 
@@ -60,4 +60,4 @@ Skills, commands and subagents from a flag-added directory load through the **`p
 
 `cwd` selects which layers apply and therefore *what the agent is*; the directories a run reads and writes are data, reached through additional directories and permissions. They need not be the same path.
 
-**`ARCHITECTURE.md`'s project-key derivation (D17) says "the working directory the run uses" without saying which**, and the answer changes what transcript continuity is scoped to. Raised in `DESIGN_OPTIONS.md` §L rather than resolved here.
+**`ARCHITECTURE.md`'s project-key derivation (§REQ402) says "the working directory the run uses" without saying which**, and the answer changes what transcript continuity is scoped to. Raised in `DESIGN_OPTIONS.md` §L rather than resolved here.

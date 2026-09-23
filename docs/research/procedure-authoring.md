@@ -15,9 +15,9 @@ Five shapes, inferred from both consumers' contracts read on 2026-09-22 — repr
 | Shape | Stresses | From |
 |---|---|---|
 | **minimal** | the floor — name, outer contract, agent contract, marshal, prompt, options | H1, H2, T1 |
-| **computed** | outer output carrying fields the model must never be asked for | H principle 3, T18, D2 |
-| **phased** | before / after-success / after-failure, each seeing the prior attempt's state | T33, T34, D33 |
-| **guarded** | guardrails composed from several sources, additively, none dropped | H5, T8–T11, D8 |
+| **computed** | outer output carrying fields the model must never be asked for | H principle 3, T18, §REQ102 |
+| **phased** | before / after-success / after-failure, each seeing the prior attempt's state | T33, T34, §REQ205 |
+| **guarded** | guardrails composed from several sources, additively, none dropped | H5, T8–T11, §REQ204 |
 | **discriminated** | a domain-level negative result returned as a **success** under its own discriminator | T19 |
 
 ## The gate: decorators on Bun
@@ -67,7 +67,7 @@ override guardrails(): readonly Guardrail[] { return []; }
 
 A subclass returning `[]` **silently drops every house guardrail**. `tsc` accepts it: the probe was **not caught**. Nothing in the type system objects, and nothing at runtime notices, because the base class's contribution was never a separate thing — it was the default return value of a method that has now been replaced.
 
-**In n1 and n2 the same mistake is not expressible.** The house set is concatenated by the helper, and a procedure has no way to reach past it; replacing rather than adding would have to be an explicit call at the site, which is exactly the property D8 and `ARCHITECTURE.md` §3 ask for.
+**In n1 and n2 the same mistake is not expressible.** The house set is concatenated by the helper, and a procedure has no way to reach past it; replacing rather than adding would have to be an explicit call at the site, which is exactly the property §REQ204 and `ARCHITECTURE.md` §3 ask for.
 
 n3 also costs on criterion 3 directly: knowing a procedure's full guardrail set means reading the subclass, the base class, and every class in between, whereas n1 and n2 each have exactly two places — the declaration and the one helper.
 

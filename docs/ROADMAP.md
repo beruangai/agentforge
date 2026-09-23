@@ -11,7 +11,7 @@ Milestones deliver capability a consumer can actually run. Each is proposed thro
 - Nx workspace in the grouped layout on current `@aws/nx-plugin` defaults; Bun, Biome, catalog versions
 - Read `@aws/nx-plugin`'s `ts#agent` and its sync machinery for what to extend rather than rebuild (§K)
 - **The blocking decisions are made**: the A2A server is assembled rather than inherited ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), §I), it speaks 1.0 only ([ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)), a procedure is an oRPC contract ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md), §N), and the task store is one task item plus a tiny index item (§A)
-- **Landed:** kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), deterministic image builds (§D), the procedure framework (§N), capability composition (§L/D7), and the AgentCore behaviour §A, §B, §C and §I rested on
+- **Landed:** kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), deterministic image builds (§D), the procedure framework (§N), capability composition (§L/§REQ203), and the AgentCore behaviour §A, §B, §C and §I rested on
 - **Still owed as a spike:** credential provisioning and expiry (§O)
 
 - **`spikes/` is triaged and removed.** It sits outside the Nx layout and does not survive this milestone: each spike is carried into a capability's `integ/` or deleted, per the disposition already decided in [`spikes/README.md`](../spikes/README.md)
@@ -23,13 +23,13 @@ Milestones deliver capability a consumer can actually run. Each is proposed thro
 The whole loop, in Docker, for a procedure a consumer would actually ship.
 
 - Task protocol: envelope, identifiers, events, outcome
-- Procedures: the oRPC contract and its derived calls, the contract hash, the run with its prompt, options, agent contract and marshal, and the before and after steps (D1–D5, D33)
-- Kernel: structured input and output throughout, settlement, abort, session start, resume and fork (D3, D9, D17)
-- Guardrail hooks composing without loss, and telemetry (D8, D23)
+- Procedures: the oRPC contract and its derived calls, the contract hash, the run with its prompt, options, agent contract and marshal, and the before and after steps (§REQ101–§REQ104, §REQ201, §REQ205)
+- Kernel: structured input and output throughout, settlement, abort, session start, resume and fork (§REQ103, §REQ206, §REQ402)
+- Guardrail hooks composing without loss, and telemetry (§REQ204, §REQ602)
 - Runtime: A2A server, gateway and executor, a process per task, filesystem task store behind the fenced interface, generated agent card
-- Caller-agnostic client and the Temporal activity factory: `SendMessage` starting or attaching, `GetTask` polled to a terminal state with a heartbeat, `CancelTask` (D10, D13, D14)
-- Typed outcomes with their causes, and what every task records (D19, D22)
-- Base image, and one agentic base image with an agent over it, built locally; the `SessionStore` adapter and the workspace sync helper against a local object store; credentials provisioned as §O decides (D17, D29)
+- Caller-agnostic client and the Temporal activity factory: `SendMessage` starting or attaching, `GetTask` polled to a terminal state with a heartbeat, `CancelTask` (§REQ301, §REQ304, §REQ305)
+- Typed outcomes with their causes, and what every task records (§REQ501, §REQ601)
+- Base image, and one agentic base image with an agent over it, built locally; the `SessionStore` adapter and the workspace sync helper against a local object store; credentials provisioned as §O decides (§REQ402, §REQ705)
 - Failure-injection tests for every layer-2 failure in `ARCHITECTURE.md` §9
 
 **Exit:** a StrategyFoundry workflow runs a real procedure against a local container, gets validated structured output, and can cancel it, retry it, and resume its session — with the run's prompt, options, transcript and usage recorded.

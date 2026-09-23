@@ -22,6 +22,6 @@ Three mechanisms, in the plugin's own order of preference:
 - Generated runtime names, with **discovery through AppConfig** rather than a name a caller assembles (`ARCHITECTURE.md` §6).
 - A client factory with a local variant and an IAM-authenticated variant.
 - One workspace-wide image registry.
-- Constructs exposing `grantInvokeAccess` for least-privilege invocation (D32).
+- Constructs exposing `grantInvokeAccess` for least-privilege invocation (§REQ708).
 
 The exact AppConfig schema, its caching and refresh behavior, and what a non-Lambda caller such as a Temporal worker pays to read it are confirmed when the constructs are built — `DESIGN_OPTIONS.md` §K.

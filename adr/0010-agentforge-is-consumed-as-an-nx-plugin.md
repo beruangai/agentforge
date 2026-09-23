@@ -22,7 +22,7 @@ Chosen: **an Nx plugin**, with **agents nested in one project** by default.
 
 * **Generators, constructs and the deploy path are all part of it.** The generators are not scaffolding convenience: a **sync generator** is how a consumer's wiring stays correct as AgentForge iterates, and without one every change becomes ad-hoc patching in two repositories. `@aws/nx-plugin` already does this, so AgentForge extends its conventions rather than starting over
 * Nesting follows the image layering ([ADR 0008](0008-code-ships-in-the-image.md)): a project holds one agentic base image and the agents that extend it, each agent keeping its own image, build target and deploy target, so a change rebuilds only the layer that contains it
-* A separate project is right for an agent whose capabilities are unlike its neighbours', such as one adding Python and NautilusTrader (D28); it extends AgentForge's base image directly
+* A separate project is right for an agent whose capabilities are unlike its neighbours', such as one adding Python and NautilusTrader (§REQ704); it extends AgentForge's base image directly
 * Each agent is still deployed as its own AgentCore runtime — the strongest isolation available — whatever project it lives in
 * Worth taking from `@aws/nx-plugin`: one workspace-wide image registry rather than one per agent, constructs exposing `grantInvokeAccess`, and a client factory with local and IAM-authenticated variants
 
