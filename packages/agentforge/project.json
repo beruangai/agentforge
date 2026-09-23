@@ -17,7 +17,6 @@
       "inputs": [
         "{projectRoot}/src/**/*",
         "{projectRoot}/integ/**/*",
-        "{projectRoot}/e2e/**/*",
         "{projectRoot}/*.mts",
         "{projectRoot}/*.ts",
         "{projectRoot}/tsconfig*.json",
@@ -71,13 +70,17 @@
       "cache": false,
       "options": {
         "configFile": "{projectRoot}/vitest.integ.mts"
-      }
-    },
-    "e2e": {
-      "executor": "@nx/vitest:test",
-      "cache": false,
-      "options": {
-        "configFile": "{projectRoot}/vitest.e2e.mts"
+      },
+      "configurations": {
+        "local": {
+          "testFiles": ["integ/local"]
+        },
+        "aws": {
+          "testFiles": ["integ/aws"]
+        },
+        "model": {
+          "testFiles": ["integ/model"]
+        }
       }
     },
     "lint": {

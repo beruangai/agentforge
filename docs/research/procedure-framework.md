@@ -1,6 +1,6 @@
 # oRPC as the procedure kernel — spike findings
 
-**Measured 2026-09-22** against **`@orpc/{contract,server,client}@2.0.0-beta.38`** — the `beta` tag, published 2026-09-21 — on Bun 1.4.0 with Zod 4. Source: `spikes/procedure-framework/`, carried at A0 into `packages/agentforge/integ/procedure-framework/`. No AWS, no model spend.
+**Measured 2026-09-22** against **`@orpc/{contract,server,client}@2.0.0-beta.38`** — the `beta` tag, published 2026-09-21 — on Bun 1.4.0 with Zod 4. Source: `spikes/procedure-framework/`, carried at A0 into `packages/agentforge/integ/local/procedure-framework/`. No AWS, no model spend.
 
 ## Why this was spiked at all
 
@@ -117,7 +117,7 @@ Proved in `o7-a2a-verbs-and-per-call-context.ts`, `tsc --strict` clean with its 
 
 ## A router assembled on a middlewared builder runs its middleware twice — 2026-09-23
 
-Found while carrying the spikes into `packages/agentforge/integ/procedure-framework/`, on **beta.39 and re-checked on beta.38** — so not drift, just something the spikes' own pattern hid. `implementer.use(middleware).router({ … })` re-applies the middleware to procedures that already carry it, and oRPC does not deduplicate: build procedures on `os = base.use(house)` and then assemble with `os.router(…)`, and **`house` runs twice per call**. Assembling on the unmiddlewared implementer runs it once. The spikes could not see it because their middleware overwrote a record rather than counting.
+Found while carrying the spikes into `packages/agentforge/integ/local/procedure-framework/`, on **beta.39 and re-checked on beta.38** — so not drift, just something the spikes' own pattern hid. `implementer.use(middleware).router({ … })` re-applies the middleware to procedures that already carry it, and oRPC does not deduplicate: build procedures on `os = base.use(house)` and then assemble with `os.router(…)`, and **`house` runs twice per call**. Assembling on the unmiddlewared implementer runs it once. The spikes could not see it because their middleware overwrote a record rather than counting.
 
 It matters for any middleware with a side effect — a lease writer, a telemetry span, an audit record. **The router is assembled on the base implementer**, and `custom-link-and-typed-context.test.ts` asserts both counts, so a future oRPC that deduplicates is reported rather than silently changing behaviour.
 

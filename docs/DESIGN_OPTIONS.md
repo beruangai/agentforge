@@ -57,7 +57,7 @@ A single item for everything was rejected because the index must be keyed by the
 
 ## §B — Whether a busy container receives invocations *(SETTLED 2026-09-22)*
 
-`/ping` is a lifecycle signal, not admission control, so a container should receive a start, a poll or a cancel whatever it last reported (`ARCHITECTURE.md` §4). That was inference from the contract's silence, and the whole await path rested on it. **It is now measured** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/agentcore/busy-container-receives-invocations.test.ts`, `provisioning-window.test.ts`.
+`/ping` is a lifecycle signal, not admission control, so a container should receive a start, a poll or a cancel whatever it last reported (`ARCHITECTURE.md` §4). That was inference from the contract's silence, and the whole await path rested on it. **It is now measured** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/aws/agentcore/busy-container-receives-invocations.test.ts`, `provisioning-window.test.ts`.
 
 - **A busy container receives everything.** With a 25-second task live and `/ping` answering `HealthyBusy`, a second `message/send`, a `tasks/get` and a `tasks/cancel` were all delivered — **3/3, at latencies indistinguishable from an idle session**. The second task ran concurrently in the same container, which reported `liveTasks: 2`.
 - **A runtime session id maps 1:1 to a container and stays put.** Six new sessions took six distinct containers; fired again, **6/6** returned the same one. One session's eight calls over ~35 s, spanning an idle gap and a task boundary, all hit one container.
@@ -77,7 +77,7 @@ The mechanism is decided: `CancelTask` reaches the gateway, which stops the task
 - **`SIGKILL` of the process group takes a grandchild the task started**; the negative control, killing the process alone, left it running. `detached: true` (`setsid`) plus `kill(-pid)` is what makes this true.
 - **A cancel arriving before the task process exists** is caught by a token set before the executor's first `await`.
 
-**Settled on the platform** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/agentcore/stop-runtime-session.test.ts`, `grace-period-after-stop.test.ts`:
+**Settled on the platform** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/aws/agentcore/stop-runtime-session.test.ts`, `grace-period-after-stop.test.ts`:
 
 - **`StopRuntimeSession` returns 200 in ~390 ms and the container receives a real `SIGTERM` ~400 ms later**, mid-task, with work still in flight.
 - **The grace period is fixed at about a minute, and being busy does not extend it.** Two sessions stopped at the same instant — one holding a 4-second task, one a 240-second task — had their containers killed **62.6 s and 61.0 s** after `SIGTERM`. The idle one lived 58 s past the end of its work; the busy one was killed with work still running **while answering `HealthyBusy`**. Across three observations: 56.0 s, 61.0 s, 62.6 s.
@@ -93,7 +93,7 @@ Three cases the implementation must cover whichever way the spike goes: a cancel
 
 ## §D — Image layering and deploy granularity *(LAYERING AND THE BUILD CHAIN SETTLED; the deploy path OPEN)*
 
-**Settled: [ADR 0008](../adr/0008-code-ships-in-the-image.md) holds.** Measured over a real three-level tree — one AgentForge base, one agentic base, three agents — on the **manifest digests a registry serves**. Findings in [`research/image-determinism.md`](research/image-determinism.md); now `packages/agentforge/integ/image-determinism/`.
+**Settled: [ADR 0008](../adr/0008-code-ships-in-the-image.md) holds.** Measured over a real three-level tree — one AgentForge base, one agentic base, three agents — on the **manifest digests a registry serves**. Findings in [`research/image-determinism.md`](research/image-determinism.md); now `packages/agentforge/integ/local/image-determinism/`.
 
 - An unchanged rebuild is **byte-identical**: all five digests unmoved across two full rebuilds.
 - A change to one agent **does not spread**: `agent-a` moved; `agent-b`, `agent-c` and the agentic base were identical.
@@ -123,7 +123,7 @@ So layering behaves as [ADR 0008](../adr/0008-code-ships-in-the-image.md) intend
 
 ## §E — What the kernel still needs *(SETTLED 2026-09-22)*
 
-Settled by spike against `@anthropic-ai/claude-agent-sdk@0.3.278` — findings, evidence and method in [`research/kernel-settlement.md`](research/kernel-settlement.md); the spikes are now `packages/agentforge/e2e/kernel-settlement/`. The rules the kernel must follow move to `ARCHITECTURE.md` §7.
+Settled by spike against `@anthropic-ai/claude-agent-sdk@0.3.278` — findings, evidence and method in [`research/kernel-settlement.md`](research/kernel-settlement.md); the spikes are now `packages/agentforge/integ/model/kernel-settlement/`. The rules the kernel must follow move to `ARCHITECTURE.md` §7.
 
 - **A final submission survives foreground dispatch**, in every shape tried — subagents and long tool storms alike. The foreground rule buys nothing on its own.
 - **§REQ206's failure changed shape rather than going away.** A resumed turn no longer cancels its tool calls; on an **open-input** session a completing background task starts a new turn and publishes a **second, contradictory result**. Closed input yields exactly one result and kills the background task.
@@ -150,7 +150,7 @@ Decided: state persists through APIs ([ADR 0011](../adr/0011-state-persists-thro
 - ~~Exclusions~~ **Decided 2026-09-23: AgentForge ships the starting list and a consumer opts out of it.** The operator's correction to this section's own wording: "every field is required where it is declared" was aimed at *expensive* settings like direction and delete propagation, and over-reached into everything. A known leak with a known answer is not a choice anyone is making. The field takes `string[] | ((current: string[]) => string[])`, so appending to the default costs a line — and **every field with a house default takes that form**.
 - ~~Whether an override may relax what the project tightened~~ **Decided 2026-09-23: the project is a default, not a ceiling.** A procedure overrides any field without ceremony. Tiers, override permissions and distinct verbs for widening are load on the consumer for a problem nobody has. The general rule is in `CLAUDE.md`; **the one exception is where losing a contribution is silent**, which is why guardrail composition stays additive (§REQ204).
 
-**The implementation is checked and it holds** — [`research/working-directory-sync.md`](research/working-directory-sync.md), `packages/agentforge/integ/filesystem-s3-sync/s7cmd-semantics.test.ts`. `s7cmd` **1.8.3** publishes a **musl aarch64** build, which matters because the base image is Alpine and a glibc binary would not run in it; it is **statically linked**, 12.7 MB, and the archive **matched its published sha256**, so "pin it by digest" is actionable. All eight behavioural claims hold against a real bucket, including the three the design rests on: `--filter-mtime-before` **does** skip a file touched moments ago while uploading the settled ones, exclusions work, and **delete propagation is off unless asked for**. One detail with a consequence: the filter takes an **absolute timestamp**, so the quiescence threshold lives in the sync runner and is recomputed each pass rather than declared once to the tool.
+**The implementation is checked and it holds** — [`research/working-directory-sync.md`](research/working-directory-sync.md), `packages/agentforge/integ/aws/filesystem-s3-sync/s7cmd-semantics.test.ts`. `s7cmd` **1.8.3** publishes a **musl aarch64** build, which matters because the base image is Alpine and a glibc binary would not run in it; it is **statically linked**, 12.7 MB, and the archive **matched its published sha256**, so "pin it by digest" is actionable. All eight behavioural claims hold against a real bucket, including the three the design rests on: `--filter-mtime-before` **does** skip a file touched moments ago while uploading the settled ones, exclusions work, and **delete propagation is off unless asked for**. One detail with a consequence: the filter takes an **absolute timestamp**, so the quiescence threshold lives in the sync runner and is recomputed each pass rather than declared once to the tool.
 
 **None of that settles the declaration.** The tool can express every option below, so which ones AgentForge *offers* remains a design decision.
 
@@ -184,7 +184,7 @@ The key, its two edges and its retention are settled: seven days, with the key s
 
 Two constraints found along the way, both recorded in the research note: **`@a2a-js/sdk@1.2.0` is protobuf-typed**, so a part written the way the specification documents it serializes to an empty part with no error; and **an absent `A2A-Version` header means protocol 0.3**, so anything that drops it downgrades the request.
 
-**Answered against AgentCore** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/agentcore/__fixtures__/server.ts`, `a2a-1-0-only-through-agentcore.test.ts`:
+**Answered against AgentCore** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/aws/agentcore/__fixtures__/server.ts`, `a2a-1-0-only-through-agentcore.test.ts`:
 
 - **`A2A-Version` is not forwarded *by default*, but it can be allowlisted.** AgentCore takes a per-runtime `requestHeaderConfiguration.requestHeaderAllowlist` (up to 20 headers, 4 KB each) on `CreateAgentRuntime`/`UpdateAgentRuntime`; `A2A-Version` breaks none of its restrictions. Measured: with it allowlisted, `A2A-Version: 1.0` **arrives and negotiates 1.0**; without the allowlist entry the header is dropped and 0.3 is negotiated; a header not on the list never arrives. **So AgentForge is not pinned to 0.3** — which is the opposite of what the first version of this section recorded, and is now an open choice rather than a constraint (below).
 - **A part reader must throw on a part it cannot decode.** The failure is real but its trigger is narrower than first written: under the **1.0 RPC method name `SendMessage`**, a part in the SDK's internal protobuf shape is accepted with its `content` silently dropped — with or without `A2A-Version: 1.0`. Under `message/send` the same part is properly rejected. `{ kind: 'data', data }` is the wire shape in both versions and always works. One combination therefore delivers an empty envelope and calls it success, which is a zero-silent-failures requirement on the harness, not a nicety.
@@ -232,7 +232,7 @@ Four rules hold whichever is chosen ([reference](research/harness-references.md)
 
 ## §N — How a procedure is written *(DECIDED 2026-09-22; three consequences OPEN)*
 
-**Decided: oRPC, contract-first** — [ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md). Findings in [`research/procedure-framework.md`](research/procedure-framework.md); spikes now `packages/agentforge/integ/procedure-framework/`. The earlier comparison of three hand-built styles stands as evidence ([`research/procedure-authoring.md`](research/procedure-authoring.md), `spikes/procedure-authoring/`, retired at A0, git history `d3f08b7`) but not as the decision: it asked which shape to build, never whether to build at all.
+**Decided: oRPC, contract-first** — [ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md). Findings in [`research/procedure-framework.md`](research/procedure-framework.md); spikes now `packages/agentforge/integ/local/procedure-framework/`. The earlier comparison of three hand-built styles stands as evidence ([`research/procedure-authoring.md`](research/procedure-authoring.md), `spikes/procedure-authoring/`, retired at A0, git history `d3f08b7`) but not as the decision: it asked which shape to build, never whether to build at all.
 
 - **The crux is the split, and it holds.** A consumer declares one contract; a utility derives **`SendMessage`** and **`GetTask`**, named as A2A names them and typed with that procedure's own shapes. **`CancelTask` is root-level**, not per procedure — a task id and a runtime session are the caller's, so nothing about it is the contract's. Proved under `tsc --strict` with probes plus a negative control.
 - **`GetTask` is one call, and returns a discriminated union.** An earlier draft had a `submit`/`result` pair, which left a caller polling a running task with nothing to read. `GetTaskRequest` is `{ id, historyLength? }` and returns the whole task with **no artifact filter**, so a separate `outcome` call would be a second name over one wire call returning identical bytes. Narrowing on `state` flows through the link: the declared output is reachable only on the `SUCCEEDED` branch, and each procedure's `GetTask` carries **its own** output type, not a shared one.
@@ -276,21 +276,21 @@ Not open questions — deliberately not being worked until something asks for th
 
 ## Spike plan
 
-**A spike lands as an integration test when its answer can drift** (`ARCHITECTURE.md` §9) — a platform or dependency behaviour is not self-renewing, so it keeps being checked; a question settled once is recorded in an ADR or a research note with its date. `spikes/` itself was retired at A0: each spike above is now a test in `packages/agentforge/integ/` or `e2e/`, or retired with its finding kept in the research note. AgentCore tests run against a throwaway runtime, never a deployment, and stub the model call so they stay cheap and deterministic.
+**A spike lands as an integration test when its answer can drift** (`ARCHITECTURE.md` §9) — a platform or dependency behaviour is not self-renewing, so it keeps being checked; a question settled once is recorded in an ADR or a research note with its date. `spikes/` itself was retired at A0: each spike above is now a test in `packages/agentforge/integ/`, or retired with its finding kept in the research note. AgentCore tests run against a throwaway runtime, never a deployment, and stub the model call so they stay cheap and deterministic.
 
 | Spike | Answers | State |
 |---|---|---|
-| Kernel settlement and structured output | §E | **done** — `packages/agentforge/e2e/kernel-settlement/` |
+| Kernel settlement and structured output | §E | **done** — `packages/agentforge/integ/model/kernel-settlement/` |
 | Task-process protocol, cancellation, group kill | §C, §G | **done** — retired at A0 ([ADR 0004](../adr/0004-a-process-per-task.md)); git history `d3f08b7` |
-| Procedure framework: the split, custom link, typed context, streaming, cancellation | §N | **done** — `packages/agentforge/integ/procedure-framework/` |
+| Procedure framework: the split, custom link, typed context, streaming, cancellation | §N | **done** — `packages/agentforge/integ/local/procedure-framework/` |
 | A2A server assembly, the wrapping gateway, client signing | §I | **done** — retired at A0; the gateway's own tests replace it; git history `d3f08b7` |
-| Image layering and bundler determinism | §D | **done** — `packages/agentforge/integ/image-determinism/` |
-| Capability composition up the image chain | §L | **done** — `packages/agentforge/integ/capability-composition/` |
-| Working-directory sync semantics | §F | **done** — `packages/agentforge/integ/filesystem-s3-sync/` |
-| Busy-container reachability, concurrency, container-per-session | §B | **done** — `packages/agentforge/integ/agentcore/`; container-per-session is AgentCore's documented guarantee and not re-tested |
-| Cancellation, the stop grace period, the outcome inside it | §C | **done** — `packages/agentforge/integ/agentcore/` |
+| Image layering and bundler determinism | §D | **done** — `packages/agentforge/integ/local/image-determinism/` |
+| Capability composition up the image chain | §L | **done** — `packages/agentforge/integ/local/capability-composition/` |
+| Working-directory sync semantics | §F | **done** — `packages/agentforge/integ/aws/filesystem-s3-sync/` |
+| Busy-container reachability, concurrency, container-per-session | §B | **done** — `packages/agentforge/integ/aws/agentcore/`; container-per-session is AgentCore's documented guarantee and not re-tested |
+| Cancellation, the stop grace period, the outcome inside it | §C | **done** — `packages/agentforge/integ/aws/agentcore/` |
 | Task store lease and visibility, from inside a microVM | §A | **done** — measured once, [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md) §A |
-| Header allowlist, 1.0-only negotiation, the silent part strip | §I | **done** — `packages/agentforge/integ/agentcore/` |
+| Header allowlist, 1.0-only negotiation, the silent part strip | §I | **done** — `packages/agentforge/integ/aws/agentcore/` |
 | **Session resume across containers** | §F | **not run** — needs a real agent in a container, so it waits for A1 |
 
 **Everything else is answered.** Credential provisioning was on this list and is not a spike: §O's first slice classifies `CREDENTIAL_EXPIRED` and does nothing more, which needs no measurement. The one outstanding spike needs an agent that does not exist yet, so **no spike blocks A0**.

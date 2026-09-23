@@ -10,11 +10,9 @@
   "include": [
     "vitest.config.mts",
     "vitest.integ.mts",
-    "vitest.e2e.mts",
     "tsdown.config.ts",
     "src/**/*.test.ts",
     "src/**/*.spec.ts",
-    "integ/**/*.ts",
-    "e2e/**/*.ts"
+    "integ/**/*.ts"
   ]
 }

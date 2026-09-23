@@ -1,0 +1,329 @@
+/**
+ * DESIGN_OPTIONS §E, question 3:
+ *   "Does an in-turn PreToolUse rejection still add anything over native
+ *    re-prompting, and does its matcher name a tool that actually exists?"
+ *
+ * The structured-output submission is carried by a real tool named
+ * `StructuredOutput` (established by e1). So a PreToolUse matcher can name it.
+ * What is not known is whether intercepting it buys anything now that the SDK
+ * validates and re-prompts on its own.
+ *
+ * Two scenarios, the two things AgentForge relies on a hook for:
+ *
+ *   hook-only-rule       a cross-field rule draft-07 cannot express, enforced
+ *                        by a PreToolUse denial. Whether the model then complies
+ *                        or argues is its choice and varies run to run; what is
+ *                        asserted is what holds either way — the denial reaches
+ *                        the model verbatim, and a denied submission never
+ *                        becomes the result.
+ *   hook-updated-input   the hook repairs the submission via `updatedInput`
+ *                        instead of rejecting it — no extra model turn.
+ *
+ * Not re-tested, and recorded in the findings: native schema re-prompting (the
+ * SDK's documented structured-output behaviour, and AgentForge validates the
+ * settled output itself), a schema-expressible rule enforced by a hook (settled
+ * once: it belongs in the schema), and a matcher naming no tool (it fires zero
+ * times; AgentForge asserts its matchers against `init.tools` at startup).
+ *
+ * Findings: docs/research/kernel-settlement.md, "E3".
+ */
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  type HookCallback,
+  type HookJSONOutput,
+  query,
+} from '@anthropic-ai/claude-agent-sdk';
+import { describe, expect, it, onTestFinished } from 'vitest';
+import { z } from 'zod';
+import {
+  createSandbox,
+  createSubscriptionEnvironment,
+  QueryRecording,
+} from '../../__fixtures__/claude-agent-sdk.ts';
+
+const CARRIER_TOOL = 'StructuredOutput';
+
+/** Fixture sizes chosen so the sum is not a round number the model can guess. */
+const fixtureFileSizes: Record<string, number> = {
+  'alpha.txt': 137,
+  'beta.txt': 2891,
+  'gamma.txt': 15043,
+};
+
+const baseShape = {
+  files: z
+    .array(z.object({ name: z.string(), bytes: z.number().int() }))
+    .describe(
+      'every .txt file in the working directory, with its exact byte size',
+    ),
+  totalBytes: z.number().int().describe('the total size'),
+  summary: z.string().describe('a short summary'),
+};
+
+const PROMPT =
+  "Use Bash to list every .txt file in the current directory and get each one's exact byte size. " +
+  'Then give your final structured output: every file with its size, the total, and a summary. ' +
+  'Write the summary as a normal descriptive sentence.';
+
+/** Cap the correction loop: a rule the model cannot satisfy must not spin forever at the operator's expense. */
+const MAXIMUM_DENIALS = 3;
+
+type CarrierInput = {
+  files?: { name?: string; bytes?: number }[];
+  totalBytes?: number;
+  summary?: string;
+};
+
+type HookCall = {
+  toolName: string;
+  decision: 'allow' | 'deny' | 'updatedInput';
+  /** What the model submitted, as the hook saw it. */
+  input: CarrierInput;
+  reason?: string;
+  repairedSummary?: string;
+};
+
+type Scenario = {
+  name: string;
+  /** Returns a denial reason, or undefined to allow. */
+  check?: (input: CarrierInput) => string | undefined;
+  /** Returns a repaired input, or undefined to leave it alone. */
+  repair?: (input: CarrierInput) => CarrierInput | undefined;
+};
+
+// Cross-field AND unstated in the prompt or the schema: draft-07 cannot
+// express it, and the model cannot guess it, so the denial path is guaranteed
+// to be exercised rather than merely available.
+const checkTotalInWholeKilobytes = (
+  input: CarrierInput,
+): string | undefined => {
+  const sum = (input.files ?? []).reduce(
+    (total, file) => total + (file.bytes ?? 0),
+    0,
+  );
+  const required = Math.ceil(sum / 1024);
+  if (input.totalBytes === required) return undefined;
+  return (
+    `"totalBytes" must be the total expressed in WHOLE KILOBYTES, rounded up — not bytes. ` +
+    `The files sum to ${sum} bytes, so totalBytes must be ${required}. You submitted ${input.totalBytes}. Resubmit.`
+  );
+};
+
+const repairToFiveWords = (input: CarrierInput): CarrierInput | undefined => {
+  const words = String(input.summary ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 5) return undefined;
+  return {
+    ...input,
+    summary: words.slice(0, 5).join(' ') || 'repaired by the harness hook',
+  };
+};
+
+const scenarios = {
+  hookOnlyRule: {
+    name: 'hook-only-rule',
+    check: checkTotalInWholeKilobytes,
+  },
+  hookUpdatedInput: {
+    name: 'hook-updated-input',
+    repair: repairToFiveWords,
+  },
+} satisfies Record<string, Scenario>;
+
+async function runScenario(scenario: Scenario) {
+  const sandbox = createSandbox(`e3-${scenario.name}`);
+  onTestFinished(() => sandbox.dispose());
+  for (const [name, size] of Object.entries(fixtureFileSizes)) {
+    writeFileSync(join(sandbox.workingDirectory, name), 'x'.repeat(size));
+  }
+
+  const outputJsonSchema = z.toJSONSchema(z.object(baseShape), {
+    target: 'draft-7',
+    io: 'input',
+  });
+
+  const hookCalls: HookCall[] = [];
+  let denials = 0;
+
+  const preToolUseHook: HookCallback = async (input) => {
+    if (input.hook_event_name !== 'PreToolUse') {
+      throw new Error(`PreToolUse hook received ${input.hook_event_name}`);
+    }
+    const toolName = input.tool_name;
+    const toolInput = input.tool_input as CarrierInput;
+    if (scenario.repair) {
+      const updated = scenario.repair(toolInput);
+      hookCalls.push({
+        toolName,
+        decision: updated ? 'updatedInput' : 'allow',
+        input: toolInput,
+        ...(updated ? { repairedSummary: updated.summary } : {}),
+      });
+      return {
+        continue: true,
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'allow',
+          ...(updated ? { updatedInput: updated } : {}),
+        },
+      } satisfies HookJSONOutput;
+    }
+    const reason =
+      denials >= MAXIMUM_DENIALS ? undefined : scenario.check?.(toolInput);
+    hookCalls.push({
+      toolName,
+      decision: reason ? 'deny' : 'allow',
+      input: toolInput,
+      ...(reason ? { reason } : {}),
+    });
+    if (reason) denials += 1;
+    return {
+      continue: true,
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: reason ? 'deny' : 'allow',
+        ...(reason ? { permissionDecisionReason: reason } : {}),
+      },
+    } satisfies HookJSONOutput;
+  };
+
+  const recording = new QueryRecording(
+    'integ',
+    'kernel-settlement',
+    `e3-in-turn-correction-${scenario.name}`,
+  );
+  await recording.drain(
+    query({
+      prompt: PROMPT,
+      options: {
+        cwd: sandbox.workingDirectory,
+        env: createSubscriptionEnvironment(sandbox.configDirectory),
+        model: 'claude-sonnet-5',
+        allowedTools: ['Bash'],
+        permissionMode: 'bypassPermissions',
+        allowDangerouslySkipPermissions: true,
+        outputFormat: { type: 'json_schema', schema: outputJsonSchema },
+        maxTurns: 25,
+        settingSources: [],
+        hooks: {
+          PreToolUse: [{ matcher: CARRIER_TOOL, hooks: [preToolUseHook] }],
+        },
+      },
+    }),
+  );
+
+  const result = recording.onlyResultMessage();
+  const structuredOutput = (
+    result.subtype === 'success' ? result.structured_output : undefined
+  ) as CarrierInput | null | undefined;
+  const carrierToolUses = recording
+    .toolUses()
+    .filter((toolUse) => toolUse.name === CARRIER_TOOL);
+  const evidence = [
+    `subtype=${result.subtype} is_error=${result.is_error} num_turns=${result.num_turns}`,
+    `carrierSubmissions=${carrierToolUses.length} hookCalls=${JSON.stringify(hookCalls.map((call) => call.decision))}`,
+    `structured_output=${JSON.stringify(structuredOutput)}`,
+    `cost=$${result.total_cost_usd.toFixed(4)}`,
+    `see ${recording.logPath}`,
+  ].join('; ');
+
+  expect(
+    recording.firstSystemInitMessage().tools,
+    `'${CARRIER_TOOL}' is advertised in system/init.tools; ${evidence}`,
+  ).toContain(CARRIER_TOOL);
+
+  return {
+    recording,
+    result,
+    structuredOutput,
+    carrierToolUses,
+    hookCalls,
+    denials,
+    evidence,
+  };
+}
+
+/** The carrier's is_error tool_results, in order. */
+function carrierErrorTexts(
+  recording: QueryRecording,
+  carrierToolUseIds: string[],
+): string[] {
+  return recording
+    .toolResults()
+    .filter(
+      (toolResult) =>
+        toolResult.isError && carrierToolUseIds.includes(toolResult.toolUseId),
+    )
+    .map((toolResult) => toolResult.text);
+}
+
+describe('E3 — in-turn PreToolUse rejection over StructuredOutput', () => {
+  it(scenarios.hookOnlyRule.name, async () => {
+    const run = await runScenario(scenarios.hookOnlyRule);
+    expect(
+      new Set(run.hookCalls.map((call) => call.toolName)),
+      `the hook sees the carrier under its emitted name; ${run.evidence}`,
+    ).toEqual(new Set([CARRIER_TOOL]));
+    expect(
+      run.denials,
+      `the cross-field rule was denied in-turn; ${run.evidence}`,
+    ).toBeGreaterThanOrEqual(1);
+    // The denial reason reaches the model verbatim, as an is_error tool_result
+    // on the carrier.
+    const deniedReasons = run.hookCalls
+      .filter((call) => call.decision === 'deny')
+      .map((call) => call.reason);
+    expect(
+      carrierErrorTexts(
+        run.recording,
+        run.carrierToolUses.map((toolUse) => toolUse.id),
+      ).filter((text) =>
+        deniedReasons.some(
+          (reason) => reason !== undefined && text.includes(reason),
+        ),
+      ),
+      `every denial reason reaches the model verbatim; ${run.evidence}`,
+    ).toHaveLength(run.denials);
+    // The model may comply or argue until it gives up (a success with no
+    // output, which the kernel treats as OUTPUT_INVALID). Either way, a
+    // submission the hook denied never becomes the result.
+    const deniedInputs = run.hookCalls
+      .filter((call) => call.decision === 'deny')
+      .map((call) => call.input);
+    const allowedInputs = run.hookCalls
+      .filter((call) => call.decision === 'allow')
+      .map((call) => call.input);
+    if (run.structuredOutput != null) {
+      expect(
+        allowedInputs,
+        `the delivered output is a submission the hook allowed; ${run.evidence}`,
+      ).toContainEqual(run.structuredOutput);
+      expect(
+        deniedInputs,
+        `the delivered output is not a submission the hook denied; ${run.evidence}`,
+      ).not.toContainEqual(run.structuredOutput);
+    }
+  });
+
+  it(scenarios.hookUpdatedInput.name, async () => {
+    const run = await runScenario(scenarios.hookUpdatedInput);
+    const repairs = run.hookCalls.filter(
+      (call) => call.decision === 'updatedInput',
+    );
+    expect(
+      repairs,
+      `the model's summary was not five words, so the hook repaired it once; ${run.evidence}`,
+    ).toHaveLength(1);
+    expect(
+      run.carrierToolUses,
+      `a repair costs no additional submission; ${run.evidence}`,
+    ).toHaveLength(1);
+    expect(
+      run.structuredOutput?.summary,
+      `the DELIVERED structured_output carries the repaired value; ${run.evidence}`,
+    ).toBe(repairs[0]?.repairedSummary);
+  });
+});

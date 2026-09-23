@@ -2,7 +2,7 @@
 
 **Measured on 2026-09-22.** Docker 29.4.1 with BuildKit v0.29.0, buildx v0.33.0, Docker Desktop on macOS arm64, `linux/arm64` targets, base pinned to `oven/bun@sha256:0723…437eb`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §D's central question. No model spend, no AWS.
 
-Source: `spikes/images/` — `setup.sh`, the three-level image tree, and `d1-deterministic-builds.sh`. Carried at A0 into `packages/agentforge/integ/image-determinism/`, which re-checks every finding below.
+Source: `spikes/images/` — `setup.sh`, the three-level image tree, and `d1-deterministic-builds.sh`. Carried at A0 into `packages/agentforge/integ/local/image-determinism/`, which re-checks every finding below.
 
 ---
 
@@ -98,7 +98,7 @@ The spike's teardown removed the throwaway registry container, the buildx builde
 
 The section above measured determinism over fixtures that **copy plain files**. Nothing was bundled, and bundling was named as the likelier source of non-determinism in a real agent image: module ordering, chunk hashing and embedded absolute paths are all things a bundler can vary between runs.
 
-Measured on **Bun 1.4.0** against a real 2.26 MB bundle — the AgentCore spike server with Express, `@a2a-js/sdk` and two AWS SDK clients (`spikes/bundler/d2-bun-bundler-determinism.sh`, now `packages/agentforge/integ/image-determinism/bun-bundler.test.ts`):
+Measured on **Bun 1.4.0** against a real 2.26 MB bundle — the AgentCore spike server with Express, `@a2a-js/sdk` and two AWS SDK clients (`spikes/bundler/d2-bun-bundler-determinism.sh`, now `packages/agentforge/integ/local/image-determinism/bun-bundler.test.ts`):
 
 | Variation | Result |
 |---|---|

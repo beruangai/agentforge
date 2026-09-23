@@ -361,13 +361,15 @@ Written by AgentForge: the outcome, the attempt and the prior attempt's state, t
 
 ## 9. How this is tested
 
-Three tiers, and a rule about what earns a test: **a spike becomes an integration test when its answer can drift.** An answer that depends on a platform or a dependency — the Agent SDK's settlement behaviour, AgentCore's contract, what a registry serves — is not self-renewing, so it lands in `integ/` and keeps being checked. An answer that settles a decision once, such as which authoring style a procedure uses or whether a binary runs on this architecture, is recorded in an ADR or a research note with its date. A test that can only pass is maintenance without information. `spikes/` was retired at A0 on exactly this rule: the spikes whose answers can drift are tests in `packages/agentforge/integ/` and `e2e/`, and the three that settled a decision once — the task-process protocol, server assembly, procedure authoring — are kept as their research notes, with the code in git history.
+Three tiers, and a rule about what earns a test: **a spike becomes an integration test when its answer can drift.** An answer that depends on a platform or a dependency — the Agent SDK's settlement behaviour, AgentCore's contract, what a registry serves — is not self-renewing, so it lands in `integ/` and keeps being checked. An answer that settles a decision once, such as which authoring style a procedure uses or whether a binary runs on this architecture, is recorded in an ADR or a research note with its date. A test that can only pass is maintenance without information. `spikes/` was retired at A0 on exactly this rule: the spikes whose answers can drift are tests in `packages/agentforge/integ/`, and the three that settled a decision once — the task-process protocol, server assembly, procedure authoring — are kept as their research notes, with the code in git history.
 
-| Tier | Runs against | Covers |
-|---|---|---|
-| **Unit** | Nothing external | The procedure model, the outcome taxonomy, the store's fencing and index, event mapping — colocated with their source |
-| **Runtime integration** | A real AgentCore runtime, with the model call stubbed | Everything around the agent: admission, idempotency, the task-process protocol, cancellation, the lease, loss, working-directory sync, deploy behavior. Deterministic and cheap, because no model is called |
-| **End-to-end** | A real runtime and a real model | Structured output, settlement, in-turn correction, cancellation mid-turn, usage accounting — run after a change that could move them, not on every commit |
+| Tier | Runs against | Covers | Runs |
+|---|---|---|---|
+| **Unit** (`test`) | Nothing external | The procedure model, the outcome taxonomy, the store's fencing and index, event mapping — colocated with their source | Every build |
+| **Integration** (`integ`) | One live slice: Docker, a real AgentCore runtime and S3, or the Agent SDK against a real model | What AgentForge relies on and the platform does not guarantee — busy-container reachability, the stop grace period, sync semantics, settlement, in-turn correction. From A1, also the runtime with the model call stubbed inside the kernel: admission, idempotency, the task-process protocol, cancellation, the lease, loss, deploy behavior | The gate before publishing, never on every commit |
+| **End-to-end** (`e2e`, from A1) | The whole path: a caller, the client, a runtime, the harness, the SDK and a real model | That a procedure called through the client comes back as its typed outcome — structured output, cancellation mid-turn, usage accounting, end to end | The gate before publishing |
+
+**Integration is grouped by what a test needs, which is also what it costs** — `integ/local/` needs Docker, `integ/aws/` the test role in `us-east-2`, `integ/model/` the subscription token and inference spend — and each group is a configuration of the target, so a publish can run the cheap groups on every candidate and the model group once. The higher the tier, the more a test must earn its cost: a live model call has to assert something AgentForge relies on and cannot learn more cheaply.
 
 The stub in the middle tier replaces the SDK call *inside the kernel*. It is a test seam, not a second kind of procedure and not something a consumer can reach — a procedure is still an agent run (§3).
 
@@ -444,13 +446,14 @@ agentforge/
         │   ├── client/             # the A2A client, AgentCore and local → /client
         │   │   └── temporal/       # the activity factory → /temporal
         │   └── infra/              # CDK constructs → /infra
-        ├── integ/                  # per concept: agentcore/, a2a-version-negotiation/,
-        │                           #   procedure-framework/, capability-composition/,
-        │                           #   filesystem-s3-sync/, image-determinism/
-        └── e2e/                    # kernel-settlement/
+        └── integ/                  # by what a test needs, then per concept
+            ├── local/              #   Docker: a2a-version-negotiation/, procedure-framework/,
+            │                       #     capability-composition/, image-determinism/
+            ├── aws/                #   the test role: agentcore/, filesystem-s3-sync/
+            └── model/              #   the subscription token: kernel-settlement/
 ```
 
-**Everything built lands under one output root, `dist/packages/agentforge/`**, never in the source tree, in a directory **named for the task that produced it**: `bundle/` is the published package — the bundle, its declarations, the manifest without its workspace-only fields, the README, and from A1 the base image's `Dockerfile` and the bundled server; `typecheck/` holds only the incremental build info for `src/`, because type checking emits nothing; `test/` holds coverage; `integ/` and `e2e/` hold what those tests record. One place to inspect, one to clean, and a source directory that holds only source. The package targets Node 26: `engines.node` declares it, the bundle's syntax target follows from it, and the compiler settings extend `@tsconfig/node26`.
+**Everything built lands under one output root, `dist/packages/agentforge/`**, never in the source tree, in a directory **named for the task that produced it**: `bundle/` is the published package — the bundle, its declarations, the manifest without its workspace-only fields, the README, and from A1 the base image's `Dockerfile` and the bundled server; `typecheck/` holds only the incremental build info for `src/`, because type checking emits nothing; `test/` holds coverage; `integ/` holds what those tests record, and `e2e/` will from A1. One place to inspect, one to clean, and a source directory that holds only source. The package targets Node 26: `engines.node` declares it, the bundle's syntax target follows from it, and the compiler settings extend `@tsconfig/node26`.
 
 `server/runtime` and `server/harness` both import `core` and never each other (§1). **A filesystem is a concept of its own**: the working directory is one use of an AgentForge-managed filesystem, and sync is a capability of the S3 kind. Git — which TrendBot uses today — and S3 Files follow as siblings with the same sync semantics; no abstraction over them is built until the second one exists.
 

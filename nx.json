@@ -15,8 +15,7 @@
       "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
       "!{projectRoot}/tsconfig.spec.json",
       "!{projectRoot}/vitest.*.mts",
-      "!{projectRoot}/integ/**",
-      "!{projectRoot}/e2e/**"
+      "!{projectRoot}/integ/**"
     ],
     "sharedGlobals": [],
     "biome": ["default", "{workspaceRoot}/biome.json"]

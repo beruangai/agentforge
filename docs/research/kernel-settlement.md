@@ -2,7 +2,7 @@
 
 **Read against the real SDK on 2026-09-22.** `@anthropic-ai/claude-agent-sdk@0.3.278`, Bun 1.4.0, macOS, the operator's Claude Max subscription, model `claude-sonnet-5` unless a case names another. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
 
-Source: `spikes/kernel-settlement/`, four runnable spikes, now the e2e tests in `packages/agentforge/e2e/kernel-settlement/`. Every message of every run is kept as JSONL — then under `spikes/out/`, now under `dist/packages/agentforge/e2e/` — so each claim below is evidence rather than recollection. Total model spend: **$1.84**.
+Source: `spikes/kernel-settlement/`, four runnable spikes, now the integration tests in `packages/agentforge/integ/model/kernel-settlement/` (`nx run @beruangai/agentforge:integ --configuration=model`). Every message of every run is kept as JSONL — then under `spikes/out/`, now under `dist/packages/agentforge/integ/` — so each claim below is evidence rather than recollection. Total model spend: **$1.84**.
 
 These are observations of one SDK version on one day. They are re-checked by those tests, not by being trusted.
 
@@ -92,6 +92,8 @@ after which it ran the command in the foreground. One result, valid structured o
 
 **A negative result worth recording:** in this run the model then reported `startedBackgroundWork: true` in its structured output, which was false — it had run the command in the foreground. Schema-valid, semantically wrong. Nothing in the SDK catches that; see E3.
 
+**Not re-tested from 2026-09-24.** On that run the model passed `run_in_background` as the string `"true"` and then worked around the switch with `nohup … & disown` — background work by another route, which the switch cannot see. What the model does once the parameter is gone is its choice, not the SDK's contract, so a test asserting it can only be flaky; the closed- and streaming-input cases above, which AgentForge's settlement rests on, remain tested.
+
 ## E3 — In-turn `PreToolUse` rejection
 
 **Answer: it adds three things native re-prompting cannot do, at a cost, and it has two sharp edges.**
@@ -113,6 +115,8 @@ Five scenarios over `StructuredOutput`, cost $0.48.
 - **The denial reason reaches the model verbatim**, as an `is_error: true` tool_result on the carrier.
 
 **What it costs:** for a rule the schema *can* express, the hook was strictly worse — more submissions, more money, same answer. **Rules that fit in the schema belong in the schema.**
+
+**Re-tested from 2026-09-24: the cross-field rule and the `updatedInput` repair** — the two things only a hook can do. The schema-rule comparisons are a cost finding recorded here, and the wrong matcher is caught at startup by the kernel (Edge 3), so none is re-asserted. The cross-field case asserts only what holds whether the model complies or argues: the carrier is `StructuredOutput`, the hook denied at least once, every denial reason reached the model verbatim, and a denied submission never became the result. On 2026-09-24 the model **complied** after two denials — deny, deny, allow — where on 2026-09-22 it refused three times (Edge 1), so the model's answer to a contract-contradicting denial is not stable across runs.
 
 ### Edge 1 — the model resists a denial that contradicts the contract
 
@@ -142,7 +146,7 @@ subtype: "success",  is_error: false,  structured_output: null
 
 Cost $0.43. Each case asserts an observable consequence, not that the argument was passed.
 
-**Re-tested from 2026-09-24: `maxTurns`, `maxBudgetUsd`, `settingSources` and an unknown option** — the bindings that are surprising or have moved between SDK versions. `model`, `disallowedTools`, `cwd` and `systemPrompt` are documented options whose binding is recorded here, not re-asserted; that AgentForge passes each through is its own unit test.
+**Re-tested from 2026-09-24: `maxTurns`, `maxBudgetUsd` and `settingSources`** — the bindings that are surprising or have moved between SDK versions. That an unknown option is ignored is recorded below and not re-tested: AgentForge's own boundary refuses an unknown key, which is its unit test, whatever the SDK does. `model`, `disallowedTools`, `cwd` and `systemPrompt` are documented options whose binding is recorded here, not re-asserted; that AgentForge passes each through is its own unit test.
 
 | Option | Binds | Evidence |
 |---|---|---|
