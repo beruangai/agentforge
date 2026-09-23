@@ -61,24 +61,34 @@
     },
     "test": {
       "executor": "@nx/vitest:test",
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/package.json",
+        "{projectRoot}/vitest.config.mts",
+        "{projectRoot}/tsconfig*.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        "sharedGlobals",
+        {
+          "externalDependencies": ["vitest", "typescript"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/coverage"],
       "options": {
         "configFile": "{projectRoot}/vitest.config.mts"
       }
     },
     "integ": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/vitest:test",
       "cache": false,
       "options": {
-        "command": "vitest --config vitest.integ.mts --run",
-        "cwd": "{projectRoot}"
+        "configFile": "{projectRoot}/vitest.integ.mts"
       }
     },
     "e2e": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/vitest:test",
       "cache": false,
       "options": {
-        "command": "vitest --config vitest.e2e.mts --run",
-        "cwd": "{projectRoot}"
+        "configFile": "{projectRoot}/vitest.e2e.mts"
       }
     }
   }
