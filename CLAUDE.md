@@ -66,7 +66,11 @@ The operator's standing conventions across projects:
 
 ## Spec-driven development
 
-Non-trivial changes go through OpenSpec (proposal → specs → design → tasks, then verification). Behavior contracts go in `openspec/specs/` and in-flight work in `openspec/changes/`; both are created when the first change is proposed. Rules in [`openspec/config.yaml`](openspec/config.yaml) and `.claude/rules/openspec.md`. OpenSpec artifacts are `docs` scope in Conventional Commits.
+**OpenSpec is for behavior, not for everything non-trivial.** A change that adds, alters or removes a behavior a consumer or another layer can observe goes through it: proposal → specs → design → tasks, then verification. Behavior contracts go in `openspec/specs/` and in-flight work in `openspec/changes/`; both are created by the first such change.
+
+**Scaffolding and tooling do not.** A workspace layout, a build target, a lint configuration, a dependency bump, a docs or ADR edit — none has a behavior contract to write, and a proposal for one is ceremony that produces a spec nobody can verify. Do the work, and say what was done in the commit. Milestone **A0 is scaffolding and is explicitly outside OpenSpec**; A1 is where the first behavior lands, and therefore where `openspec/specs/` begins.
+
+Rules in [`openspec/config.yaml`](openspec/config.yaml) and `.claude/rules/openspec.md`. OpenSpec artifacts are `docs` scope in Conventional Commits.
 
 ## Related codebases
 

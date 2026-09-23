@@ -1,6 +1,8 @@
 # Roadmap
 
-Milestones deliver capability a consumer can actually run. Each is proposed through OpenSpec, and the questions it depends on in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md) are settled first — by spike where they turn on platform behavior.
+Milestones deliver capability a consumer can actually run. The questions each depends on in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md) are settled first — by spike where they turn on platform behavior.
+
+**A milestone that delivers behavior is proposed through OpenSpec; A0 is not.** A0 is the workspace itself — layout, targets, tooling, and retiring `spikes/` — and has no behavior contract to write, so it is done directly. `openspec/specs/` begins with A1.
 
 **StrategyFoundry's M0 is its own lowest bar, not this roadmap's target.** A milestone here ends with agents that execute real work reliably, not with a foundation that compiles.
 
