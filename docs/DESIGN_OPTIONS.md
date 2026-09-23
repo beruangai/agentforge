@@ -8,9 +8,9 @@ What is not yet decided. A question is worked here until it is settled; the outc
 
 | | Question | Settled by | Blocks |
 |---|---|---|---|
-| **§F** | The sync declaration's remaining fields | Design in the first slice | Session resume and artifacts |
+| **§F** | Sync cadence and the quiescence threshold; the project-key sanitiser | Design in the first slice | Session resume and artifacts |
 | **§A** | The item shape once a large outcome shares it | Design in the first slice | The first slice's store |
-| **§D** | The deploy path that compares digests | Design, with the constructs | Deployment |
+| **§D** | How the local `FROM` chain is built, and the deploy path that compares digests | **One spike**, then design with the constructs | Deployment |
 | **§O** | Rotation, and the broker when it arrives | Later; the first slice keeps room | Nothing yet |
 | **§N** | The contract hash, the envelope-to-router mapping, and the card generator | Design in the first slice | The first slice |
 | **§K** | The plugin and construct surface | Design, after the first agent exists | A2's tooling |
