@@ -1,36 +1,48 @@
 schema: spec-driven
 
 context: |
-  AgentForge: a procedure wrapper for the Claude Agent SDK, shared across projects.
-  Tech stack: TypeScript, Bun, Nx grouped layout on @aws/nx-plugin, Vitest, Zod, AWS CDK.
+  AgentForge: a procedure wrapper for the Claude Agent SDK, built for StrategyFoundry and
+  TrendBot, not for public use.
+  Tech stack: TypeScript on Bun, Nx grouped layout on @aws/nx-plugin, Vitest, Zod, oRPC, AWS CDK.
+
   Four layers with a contract at every boundary (docs/ARCHITECTURE.md §1):
-  1 runtime (A2A server and client, TaskExecutor, durable task store, deployment constructs),
-  2 harness (procedures, the agent() helper and kernel, optional helpers), 3 consumer, 4 Claude Agent SDK.
-  Layers 1 and 2 never import each other; they share only the task protocol library.
-  Only two crossings are protocols: the A2A wire, and the pipe to a task process.
-  A2A is the contract between a caller and the runtime; the client is caller-agnostic and a
-  Temporal activity factory sits over it. A task runs in its own process, speaking JSON-RPC
-  over a pipe; task state is durable outside the microVM, indexed by a caller-supplied
-  idempotency key. AgentForge is delivered as an Nx plugin with CDK constructs; an agent is a
-  deployed AgentCore runtime, and agents that share an image nest in one project.
-  How a consumer relates runtime sessions, A2A contexts, Claude sessions and working
+  1 runtime (A2A server and client, gateway, executor, durable task store, deployment constructs),
+  2 harness (procedures, the agent() helper and kernel, optional helpers), 3 consumer,
+  4 Claude Agent SDK. Layers 1 and 2 never import each other; they share only the task protocol
+  library. Only two crossings are protocols: the A2A wire, and the pipe to a task process.
+
+  A2A — version 1.0 only — is the contract between a caller and the runtime; the client is
+  caller-agnostic and a Temporal activity factory sits over it. A procedure is an oRPC contract
+  from which SendMessage, GetTask and CancelTask are derived; GetTask returns a discriminated
+  union on the task state. A task runs in its own process, speaking JSON-RPC over a pipe; task
+  state is durable outside the microVM, indexed by a caller-supplied idempotency key.
+
+  AgentForge is delivered as an Nx plugin with CDK constructs. It publishes no image: the
+  package ships the bundled server and its Dockerfile, the image chain is built locally through
+  Nx tasks, and only the leaf agent image reaches ECR. Nx owns the build graph; AgentForge
+  writes no second dependency graph, content hash or digest comparison.
+
+  How a consumer relates runtime sessions, A2A contexts, Claude sessions, cwd and working
   directories is the consumer's, never AgentForge's.
-  Consumers (StrategyFoundry, TrendBot) state requirements in their own repositories'
-  docs/AGENTFORGE_CONTRACT.md (ids H# and T#), which are unvetted drafts; docs/CONSUMERS.md
-  distils them into the set AgentForge answers to (ids D#) and records what is not carried.
-  The ADRs in adr/ are accepted; docs/DESIGN_OPTIONS.md holds what is still open.
+
+  docs/REQUIREMENTS.md is the register AgentForge answers to. It is AgentForge's own — ids are
+  REQ###, blocked a hundred per category and permanent, referenced in prose as §REQ304. The
+  consumer contract drafts it began as are CLOSED: do not read, cite or track them, and never
+  use an H# or T# id. The ADRs in adr/ are accepted and are mutated in place while no code
+  depends on them; docs/DESIGN_OPTIONS.md holds what is still open.
 
 rules:
   proposal:
-    - Trace to the distilled requirements it serves (D#), and name those it leaves unmet
+    - Trace to the requirements it serves (§REQ###), and name those it leaves unmet
     - Name the [OPEN §x] sections it depends on; never resolve one silently
     - Name the protocol or interface it changes, and why the change belongs there
     - Include a "Non-goals" section
-    - No consumer domain vocabulary
+    - No consumer domain vocabulary; borrow the SDK's, AgentCore's or A2A's terms verbatim
   design:
     - Include the public API surface with TypeScript signatures
     - Include the error handling strategy and the outcomes each failure maps to
-    - Include the failure-injection tests the change adds
+    - State which behaviours earn an integration test because their answer can drift, and which
+      are settled once and belong in an ADR or a dated research note
   tasks:
     - Break into implementable chunks (1-4 hours each)
     - Include test tasks alongside implementation tasks
