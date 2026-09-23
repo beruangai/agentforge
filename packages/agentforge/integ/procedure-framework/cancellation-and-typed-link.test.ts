@@ -1,0 +1,117 @@
+/**
+ * Cancellation reaches middleware and handler, and a `ClientLink` types the
+ * per-call client context with no cast — recorded in
+ * docs/research/procedure-framework.md.
+ *
+ * Cancellation is out of band for AgentForge: a caller's signal cannot travel
+ * with an `InvokeAgentRuntime` call, so the link must map a caller's abort onto
+ * the separate `CancelTask` invocation. Accepting a signal and dropping it
+ * would be a silent failure.
+ */
+import path from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { createCancellableClient } from './__fixtures__/cancellation-and-typed-link.ts';
+import {
+  type TypecheckResult,
+  typecheck,
+  UNUSED_TS_EXPECT_ERROR_DIRECTIVE,
+} from './__fixtures__/typecheck.ts';
+
+describe('client context through a typed link', () => {
+  it('hands the link the caller’s idempotency key beside the input', async () => {
+    const { client, seenByLink } = createCancellableClient();
+
+    const handle = await client.SendMessage(
+      { strategyId: 'alpha' },
+      { context: { idempotencyKey: 'idem-7' } },
+    );
+
+    expect(handle).toStrictEqual({
+      taskId: 'task-alpha',
+      contextId: 'context-alpha',
+      state: 'SUBMITTED',
+    });
+    expect(seenByLink).toMatchObject([
+      { path: ['SendMessage'], idempotencyKey: 'idem-7' },
+    ]);
+  });
+});
+
+describe('cancellation', () => {
+  it('reaches middleware and handler as one signal, and a running procedure returns promptly', async () => {
+    const { client, observations, seenByLink } = createCancellableClient();
+    const caller = new AbortController();
+    setTimeout(() => caller.abort(new Error('CancelTask arrived')), 60);
+
+    const started = performance.now();
+    const outcome = await client.RunForMilliseconds(
+      { milliseconds: 5_000 },
+      { context: { idempotencyKey: 'idem-8' }, signal: caller.signal },
+    );
+    const elapsedMilliseconds = performance.now() - started;
+
+    expect(seenByLink).toHaveLength(1);
+    expect(seenByLink[0]?.signal).toBeInstanceOf(AbortSignal);
+    expect(observations.middlewareSignals).toHaveLength(1);
+    expect(observations.abortedAtMiddlewareEntry).toStrictEqual([false]);
+    expect(observations.handlerSignals).toHaveLength(1);
+    expect(observations.handlerSignals[0]).toBe(
+      observations.middlewareSignals[0],
+    );
+    expect(observations.handlerContextSignals[0]).toBe(
+      observations.middlewareSignals[0],
+    );
+    expect(observations.abortedWhenHandlerReturned).toStrictEqual([true]);
+    expect(outcome).toStrictEqual({ finished: false });
+    expect(elapsedMilliseconds).toBeLessThan(1_000);
+  });
+
+  it('lets an uncancelled run finish — the check can fail', async () => {
+    const { client, observations } = createCancellableClient();
+
+    const outcome = await client.RunForMilliseconds(
+      { milliseconds: 20 },
+      { context: { idempotencyKey: 'idem-9' } },
+    );
+
+    expect(outcome).toStrictEqual({ finished: true });
+    expect(observations.abortedWhenHandlerReturned).toStrictEqual([false]);
+  });
+});
+
+describe('types of the client context', () => {
+  let result: TypecheckResult;
+
+  beforeAll(() => {
+    result = typecheck(
+      path.join(
+        import.meta.dirname,
+        '__fixtures__/cancellation-and-typed-link.type-probes.ts',
+      ),
+      {
+        fileName: 'cancellation-and-typed-link.negative-control.ts',
+        sourceText: [
+          "import { createCancellableClient } from './cancellation-and-typed-link.ts';",
+          'export async function negativeControl() {',
+          '  const { client } = createCancellableClient();',
+          '  // @ts-expect-error placed on a valid call, so it must be reported as unused',
+          "  await client.SendMessage({ strategyId: 'a' }, { context: { idempotencyKey: 'k' } });",
+          '}',
+        ].join('\n'),
+      },
+    );
+  });
+
+  it('holds every probe under the project’s strict configuration', () => {
+    expect(result.probeDiagnostics).toStrictEqual([]);
+  });
+
+  it('reports a directive on a valid line, so the check can fail', () => {
+    expect(result.negativeControlDiagnostics).toStrictEqual([
+      expect.objectContaining({
+        line: 4,
+        code: UNUSED_TS_EXPECT_ERROR_DIRECTIVE,
+      }),
+    ]);
+  });
+});

@@ -115,6 +115,12 @@ Two values ride beside a call's input and neither is any procedure's to declare:
 Proved in `o7-a2a-verbs-and-per-call-context.ts`, `tsc --strict` clean with its directives verified live: a `SendMessage` with no key does not compile, nor one with no session to route to; a `GetTask` must still be routed and is **not** asked for a key; `CancelTask` rejects a procedure's input; and each namespace's `GetTask` still carries its own output type.
 
 
+## A router assembled on a middlewared builder runs its middleware twice — 2026-09-23
+
+Found while carrying the spikes into `packages/agentforge/integ/procedure-framework/`, on **beta.39 and re-checked on beta.38** — so not drift, just something the spikes' own pattern hid. `implementer.use(middleware).router({ … })` re-applies the middleware to procedures that already carry it, and oRPC does not deduplicate: build procedures on `os = base.use(house)` and then assemble with `os.router(…)`, and **`house` runs twice per call**. Assembling on the unmiddlewared implementer runs it once. The spikes could not see it because their middleware overwrote a record rather than counting.
+
+It matters for any middleware with a side effect — a lease writer, a telemetry span, an audit record. **The router is assembled on the base implementer**, and `custom-link-and-typed-context.test.ts` asserts both counts, so a future oRPC that deduplicates is reported rather than silently changing behaviour.
+
 ## `Locking` does not answer idempotency
 
 Read from [the Lock helper's documentation](https://orpc.dev/docs/helpers/lock)
