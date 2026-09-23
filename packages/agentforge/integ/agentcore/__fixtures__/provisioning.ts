@@ -1,4 +1,3 @@
-/// <reference lib="esnext.disposable" />
 import { BedrockAgentCoreClient } from '@aws-sdk/client-bedrock-agentcore';
 import {
   BedrockAgentCoreControlClient,

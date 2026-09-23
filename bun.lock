@@ -14,6 +14,7 @@
         "@nx/vitest": "catalog:",
         "@nx/workspace": "catalog:",
         "@swc/helpers": "~0.5.18",
+        "@tsconfig/node26": "catalog:",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
         "nx": "catalog:",
@@ -76,6 +77,7 @@
     "@orpc/contract": "2.0.0-beta.39",
     "@orpc/server": "2.0.0-beta.39",
     "@orpc/shared": "2.0.0-beta.39",
+    "@tsconfig/node26": "26.0.1",
     "@types/express": "5.0.6",
     "@types/node": "26.6.2",
     "@typescript/vfs": "1.6.5",
@@ -633,6 +635,8 @@
     "@standard-server/shared": ["@standard-server/shared@0.9.2", "", {}, "sha512-QMdJDBG6/oKMoZOAcWXdZdRcKRXSrRj05NNwA8tRmrymQNt3KxojnWJERwu++z405dYAs3/zRL9eAOWbD7i4qQ=="],
 
     "@swc/helpers": ["@swc/helpers@0.5.23", "", { "dependencies": { "tslib": "^2.8.0" } }, "sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw=="],
+
+    "@tsconfig/node26": ["@tsconfig/node26@26.0.1", "", {}, "sha512-NQT8JUFDKeAIWpR1dakeF534msQAsoSLr1WpKdRDt3sCvk2fsFK3EVKUBG5xKYVamiRO6yTfniiyvCaqOGgn/g=="],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.9.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-6+7nlbMVX/PVDCwaIQ8nTOPveOcFLSt8GcXdx8hD0bt39uWxYT88uXzqTd4fTvqta7oeUJqudepapKNt2DYJFw=="],
 

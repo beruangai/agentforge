@@ -1,5 +1,3 @@
-/// <reference lib="esnext.disposable" />
-
 /**
  * What a test file creates in AWS is deferred onto an `AsyncDisposableStack`
  * the moment it exists, and released in `afterAll`, which vitest runs even
