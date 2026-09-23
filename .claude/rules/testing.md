@@ -11,6 +11,8 @@ Unit tests run against nothing external. **Runtime integration tests** run again
 
 The question is *would we want to be told when this changes*, not *did a spike produce it*.
 
+**Test what AgentForge relies on and the platform does not guarantee.** A documented guarantee is trusted, not re-tested — that each AgentCore session gets its own microVM is AgentCore's promise, not a finding. An observation nothing depends on — a warm pool, a latency, an exact list of forwarded headers — is a dated research note, not an assertion. A test earns its place when all three hold: AgentForge's design rests on the answer, the documentation is silent, ambiguous or wrong about it, and the answer can move. Whether AgentForge passes an option through is its own unit test; whether the SDK then honours a documented option is the SDK's.
+
 Each tier is its own target and its own vitest config, so the guard is the target rather than a conditional inside a test. All three use the `@nx/vitest:test` executor; the `@nx/vitest` inference plugin is not registered, so no `test-ci` or per-file targets appear:
 
 ```json
@@ -37,6 +39,17 @@ test: {
   hookTimeout: 120_000,
 }
 ```
+
+**The exception is a concept whose files own disjoint platform resources.** `integ/agentcore/` runs its files in parallel as its own vitest project in `vitest.integ.mts`: each file provisions and deletes a uniquely named runtime, so no file can see another's, and deletion alone takes minutes. A new concept earns the same only when that holds; a shared runtime is not the way to go faster.
+
+## Credentials per target
+
+A tier gets exactly the credentials it uses, from `.env.<target>` — never from `.env.local`, which Nx loads into every task. Nx loads `.env.<target>.local`, then `.env.<target>`, then `.env.local`, then `.env`, and the first to set a variable wins.
+
+- `integ`: `.env.integ` (committed) sets `AWS_PROFILE=agentforge--test-integ` and `AWS_REGION=us-east-2` — a test-only role in the AgentForge account, assumed from the operator's SSO session, in a region that is not prod's (`integ/test-role-permissions-policy.json`)
+- `e2e`: `.env.e2e.local` (ignored) holds the subscription token, and no AWS profile
+- `test`: nothing. There is no `default` profile, so a task with no `AWS_PROFILE` has no AWS credentials at all
+- A future `synth` or `deploy` target takes its profile from `.env.synth` / `.env.deploy` the same way
 
 ## No Placeholder Integration Tests
 

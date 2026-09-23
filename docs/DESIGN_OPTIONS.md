@@ -35,10 +35,10 @@ The interface is fixed and built in the first slice: a conditional insert for th
 - The item shape: what the A2A task, the index, the lease and the outcome look like as one record, and what a poll costs to read
 - ~~The lease interval~~ **Decided 2026-09-23: stale at ~60 seconds.**
 
-**Measured** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md) §A, `packages/agentforge/integ/agentcore/lease-visibility.test.ts`. From inside a microVM, on a 236-byte item at a 2-second renewal interval:
+**Measured** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md) §A, once; not re-tested, because nothing here rests on an undocumented bound. From inside a microVM, on a 236-byte item at a 2-second renewal interval:
 
 - **A write costs the task ~7 ms** (median; 6–67 ms, the outlier being the SDK's first call).
-- **A renewal is visible to an eventually-consistent read ~11 ms later**, and the read-back saw it **on the first poll, 6 times out of 6**. DynamoDB's propagation is not something to design around at this size and rate, and a strongly-consistent read buys nothing while costing double.
+- **A renewal was visible to an eventually-consistent read ~11 ms later**, on the first poll 6 times out of 6. DynamoDB does not document that bound, so the lease is read with `ConsistentRead`, which it does guarantee — 1 RCU instead of half of one.
 - **1,800 writes an hour** at 2 s — roughly a fifth of a cent on-demand. The interval could go well below 2 s before the write cost registered against the work it guards.
 
 **So the lease interval is not constrained by the store.** It is constrained by how quickly loss must be noticed, which is a design choice rather than a measurement — and **the choice is ~60 seconds of staleness** (2026-09-23).
@@ -57,7 +57,7 @@ A single item for everything was rejected because the index must be keyed by the
 
 ## §B — Whether a busy container receives invocations *(SETTLED 2026-09-22)*
 
-`/ping` is a lifecycle signal, not admission control, so a container should receive a start, a poll or a cancel whatever it last reported (`ARCHITECTURE.md` §4). That was inference from the contract's silence, and the whole await path rested on it. **It is now measured** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/agentcore/busy-container-receives-invocations.test.ts`, `container-per-session.test.ts`, `provisioning-window.test.ts`.
+`/ping` is a lifecycle signal, not admission control, so a container should receive a start, a poll or a cancel whatever it last reported (`ARCHITECTURE.md` §4). That was inference from the contract's silence, and the whole await path rested on it. **It is now measured** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/agentcore/busy-container-receives-invocations.test.ts`, `provisioning-window.test.ts`.
 
 - **A busy container receives everything.** With a 25-second task live and `/ping` answering `HealthyBusy`, a second `message/send`, a `tasks/get` and a `tasks/cancel` were all delivered — **3/3, at latencies indistinguishable from an idle session**. The second task ran concurrently in the same container, which reported `liveTasks: 2`.
 - **A runtime session id maps 1:1 to a container and stays put.** Six new sessions took six distinct containers; fired again, **6/6** returned the same one. One session's eight calls over ~35 s, spanning an idle gap and a task boundary, all hit one container.
@@ -184,7 +184,7 @@ The key, its two edges and its retention are settled: seven days, with the key s
 
 Two constraints found along the way, both recorded in the research note: **`@a2a-js/sdk@1.2.0` is protobuf-typed**, so a part written the way the specification documents it serializes to an empty part with no error; and **an absent `A2A-Version` header means protocol 0.3**, so anything that drops it downgrades the request.
 
-**Answered against AgentCore** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/agentcore/__fixtures__/server.ts`, `request-header-allowlist.test.ts`:
+**Answered against AgentCore** — [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md), `packages/agentforge/integ/agentcore/__fixtures__/server.ts`, `a2a-1-0-only-through-agentcore.test.ts`:
 
 - **`A2A-Version` is not forwarded *by default*, but it can be allowlisted.** AgentCore takes a per-runtime `requestHeaderConfiguration.requestHeaderAllowlist` (up to 20 headers, 4 KB each) on `CreateAgentRuntime`/`UpdateAgentRuntime`; `A2A-Version` breaks none of its restrictions. Measured: with it allowlisted, `A2A-Version: 1.0` **arrives and negotiates 1.0**; without the allowlist entry the header is dropped and 0.3 is negotiated; a header not on the list never arrives. **So AgentForge is not pinned to 0.3** — which is the opposite of what the first version of this section recorded, and is now an open choice rather than a constraint (below).
 - **A part reader must throw on a part it cannot decode.** The failure is real but its trigger is narrower than first written: under the **1.0 RPC method name `SendMessage`**, a part in the SDK's internal protobuf shape is accepted with its `content` silently dropped — with or without `A2A-Version: 1.0`. Under `message/send` the same part is properly rejected. `{ kind: 'data', data }` is the wire shape in both versions and always works. One combination therefore delivers an empty envelope and calls it success, which is a zero-silent-failures requirement on the harness, not a nicety.
@@ -287,9 +287,9 @@ Not open questions — deliberately not being worked until something asks for th
 | Image layering and bundler determinism | §D | **done** — `packages/agentforge/integ/image-determinism/` |
 | Capability composition up the image chain | §L | **done** — `packages/agentforge/integ/capability-composition/` |
 | Working-directory sync semantics | §F | **done** — `packages/agentforge/integ/filesystem-s3-sync/` |
-| Busy-container reachability, concurrency, container-per-session | §B | **done** — `packages/agentforge/integ/agentcore/` |
+| Busy-container reachability, concurrency, container-per-session | §B | **done** — `packages/agentforge/integ/agentcore/`; container-per-session is AgentCore's documented guarantee and not re-tested |
 | Cancellation, the stop grace period, the outcome inside it | §C | **done** — `packages/agentforge/integ/agentcore/` |
-| Task store lease and visibility, from inside a microVM | §A | **done** — `packages/agentforge/integ/agentcore/` |
+| Task store lease and visibility, from inside a microVM | §A | **done** — measured once, [`research/agentcore-runtime-observed.md`](research/agentcore-runtime-observed.md) §A |
 | Header allowlist, 1.0-only negotiation, the silent part strip | §I | **done** — `packages/agentforge/integ/agentcore/` |
 | **Session resume across containers** | §F | **not run** — needs a real agent in a container, so it waits for A1 |
 

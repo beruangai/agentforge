@@ -28,14 +28,14 @@ export interface AwsEnvironment {
 
 /**
  * The account is derived from STS, never hard-coded. The region is required
- * explicitly: Nx loads `.env`, which sets `AWS_PROFILE` and `AWS_REGION`, into
- * every task, and a test run outside Nx must set them itself.
+ * explicitly: Nx loads `.env.integ`, which sets `AWS_PROFILE` and `AWS_REGION`,
+ * into the `integ` task alone, and a test run outside Nx must set them itself.
  */
 export async function resolveAwsEnvironment(): Promise<AwsEnvironment> {
   const region = process.env.AWS_REGION;
   if (region === undefined || region === '') {
     throw new Error(
-      'AWS_REGION is not set; run through `nx run @beruangai/agentforge:integ`, which loads it from .env',
+      'AWS_REGION is not set; run through `nx run @beruangai/agentforge:integ`, which loads it from .env.integ',
     );
   }
   const identity = await new STSClient({ region }).send(

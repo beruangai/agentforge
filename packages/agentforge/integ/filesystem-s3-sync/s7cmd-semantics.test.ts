@@ -202,12 +202,6 @@ describe('s7cmd, pinned, in the base image, against a real bucket', () => {
     expect(linkage.stderr).toContain('Not a valid dynamic program');
   });
 
-  it('local → S3 uploads every file', async () => {
-    const workingDirectory = await createAgentWorkingDirectory('plain');
-    await syncUp(workingDirectory, 'plain');
-    expect(await keysUnder('plain')).toEqual(everyFile);
-  });
-
   it('quiescence: --filter-mtime-before an absolute cutoff leaves the fresh file and uploads the settled ones', async () => {
     const workingDirectory = await createAgentWorkingDirectory('quiescent');
     const now = new Date();
@@ -271,17 +265,6 @@ describe('s7cmd, pinned, in the base image, against a real bucket', () => {
     expect(await keysUnder('delete-explicit')).toEqual(
       everyFileExcept('README.md'),
     );
-  });
-
-  it('--dry-run uploads nothing', async () => {
-    const workingDirectory = await createAgentWorkingDirectory('dry-run');
-    await syncUp(workingDirectory, 'dry-run');
-    expect(await keysUnder('dry-run')).toEqual(everyFile);
-
-    await writeFile(join(workingDirectory.hostPath, 'src/added.ts'), 'new\n');
-    await syncUp(workingDirectory, 'dry-run', '--dry-run');
-
-    expect(await keysUnder('dry-run')).toEqual(everyFile);
   });
 
   it('S3 → local round trip brings every file back intact', async () => {

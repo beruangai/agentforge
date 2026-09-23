@@ -135,7 +135,7 @@ async function probeCreateAgentRuntime(
     if (isAccessDenied(error)) {
       const message = errorMessage(error);
       if (message.includes('iam:PassRole')) {
-        return `iam:PassRole on ${environment.executionRoleArn} is denied — an admin must attach integ/agentcore/__fixtures__/agentcore-passrole-policy.json to ${environment.callerArn}`;
+        return `iam:PassRole on ${environment.executionRoleArn} is denied — ${environment.callerArn} must carry integ/test-role-permissions-policy.json (integ/agentcore/README.md)`;
       }
       return describeProbeFailure(
         'bedrock-agentcore:CreateAgentRuntime',

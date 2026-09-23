@@ -13,7 +13,7 @@
         "ecr:GetDownloadUrlForLayer",
         "ecr:BatchCheckLayerAvailability"
       ],
-      "Resource": "arn:aws:ecr:REGION:ACCOUNT_ID:repository/*"
+      "Resource": "arn:aws:ecr:us-east-2:913756569129:repository/*"
     },
     {
       "Effect": "Allow",
@@ -24,7 +24,7 @@
         "logs:DescribeLogStreams",
         "logs:DescribeLogGroups"
       ],
-      "Resource": "arn:aws:logs:REGION:ACCOUNT_ID:log-group:/aws/bedrock-agentcore/*"
+      "Resource": "arn:aws:logs:us-east-2:913756569129:log-group:/aws/bedrock-agentcore/*"
     },
     {
       "Effect": "Allow",
@@ -52,14 +52,14 @@
         "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
       ],
       "Resource": [
-        "arn:aws:bedrock-agentcore:REGION:ACCOUNT_ID:workload-identity-directory/default",
-        "arn:aws:bedrock-agentcore:REGION:ACCOUNT_ID:workload-identity-directory/default/workload-identity/*"
+        "arn:aws:bedrock-agentcore:us-east-2:913756569129:workload-identity-directory/default",
+        "arn:aws:bedrock-agentcore:us-east-2:913756569129:workload-identity-directory/default/workload-identity/*"
       ]
     },
     {
       "Effect": "Allow",
       "Action": ["dynamodb:*"],
-      "Resource": "arn:aws:dynamodb:REGION:ACCOUNT_ID:table/agentforge-integ-*"
+      "Resource": "arn:aws:dynamodb:us-east-2:913756569129:table/agentforge-integ-*"
     },
     {
       "Effect": "Allow",

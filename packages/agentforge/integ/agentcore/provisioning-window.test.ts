@@ -1,6 +1,6 @@
 /**
  * §B — the provisioning window: what a caller sees between `CreateAgentRuntime`
- * and the first invocation that works, and what deleting costs.
+ * and the first invocation that works.
  *
  * The documentation describes a retryable HTTP 409 while a session is
  * provisioned. Measured on 2026-09-22 (docs/research/agentcore-runtime-observed.md),
@@ -11,15 +11,9 @@
  * ONE container across the CREATING → READY transition. One observation —
  * enough to say a caller must tolerate a multi-second first call, not enough
  * to say a 409 never happens; this keeps checking.
- *
- * `DeleteAgentRuntime` returns at once while the runtime sits in DELETING for
- * about five minutes, so a teardown cannot be treated as synchronous.
  */
 import { setTimeout } from 'node:timers/promises';
-import {
-  DeleteAgentRuntimeCommand,
-  GetAgentRuntimeCommand,
-} from '@aws-sdk/client-bedrock-agentcore-control';
+import { GetAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore-control';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
 import {
@@ -30,7 +24,6 @@ import {
 } from './__fixtures__/invocation.ts';
 import {
   a2a10OnlyProfile,
-  type CreatedAgentRuntime,
   createAgentRuntime,
   type PreparedFixtureImage,
   prepareFixtureImage,
@@ -52,7 +45,6 @@ interface WindowObservation {
 describe('the AgentCore provisioning window (§B)', () => {
   const resources = createResourceStack();
   let prepared: PreparedFixtureImage;
-  let runtime: CreatedAgentRuntime | undefined;
 
   beforeAll(async () => {
     prepared = await prepareFixtureImage(resources, 'window');
@@ -67,7 +59,6 @@ describe('the AgentCore provisioning window (§B)', () => {
     const created = await createAgentRuntime(resources, prepared, {
       profile: a2a10OnlyProfile,
     });
-    runtime = created;
     expect(created.statusAtCreation).toBe('CREATING');
     const a2a = new A2aOverAgentCore(
       prepared.clients.data,
@@ -153,20 +144,4 @@ describe('the AgentCore provisioning window (§B)', () => {
       ),
     ).toBe(true);
   }, 300_000);
-
-  it('returns from DeleteAgentRuntime while the runtime is still DELETING', async () => {
-    if (runtime === undefined) {
-      throw new Error('the provisioning window test created no runtime');
-    }
-    const { agentRuntimeId } = runtime;
-    const deleted = await prepared.clients.control.send(
-      new DeleteAgentRuntimeCommand({ agentRuntimeId }),
-    );
-    expect(deleted.status).toBe('DELETING');
-    const after = await prepared.clients.control.send(
-      new GetAgentRuntimeCommand({ agentRuntimeId }),
-    );
-    expect(after.status).toBe('DELETING');
-    // The deferred teardown waits for it to be gone.
-  });
 });

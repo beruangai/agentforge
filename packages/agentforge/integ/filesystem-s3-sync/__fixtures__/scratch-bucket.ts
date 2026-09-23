@@ -34,9 +34,9 @@ export interface AwsForContainer {
   accountId: string;
   /**
    * Resolved on the host through the SDK's own credential chain — the
-   * `AWS_PROFILE` Nx loads from `.env` — and handed to the container as plain
-   * environment variables, which is the one source every SDK reads first. The
-   * container has no profile configuration of its own.
+   * `AWS_PROFILE` Nx loads from `.env.integ` — and handed to the container as
+   * plain environment variables, which is the one source every SDK reads
+   * first. The container has no profile configuration of its own.
    */
   containerEnvironment: Record<string, string>;
 }

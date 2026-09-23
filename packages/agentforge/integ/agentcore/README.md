@@ -1,22 +1,24 @@
 # AgentCore integration tests
 
-AgentCore's contract, observed against a real runtime: the request header allowlist, the silent part strip, the ~60-second kill after `StopRuntimeSession`, one container per session, a busy container still receiving invocations, the lease. Any of them can move with a platform change and nothing else would notice. The findings, with their dates, are in [`docs/research/agentcore-runtime-observed.md`](../../../../docs/research/agentcore-runtime-observed.md); each test asserts one of them.
+What AgentForge relies on from AgentCore and AgentCore does not document: a busy container still receiving `SendMessage`, `GetTask` and `CancelTask`; an invocation during CREATING blocking rather than returning 409; SIGTERM at once on `StopRuntimeSession`, the ~60-second kill after it, and a working network inside it; and A2A 1.0 only, through AgentCore. Any of them can move with a platform change and nothing else would notice. What AgentCore documents — one microVM per session, the header allowlist — is trusted, not re-tested (`.claude/rules/testing.md`). The findings, with their dates, are in [`docs/research/agentcore-runtime-observed.md`](../../../../docs/research/agentcore-runtime-observed.md); each test asserts one of them.
 
 No model is called. The container in `__fixtures__/server.ts` is an A2A server whose "task" is a timer — the thing AgentCore's behaviour is observed through, not AgentForge's server.
 
 ## Running
 
-From the repository root, `nx run @beruangai/agentforge:integ`. Nx loads `.env` (`AWS_PROFILE=agentforge`, `AWS_REGION=us-west-2`) into the task. The account is read from STS; nothing is hard-coded.
+From the repository root, `nx run @beruangai/agentforge:integ`. Nx loads `.env.integ` — `AWS_PROFILE=agentforge--test-integ`, `AWS_REGION=us-east-2` — into the `integ` task and no other, so no other task holds these credentials, and nothing anywhere falls back to a `default` profile. That profile assumes the `AgentForgeTestInteg` role from your `agentforge` SSO session, so sign in with `aws sso login --profile agentforge`; if the session has lapsed the run fails on credentials rather than working around it. The code reads the account from STS; the policy documents name it, `913756569129`, because a policy is only well formed with its account and region written out.
 
-The tests also need Docker with `buildx` and `bun` on `PATH`: each file bundles the fixture server with `bun build --target=bun`, builds it for `linux/arm64` on `oven/bun:1.4.0-alpine` pinned by digest, and pushes it to ECR.
+**Tests run in `us-east-2`; prod is `us-west-2`.** The test role reaches nothing in any other region: every regional resource it names carries `us-east-2` in its ARN, and every call that cannot be scoped to a resource is conditioned on `aws:RequestedRegion`.
+
+The tests also need Docker with `buildx`, `bun`, and `docker-credential-ecr-login` ([amazon-ecr-credential-helper](https://github.com/awslabs/amazon-ecr-credential-helper); `brew install docker-credential-helper-ecr`) on `PATH`: each file bundles the fixture server with `bun build --target=bun`, builds it for `linux/arm64` on `oven/bun:1.4.0-alpine` pinned by digest, and pushes it to ECR. There is no `docker login`: the helper fetches an ECR token from the task's `AWS_PROFILE` at each push and caches nothing, so no registry credential lands in the keychain.
 
 Before provisioning anything, every file runs the access check in `__fixtures__/access.ts`. It walks each permission the tests need to the end of the path — ending in a real `CreateAgentRuntime` against a nonexistent image, which fails on the image when IAM is right and on authorization when it is not — and fails naming exactly what is missing. It exists because on 2026-09-22 a probe checked `iam:CreateRole`, found it denied, and asked for a role, when the permission actually blocking `CreateAgentRuntime` was `iam:PassRole`.
 
 ## What each file creates, and removes
 
-Every file provisions its own resources in `beforeAll` and deletes them in `afterAll`, all tagged `agentforge:integ=true`: an ECR repository `agentforge/integ-<purpose>-<suffix>`, a runtime `agentforge_integ_<purpose>_<suffix>`, its log groups, and — for the lease and grace-outcome tests — a DynamoDB table `agentforge-integ-lease-<purpose>-<suffix>`.
+Every file provisions its own resources in `beforeAll` and deletes them in `afterAll`, all tagged `agentforge:integ=true`: an ECR repository `agentforge/integ-<purpose>-<suffix>`, a runtime `agentforge_integ_<purpose>_<suffix>`, its log groups, and — for the grace-outcome test — a DynamoDB table `agentforge-integ-lease-<purpose>-<suffix>`.
 
-Deleting a runtime is slow: it sits in DELETING for about five minutes, and teardown waits until it and its workload identity are gone rather than returning on the call. Expect each file to take several minutes beyond its tests. A teardown that cannot delete something fails the run and names what is left. To check by tag afterwards:
+Deleting a runtime is slow: it sits in DELETING for about five minutes, and teardown waits until it and its workload identity are gone rather than returning on the call. Expect each file to take several minutes beyond its tests. The files run in parallel with one another (`vitest.integ.mts`), so the whole directory takes about as long as its slowest file. A teardown that cannot delete something fails the run and names what is left. To check by tag afterwards:
 
 ```bash
 aws resourcegroupstaggingapi get-resources \
@@ -26,60 +28,61 @@ aws resourcegroupstaggingapi get-resources \
 
 ## What an admin must create once
 
-The tests run as the `agentforge` PowerUser SSO profile. `AWSPowerUserAccess` is `NotAction: ["iam:*", "organizations:*", "account:*"]`, so everything the tests do — `bedrock-agentcore*`, ECR, DynamoDB, CloudWatch Logs — is granted, **except two IAM pieces that need an admin identity**. They are prerequisites, not tests; nothing here creates or deletes them.
+Two things, both needing an admin identity. They are prerequisites, not tests; nothing here creates or deletes them. Every policy document here is attached as it is — account `913756569129` and region `us-east-2` are written into each. Run from the repository root, as an admin, in that account:
 
-Run from the repository root, as an admin, in the account and region the tests use:
+**1. The `AgentForgeTestInteg` role**, in this account, with trust policy [`../test-role-trust-policy.json`](../test-role-trust-policy.json) and inline policy [`../test-role-permissions-policy.json`](../test-role-permissions-policy.json).
+
+- **Who may assume it:** only the SSO role Identity Center provisions for `PowerUserAccess` in this account, matched by `aws:PrincipalArn` because that role's path is generated.
+- **What it may do:** what the AgentCore and `s7cmd` sync tests call, and nothing outside `us-east-2`. AgentCore is granted whole within `us-east-2`, because that region holds nothing but tests, and `CreateAgentRuntime` also authorizes the endpoint, tags and workload identity it creates against resources that have no name yet. ECR, DynamoDB, logs and S3 are further scoped to the names the tests create (`agentforge/integ-*`, `agentforge-integ-*`, `agentforge_integ_*`). It includes `iam:PassRole` on the execution role below, conditioned on `iam:PassedToService: bedrock-agentcore.amazonaws.com`; without it `CreateAgentRuntime` is refused no matter what the role allows.
+
+It is a role in this account rather than an Identity Center permission set because its policy only means anything here: it names this account and region, and a change is one `put-role-policy`, with no management-account step.
 
 ```bash
-export AWS_REGION=us-west-2
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-FIXTURES=packages/agentforge/integ/agentcore/__fixtures__
-render() { sed -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/REGION/$AWS_REGION/g" "$1"; }
+aws iam create-role --role-name AgentForgeTestInteg \
+  --assume-role-policy-document file://packages/agentforge/integ/test-role-trust-policy.json
+aws iam put-role-policy --role-name AgentForgeTestInteg \
+  --policy-name agentforge-integ-test \
+  --policy-document file://packages/agentforge/integ/test-role-permissions-policy.json
 ```
 
-**1. The execution role AgentCore assumes** — trusted by `bedrock-agentcore.amazonaws.com` for this account only; it pulls from ECR, writes the runtime's logs, and may touch DynamoDB tables and S3 buckets named `agentforge-integ-*`:
+and a profile for it in `~/.aws/config`, reached from the `agentforge` SSO profile:
+
+```ini
+[profile agentforge--test-integ]
+source_profile = agentforge
+role_arn = arn:aws:iam::913756569129:role/AgentForgeTestInteg
+region = us-east-2
+```
+
+`.env.integ` names the profile. After editing the policy file, re-run `put-role-policy`. A chained role's session lasts at most an hour; the SDKs assume it again when it lapses.
+
+The policy is scoped by region and name rather than pared to the last action: tagging, image deletion and what AgentCore creates alongside a runtime are granted outright rather than discovered one denial at a time, since each denial costs an admin round-trip. The access check above names anything still missing.
+
+**2. The execution role AgentCore assumes** — trusted by `bedrock-agentcore.amazonaws.com` for this account and `us-east-2` only; it pulls from ECR, writes the runtime's logs, and may touch DynamoDB tables and S3 buckets named `agentforge-integ-*`:
 
 ```bash
+FIXTURES=packages/agentforge/integ/agentcore/__fixtures__
 aws iam create-role --role-name agentforge-integ-agentcore-execution \
   --tags Key=agentforge:integ,Value=true \
-  --assume-role-policy-document "$(render "$FIXTURES/execution-role-trust-policy.json")"
+  --assume-role-policy-document "file://$FIXTURES/execution-role-trust-policy.json"
 
 aws iam put-role-policy --role-name agentforge-integ-agentcore-execution \
   --policy-name agentforge-integ-execution \
-  --policy-document "$(render "$FIXTURES/execution-role-permissions-policy.json")"
+  --policy-document "file://$FIXTURES/execution-role-permissions-policy.json"
 ```
 
-**2. `iam:PassRole` on that role, for the identity the tests run as**, conditioned on `iam:PassedToService: bedrock-agentcore.amazonaws.com`. Without it `CreateAgentRuntime` is refused no matter what the role allows. The `agentforge` profile is an IAM Identity Center permission set, so the grant goes on the permission set, not on the role Identity Center manages:
 
-```bash
-INSTANCE_ARN=$(aws sso-admin list-instances --query 'Instances[0].InstanceArn' --output text)
-# The permission set the agentforge profile signs in with:
-aws sso-admin list-permission-sets --instance-arn "$INSTANCE_ARN"
-PERMISSION_SET_ARN=arn:aws:sso:::permissionSet/...   # from the list above
+### Replaced
 
-# Replaces the permission set's inline policy: if it already has one, merge
-# this statement into it first (aws sso-admin get-inline-policy-for-permission-set).
-aws sso-admin put-inline-policy-to-permission-set \
-  --instance-arn "$INSTANCE_ARN" --permission-set-arn "$PERMISSION_SET_ARN" \
-  --inline-policy "$(render "$FIXTURES/agentcore-passrole-policy.json")"
-aws sso-admin provision-permission-set \
-  --instance-arn "$INSTANCE_ARN" --permission-set-arn "$PERMISSION_SET_ARN" \
-  --target-type AWS_ACCOUNT --target-id "$ACCOUNT_ID"
-```
+- **The tests no longer run as the `agentforge` profile.** It is only the source the test role is assumed from. Drop the `PassTheIntegExecutionRoleToAgentCoreOnly` statement from its permission set, if it was added there.
+- **The `AgentForgeTestInteg` permission set**, which this role replaces: remove its account assignment, then the permission set.
+- **The spikes' role**, `agentforge-spike-agentcore-execution`, if it still exists:
 
-For a plain IAM user or role instead, attach the same rendered document with `aws iam put-user-policy` or `aws iam put-role-policy`.
-
-### Renamed from the spikes
-
-The spikes used `agentforge-spike-agentcore-execution` (inline policy `agentforge-spike-execution`, DynamoDB and S3 scoped to `agentforge-spike-*`), and a PassRole grant naming that role. Everything these tests create is named `agentforge-integ-*`, so the role and the grant are renamed to match; the trust policy is unchanged. Once the two steps above are done, remove the spike's role:
-
-```bash
-aws iam delete-role-policy --role-name agentforge-spike-agentcore-execution \
-  --policy-name agentforge-spike-execution
-aws iam delete-role --role-name agentforge-spike-agentcore-execution
-```
-
-and drop the old `PassTheSpikeExecutionRoleToAgentCoreOnly` statement from wherever the spike's PassRole grant was attached.
+  ```bash
+  aws iam delete-role-policy --role-name agentforge-spike-agentcore-execution \
+    --policy-name agentforge-spike-execution
+  aws iam delete-role --role-name agentforge-spike-agentcore-execution
+  ```
 
 ### Removing them
 
@@ -89,4 +92,7 @@ aws iam delete-role-policy --role-name agentforge-integ-agentcore-execution \
 aws iam delete-role --role-name agentforge-integ-agentcore-execution
 ```
 
-and remove the PassRole statement from the permission set, then `provision-permission-set` again.
+```bash
+aws iam delete-role-policy --role-name AgentForgeTestInteg --policy-name agentforge-integ-test
+aws iam delete-role --role-name AgentForgeTestInteg
+```

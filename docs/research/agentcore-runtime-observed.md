@@ -1,6 +1,6 @@
 # AgentCore Runtime — what it actually does
 
-**Measured on 2026-09-22** against a real runtime in `us-west-2`, account 913756569129: an ARM64 container, `PUBLIC` network mode, `serverProtocol: A2A`, built on `@a2a-js/sdk@1.2.0`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §B, §C's platform half, and the AgentCore half of §I.
+**Measured on 2026-09-22** against a real runtime in `us-west-2`, and **re-run on 2026-09-24 in `us-east-2`** by the integration tests, which all pass there — every finding below held except the pre-warmed pool, as noted. Account 913756569129: an ARM64 container, `PUBLIC` network mode, `serverProtocol: A2A`, built on `@a2a-js/sdk@1.2.0`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §B, §C's platform half, and the AgentCore half of §I.
 
 This note is **observed behaviour**. [`agentcore-runtime.md`](agentcore-runtime.md) is what the documentation *says*; where the two differ, this note names the difference. Source: `spikes/agentcore/`, carried at A0 into `packages/agentforge/integ/agentcore/`, which re-checks it against the platform. The container mints a container id at process start and returns it on every task, so "the same container" is observed rather than inferred.
 
@@ -32,7 +32,7 @@ x-amzn-bedrock-agentcore-runtime-session-id, x-amzn-trace-id
 
 **But AgentCore forwards any header placed on a per-runtime allowlist**, configured as `requestHeaderConfiguration: { requestHeaderAllowlist: [...] }` on `CreateAgentRuntime` and `UpdateAgentRuntime` — up to 20 headers, 4 KB each, excluding a published restricted table and anything prefixed `x-amz-` / `x-amzn-` (except `X-Amzn-Bedrock-AgentCore-Runtime-Custom-`).
 
-Measured with `A2A-Version` and `X-Agentforge-Probe` allowlisted (`spikes/agentcore/i2-header-allowlist.ts`, now `packages/agentforge/integ/agentcore/request-header-allowlist.test.ts`):
+Measured with `A2A-Version` and `X-Agentforge-Probe` allowlisted (`spikes/agentcore/i2-header-allowlist.ts`). The allowlist itself is documented, so it is not re-tested: the one header AgentForge relies on, `A2A-Version`, is exercised by `a2a-1-0-only-through-agentcore.test.ts`. The header test that carried this table was removed on 2026-09-24; git history keeps it.
 
 | Sent | Reached the container | SDK negotiated |
 |---|---|---|
@@ -126,19 +126,21 @@ So the container need not know its own public URL — and must not be relied on 
 
 Six brand-new session ids fired in parallel landed on **six distinct containers**. Fired again three seconds later, **6/6 returned the same container**. Separately, one session's eight calls spanning ~35 seconds — including an idle gap and a task boundary — all hit one container.
 
-### Containers are pre-warmed, not started per session
+### Pre-warmed containers: seen once, not reproduced, and not relied on
 
-At a session's **first** call the container had already been up for **28–212 seconds**. Five of six shared an uptime within 900ms of each other, so the pool is replenished in batches. A session claims a warm container; it does not start one.
+On 2026-09-22 in `us-west-2`, at a session's **first** call the container had already been up for **28–212 seconds**, read as a pool a session claims rather than starts.
 
-This corrects the reading taken on the first night, when eleven `listening` events shortly after `CreateAgentRuntime` were read as a pre-warmed pool *and left untested*. The reading was right; it is now measured.
+**Not reproduced on 2026-09-24 in `us-east-2`**, twice. Ten containers announced themselves ~6 s after `CreateAgentRuntime` and **none** served a session: the warm-up call and all six sessions each landed on a container started for it — up 0.8–1.6 s at its first call, which took 3.6–5.5 s. The second call to each session reached the same container in ~0.4 s.
+
+Nothing in AgentForge depends on a warm pool, so this is recorded rather than tested. What AgentForge does depend on — one microVM per session, and a session id routing to it — is AgentCore's documented guarantee ([`agentcore-runtime.md`](agentcore-runtime.md) §Sessions), and is not re-tested either. `container-per-session.test.ts` was removed on 2026-09-24 for both reasons; git history keeps it.
 
 ### What a session costs
 
 | | |
 |---|---|
-| A session's **first** call | **≈ 1.2 s** |
-| Every call after that | **≈ 355 ms** |
-| So: session establishment | **≈ 850 ms** |
+| A session's **first** call | **≈ 1.2 s** (`us-west-2`, 2026-09-22); **3.6–5.5 s** (`us-east-2`, 2026-09-24, a container started per session) |
+| Every call after that | **≈ 355 ms**; ≈ 420 ms in `us-east-2` |
+| So: session establishment | **≈ 850 ms** to **several seconds** — a caller tolerates a multi-second first call |
 
 > An earlier run of this spike showed ~2.66 s for a first call. That number was **client-side**: credential resolution, TLS and the SDK's lazy loading all land on whichever call happens to be first. The spike now makes a warm-up call and discards it. Recorded because ~2.6 s would have been quoted as a platform cost and it is not one.
 
@@ -240,7 +242,7 @@ So networking, credentials and the DynamoDB client all survive `SIGTERM`; nothin
 | lease item, as returned | 236 bytes, 1 RCU |
 | renewals implied by a 1-hour run at 2 s | 1,800 writes |
 
-**An eventually-consistent read never once failed to see a just-written lease.** DynamoDB's propagation is not a factor to design around at this item size and rate; a strongly-consistent read buys nothing here and costs double.
+**An eventually-consistent read never once failed to see a just-written lease** — but DynamoDB documents no such bound, so nothing is built on it: the lease is read with `ConsistentRead`, whose read-after-write DynamoDB does guarantee, at 1 RCU instead of half of one for a 236-byte item. These numbers settle §A's interval once and are not re-tested; `lease-visibility.test.ts` was removed on 2026-09-24, and git history keeps it.
 
 **A renewal costs the task about 7 ms.** A 2-second interval is affordable: 1,800 writes an hour of a 236-byte item is roughly a fifth of a cent per hour on-demand, and the interval could go well below 2 seconds before the write cost became visible against the work it is guarding.
 

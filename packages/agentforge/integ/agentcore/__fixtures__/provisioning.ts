@@ -56,17 +56,6 @@ export const a2a10OnlyProfile: RuntimeProfile = {
   requestHeaderAllowlist: ['A2A-Version'],
 };
 
-/**
- * The configuration the request header allowlist was measured on: 1.0 and
- * 0.3 both declared, so an absent `A2A-Version` negotiates 0.3 instead of
- * being refused, plus a custom header to show the allowlist is a filter and
- * not an `A2A-Version` special case.
- */
-export const permissiveProbeHeadersProfile: RuntimeProfile = {
-  environmentVariables: {},
-  requestHeaderAllowlist: ['A2A-Version', 'X-Agentforge-Probe'],
-};
-
 export interface AgentCoreClients {
   readonly control: BedrockAgentCoreControlClient;
   readonly data: BedrockAgentCoreClient;

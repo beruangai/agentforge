@@ -142,6 +142,8 @@ subtype: "success",  is_error: false,  structured_output: null
 
 Cost $0.43. Each case asserts an observable consequence, not that the argument was passed.
 
+**Re-tested from 2026-09-24: `maxTurns`, `maxBudgetUsd`, `settingSources` and an unknown option** — the bindings that are surprising or have moved between SDK versions. `model`, `disallowedTools`, `cwd` and `systemPrompt` are documented options whose binding is recorded here, not re-asserted; that AgentForge passes each through is its own unit test.
+
 | Option | Binds | Evidence |
 |---|---|---|
 | `maxTurns: 2` | yes | **throws** `Reached maximum number of turns (2)` |

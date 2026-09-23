@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ECRClient, GetAuthorizationTokenCommand } from '@aws-sdk/client-ecr';
 import { pinnedBunBaseImageReference } from '../../__fixtures__/pinned-base-image.ts';
 import { runCommand } from '../../__fixtures__/run-command.ts';
 import type { AwsEnvironment } from './aws-environment.ts';
@@ -23,8 +22,11 @@ export interface PushedImage {
  * layer cache keeps a repeat cheap, so each test file builds its own.
  *
  * The build context and the Docker configuration are temporary directories,
- * removed afterwards: nothing is written into the repository, and the ECR
- * token `docker login` stores does not outlive the build.
+ * removed afterwards, and nothing is written into the repository. There is no
+ * `docker login`: the push authenticates through `docker-credential-ecr-login`
+ * (awslabs/amazon-ecr-credential-helper), which fetches an ECR token from the
+ * task's own `AWS_PROFILE` on each use, so no token is stored anywhere and an
+ * expired SSO session fails the push rather than being worked around.
  */
 export async function buildAndPushFixtureImage(
   environment: AwsEnvironment,
@@ -53,12 +55,16 @@ export async function buildAndPushFixtureImage(
     );
 
     const dockerConfigDirectory = join(scratchDirectory, 'docker-config');
-    await writeDockerConfigWithoutCredentialHelper(dockerConfigDirectory);
+    await writeDockerConfigWithEcrCredentialHelper(
+      dockerConfigDirectory,
+      environment.registry,
+    );
     const dockerEnvironment: NodeJS.ProcessEnv = {
       ...process.env,
       DOCKER_CONFIG: dockerConfigDirectory,
+      // The helper otherwise caches tokens under ~/.ecr.
+      AWS_ECR_DISABLE_CACHE: 'true',
     };
-    await loginToEcr(environment, dockerConfigDirectory, dockerEnvironment);
 
     const imageUri = `${repositoryUri}:fixture`;
     const metadataFile = join(scratchDirectory, 'metadata.json');
@@ -100,60 +106,23 @@ export async function buildAndPushFixtureImage(
   }
 }
 
-async function loginToEcr(
-  environment: AwsEnvironment,
-  dockerConfigDirectory: string,
-  dockerEnvironment: NodeJS.ProcessEnv,
-): Promise<void> {
-  const response = await new ECRClient({ region: environment.region }).send(
-    new GetAuthorizationTokenCommand({}),
-  );
-  const token = response.authorizationData?.[0]?.authorizationToken;
-  if (token === undefined) {
-    throw new Error('ECR GetAuthorizationToken returned no authorizationToken');
-  }
-  const decoded = Buffer.from(token, 'base64').toString('utf8');
-  const separator = decoded.indexOf(':');
-  const username = decoded.slice(0, separator);
-  const password = decoded.slice(separator + 1);
-  if (separator < 0 || username !== 'AWS' || password === '') {
-    throw new Error(
-      'ECR authorization token did not decode to "AWS:<password>"',
-    );
-  }
-  // runCommand takes no stdin, so the password reaches `--password-stdin`
-  // through a file only this user can read, removed straight after.
-  const passwordFile = join(dockerConfigDirectory, 'ecr-password');
-  await writeFile(passwordFile, password, { mode: 0o600 });
-  try {
-    await runCommand(
-      'sh',
-      [
-        '-c',
-        'docker login --username AWS --password-stdin "$1" < "$2"',
-        'docker-login',
-        environment.registry,
-        passwordFile,
-      ],
-      {
-        purpose: `Logging in to ${environment.registry}`,
-        environment: dockerEnvironment,
-      },
-    );
-  } finally {
-    await rm(passwordFile, { force: true });
-  }
-}
-
 /**
- * Docker Desktop on macOS stores registry credentials in the keychain via
- * `credsStore: desktop`, and the helper hangs under a non-interactive shell
- * ("error getting credentials — err: signal: terminated"). A config directory
- * without `credsStore` or `credHelpers` fixes it, but must carry cli-plugins,
- * contexts and buildx across or buildx disappears.
+ * A copy of the operator's Docker configuration whose only credential helper
+ * is `ecr-login`, for the one registry the fixture pushes to.
+ *
+ * `credsStore` is removed because Docker Desktop's `desktop` helper hangs under
+ * a non-interactive shell ("error getting credentials — err: signal:
+ * terminated"). Removing it does NOT keep credentials out of the keychain: with
+ * no `credsStore`, the Docker CLI falls back to the platform's default helper
+ * (`docker-credential-osxkeychain`) when it is on `PATH`, which is why a
+ * `docker login` per file collided in the keychain when the files ran in
+ * parallel (2026-09-24). A registry named in `credHelpers` bypasses that
+ * fallback. cli-plugins, contexts and buildx are carried across, or buildx
+ * disappears.
  */
-async function writeDockerConfigWithoutCredentialHelper(
+async function writeDockerConfigWithEcrCredentialHelper(
   dockerConfigDirectory: string,
+  registry: string,
 ): Promise<void> {
   await mkdir(dockerConfigDirectory, { recursive: true });
   const sourceDirectory =
@@ -168,8 +137,8 @@ async function writeDockerConfigWithoutCredentialHelper(
       >)
     : {};
   delete configuration.credsStore;
-  delete configuration.credHelpers;
   delete configuration.auths;
+  configuration.credHelpers = { [registry]: 'ecr-login' };
   for (const part of ['cli-plugins', 'contexts', 'buildx']) {
     const source = join(sourceDirectory, part);
     if (existsSync(source)) {

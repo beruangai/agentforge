@@ -30,7 +30,8 @@ import { type TestTier, taskOutputDirectory } from './task-output-directory.ts';
  * The operator's subscription token. `TEMP_CLAUDE_CODE_OAUTH_TOKEN` is
  * preferred when present: it is a short-lived token supplied for one session
  * and revoked afterwards, so a run never uses the standing one by accident.
- * Nx loads both from `.env` and `.env.local` into the task's environment.
+ * Nx loads both from `.env.e2e.local` into the `e2e` task alone; no other task
+ * receives a token.
  */
 export function resolveClaudeCodeOAuthToken(): string {
   const temporaryToken = process.env.TEMP_CLAUDE_CODE_OAUTH_TOKEN;
@@ -45,7 +46,7 @@ export function resolveClaudeCodeOAuthToken(): string {
   const standingToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
   if (standingToken === undefined) {
     throw new Error(
-      'neither TEMP_CLAUDE_CODE_OAUTH_TOKEN nor CLAUDE_CODE_OAUTH_TOKEN is set in process.env; run through `nx run @beruangai/agentforge:e2e`, which loads them from .env.local',
+      'neither TEMP_CLAUDE_CODE_OAUTH_TOKEN nor CLAUDE_CODE_OAUTH_TOKEN is set in process.env; run through `nx run @beruangai/agentforge:e2e`, which loads them from .env.e2e.local',
     );
   }
   if (!standingToken.startsWith('sk-ant-')) {

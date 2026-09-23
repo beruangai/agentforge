@@ -29,6 +29,7 @@
     "allow": ["Bash(openspec *)", "Bash(ls *)", "Edit(./**)"],
     "deny": [
       "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
       "Read(**/.local.*)",
       "Read(.local/NOTES.md)"
     ]

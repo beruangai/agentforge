@@ -28,7 +28,7 @@ Settled by the operator and not to be reopened: **AgentForge owns its requiremen
 
 **The consumer owns isolation and side effects.** How runtime sessions, A2A contexts, Claude sessions and working directories relate is the consumer's, and may differ per procedure. AgentForge propagates them and enforces only mechanical invariants. A side effect's recovery is the consumer's too.
 
-**Settle platform behavior by testing it.** Where a question turns on what AgentCore, A2A's SDK, S3 Files, or the Agent SDK actually does, a spike against the real thing answers it — not documentation, not a search summary, not what the predecessor harness assumed.
+**Settle platform behavior by testing it — where AgentForge relies on it and the platform does not guarantee it.** Where a question turns on what AgentCore, A2A's SDK, S3 Files, or the Agent SDK actually does and the documentation is silent, ambiguous or wrong, a spike against the real thing answers it — not a search summary, not what the predecessor harness assumed. A documented guarantee is trusted, not re-tested; an observation nothing depends on is recorded, not asserted (`.claude/rules/testing.md`).
 
 **Every intermittent failure becomes a test, and so does every spike.** Reproduce a failure once, in the layer that owns it, and keep it covered. A spike lands in `integ/` rather than as a script, because a platform answer is not self-renewing.
 
@@ -45,6 +45,7 @@ The operator's standing conventions across projects:
 - **Binary state is a boolean.** An enum only where a third state is genuinely foreseeable, and its values are `SCREAMING_SNAKE_CASE`.
 - **One published package.** AgentForge vends `@beruangai/agentforge` with entry points per environment; internal libraries are never published on their own.
 - **Nx owns the build graph, and AgentForge never duplicates it.** Every build — bundles, images, deploys — is an Nx task with its real inputs declared, so staleness and ordering are Nx's. Write no second dependency graph, content hash or digest comparison. A build run outside the task graph is a consumer's or developer's mistake, not a case to detect, prevent or support.
+- **Credentials belong to the target that uses them.** Each target gets its credentials from `.env.<target>`, never from `.env.local`, which Nx loads into every task. There is no `default` AWS profile, so a task with no `AWS_PROFILE` has none. Tests run as a test-only role in `us-east-2`; prod is `us-west-2` (`.claude/rules/testing.md`).
 - **uuid7 for every id AgentForge mints.** Never uuid4. Ids minted by a dependency are opaque and not reformatted.
 - **Zero silent failures.** Throw and handle. No empty-result fallbacks, no swallowed exceptions, no defaults papering over missing data, no option accepted and dropped.
 - **No legacy support.** Latest stable toolchain; no shims or compatibility bridges.

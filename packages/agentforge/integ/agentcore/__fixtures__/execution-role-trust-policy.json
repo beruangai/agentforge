@@ -6,9 +6,9 @@
       "Principal": { "Service": "bedrock-agentcore.amazonaws.com" },
       "Action": "sts:AssumeRole",
       "Condition": {
-        "StringEquals": { "aws:SourceAccount": "ACCOUNT_ID" },
+        "StringEquals": { "aws:SourceAccount": "913756569129" },
         "ArnLike": {
-          "aws:SourceArn": "arn:aws:bedrock-agentcore:REGION:ACCOUNT_ID:*"
+          "aws:SourceArn": "arn:aws:bedrock-agentcore:us-east-2:913756569129:*"
         }
       }
     }

@@ -72,11 +72,14 @@ describe('a busy AgentCore container (§B)', () => {
 
     // Fired together: if HealthyBusy were admission control, these would stall
     // behind the long task or be refused.
-    const [second, polled, cancelled] = await Promise.all([
+    const [second, polled] = await Promise.all([
       a2a.SendMessage(session, { runMilliseconds: 1_500 }),
       a2a.GetTask(session, long.task.id),
-      setTimeout(800).then(() => a2a.CancelTask(session, long.task.id)),
     ]);
+    // Only after the poll has answered, with the long task still running. A
+    // cancel fired on an 800 ms timer instead could land before the poll: on
+    // 2026-09-24 the poll saw TASK_STATE_CANCELED.
+    const cancelled = await a2a.CancelTask(session, long.task.id);
 
     // The second task ran concurrently, in the same container.
     expect(second.task.metadata.containerId).toBe(container);

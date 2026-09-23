@@ -19,6 +19,10 @@ From [AgentCore Runtime quotas](https://docs.aws.amazon.com/bedrock-agentcore/la
 | Payload size | 100 MB | No |
 | `runtimeSessionId` length | at least 33 characters | — |
 
+## Regions
+
+From [supported AWS Regions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-regions.html), read 2026-09-23: Runtime microVMs, Identity, Gateway, Memory, Observability and Built-in Tools are available in both `us-west-2` (prod) and `us-east-2` (where the integration tests run), so the tests exercise the same Runtime feature set as prod. The two differ only in what AgentForge does not use: the AWS Agent Registry is in `us-west-2` and not in `us-east-2`, and the Web Search Tool is in neither.
+
 ## Sessions
 
 From [isolated sessions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html):
