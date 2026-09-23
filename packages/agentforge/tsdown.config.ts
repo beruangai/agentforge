@@ -15,7 +15,7 @@ export default defineConfig({
   },
   format: 'esm',
   platform: 'node',
-  target: 'es2022',
+  target: 'es2024',
   tsconfig: 'tsconfig.lib.json',
   dts: true,
   sourcemap: true,
