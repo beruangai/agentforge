@@ -1,6 +1,6 @@
 # oRPC as the procedure kernel — spike findings
 
-**Measured 2026-09-22** against **`@orpc/{contract,server,client}@2.0.0-beta.38`** — the `beta` tag, published 2026-09-21 — on Bun 1.4.0 with Zod 4. Source: `spikes/procedure-framework/`. No AWS, no model spend.
+**Measured 2026-09-22** against **`@orpc/{contract,server,client}@2.0.0-beta.38`** — the `beta` tag, published 2026-09-21 — on Bun 1.4.0 with Zod 4. Source: `spikes/procedure-framework/`, carried at A0 into `packages/agentforge/integ/procedure-framework/`. No AWS, no model spend.
 
 ## Why this was spiked at all
 

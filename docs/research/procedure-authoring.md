@@ -4,7 +4,7 @@
 
 **Measured on 2026-09-22.** TypeScript 5 standard decorators on Bun 1.4.0, `tsc` with `--strict`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §N. No model spend.
 
-Source: `spikes/procedure-authoring/` — a baseline inferred from both consumers, the same five procedures authored in all three candidate styles, and a judge that runs `tsc` over deliberately-wrong variants rather than arguing about them.
+Source: `spikes/procedure-authoring/` (retired at A0; git history `d3f08b7`) — a baseline inferred from both consumers, the same five procedures authored in all three candidate styles, and a judge that runs `tsc` over deliberately-wrong variants rather than arguing about them.
 
 ---
 

@@ -8,14 +8,17 @@ Milestones deliver capability a consumer can actually run. The questions each de
 
 ## A0 — Scaffold, blocking decisions, local spikes
 
-**The local spikes are done.** What A0 still owes is the workspace itself.
+**Delivered 2026-09-23.** The workspace builds, `spikes/` is gone, and every spike is a test or a research note.
 
-- Nx workspace in the grouped layout on current `@aws/nx-plugin` defaults; Bun, Biome, catalog versions
-- Read `@aws/nx-plugin`'s `ts#agent` and its sync machinery for what to extend rather than rebuild (§K)
+- Nx workspace on current `@aws/nx-plugin` defaults — Bun, Biome, catalog versions — as **one project, `packages/agentforge`, which is the one published package**, with concepts as sub-module folders rather than projects (`ARCHITECTURE.md` §10). TypeScript 6 and vitest 4, because Nx cannot yet run TypeScript 7 and `@nx/vitest` stops at vitest 4 ([research](research/aws-nx-plugin.md))
+- **The entry points and their boundary**: `/contract`, `/client`, `/temporal`, `/agent`, `/infra`, bundled by tsdown with shared chunks; `/agent` gated by the `agentforge-agent` export condition, tested under Node, TypeScript and Bun
+- **Three test tiers as separate targets**: `test`, `integ`, `e2e`
+- `@aws/nx-plugin`'s preset and `ts#sync` read ([research](research/aws-nx-plugin.md)); **`ts#agent` deferred with §K** — what AgentForge's generators write waits for the first agent, and reading it now is reading against no requirement
 - **The blocking decisions are made**: the A2A server is assembled rather than inherited ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), §I), it speaks 1.0 only ([ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)), a procedure is an oRPC contract ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md), §N), and the task store is one task item plus a tiny index item (§A)
 - **Landed:** kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), deterministic image builds (§D), the procedure framework (§N), capability composition (§L/§REQ203), and the AgentCore behaviour §A, §B, §C and §I rested on
 - **No spike is outstanding.** §O's first slice classifies `CREDENTIAL_EXPIRED` and does nothing more, which needs no measurement; the one unrun spike — session resume across containers (§F) — needs an agent that does not exist until A1
-- **`spikes/` is triaged and removed.** It sits outside the Nx layout and does not survive this milestone: each spike is carried into a capability's `integ/` or deleted, per the disposition already decided in [`spikes/README.md`](../spikes/README.md)
+- **`spikes/` is triaged and removed**, per the disposition decided before A0: kernel settlement → `e2e/`; AgentCore, A2A version negotiation, the procedure framework, capability composition, image and bundler determinism, and `s7cmd` sync → `integ/`; task-process, server assembly and procedure authoring retired to their research notes, with the code in git history at `d3f08b7`
+- **Run at A0**: every test that needs neither AWS nor a model — procedure framework, capability composition, A2A version negotiation, image determinism. **Written but not yet run**, because A0 creates no AWS resources and spends nothing on a model: the AgentCore and `s7cmd` sync integration tests, and the kernel-settlement e2e tests. Their first run is where a changed platform or SDK would show
 
 **Exit:** the workspace builds; `spikes/` is gone; every A0 question is closed or explicitly deferred with its reason; each spike whose answer can drift is an integration test and each that settled a decision once is an ADR or a dated research note (`ARCHITECTURE.md` §9).
 

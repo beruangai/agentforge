@@ -361,7 +361,7 @@ Written by AgentForge: the outcome, the attempt and the prior attempt's state, t
 
 ## 9. How this is tested
 
-Three tiers, and a rule about what earns a test: **a spike becomes an integration test when its answer can drift.** An answer that depends on a platform or a dependency — the Agent SDK's settlement behaviour, AgentCore's contract, what a registry serves — is not self-renewing, so it lands in `integ/` and keeps being checked. An answer that settles a decision once, such as which authoring style a procedure uses or whether a binary runs on this architecture, is recorded in an ADR or a research note with its date. A test that can only pass is maintenance without information. Each existing spike's disposition is already decided in [`spikes/README.md`](../spikes/README.md); that directory does not survive A0.
+Three tiers, and a rule about what earns a test: **a spike becomes an integration test when its answer can drift.** An answer that depends on a platform or a dependency — the Agent SDK's settlement behaviour, AgentCore's contract, what a registry serves — is not self-renewing, so it lands in `integ/` and keeps being checked. An answer that settles a decision once, such as which authoring style a procedure uses or whether a binary runs on this architecture, is recorded in an ADR or a research note with its date. A test that can only pass is maintenance without information. `spikes/` was retired at A0 on exactly this rule: the spikes whose answers can drift are tests in `packages/agentforge/integ/` and `e2e/`, and the three that settled a decision once — the task-process protocol, server assembly, procedure authoring — are kept as their research notes, with the code in git history.
 
 | Tier | Runs against | Covers |
 |---|---|---|

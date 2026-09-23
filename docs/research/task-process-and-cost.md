@@ -2,7 +2,7 @@
 
 **Measured on 2026-09-22.** Bun 1.4.0, macOS arm64 (Apple Silicon), 8-core. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §G in full and §C's **local** half; §C's platform half is blocked with §B (see §B's note). No model spend.
 
-Source: `spikes/task-process/`, an executor and a task process speaking the real protocol. Ten cases, nine confirmed and one measured.
+Source: `spikes/task-process/` (retired at A0 — the executor's own tests cover the same ground; git history `d3f08b7`), an executor and a task process speaking the real protocol. Ten cases, nine confirmed and one measured.
 
 > **Read the numbers as a floor, not a forecast.** They come from a developer Mac, not the 2 vCPU / 8 GB ARM64 microVM an agent runs in, and the task process here imports the Agent SDK without spawning the Claude Code CLI a real run spawns. The *shape* of each result is what transfers; the absolute figures are re-measured on AgentCore.
 

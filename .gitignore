@@ -56,6 +56,3 @@ test-output/
 *.local.*
 !.env.*.example
 
-# Spike scratch
-spikes/out/
-spikes/.sandboxes/

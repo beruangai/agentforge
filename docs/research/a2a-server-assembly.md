@@ -2,7 +2,7 @@
 
 **Read against the real packages on 2026-09-22.** `@a2a-js/sdk@1.2.0`, `bedrock-agentcore@0.4.4` (the latest published), Bun 1.4.0, Express 5. Answers the local half of [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §I. The AgentCore half — pass-through of `contextId` and headers, real 409/424 statuses — is answered separately.
 
-Source: `spikes/server-assembly/i1-gateway-wrap.ts`, a complete working gateway over a real HTTP server and a real client. No model spend.
+Source: `spikes/server-assembly/i1-gateway-wrap.ts` (retired at A0; git history `d3f08b7`), a complete working gateway over a real HTTP server and a real client. No model spend.
 
 ---
 

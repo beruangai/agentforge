@@ -1,6 +1,6 @@
 # Working-directory sync — does `s7cmd` hold up?
 
-**Measured on 2026-09-22.** `s7cmd` **1.8.3**, released 2026-09-19. Answers the mechanical half of [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §F — whether the leading implementation candidate does what the design note assumes. Source: `spikes/sync/f1-s7cmd-semantics.sh`.
+**Measured on 2026-09-22.** `s7cmd` **1.8.3**, released 2026-09-19. Answers the mechanical half of [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §F — whether the leading implementation candidate does what the design note assumes. Source: `spikes/sync/f1-s7cmd-semantics.sh`, carried at A0 into `packages/agentforge/integ/filesystem-s3-sync/`.
 
 §F rests three design choices on this tool: that `LastModifiedDate` filtering is a usable **quiescence heuristic**, that exclusions work, and that **delete propagation is an explicit choice rather than a default**. All three were assumptions. All three hold.
 

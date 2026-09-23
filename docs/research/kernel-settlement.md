@@ -2,9 +2,9 @@
 
 **Read against the real SDK on 2026-09-22.** `@anthropic-ai/claude-agent-sdk@0.3.278`, Bun 1.4.0, macOS, the operator's Claude Max subscription, model `claude-sonnet-5` unless a case names another. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
 
-Source: `spikes/kernel-settlement/`, four runnable spikes. Every message of every run is kept as JSONL under `spikes/out/`, so each claim below is evidence rather than recollection. Total model spend: **$1.84**.
+Source: `spikes/kernel-settlement/`, four runnable spikes, now the e2e tests in `packages/agentforge/e2e/kernel-settlement/`. Every message of every run is kept as JSONL — then under `spikes/out/`, now under `packages/agentforge/test-output/e2e/` — so each claim below is evidence rather than recollection. Total model spend: **$1.84**.
 
-These are observations of one SDK version on one day. They are re-checked by promoting the spikes into `integ/`, not by being trusted.
+These are observations of one SDK version on one day. They are re-checked by those tests, not by being trusted.
 
 ---
 
