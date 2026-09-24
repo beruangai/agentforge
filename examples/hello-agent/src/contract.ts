@@ -1,3 +1,4 @@
+import { timeBudget } from '@beruangai/agentforge/contract';
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
 
@@ -24,6 +25,7 @@ export const helloAgent = {
     ),
   /** Runs a shell command for a while before answering: something to cancel. */
   sleepThenAnswer: oc
+    .meta(timeBudget(300))
     .input(z.object({ seconds: z.number().int().positive().max(600) }))
     .output(z.object({ answer: z.string() })),
 };

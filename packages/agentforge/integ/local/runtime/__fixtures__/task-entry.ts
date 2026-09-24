@@ -11,6 +11,18 @@ import { runtimeContract } from './contract.ts';
 
 const os = implementAgent(runtimeContract);
 
+async function wait(
+  input: { milliseconds: number },
+  context: { signal: AbortSignal },
+): Promise<{ waited: boolean }> {
+  try {
+    await delay(input.milliseconds, undefined, { signal: context.signal });
+    return { waited: true };
+  } catch {
+    return { waited: false };
+  }
+}
+
 runTaskProcess({
   contract: runtimeContract,
   router: os.router({
@@ -18,14 +30,10 @@ runTaskProcess({
       text: input.text,
       attempt: context.attempt,
     })),
-    wait: os.wait.handler(async ({ input, context }) => {
-      try {
-        await delay(input.milliseconds, undefined, { signal: context.signal });
-        return { waited: true };
-      } catch {
-        return { waited: false };
-      }
-    }),
+    wait: os.wait.handler(async ({ input, context }) => wait(input, context)),
+    hurried: os.hurried.handler(async ({ input, context }) =>
+      wait(input, context),
+    ),
     stubborn: os.stubborn.handler(async ({ input }) => {
       const grandchild = spawn('sleep', ['300'], { stdio: 'ignore' });
       writeFileSync(input.pidFile, String(grandchild.pid));

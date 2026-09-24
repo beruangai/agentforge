@@ -11,6 +11,7 @@ import {
   contractHash,
   outputSchemaOf,
   procedureAt,
+  timeBudgetOf,
 } from '#core/contract/procedures.ts';
 import {
   type Cause,
@@ -121,8 +122,11 @@ function procedureClient(
 ): ProcedureClient<unknown, unknown> {
   const hash = contractHash(procedure);
   const output = outputSchemaOf(procedure);
+  const declaredTimeBudgetSeconds = timeBudgetOf(procedure);
   return {
     async SendMessage(input, context) {
+      const timeBudgetSeconds =
+        context.timeBudgetSeconds ?? declaredTimeBudgetSeconds;
       const envelope: Envelope = {
         procedure: path,
         contractHash: hash,
@@ -131,9 +135,7 @@ function procedureClient(
         ...(context.continuityKey === undefined
           ? {}
           : { continuityKey: context.continuityKey }),
-        ...(context.timeBudgetSeconds === undefined
-          ? {}
-          : { timeBudgetSeconds: context.timeBudgetSeconds }),
+        ...(timeBudgetSeconds === undefined ? {} : { timeBudgetSeconds }),
         ...(context.metadata === undefined
           ? {}
           : { metadata: context.metadata }),

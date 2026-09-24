@@ -183,20 +183,24 @@ describe('the runtime', () => {
     await vi.waitUntil(() => !isRunning(grandchild), { timeout: 5_000 });
   }, 30_000);
 
-  it('fails a task whose time budget runs out', async () => {
-    const context = { ...starting(), timeBudgetSeconds: 1 };
-    const ended = await awaitTask(
-      client.wait,
-      await client.wait.SendMessage({ milliseconds: 60_000 }, context),
-      {
-        ...context,
-        pollIntervalMilliseconds: 200,
-      },
+  it('fails a task at the time budget its procedure declares, unless the call overrides it', async () => {
+    const context = starting();
+    const timedOut = await awaitTask(
+      client.hurried,
+      await client.hurried.SendMessage({ milliseconds: 60_000 }, context),
+      { ...context, pollIntervalMilliseconds: 200 },
     );
-    expect(ended).toMatchObject({
+    expect(timedOut).toMatchObject({
       state: 'TASK_STATE_FAILED',
       cause: { code: 'TIMED_OUT' },
     });
+    const extended = { ...starting(), timeBudgetSeconds: 10 };
+    const completed = await awaitTask(
+      client.hurried,
+      await client.hurried.SendMessage({ milliseconds: 1_500 }, extended),
+      { ...extended, pollIntervalMilliseconds: 200 },
+    );
+    expect(completed.state).toBe('TASK_STATE_COMPLETED');
   });
 
   it('records a crash with the tail of its stderr', async () => {

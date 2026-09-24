@@ -1,5 +1,6 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
+import { timeBudget } from '../../../../src/core/contract/procedures.ts';
 
 /** Procedures that exercise the runtime without a model. */
 export const runtimeContract = {
@@ -8,6 +9,11 @@ export const runtimeContract = {
     .output(z.object({ text: z.string(), attempt: z.number() })),
   /** Runs until cancelled, or for `milliseconds`. */
   wait: oc
+    .input(z.object({ milliseconds: z.number() }))
+    .output(z.object({ waited: z.boolean() })),
+  /** `wait`, declaring a one-second time budget. */
+  hurried: oc
+    .meta(timeBudget(1))
     .input(z.object({ milliseconds: z.number() }))
     .output(z.object({ waited: z.boolean() })),
   /** Ignores cancellation and starts a grandchild that writes its pid to `pidFile`. */

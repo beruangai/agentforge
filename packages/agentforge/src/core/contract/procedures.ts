@@ -1,6 +1,29 @@
 import { createHash } from 'node:crypto';
-import type { AnyProcedureContract, RouterContract } from '@orpc/contract';
+import {
+  type AnyProcedureContract,
+  defineMeta,
+  type RouterContract,
+} from '@orpc/contract';
 import { z } from 'zod';
+
+const [timeBudgetMeta, readTimeBudget] = defineMeta(
+  'agentforge.timeBudgetSeconds',
+  (incoming: number) => z.number().int().positive().parse(incoming),
+);
+
+/**
+ * A procedure's time budget, declared with its contract and overridable per
+ * call (§REQ202): `oc.meta(timeBudget(600)).input(…).output(…)`. A contract
+ * without one runs under the agent's default.
+ */
+export const timeBudget = timeBudgetMeta;
+
+/** The time budget a procedure's contract declares, if any. */
+export function timeBudgetOf(
+  contract: AnyProcedureContract,
+): number | undefined {
+  return readTimeBudget(contract);
+}
 
 export interface ProcedureEntry {
   /** Dotted path in the contract. */

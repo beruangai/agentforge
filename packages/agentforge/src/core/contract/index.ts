@@ -15,6 +15,8 @@ export {
   outputSchemaOf,
   type ProcedureEntry,
   procedureAt,
+  timeBudget,
+  timeBudgetOf,
 } from './procedures.ts';
 export {
   type Cause,
