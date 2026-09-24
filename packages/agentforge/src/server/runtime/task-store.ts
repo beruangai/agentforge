@@ -6,6 +6,7 @@ import {
   type DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
+  ResourceInUseException,
   UpdateItemCommand,
   UpdateTimeToLiveCommand,
 } from '@aws-sdk/client-dynamodb';
@@ -232,10 +233,22 @@ function idempotencyKeyKey(idempotencyKey: string): string {
 }
 
 /**
- * Creates the table the store expects — for local development and tests; in
- * the cloud the CDK construct owns it.
+ * Creates the table the store expects unless it exists — for local
+ * development and tests. In the cloud the CDK construct owns it.
  */
 export async function createTaskTable(
+  client: DynamoDBClient,
+  tableName: string,
+): Promise<void> {
+  try {
+    await createTable(client, tableName);
+  } catch (error) {
+    if (error instanceof ResourceInUseException) return;
+    throw error;
+  }
+}
+
+async function createTable(
   client: DynamoDBClient,
   tableName: string,
 ): Promise<void> {

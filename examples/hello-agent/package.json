@@ -1,0 +1,20 @@
+{
+  "name": "@beruangai/example-hello-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AgentForge's own dogfood agent: a thin consumer that proves the whole path, locally and on AgentCore.",
+  "dependencies": {
+    "@a2a-js/sdk": "catalog:",
+    "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@aws-sdk/client-dynamodb": "catalog:",
+    "@beruangai/agentforge": "workspace:*",
+    "@orpc/contract": "catalog:",
+    "@orpc/server": "catalog:",
+    "express": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}

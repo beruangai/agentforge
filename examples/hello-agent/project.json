@@ -1,0 +1,59 @@
+{
+  "name": "@beruangai/example-hello-agent",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "examples/hello-agent/src",
+  "tags": ["example"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tsconfig.base.json"
+      ],
+      "outputs": ["{workspaceRoot}/dist/examples/hello-agent/typecheck"],
+      "options": {
+        "command": "tsc -p tsconfig.json",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["biome"],
+      "options": {
+        "command": "biome check {projectRoot}"
+      }
+    },
+    "image": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        {
+          "projects": ["@beruangai/agentforge"],
+          "target": "bundle"
+        },
+        {
+          "projects": ["@beruangai/agentforge"],
+          "target": "image"
+        }
+      ],
+      "options": {
+        "command": "docker build --platform linux/arm64 -f examples/hello-agent/Dockerfile -t agentforge-examples/hello-agent:local .",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["image"],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts",
+        "cwd": "{projectRoot}",
+        "envFile": "{workspaceRoot}/.env.integ.local"
+      }
+    }
+  }
+}

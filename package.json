@@ -30,7 +30,8 @@
   },
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "examples/*"
   ],
   "catalog": {
     "@a2a-js/sdk": "1.2.0",

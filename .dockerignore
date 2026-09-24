@@ -1,0 +1,8 @@
+# Image builds take the workspace root as context; only what an image copies is sent.
+**
+!package.json
+!bun.lock
+!packages/*/package.json
+!examples/*/package.json
+!examples/*/src
+!dist/packages/agentforge/bundle

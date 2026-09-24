@@ -12,30 +12,36 @@
   },
   "exports": {
     "./contract": {
+      "@beruangai/source": "./src/core/contract/index.ts",
       "types": "./contract.d.ts",
       "default": "./contract.js"
     },
     "./client": {
+      "@beruangai/source": "./src/client/index.ts",
       "types": "./client.d.ts",
       "default": "./client.js"
     },
     "./temporal": {
+      "@beruangai/source": "./src/client/temporal/index.ts",
       "types": "./temporal.d.ts",
       "default": "./temporal.js"
     },
     "./agent": {
       "agentforge-agent": {
+        "@beruangai/source": "./src/server/harness/index.ts",
         "types": "./agent.d.ts",
         "default": "./agent.js"
       }
     },
     "./server": {
       "agentforge-agent": {
+        "@beruangai/source": "./src/server/runtime/index.ts",
         "types": "./server.d.ts",
         "default": "./server.js"
       }
     },
     "./infra": {
+      "@beruangai/source": "./src/infra/index.ts",
       "types": "./infra.d.ts",
       "default": "./infra.js"
     },

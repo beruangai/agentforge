@@ -7,7 +7,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import express from 'express';
 import { TaskProcessExecutor } from './executor.ts';
 import { createGateway } from './gateway.ts';
-import { DynamoDBTaskStore } from './task-store.ts';
+import { createTaskTable, DynamoDBTaskStore } from './task-store.ts';
 
 export interface ServerConfig {
   /** The agent's name, on its card and in its records. */
@@ -85,6 +85,11 @@ export async function startServer(
       ? {}
       : { endpoint: config.dynamoDBEndpoint },
   );
+  // Against DynamoDB Local the server makes its own table; in the cloud the
+  // construct owns it, and a missing one fails the first task loudly.
+  if (config.dynamoDBEndpoint !== undefined) {
+    await createTaskTable(dynamoDB, config.tableName);
+  }
   const store = new DynamoDBTaskStore(dynamoDB, config.tableName);
   const executor = new TaskProcessExecutor({
     taskCommand: config.taskCommand,

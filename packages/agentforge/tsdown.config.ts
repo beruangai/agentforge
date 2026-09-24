@@ -37,7 +37,7 @@ export default defineConfig({
   outDir: bundleDirectory,
   clean: true,
   fixedExtension: false,
-  copy: ['README.md'],
+  copy: ['README.md', 'Dockerfile'],
   hooks: {
     'build:done': writePublishedManifest,
   },
@@ -51,9 +51,15 @@ export default defineConfig({
  * install. There is none yet; how they resolve is decided with the first.
  */
 async function writePublishedManifest(): Promise<void> {
-  const { devDependencies: _workspaceOnly, ...manifest } = JSON.parse(
-    await readFile('package.json', 'utf8'),
-  ) as Record<string, unknown>;
+  const {
+    devDependencies: _workspaceOnly,
+    imports: _sourceOnly,
+    ...manifest
+  } = JSON.parse(await readFile('package.json', 'utf8')) as Record<
+    string,
+    unknown
+  >;
+  manifest.exports = withoutSourceCondition(manifest.exports);
   for (const field of [
     'dependencies',
     'peerDependencies',
@@ -73,5 +79,19 @@ async function writePublishedManifest(): Promise<void> {
   await writeFile(
     join(bundleDirectory, 'package.json'),
     `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+}
+
+/**
+ * `@beruangai/source` resolves an entry point to its TypeScript source inside
+ * this workspace, where the examples consume AgentForge live. A consumer only
+ * ever sees the built files.
+ */
+function withoutSourceCondition(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== '@beruangai/source')
+      .map(([key, child]) => [key, withoutSourceCondition(child)]),
   );
 }

@@ -97,6 +97,14 @@
           "command": "node -e \"\""
         }
       }
+    },
+    "image": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "docker build --platform linux/arm64 -t agentforge/a2a-claude:local .",
+        "cwd": "{projectRoot}"
+      }
     }
   }
 }
