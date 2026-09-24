@@ -37,6 +37,9 @@
         "zod": "catalog:",
       },
       "devDependencies": {
+        "@temporalio/activity": "catalog:",
+        "@temporalio/common": "catalog:",
+        "@temporalio/testing": "catalog:",
         "vitest": "catalog:",
       },
     },
