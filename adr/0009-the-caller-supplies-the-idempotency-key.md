@@ -8,7 +8,7 @@ decision-makers: Jeremy Jonas
 
 ## Context and Problem Statement
 
-A caller retries. Temporal times out an activity whose run is still going and schedules another attempt; a network error makes a client resend a start it already sent. Neither may start a second expensive agent run (H13, T26). A2A already carries two identifiers a caller can influence — the task id and the `contextId` — so a third field needs justifying.
+A caller retries. Temporal times out an activity whose run is still going and schedules another attempt; a network error makes a client resend a start it already sent. Neither may start a second expensive agent run (§REQ305). A2A already carries two identifiers a caller can influence — the task id and the `contextId` — so a third field needs justifying.
 
 ## Considered Options
 

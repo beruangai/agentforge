@@ -20,7 +20,9 @@ From [Persist sessions to external storage](https://code.claude.com/docs/en/agen
 - A `SessionStore` adapter mirrors transcripts to an external backend so "a session created on one host can be resumed on another host running from a matching working directory". Required methods `append` and `load`; optional `listSessions`, `listSessionSummaries`, `delete`, `listSubkeys`.
 - `SessionKey` is `{ projectKey, sessionId, subpath? }`; `projectKey` encodes the working directory, and `subpath` addresses a subagent transcript. Resuming subagent transcripts requires `listSubkeys`.
 - **Dual write:** the subprocess always writes locally first and the SDK forwards the batch to the store. On a run resumed *from the store*, the local copy is deleted at run end, so the store holds the only durable copy.
-- **Mirror writes are best-effort:** up to three attempts, then the batch is dropped, an error is logged and a `{ type: "system", subtype: "mirror_error" }` message is emitted. Retries can re-deliver entries, so an adapter deduplicates by `entry.uuid`.
+- **Mirror writes are best-effort:** up to three attempts, then the batch is dropped, an error is logged and a `{ type: "system", subtype: "mirror_error" }` message is emitted. **A call that times out is not retried.** Retries can re-deliver entries, so an adapter deduplicates by `entry.uuid`.
+- **Flushing is batched by default** — `sessionStoreFlush: 'batched'` flushes at the end of a turn — so a container that dies mid-turn loses what was not yet flushed; `'eager'` flushes as entries arrive. Loading from the store times out after `loadTimeoutMs`, 60 s by default. The store API is marked `@alpha` (re-read 2026-09-24).
+- **Resuming from the store swaps the config directory.** The SDK writes the loaded session into a temporary directory and runs the CLI with `CLAUDE_CONFIG_DIR` pointing there, seeding only credentials, `.claude.json` and the user `settings.json`. Whatever else the user scope held — skills, subagents, commands, `CLAUDE.md` — is not there on a resumed run unless it is supplied another way (re-read 2026-09-24; not yet measured, [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §F).
 - Conflicts: `persistSession: false` and file checkpointing both throw at startup when combined with a store.
 - Reference adapters for S3, Redis and Postgres ship in the SDK repositories, with a conformance suite. Retention is the adapter's responsibility; the SDK never deletes.
 
@@ -44,12 +46,23 @@ Established against the current SDK, superseding the predecessor harness's worka
 
 What remains for AgentForge is the outer validation and the typed `output_invalid` outcome, not a pile of conversion workarounds.
 
-**The rest of §E is now settled by spike** — see [`kernel-settlement.md`](kernel-settlement.md), read 2026-09-22 against `0.3.278`. In particular: the submission is carried by a real tool named `StructuredOutput` that is advertised in `init.tools`, so a `PreToolUse` matcher can name it *and* assert it at startup; a matcher naming a tool that does not exist fires zero times, silently.
+**The rest of §E is settled by spike** — see [`kernel-settlement.md`](kernel-settlement.md), read 2026-09-22 against `0.3.278` and re-run 2026-09-24 against `0.3.280`. In particular: the submission is carried by a real tool named `StructuredOutput` that is advertised in `init.tools`, so a `PreToolUse` matcher can name it; a matcher naming a tool that does not exist fires zero times, silently.
+
+## Reading how a run ended — re-read 2026-09-24 against `0.3.280`
+
+- **A limit yields its result, then the iterator throws.** "A single message `query()` call raises an error that includes the failure text after yielding the final result message" ([streaming vs single mode](https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode)); the recorded `maxTurns` and `maxBudgetUsd` runs show exactly that, `subtype: error_max_turns` / `error_max_budget_usd` first.
+- **`terminal_reason` names why a result ended** — `completed`, `max_turns`, `budget_exhausted`, `structured_output_retry_exhausted`, `api_error`, `aborted_streaming`, `aborted_tools`, `hook_stopped`, among others — and `api_error_status` carries the provider's HTTP status. Assistant messages carry `error: 'authentication_failed' | 'rate_limit' | 'overloaded' | 'billing_error' | …`, and an `auth_status` message exists. A `rate_limit_event` with `status: 'rejected'` carries `resetsAt`. These are what an outcome is classified from; an error's text is not.
+- **Control requests — `interrupt()` among them — are "only supported when streaming input/output is used"** (`sdk.d.ts`). In the string-prompt form only an `AbortController` reaches the run. A CLI stopped by `SIGTERM` "leaves the turn that was in progress unfinished and records no result" ([headless](https://code.claude.com/docs/en/headless)).
+- **Background work is observable.** `system/background_tasks_changed` carries the whole live set each time; `task_started.is_backgrounded` flags backgrounded work; a result produced by a background task's completion carries `origin.kind: 'task-notification'`.
+- **Subagents run in the background by default** since CLI 2.1.198 — an `Agent` call that omits `run_in_background` launches a background subagent ([subagents](https://code.claude.com/docs/en/agent-sdk/subagents)). `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` removes `run_in_background` from Bash **and the subagent tool** and turns off auto-backgrounding ([environment variables](https://code.claude.com/docs/en/env-vars)); the `env` option sets it per query.
+- **A resumed session keeps what it started with.** `systemPrompt` is recorded on first use; on `resume` a different one is ignored until compaction or a new session. `total_cost_usd` and `modelUsage` continue from the transcript, while `maxTurns` and `maxBudgetUsd` count only this `query()`.
+- **Telemetry is correlated for free**: with an active span the SDK passes `TRACEPARENT`/`TRACESTATE` to the CLI. The CLI's export on exit "is bounded by a short timeout" and fails silently by default ([observability](https://code.claude.com/docs/en/agent-sdk/observability)).
+- The subagent tool is `Agent` in `tool_use` blocks and `Task` in `init.tools` ([subagents](https://code.claude.com/docs/en/agent-sdk/subagents)); a hook matcher containing regex characters is an unanchored regex ([hooks](https://code.claude.com/docs/en/hooks#matcher-patterns)).
 
 ## What this means here
 
-- The working directory is not cosmetic: it keys the project, the transcript location, and the store lookup. A procedure that changes it changes where its session lives (H15).
-- Cross-container resume (H14) has two candidate mechanisms — the store adapter or a persistent mount — which differ in what the base image and the CDK constructs must provide. Decided by spike, `DESIGN_OPTIONS.md` §F.
+- The working directory is not cosmetic: it keys the project, the transcript location, and the store lookup — which is why AgentForge pins the project key with `CLAUDE_CODE_PROJECT_DIR_NAME` rather than deriving it from a path (`ARCHITECTURE.md` §6).
+- Cross-container resume (§REQ402) goes through the store adapter; mounts were ruled out ([ADR 0011](../../adr/0011-state-persists-through-apis-not-mounts.md)). What a resumed run is missing is measured in the §F spike.
 - Mirror failure is a real failure mode to surface rather than swallow: `mirror_error` must reach the task record, not be logged and forgotten.
 
 

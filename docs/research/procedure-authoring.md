@@ -12,13 +12,13 @@ Source: `spikes/procedure-authoring/` (retired at A0; git history `d3f08b7`) —
 
 Five shapes, inferred from both consumers' contracts read on 2026-09-22 — representative, not exhaustive, chosen to expose the differences between the styles. Consumer domain vocabulary is deliberately absent (`ARCHITECTURE.md` §11): the shapes are borrowed, the nouns are not.
 
-| Shape | Stresses | From |
+| Shape | Stresses | Serves |
 |---|---|---|
-| **minimal** | the floor — name, outer contract, agent contract, marshal, prompt, options | H1, H2, T1 |
-| **computed** | outer output carrying fields the model must never be asked for | H principle 3, T18, §REQ102 |
-| **phased** | before / after-success / after-failure, each seeing the prior attempt's state | T33, T34, §REQ205 |
-| **guarded** | guardrails composed from several sources, additively, none dropped | H5, T8–T11, §REQ204 |
-| **discriminated** | a domain-level negative result returned as a **success** under its own discriminator | T19 |
+| **minimal** | the floor — name, outer contract, agent contract, marshal, prompt, options | §REQ101 |
+| **computed** | outer output carrying fields the model must never be asked for | §REQ102 |
+| **phased** | before / after-success / after-failure, each seeing the prior attempt's state | §REQ205 |
+| **guarded** | guardrails composed from several sources, additively, none dropped | §REQ204 |
+| **discriminated** | a domain-level negative result returned as a **success** under its own discriminator | §REQ502 |
 
 ## The gate: decorators on Bun
 

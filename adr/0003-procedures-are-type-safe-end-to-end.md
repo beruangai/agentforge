@@ -8,7 +8,7 @@ decision-makers: Jeremy Jonas
 
 ## Context and Problem Statement
 
-A workflow calls a procedure by name with an input and gets an output back. Both consumers require that a wrong name or a mismatched shape fails at compile time, with no per-procedure client wiring (H1, H2, T1). The output the agent produces is often not the output the caller needs. And the container answering a call may be running code older than the worker's.
+A workflow calls a procedure by name with an input and gets an output back. A wrong name or a mismatched shape must fail at compile time, with no per-procedure client wiring (§REQ101). The output the agent produces is often not the output the caller needs. And the container answering a call may be running code older than the worker's.
 
 **Invocation is asynchronous, which shapes the answer.** A start returns a task handle, never an outcome, so its output is the *same* for every procedure; a caller then polls, and may cancel. End-to-end type safety therefore needs **several typed procedures per declaration**, however they are produced — which is what the wire already has.
 
@@ -24,9 +24,9 @@ Chosen option: **an RPC framework — oRPC, contract-first** — retaining the t
 
 * A consumer declares **one contract**: a name, an input schema and an output schema, in Zod. A utility **derives the typed calls** — `SendMessage` and `GetTask` per procedure, `CancelTask` once at the root — named as A2A names them, so they are derived rather than written out
 * The **contract** half is what a caller imports; the **implementation** half registers against it in the container, and an import of the implementation from a worker's build fails
-* **Outer and agent contracts stay separate**, with a marshal step between them: computed fields and identifiers are added there, never asked of the model (T18)
-* The **contract hash** travels in the envelope; a container that does not implement it refuses the task before any work (H3, T3)
-* Strict parsing at every boundary — an undeclared field is rejected, never dropped (T16)
+* **Outer and agent contracts stay separate**, with a marshal step between them: computed fields and identifiers are added there, never asked of the model (§REQ102)
+* The **contract hash** travels in the envelope; a container that does not implement it refuses the task before any work (§REQ104)
+* Strict parsing at every boundary — an undeclared field is rejected, never dropped (§REQ103)
 * **The transport stays ours.** A custom client link carries a call over A2A rather than HTTP, and the framework contributes no transport assumptions
 
 ## Consequences

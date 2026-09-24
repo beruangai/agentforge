@@ -30,20 +30,21 @@ The whole loop, in Docker, for a procedure a consumer would actually ship.
 
 - Task protocol: envelope, identifiers, events, outcome
 - Procedures: the oRPC contract and its derived calls, the contract hash, the run with its prompt, options, agent contract and marshal, and the before and after steps (§REQ101–§REQ104, §REQ201, §REQ205)
-- Kernel: structured input and output throughout, settlement, abort, session start, resume and fork (§REQ103, §REQ206, §REQ402)
+- Kernel: streaming input and output, structured input and output throughout, settlement with background work off per query, classification from the result, interrupt and abort, session start, resume and fork (§REQ103, §REQ206, §REQ402)
 - Guardrail hooks composing without loss, and telemetry (§REQ204, §REQ602)
-- Runtime: A2A server, gateway and executor, a process per task, filesystem task store behind the fenced interface, generated agent card
+- Runtime: A2A server, gateway and executor — which owns the time budget — a process per task, the DynamoDB task store run against DynamoDB Local, generated agent card (§P)
 - Caller-agnostic client and the Temporal activity factory: `SendMessage` starting or attaching, `GetTask` polled to a terminal state with a heartbeat, `CancelTask` (§REQ301, §REQ304, §REQ305)
 - Typed outcomes with their causes, and what every task records (§REQ501, §REQ601)
-- Base image, and one agentic base image with an agent over it, built locally; the `SessionStore` adapter and the workspace sync helper against a local object store; credentials provisioned as §O decides (§REQ402, §REQ705)
+- Base image, and one agentic base image with an agent over it, built locally; the `SessionStore` adapter and the workspace sync helper against an S3-compatible server in Docker (§P), and the session-resume spike (§F); credentials provisioned as §O decides (§REQ402, §REQ705)
 - Failure-injection tests for every layer-2 failure in `ARCHITECTURE.md` §9
 
 **Exit:** a StrategyFoundry workflow runs a real procedure against a local container, gets validated structured output, and can cancel it, retry it, and resume its session — with the run's prompt, options, transcript and usage recorded.
 
 ## A2 — The same agent on AgentCore
 
-- The one AgentCore question left: session resume across containers (§F). Reachability (§B), cancellation (§C) and the store's lease (§A) were answered in A0
-- A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency, lease and loss; admission limits
+- Platform version V2: the construct sets it, through a custom resource while the CDK cannot (§D), and the spike on whether ids minted after a restore are unique runs first (§H). Reachability (§B), cancellation (§C) and the store's lease (§A) were answered in A0, on V1, and the AgentCore integration tests re-check them on V2
+- A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency, lease and loss; admission limits, with the default measured on real runs (§G)
+- Operational metrics and one dashboard per agent (§REQ604)
 - The Nx plugin: generators for an agentic project, an agentic base image, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
 - CDK constructs and the deploy path: the local `FROM` chain as Nx tasks, and an update only for the agents Nx rebuilt (§D)
 - Failure-injection tests for every layer-1 failure, on AgentCore

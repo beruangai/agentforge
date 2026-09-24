@@ -12,7 +12,7 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 **Client** — The caller-agnostic API over the wire: **`SendMessage`** and **`GetTask`** per procedure, **`CancelTask`** at the root, plus an `await` helper that polls `GetTask` to a terminal state. Built on an oRPC client over a link that speaks A2A, so it is typed from the imported contract and nothing else.
 
-**Task handle** — What `SendMessage` returns: `taskId`, `contextId` and `SUBMITTED`. The same shape for every procedure, and what `GetTask` and `CancelTask` are called with.
+**Task handle** — What `SendMessage` returns: `taskId`, `contextId` and `TASK_STATE_SUBMITTED`. The same shape for every procedure, and what `GetTask` and `CancelTask` are called with.
 
 **Activity factory** — The Temporal adapter over the client: heartbeats while awaiting, and maps cancellation and outcomes to activity terms. First-class, never required.
 
@@ -30,7 +30,7 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 **Agent contract** — What the agent fills in, given to the SDK as its output schema. Often differs from the outer output; an ordinary function maps one to the other.
 
-**`SendMessage` / `GetTask`** — The two oRPC procedures derived from one contract, named as A2A names them. `SendMessage` takes the declared input and returns a task handle; `GetTask` takes a task id and returns a discriminated union on the task's state, so the declared output is reachable only on the `SUCCEEDED` branch.
+**`SendMessage` / `GetTask`** — The two oRPC procedures derived from one contract, named as A2A names them. `SendMessage` takes the declared input and returns a task handle; `GetTask` takes a task id and returns a discriminated union on the task's state, so the declared output is reachable only on the `TASK_STATE_COMPLETED` branch.
 
 **`CancelTask`** — One root-level procedure, not derived per contract: a task id in, a state out, identically whatever the task was running.
 
@@ -54,7 +54,11 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 **Task** — One attempt at one procedure, ending in one outcome. An A2A task on the wire; an asynchronous job to AgentCore, which `/ping` reports as busy.
 
-**Envelope** — What starts a task, carried as an A2A data part: procedure name, contract hash, outer input, idempotency key, identifiers, correlation ids.
+**Envelope** — What starts a task, carried as an A2A data part: procedure name, contract hash, outer input, idempotency key, identifiers, correlation ids, and the `metadata` and `tags` every record carries.
+
+**Task state** — A2A's own, verbatim: `TASK_STATE_SUBMITTED`, `TASK_STATE_WORKING`, `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, `TASK_STATE_CANCELED`, `TASK_STATE_REJECTED`, and `TASK_STATE_INPUT_REQUIRED` reserved for a pause. AgentForge adds no state of its own.
+
+**Metadata and tags** — Free-form fields on every record, propagated from the envelope, for what is worth tracking and never load-bearing. Anything a decision rests on is a typed field instead.
 
 **Idempotency key** — Supplied by the caller and stable across its retries; the store indexes tasks by it, so starting again with it attaches rather than runs again ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
 
@@ -80,9 +84,9 @@ Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agen
 
 **Admission limit** — The most tasks an agent runs at once in one container. A task beyond it is rejected, never queued.
 
-**Outcome** — A task's typed result: `SUCCEEDED` with the outer output, or a failure carrying its cause. Values are `SCREAMING_SNAKE_CASE`.
+**Outcome** — How a task ended: `TASK_STATE_COMPLETED` with the outer output, `TASK_STATE_CANCELED`, or `TASK_STATE_FAILED` carrying its typed **cause** — `OUTPUT_INVALID`, `TIMED_OUT`, `LOST` and the rest (`ARCHITECTURE.md` §4). Cause values are `SCREAMING_SNAKE_CASE`.
 
-**`LOST`** — The outcome of a task whose container died, derived from a stale lease at read time. Its side effects may have happened.
+**`LOST`** — The cause on a failed task whose container died, derived at read time from a stale lease or a container id that is not the reader's. Its side effects may have happened.
 
 ## Agents and delivery
 

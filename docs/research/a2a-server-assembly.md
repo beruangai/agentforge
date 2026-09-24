@@ -109,7 +109,7 @@ name=JsonRpcTransportError   code=undefined   message="this image does not imple
 
 The message survives; **the custom code does not**. A plain thrown `Error` is wrapped as `-32603 INTERNAL_ERROR`, because the handler only maps the SDK's own A2A error classes.
 
-This is a reason to prefer the mapping `ARCHITECTURE.md` §4 already specifies — **`REFUSED` → an A2A `REJECTED` task carrying its reason** — over throwing. A rejected task gives the caller a typed, inspectable object; a throw gives it a string. The spike used throws because they were faster to write, and they work; the implementation should not copy that.
+This is a reason to prefer the mapping `ARCHITECTURE.md` §4 already specifies — **a refusal → a `TASK_STATE_REJECTED` task carrying its reason** — over throwing. A rejected task gives the caller a typed, inspectable object; a throw gives it a string. The spike used throws because they were faster to write, and they work; the implementation should not copy that.
 
 ---
 

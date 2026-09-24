@@ -1,6 +1,6 @@
 # Kernel settlement — spike findings
 
-**Read against the real SDK on 2026-09-22.** `@anthropic-ai/claude-agent-sdk@0.3.278`, Bun 1.4.0, macOS, the operator's Claude Max subscription, model `claude-sonnet-5` unless a case names another. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
+**Read against the real SDK on 2026-09-22.** `@anthropic-ai/claude-agent-sdk@0.3.278`, Bun 1.4.0, macOS, the operator's Claude Max subscription, model `claude-sonnet-5` unless a case names another. **Re-run 2026-09-24 against `0.3.280`**, and corrected the same day where the recordings and the SDK's documentation disagreed with what was first written (E1, E2, E4). Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
 
 Source: `spikes/kernel-settlement/`, four runnable spikes, now the integration tests in `packages/agentforge/integ/model/kernel-settlement/` (`nx run @beruangai/agentforge:integ --configuration=model`). Every message of every run is kept as JSONL — then under `spikes/out/`, now under `dist/packages/agentforge/integ/` — so each claim below is evidence rather than recollection. Total model spend: **$1.84**.
 
@@ -49,6 +49,8 @@ Cost $0.52. Exactly one `StructuredOutput` call per run; exactly one result per 
 
 **What this does not prove.** It does not prove dispatched work is *safe* generally — only that foreground dispatch does not cost the submission. The risk §REQ206 recorded has moved to E2, not disappeared.
 
+**Corrected 2026-09-24: the subagent case may not have been foreground at all.** Subagents run in the background by default since CLI 2.1.198 — an `Agent` call that omits `run_in_background` launches a background one ([subagents](https://code.claude.com/docs/en/agent-sdk/subagents)) — and the scenario only *asked* the model not to background anything; it never asserted `run_in_background: false` or `task_started.is_backgrounded`. In the closed-input form the result is held until background subagents finish, with a 10-minute idle ceiling after which the partial result is dropped ([headless](https://code.claude.com/docs/en/headless)), so a held background run and a foreground one look alike here. What E1 shows is that the submission survived; not which way the subagents ran.
+
 ## E2 — Background work: the §REQ206 failure changed shape rather than going away
 
 **Answer: a resumed turn no longer cancels its tool calls. It does something quieter and worse — it publishes a second, contradictory outcome.**
@@ -74,10 +76,13 @@ RESULT #2 @32360ms  num_turns=2  structured={"startedBackgroundWork": false, "no
 
 Both results carry `subtype: success`, `is_error: false`. The first is **not** cancelled. But the second answers a question nobody asked, and a consumer that keeps the last result it sees silently ships it.
 
-**Consequences for the kernel, both of which are cheap and neither of which is optional:**
+**What the kernel does about it — decided by the operator on 2026-09-24.** The first reading here was to use the closed-input form and stop reading at the first result. **Neither holds:**
 
-1. **The kernel uses the closed-input form.** It is the only one observed to produce exactly one result.
-2. **The kernel takes the first result and stops reading.** "Exactly one outcome is published" (`ARCHITECTURE.md` §7) must be enforced by the kernel, because the SDK does not guarantee it on an open-input session.
+- **The kernel runs in streaming input and output.** A prompt AgentForge composes is several content blocks, which the string form cannot carry, and only streaming input reaches the run with `interrupt()` and the other control requests. The predecessor harness is streaming for the same reasons. So closed input is not an option, and the second result above is the case the kernel must make impossible rather than avoid.
+- **Background work is switched off per query**: `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` through the `env` option, which removes `run_in_background` from Bash **and the subagent tool** and turns off auto-backgrounding. This is the predecessor harness's current patch, from recent testing there: with background work on, `StructuredOutput` was called more than once and the SDK's automatic follow-up turn on a background completion dropped the earlier tool calls, so the final structured output was not deterministic. A detected second result is not enough; which answer is final is the objective.
+- **The kernel publishes on the first result, then ends its input and keeps reading to process exit under a bound.** Stopping at the result closes the CLI while a `mirror_error` from the final transcript flush, or the telemetry export, may still be on its way.
+
+**Open: whether background work can be allowed with a deterministic final answer** — a spike of its own, `DESIGN_OPTIONS.md` §E. The streaming-input case above stays tested, because it is what would tell us the SDK changed.
 
 ### Background disabled — `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`
 
@@ -92,7 +97,7 @@ after which it ran the command in the foreground. One result, valid structured o
 
 **A negative result worth recording:** in this run the model then reported `startedBackgroundWork: true` in its structured output, which was false — it had run the command in the foreground. Schema-valid, semantically wrong. Nothing in the SDK catches that; see E3.
 
-**Not re-tested from 2026-09-24.** On that run the model passed `run_in_background` as the string `"true"` and then worked around the switch with `nohup … & disown` — background work by another route, which the switch cannot see. What the model does once the parameter is gone is its choice, not the SDK's contract, so a test asserting it can only be flaky; the closed- and streaming-input cases above, which AgentForge's settlement rests on, remain tested.
+**Not a kill switch for the shell — corrected 2026-09-24.** On that run the model passed `run_in_background` as the string `"true"` and then worked around the switch with `nohup … & disown`: background work by another route, which the switch cannot see. What a shell command starts is contained by the task's process group, which is killed at cancellation and at the end of the task (§REQ304), not by this switch. The switch also covers the subagent tool and auto-backgrounding, not only Bash ([environment variables](https://code.claude.com/docs/en/env-vars)). The scenario is not re-tested: what the model does once the parameter is gone is its choice, not the SDK's contract.
 
 ## E3 — In-turn `PreToolUse` rejection
 
@@ -160,17 +165,17 @@ Cost $0.43. Each case asserts an observable consequence, not that the argument w
 | `settingSources: ['project']` | yes | same fixture, answered `PINEAPPLE` |
 | `thisOptionDoesNotExist` | **no** | run completed normally; the key was **silently ignored** |
 
-### The limits throw; they do not return a result
+### The limits yield their result, then throw — corrected 2026-09-24
 
-`maxTurns` and `maxBudgetUsd` raise out of the async iterator:
+`maxTurns` and `maxBudgetUsd` end the run with an ordinary result message — `subtype: 'error_max_turns'` with `terminal_reason: 'max_turns'`, and `subtype: 'error_max_budget_usd'` with `terminal_reason: 'budget_exhausted'` — **and then** the iterator throws:
 
 ```
 Error: Claude Code returned an error result: Reached maximum number of turns (2)
 ```
 
-rather than yielding a result message with `subtype: 'error_max_turns'`. `SDKResultMessage` declares those subtypes, so a kernel reading only result messages would be correct by the type and wrong in practice: it would never map `TURN_BUDGET_EXHAUSTED` and would instead surface an unhandled throw as a generic `FAILED`.
+The first version of this section said the error came *instead of* the result. The recordings of these very runs contain the result, and the SDK documents the order: a single-message `query()` "raises an error that includes the failure text after yielding the final result message" ([streaming vs single mode](https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode)). The test drained everything and asserted only the throw, so it never looked.
 
-**The kernel must catch around the iterator and classify the thrown error**, not only the result message. `TURN_BUDGET_EXHAUSTED` and a budget outcome are reachable only that way.
+**The kernel classifies from the result** — `terminal_reason`, `subtype` and `api_error_status` — never from an error's text. A catch around the iterator remains, for the runs that end with no result at all: a crash, a lost connection, an abort.
 
 ### §REQ201's failure mode is live
 
@@ -182,9 +187,9 @@ rather than yielding a result message with `subtype: 'error_max_turns'`. `SDKRes
 
 Every item below is forced by an observation above, not inferred.
 
-1. **Use the closed-input (`prompt` string) form.** Open input can produce a second result (E2).
-2. **Take the first result and stop reading.** One outcome is the kernel's guarantee, not the SDK's (E2).
-3. **Catch around the iterator.** `maxTurns` and `maxBudgetUsd` bind by throwing (E4).
+1. **Run in streaming input and output, with background work switched off per query.** A background completion starts a second turn and a second result (E2); the prompt needs content blocks and the run needs `interrupt()`.
+2. **Publish on the first result, then end the input and read to process exit under a bound.** One outcome is the kernel's guarantee, not the SDK's (E2); what arrives after the result — a `mirror_error`, the telemetry flush — still has to be read.
+3. **Classify from the result's `terminal_reason`, `subtype` and `api_error_status`; catch around the iterator for runs that end with none.** The limits yield their result, then throw (E4).
 4. **Treat `subtype: success` with absent `structured_output` as `OUTPUT_INVALID`** (E3).
 5. **Validate the resolved options against the SDK's `Options` type and refuse unknown keys** — the SDK ignores them (E4).
 6. **Assert at startup that `init.tools` contains every tool name the kernel's hook matchers reference** — a wrong matcher is silent (E3).
@@ -195,6 +200,5 @@ Every item below is forced by an observation above, not inferred.
 
 ## What remains open
 
-- **Whether to set `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` in the base image.** It is a hard, schema-level kill switch, and with closed input the tasks are killed at the result anyway — so the choice is between a task killed abruptly at the end and one that never starts. A procedure that genuinely wants background work has no way to opt in once the image sets it. Not settled here; see `DESIGN_OPTIONS.md` §E's remaining note.
-- **Whether the second-result behaviour also occurs on a closed-input run whose background task finishes *before* the result.** Every closed-input run observed had the task still live at the result.
+- **Whether background work can be allowed with a deterministic final answer.** Settled for now by switching it off per query (E2); a spike of its own if a procedure asks for background work, `DESIGN_OPTIONS.md` §E.
 - **`maxTurns` interaction with a hook denial loop.** The denial scenarios ran under `maxTurns: 25` and stopped for other reasons.

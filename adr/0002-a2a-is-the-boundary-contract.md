@@ -32,4 +32,4 @@ Chosen option: **A2A**, because the task lifecycle it standardizes — submit, w
 * Good, because the wire, its states, and its client are not ours to maintain, and an outcome never depends on a connection staying open
 * Good, because the same server runs locally in Docker and on AgentCore
 * Bad, because a short procedure pays a start-and-read round trip
-* Bad, because AgentCore returns real HTTP statuses where A2A expects 200, the SDK mints ids with uuid4 against our uuid7 convention, and its card resolver cannot reach a card served through `InvokeAgentRuntime` — each has to be handled in the client
+* Bad, because AgentCore returns real HTTP statuses where A2A expects 200, the SDK mints ids with uuid4 against our uuid7 convention, and its card resolver needs a signing `fetch` to reach a card served through `InvokeAgentRuntime` — each has to be handled in the client

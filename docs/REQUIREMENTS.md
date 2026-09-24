@@ -39,7 +39,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 
 | | Requirement |
 |---|---|
-| **REQ201** | Every option a procedure sets reaches the SDK, or the task is rejected. Nothing accepted is silently dropped |
+| **REQ201** | Every option a procedure sets — itself, or through AgentForge's defaults and helpers — takes effect in the run as it intended, or the task is rejected before the run. Nothing accepted is silently dropped. What a session fixes when it starts, such as its system prompt, is carried by the session when it is resumed: resuming means continuing it, not reconfiguring it |
 | **REQ202** | A consumer controls a run's time budget and it is enforced. *Where* it is declared is AgentForge's: one budget per task, declared with the procedure and overridable per invocation, so a caller that sizes budgets per call is served without a second authority over when a run ends |
 | **REQ203** | A session starts from exactly what the procedure composed. Nothing is discovered at the entry point, and what capabilities a session can see is the consumer's configuration rather than a resolution algorithm AgentForge runs |
 | **REQ204** | Guardrails a procedure supplies compose with the harness's own, and none is lost to ordering or merging. Their enforcement *semantics* are the consumer's to define |
@@ -80,6 +80,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ601** | Every task records the prompt as sent, the resolved options, where the transcript is, usage, timings and every identifier, correlated to the caller's own |
 | **REQ602** | Traces export over OpenTelemetry and are flushed before the container goes away |
 | **REQ603** | No credential appears in anything AgentForge emits — log line, error, or recorded value |
+| **REQ604** | What AgentForge cannot rule out and needs evidence about — a container ending mid-turn, a termination inside its grace window, a lost task, an outcome that could not be recorded — is counted per agent as a metric, and an agent's operational metrics are on one dashboard alongside what the platform already reports |
 
 ### Building and deploying — `REQ7xx`
 

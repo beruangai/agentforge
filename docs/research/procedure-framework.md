@@ -50,7 +50,7 @@ confirming TS2578.
 | A signal reaches middleware and handler | **yes**, and it is the same object in both |
 | A running procedure can be cancelled | **yes** — a 5000 ms run returned in 64 ms, `finished: false` |
 
-**The wire encoding is AgentForge's to write.** `eventIteratorToStream` yields
+**The wire encoding is AgentForge's to write.** `asyncIteratorToStream` (v1's `eventIteratorToStream`, a deprecated alias in v2) yields
 the **event objects**, not encoded bytes — its name suggests otherwise and the
 first attempt at this spike was wrong because of it. oRPC's SSE encoding lives
 in its HTTP handler, which AgentForge does not use. So a streaming link
@@ -100,7 +100,7 @@ The first spike derived a `submit`/`result` **pair**. The operator rejected it o
 
 Proved in `o6-task-centric-split.ts`, `tsc --strict` clean with its directives verified live:
 
-- **Narrowing flows through the link.** `task.output` is a compile error before the `state === 'SUCCEEDED'` check and typed inside it; a failure's `cause` is absent from the success branch.
+- **Narrowing flows through the link.** `task.output` is a compile error before the `state === 'TASK_STATE_COMPLETED'` check and typed inside it; a failure's `cause` is absent from the success branch.
 - **Each procedure's `status` carries its own output type.** Reading `reviewStrategy`'s `verdict` off `summariseCorpus`'s status does not compile — the union is built from that contract's output, not a shared one.
 - **`cancel` rejects a procedure input**, because it is not shaped by the contract.
 
@@ -119,7 +119,7 @@ Proved in `o7-a2a-verbs-and-per-call-context.ts`, `tsc --strict` clean with its 
 
 Found while carrying the spikes into `packages/agentforge/integ/local/procedure-framework/`, on **beta.39 and re-checked on beta.38** — so not drift, just something the spikes' own pattern hid. `implementer.use(middleware).router({ … })` re-applies the middleware to procedures that already carry it, and oRPC does not deduplicate: build procedures on `os = base.use(house)` and then assemble with `os.router(…)`, and **`house` runs twice per call**. Assembling on the unmiddlewared implementer runs it once. The spikes could not see it because their middleware overwrote a record rather than counting.
 
-It matters for any middleware with a side effect — a lease writer, a telemetry span, an audit record. **The router is assembled on the base implementer**, and `custom-link-and-typed-context.test.ts` asserts both counts, so a future oRPC that deduplicates is reported rather than silently changing behaviour.
+It matters for any middleware with a side effect — a lease writer, a telemetry span, an audit record. **The router is assembled on the base implementer.** It is v2's documented behaviour, not a quirk: the v1-to-v2 migration guide lists "automatic deduplication removed" and offers a context-flag guard as the recipe (read 2026-09-24), so it is recorded here rather than tested.
 
 ## `Locking` does not answer idempotency
 
@@ -157,7 +157,7 @@ package is also `experimental-`. **Not adopted.**
 
 ## Standing considerations
 
-- **v2 is beta** (`2.0.0-beta.38`, 38 betas). The operator's direction is to target v2 rather than adopt v1 on the edge of a major migration.
+- **v2 is beta** — `2.0.0-beta.39` installed, `beta.40` published 2026-09-23 with one serialization fix, `latest` still v1 (1.15.4), and no release date for v2. The operator's direction is to target v2 rather than adopt v1 on the edge of a major migration.
 - **Maturity**: MIT, org `middleapi`, 5,636 stars, **67 contributors**, ~946k weekly downloads on v1, pushed daily. An earlier note in this repository said "single maintainer" — that came from npm's `maintainers` field, which is publish rights rather than project maintainership, and it was wrong.
 - **`@orpc/contract` is 90 KB** and depends on `@standard-schema/spec`, so **Zod 4 works natively**. It pulls `@orpc/client` (138 KB), which is what a caller needs in order to call — not incidental weight.
 

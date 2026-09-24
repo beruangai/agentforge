@@ -14,7 +14,7 @@ An earlier commit (`70ff01b`, 2026-09-22) recorded that **`InvokeAgentRuntime` s
 
 `InvokeAgentRuntime` **forwards the caller's `content-type` unchanged, and sends none when the caller sent none.** The earlier observation came only from the AWS CLI, whose `--payload file://…` sends no content type at all. `@aws-sdk/client-bedrock-agentcore` defaults to `application/octet-stream`, which `@a2a-js/sdk`'s `jsonRpcHandler` rejects with `-32005 CONTENT_TYPE_NOT_SUPPORTED` — surfacing to the caller as **HTTP 424 with `-32055 "Runtime client error - Please check your CloudWatch logs"`**, which names neither the header nor the cause.
 
-**The fix is on the caller**: set `contentType: 'application/json'` on `InvokeAgentRuntimeCommand`. A permissive body parser in the container (`express.json({ type: () => true })`) makes the body *parse*, but does not stop `jsonRpcHandler` rejecting the content type, so it is not sufficient on its own.
+**The fix is on the caller**: set `contentType: 'application/json'` on the AWS SDK's command for the `InvokeAgentRuntime` API (`InvokeAgentRuntimeCommand` — not `InvokeAgentRuntimeCommandCommand`, which is the separate command-execution API). A permissive body parser in the container (`express.json({ type: () => true })`) makes the body *parse*, but does not stop `jsonRpcHandler` rejecting the content type, so it is not sufficient on its own.
 
 ---
 

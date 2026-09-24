@@ -34,9 +34,9 @@ Unify naming across all docs. If CLI uses `<agent> <command>`, use it everywhere
 
 ## Spec Naming
 
-**Prefix specs with package name.** Since OpenSpec doesn't support namespaced/nested specs, prefix capability names with the owning package for readability and separation of concern:
-- `claude-sandbox-execution`, not `execution`
-- `mcp-gateway-routing`, not `routing`
+**Prefix specs with the owning concept.** OpenSpec doesn't support namespaced or nested specs, and AgentForge is one package, so a package prefix would say nothing. Prefix a capability with the concept folder that owns it — `runtime`, `harness`, `client`, `infra`, `core`, `filesystem`:
+- `runtime-task-admission`, not `admission`
+- `harness-kernel-settlement`, not `settlement`
 
 ## Spec Content
 

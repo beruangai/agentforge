@@ -18,6 +18,8 @@ From [AgentCore Runtime quotas](https://docs.aws.amazon.com/bedrock-agentcore/la
 | Maximum session lifetime | 8 hours | Yes — `maxLifetime` |
 | Payload size | 100 MB | No |
 | `runtimeSessionId` length | at least 33 characters | — |
+| Container image size | 2 GB | No — read 2026-09-24; it bounds how much the layered agentic base images of `ARCHITECTURE.md` §6 may carry |
+| Environment variables, total | 4 KB on V1; **2.5 KB on V2** for a container agent | No — read 2026-09-24, [platform versions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html#runtime-platform-versions); AWS says V2 will be raised to match |
 
 ## Regions
 
@@ -52,7 +54,7 @@ From the [long-running agents guide](https://docs.aws.amazon.com/bedrock-agentco
 
 - `/ping` returns HTTP 200 with `{"status": "Healthy" | "HealthyBusy"}`. `Healthy` is "ready to accept new work"; `HealthyBusy` is "operational but currently busy with async tasks. While the status is `HealthyBusy`, the runtime session is considered active and is kept alive."
 - **It is a lifecycle signal, not admission control.** Nothing in the contract says a status stops an invocation being delivered; the status decides whether the session is kept alive or reaped. Concurrency is the container's own responsibility on both protocols, and both can receive messages while work is in progress.
-- **Operator, not found in the pages read:** the container must answer `Healthy` within 120 seconds of starting, and that first healthy response is the snapshot used for warm starts. Treat as operating knowledge until confirmed.
+- **On platform version V2 the container must report healthy within 120 seconds of starting, and the first healthy `/ping` is when the snapshot is taken** — documented 2026-09-24 ([platform versions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html#runtime-v2-what-to-expect)); it was operating knowledge before. See the V2 section below.
 - A session reporting `Healthy` for 15 minutes is terminated; `HealthyBusy` keeps it alive past the idle timeout.
 - `time_of_last_update` is optional; setting it on every ping prevents the idle timeout from firing and can exhaust the session quota.
 - "Ensure `@app.entrypoint` handler does not perform blocking operations, as this might also block the /ping health check endpoint."
@@ -102,6 +104,18 @@ From [lifecycle settings](https://docs.aws.amazon.com/bedrock-agentcore/latest/d
 - "Each microVM session uses the code assets (`agentRuntimeArtifact`) that were deployed at the time of microVM creation. **If you update your agent runtime with new code, existing sessions will continue using the previous version until they terminate and new sessions are created.**"
 - So a deploy does not recycle running containers and cannot interrupt a turn. Two artifact versions serve traffic while long sessions drain, which is normal rather than a fault — but a task's record has to say which artifact ran it.
 - Lifecycle timers are per session: the idle timeout resets on each invocation to that session, `maxLifetime` starts at creation and cannot be reset, and when either fires only that session's microVM is terminated.
+- **A termination by the idle timeout or `maxLifetime` "can last up to 15 seconds"** (read 2026-09-24) — a quarter of the ~60 s measured after `StopRuntimeSession` ([observed](agentcore-runtime-observed.md)).
+
+## Platform version V2 — read 2026-09-24
+
+From [platform versions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html#runtime-platform-versions) and [optimize for V2](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-v2-optimize.html). **AgentForge runs on V2** (`ARCHITECTURE.md` §5); every observation in [`agentcore-runtime-observed.md`](agentcore-runtime-observed.md) before 2026-09-24 was made on V1.
+
+- `platformVersion` is `V1` (the default) or `V2`, set on `CreateAgentRuntime` or `UpdateAgentRuntime`; an update that omits it keeps the current one. `CreateAgentRuntime`'s response does not return it; `GetAgentRuntime` does. Available in `us-east-2` and `us-west-2`.
+- **V2 restores every container from one snapshot**, taken at the first healthy `/ping`. Work done at startup is shared by every restored instance; anything that must differ per request or can expire — random values, identifiers, the current time, an elapsed-time reference, credentials — is produced per request. "`time.monotonic()` does not advance across a restore." "Every restored instance reports the same hostname (`localhost`) and PID (`1`)."
+- **A cryptographic library that cached random state at startup can reuse it across instances**; a container agent must bring a snapshot-safe build that reseeds after a restore. Whether Bun's does is not documented — `DESIGN_OPTIONS.md` §H.
+- Report healthy only once initialisation is done, within 120 seconds, or creation fails. Sockets opened at startup do not survive a restore; clients built and exercised at startup reconnect transparently. Do not bind a fixed source port.
+- **Create and update take minutes**, not seconds, while the snapshot is prepared; `update` or `delete` before a terminal status returns `ConflictException`. A snapshot is deleted when no endpoint points at its version, which can take up to 8 hours while its sessions drain.
+- **CloudFormation and the CDK cannot set `platformVersion` yet.**
 
 ## Stopping a session
 

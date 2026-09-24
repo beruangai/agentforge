@@ -19,7 +19,7 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0004](0004-a-process-per-task.md) | A process per task, speaking JSON-RPC over a pipe | accepted |
 | [0006](0006-task-state-is-durable-outside-the-session.md) | Task state is durable outside the runtime session | accepted |
 | [0007](0007-identity-is-the-consumers.md) | Identity and isolation are the consumer's | accepted |
-| [0008](0008-code-ships-in-the-image.md) | Code ships in the image; images layer; only state is mounted | accepted |
+| [0008](0008-code-ships-in-the-image.md) | Code ships in the image, and images layer | accepted |
 | [0009](0009-the-caller-supplies-the-idempotency-key.md) | The caller supplies the idempotency key; a task id is a wire handle | accepted |
 | [0010](0010-agentforge-is-consumed-as-an-nx-plugin.md) | AgentForge is consumed as an Nx plugin, and agents nest in one project | accepted |
 | [0011](0011-state-persists-through-apis-not-mounts.md) | State persists through APIs, not mounts | accepted |
