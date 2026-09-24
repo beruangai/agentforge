@@ -1,60 +1,36 @@
 # Roadmap
 
-Milestones deliver capability a consumer can actually run. The questions each depends on in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md) are settled first — by spike where they turn on platform behavior.
+Each milestone ends with capability verified end to end on **AgentForge's own example agents** (`examples/`), before any consumer adopts it. A consumer never finds a failure an example could have found.
 
-**A milestone that delivers behavior is proposed through OpenSpec; A0 is not.** A0 is the workspace itself — layout, targets, tooling, and retiring `spikes/` — and has no behavior contract to write, so it is done directly. `openspec/specs/` begins with A1.
+## A0 — Scaffold and blocking decisions
 
-**StrategyFoundry's M0 is its own lowest bar, not this roadmap's target.** A milestone here ends with agents that execute real work reliably, not with a foundation that compiles.
-
-## A0 — Scaffold, blocking decisions, local spikes
-
-**Delivered 2026-09-23.** The workspace builds, `spikes/` is gone, and every spike is a test or a research note.
-
-- Nx workspace on current `@aws/nx-plugin` defaults — Bun, Biome, catalog versions — as **one project, `packages/agentforge`, which is the one published package**, with concepts as sub-module folders rather than projects (`ARCHITECTURE.md` §10). TypeScript 6 and vitest 4, because Nx cannot yet run TypeScript 7 and `@nx/vitest` stops at vitest 4 ([research](research/aws-nx-plugin.md))
-- **The entry points and their boundary**: `/contract`, `/client`, `/temporal`, `/agent`, `/infra`, bundled by tsdown with shared chunks; `/agent` gated by the `agentforge-agent` export condition, tested under Node, TypeScript and Bun
-- **Test tiers as separate targets**: `test` on every build; `integ` as the gate before publishing, grouped by what a test needs — `--configuration=local` (Docker), `aws` (the test role), `model` (the subscription token and inference spend). `e2e` is the whole path, caller to model, and has no target until A1 builds that path
-- `@aws/nx-plugin`'s preset and `ts#sync` read ([research](research/aws-nx-plugin.md)); **`ts#agent` deferred with §K** — what AgentForge's generators write waits for the first agent, and reading it now is reading against no requirement
-- **The blocking decisions are made**: the A2A server is assembled rather than inherited ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md), §I), it speaks 1.0 only ([ADR 0014](../adr/0014-agentforge-speaks-a2a-1-0-only.md)), a procedure is an oRPC contract ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md), §N), and the task store is one task item plus a tiny index item (§A)
-- **Landed:** kernel settlement (§E), the task-process protocol with cancellation and group kill (§C, §G), deterministic image builds (§D), the procedure framework (§N), capability composition (§L/§REQ203), and the AgentCore behaviour §A, §B, §C and §I rested on
-- **No spike is outstanding.** §O's first slice classifies `CREDENTIAL_EXPIRED` and does nothing more, which needs no measurement; the one unrun spike — session resume across containers (§F) — needs an agent that does not exist until A1
-- **`spikes/` is triaged and removed**, per the disposition decided before A0: kernel settlement → `integ/model/`; AgentCore and `s7cmd` sync → `integ/aws/`; A2A version negotiation, the procedure framework, capability composition, image and bundler determinism → `integ/local/` (image and bundler determinism retired on 2026-09-24, findings in `research/image-determinism.md`); task-process, server assembly and procedure authoring retired to their research notes, with the code in git history at `d3f08b7`
-- **Run at A0**: every test that needs neither AWS nor a model — procedure framework, capability composition, A2A version negotiation, image determinism. Image determinism was retired on 2026-09-24: nothing AgentForge does depends on it, and its findings stand in `research/image-determinism.md`
-- **AgentCore and `s7cmd` sync, first run 2026-09-24**, in `us-east-2` as the test-only `AgentForgeTestInteg` role (tests never run in prod's `us-west-2`): every file passes, the AgentCore files in parallel. Two findings came of it — the pre-warmed pool seen on 2026-09-22 did not reproduce, and nothing depends on it; and a timing race in the busy-container test was fixed. The integ tier was then cut to what AgentForge relies on and the platform does not guarantee (`.claude/rules/testing.md`): container-per-session, the header allowlist and the lease read-back moved to research notes
-- **Kernel settlement, first run 2026-09-24** against a real model, $1.54: 14 of 16 passed, and both failures were the tests' premises, not SDK drift. Background-disabled asserted what the model chose to do — it worked around the switch with `nohup … &` — and was dropped; the hook-only rule asserted a loop where the model complied, and now asserts the guarantee AgentForge rests on, that a denied submission never becomes the result. The model group was cut to scenarios AgentForge relies on (`research/kernel-settlement.md`)
-
-**Exit:** the workspace builds; `spikes/` is gone; every A0 question is closed or explicitly deferred with its reason; each spike whose answer can drift is an integration test and each that settled a decision once is an ADR or a dated research note (`ARCHITECTURE.md` §9).
+**Delivered 2026-09-23.** One Nx project that is the published package; entry points behind export conditions; the test tiers; the ADRs; the platform spikes that the design rests on, as integration tests where their answers can drift.
 
 ## A1 — A working agent, locally
 
-The whole loop, in Docker, for a procedure a consumer would actually ship.
+**Delivered 2026-09-25**, on `hello-agent`, against a real model.
 
-- Task protocol: envelope, identifiers, events, outcome
-- Procedures: the oRPC contract and its derived calls, the contract hash, the run with its prompt, options, agent contract and marshal, and the before and after steps (§REQ101–§REQ104, §REQ201, §REQ205)
-- Kernel: streaming input and output, structured input and output throughout, settlement with background work off per query, classification from the result, interrupt and abort, session start, resume and fork (§REQ103, §REQ206, §REQ402)
-- Guardrail hooks composing without loss, and telemetry (§REQ204, §REQ602)
-- Runtime: A2A server, gateway and executor — which owns the time budget — a process per task, the DynamoDB task store run against DynamoDB Local, generated agent card (§P)
-- Caller-agnostic client and the Temporal activity factory: `SendMessage` starting or attaching, `GetTask` polled to a terminal state with a heartbeat, `CancelTask` (§REQ301, §REQ304, §REQ305)
-- Typed outcomes with their causes, and what every task records (§REQ501, §REQ601)
-- Base image, and one agentic base image with an agent over it, built locally; the `SessionStore` adapter and the workspace sync helper against an S3-compatible server in Docker (§P), and the session-resume spike (§F); credentials provisioned as §O decides (§REQ402, §REQ705)
-- Failure-injection tests for every layer-2 failure in `ARCHITECTURE.md` §9
+- Contracts as oRPC, the contract hash, the time budget in contract meta; `implementAgent` and `context.runAgent`; `composeOptions` with additive guardrails (§REQ101–§REQ104, §REQ201–§REQ206)
+- The kernel: streaming input, structured output, one outcome, classification from fields, interrupt then abort, dead-guardrail detection, a record per run (§REQ206, §REQ501, §REQ601)
+- The runtime: A2A 1.0 server, gateway (idempotent attach, attempts, admission, continuity, session check), executor (a process per task over IPC, time budget, lease, group kill), DynamoDB task store with derived loss (§REQ301–§REQ306)
+- The client over a local container or AgentCore, and the Temporal activity (§REQ301, §REQ305)
+- The base image and the agent image from the lockfile
+- `hello-agent`'s e2e: a typed output, a resumed session in the same container, an idempotent attach, a cancel mid-Bash; the Temporal activity completing and cancelling
 
-**Exit:** a StrategyFoundry workflow runs a real procedure against a local container, gets validated structured output, and can cancel it, retry it, and resume its session — with the run's prompt, options, transcript and usage recorded.
+**Not in A1, and why**: cross-container resume (§F — needs the S3 `SessionStore`, and one container resumes today); telemetry and metrics (§T, with A2's dashboard); generators (§K, once a second agent shows what to generate).
 
 ## A2 — The same agent on AgentCore
 
-- Platform version V2: the construct sets it, through a custom resource while the CDK cannot (§D), and the spike on whether ids minted after a restore are unique runs first (§H). Reachability (§B), cancellation (§C) and the store's lease (§A) were answered in A0, on V1, and the AgentCore integration tests re-check them on V2
-- A2A client over `InvokeAgentRuntime` with SigV4 and 409 retry; durable task store; idempotency, lease and loss; admission limits, with the default measured on real runs (§G)
-- Operational metrics and one dashboard per agent (§REQ604)
-- The Nx plugin: generators for an agentic project, an agentic base image, an agent, a procedure and a caller's wiring, plus the sync generator (§K)
-- CDK constructs and the deploy path: the local `FROM` chain as Nx tasks, and an update only for the agents Nx rebuilt (§D)
-- Failure-injection tests for every layer-1 failure, on AgentCore
+- The construct and deploy path (§D): runtime on V2, its role, the task table, the leaf image in ECR, a deploy that waits for `READY`
+- The uuid-after-restore spike (§H) and the admission default measured (§G)
+- `hello-agent`'s e2e against the deployed runtime through `agentCoreTransport`, including a container stop mid-task ending `LOST` and a retry attaching
+- Telemetry and per-agent metrics (§T)
+- Cross-container resume (§F), if a consumer needs it before A3
 
-**Exit:** the same procedure, unchanged, runs against a deployed agent; it survives a container kill and a caller redeploy; and changing one agent deploys that agent alone.
+**Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop.
 
-## A3 — TrendBot
+## A3 — Consumers
 
-- TrendBot's needs met against [REQUIREMENTS.md](REQUIREMENTS.md); anything it still lacks enters that register through the operator rather than as a contract to chase
-- Its guardrail semantics as its own hooks, its git lifecycle in the before and after steps, its three agents deployed
-- The sync generator exercised on a real consumer across at least one AgentForge release
-
-**Exit:** TrendBot runs on this AgentForge, and the first one is deleted.
+- StrategyFoundry adopts; TrendBot migrates off its predecessor harness
+- What either lacks enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator, and lands on an example first
+- The plugin's generators and sync generator (§K), extracted from what the examples and the first consumer wired by hand

@@ -1,4 +1,4 @@
-import { configDefaults, defineConfig } from 'vitest/config';
+import { defineConfig } from 'vitest/config';
 import unit from './vitest.config.mts';
 
 /**
@@ -10,7 +10,7 @@ import unit from './vitest.config.mts';
  * folder under `integ/` each, selected by the `integ` target's configurations:
  *
  * - `local`: Docker and the local toolchain; no credentials, no spend
- * - `aws`: the test role in `us-east-2` (`.env.integ`); AgentCore and S3
+ * - `aws`: the test role in `us-east-2` (`.env.integ`); AgentCore
  * - `model`: the subscription token (`.env.integ.local`); model inference
  *
  * AgentCore's files run in parallel: each provisions and deletes its own
@@ -31,7 +31,6 @@ const integration = {
 } as const;
 
 const testFiles = '**/*.{test,spec}.ts';
-const agentCoreFiles = `integ/aws/agentcore/${testFiles}`;
 
 export default defineConfig({
   ...unit,
@@ -54,18 +53,8 @@ export default defineConfig({
         root: import.meta.dirname,
         test: {
           ...integration,
-          name: '@beruangai/agentforge:integ:aws',
-          include: [`integ/aws/${testFiles}`],
-          exclude: [...configDefaults.exclude, agentCoreFiles],
-          fileParallelism: false,
-        },
-      },
-      {
-        root: import.meta.dirname,
-        test: {
-          ...integration,
           name: '@beruangai/agentforge:integ:aws:agentcore',
-          include: [agentCoreFiles],
+          include: [`integ/aws/agentcore/${testFiles}`],
           fileParallelism: true,
         },
       },

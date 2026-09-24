@@ -26,14 +26,13 @@ Chosen option: **an RPC framework — oRPC, contract-first** — retaining the t
 * The **contract** half is what a caller imports; the **implementation** half registers against it in the container, and an import of the implementation from a worker's build fails
 * **Outer and agent contracts stay separate**, with a marshal step between them: computed fields and identifiers are added there, never asked of the model (§REQ102)
 * The **contract hash** travels in the envelope; a container that does not implement it refuses the task before any work (§REQ104)
-* Strict parsing at every boundary — an undeclared field is rejected, never dropped (§REQ103)
-* **The transport stays ours.** A custom client link carries a call over A2A rather than HTTP, and the framework contributes no transport assumptions
+* Parsing against the contract at every boundary — input before the run, the agent's output before the handler sees it, the outer output before it leaves, and the output again in the caller (§REQ103)
+* **The transport stays ours.** The client derives its calls from the contract and speaks A2A itself; oRPC contributes the contract and the in-container implementation, and no transport
 
 ## Consequences
 
 * Good, because the three calls are generated from one declaration instead of being hand-written things that can drift from it or from each other
 * Good, because `GetTask` returns a discriminated union on the task's state, so a caller reads a non-terminal state and reaches the output only where it exists
 * Good, because typed middleware and an accumulating typed context come with the framework rather than being built and maintained here
-* Good, because errors are the link's business: nothing is marshalled behind the caller's back, so a raw error and its stack reach a developer
-* Bad, because the contract half now depends on `@orpc/contract` and `@orpc/client` rather than on Zod alone, which a consumer must keep in step
+* Bad, because the contract half now depends on `@orpc/contract` rather than on Zod alone, which a consumer must keep in step
 * Bad, because the framework's major version is a dependency of the public type surface

@@ -1,83 +1,69 @@
 # Claude Code Orientation
 
-**AgentForge** is a procedure wrapper for the Claude Agent SDK, built for its consumers — StrategyFoundry and TrendBot — not for public use. Consumers declare procedures; AgentForge runs each as an asynchronous task over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
+**AgentForge** runs a Claude Agent SDK procedure as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — for its consumers, StrategyFoundry and TrendBot, not for public use. One package, `@beruangai/agentforge`: a contract helper, a client and a Temporal activity for callers; the harness and server for an agent's image; a base image `Dockerfile`; CDK constructs from A2.
 
-No implementation yet. **The [ADRs](adr/README.md) are accepted and the architecture rests on them.** **Until code exists, an accepted ADR is mutated in place when its reasoning stops holding** — the operator's standing rule, because there is nothing built on it to migrate. A superseding ADR is for after that. Either way the decision is the operator's to make. A new decision is still written `proposed` until the operator accepts it, and everything in `docs/DESIGN_OPTIONS.md` is open.
+**A1 is built** and verified end to end on [`examples/hello-agent`](examples/hello-agent) against a real model. A2 (AgentCore deploy) is next.
+
+## Simplicity first
+
+AgentForge is a few small, rock-solid capabilities for one engineer across a few projects — not an enterprise product. **Strict about layer contracts and ownership; as simple as possible inside them.** Don't over-engineer, over-analyse, over-abstract, over-feature, over-test or over-document:
+
+- The smallest design that is correct wins. Record a finding in a sentence, not a section.
+- Don't open new analysis threads or decision lists unless something is blocking; pick the sensible default, say so, and move on.
+- Interpret a rule by its intent, not its most literal reading.
+- **Dogfood.** Every capability lands on an example agent in `examples/` and is verified end to end there — built from the published bundle, called through the client — before any consumer adopts it.
 
 ## Read first
 
-1. [`README.md`](README.md)
-2. [`docs/SOLUTION_SPACE.md`](docs/SOLUTION_SPACE.md) — the problem and the scope
-3. [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — the register this workspace answers to. **It is AgentForge's own.** The consumer contracts it began as are closed; do not read, track or enforce them
-4. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the layers, the contract at each boundary, procedures, tasks, runtime, harness
-5. [`docs/DESIGN_OPTIONS.md`](docs/DESIGN_OPTIONS.md) — **what is not decided**, and the spikes that decide it
-6. [`adr/`](adr/README.md) — **read the relevant ADR before proposing to reverse a direction**
-7. [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terms
+1. [`README.md`](README.md) — define, implement, consume
+2. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — what is built and decided
+3. [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — the register AgentForge answers to. **It is AgentForge's own**; the consumer drafts it began as are closed — never read, track or enforce them
+4. [`docs/DESIGN_OPTIONS.md`](docs/DESIGN_OPTIONS.md) — what is open
+5. [`adr/`](adr/README.md) — read the relevant ADR before proposing to reverse a direction
 
-Before relying on platform behavior, [`docs/research/`](docs/research/) — verified facts about AgentCore, A2A, and the Agent SDK, each with the date it was read. [`docs/lineage/`](docs/lineage/) is evidence from the predecessor harness, never a specification.
+[`docs/research/`](docs/research/) holds dated, verified platform facts — read before relying on AgentCore, A2A or Agent SDK behaviour. [`docs/lineage/`](docs/lineage/) is evidence from the predecessor harness, never a specification.
 
 ## Premise
 
-Settled by the operator and not to be reopened: **AgentForge owns its requirements**, and the operator negotiates with a consumer where one is affected; invocation is asynchronous; authentication is the operator's Claude Max subscription, used as intended. The [ADRs](adr/README.md) are accepted on top of these; `docs/DESIGN_OPTIONS.md` is what is still open.
+Settled and not reopened: **AgentForge owns its requirements**, and the operator negotiates with a consumer where one is affected; invocation is asynchronous; authentication is the operator's Claude Max subscription, used as intended.
 
-**The register is [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)**, and a capability no `REQ` id asks for is not built. **Ids are blocked by category a hundred at a time and are permanent** — a new requirement takes the next free number in its own block, a withdrawn one keeps its number forever, and prose references carry the section mark (`§REQ304`). It began as a distillation of two consumer drafts and no longer tracks them — those drafts are closed, and a new need enters here through the operator, who negotiates it with the consumer, rather than as a clause elsewhere this repository must chase. A requirement only one consumer has is met by configuration or by a helper it calls, never by a branch in the harness or the runtime.
-
-**Four layers, with a contract at every boundary.** Runtime, harness, consumer, SDK. Layers 1 and 2 never import each other; they share only the task protocol and the procedure contract — the oRPC contract every seam is typed by. Each layer is testable alone, and a failure is fixed in the layer that owns it.
-
-**The caller is outside the boundary.** The client is caller-agnostic and the Temporal activity factory sits over it. Nothing below the client knows a caller exists, and Temporal is never a dependency of the runtime or the harness.
-
-**The consumer owns isolation and side effects.** How runtime sessions, A2A contexts, Claude sessions and working directories relate is the consumer's, and may differ per procedure. AgentForge propagates them and enforces only mechanical invariants. A side effect's recovery is the consumer's too.
-
-**Settle platform behavior by testing it — where AgentForge relies on it and the platform does not guarantee it.** Where a question turns on what AgentCore, A2A's SDK, S3 Files, or the Agent SDK actually does and the documentation is silent, ambiguous or wrong, a spike against the real thing answers it — not a search summary, not what the predecessor harness assumed. A documented guarantee is trusted, not re-tested; an observation nothing depends on is recorded, not asserted (`.claude/rules/testing.md`).
-
-**Every intermittent failure becomes a test, and so does every spike.** Reproduce a failure once, in the layer that owns it, and keep it covered. A spike lands in `integ/` rather than as a script, because a platform answer is not self-renewing.
+- **A capability no `REQ` id asks for is not built.** Ids are blocked by category a hundred at a time and are permanent; cite them as `§REQ304`. A need only one consumer has is met by configuration or a helper it calls, never a branch in the harness or runtime.
+- **Four layers.** Runtime and harness never import each other; both import `core/`. The consumer's task entry is where they meet. A failure is fixed in the layer that owns it.
+- **The caller is outside the boundary.** Nothing below the client knows a caller exists; Temporal is never a dependency of the runtime or the harness.
+- **The consumer owns isolation and side effects**, and their recovery. AgentForge carries identifiers and enforces only mechanical invariants.
+- **Settle platform behaviour by testing it** — only where AgentForge relies on it and the documentation is silent, ambiguous or wrong. A documented guarantee is trusted; an observation nothing depends on is a dated note, not a test.
 
 ## Conventions
 
-The operator's standing conventions across projects:
-
-- **Organize by concept, never by type — and in folders, not projects.** One Nx project, `packages/agentforge`, on `@aws/nx-plugin` defaults, which is the one published package. Inside it, sub-module folders by concept: `core/` (shared), `server/` (the container: `runtime/`, `harness/`, `filesystem/`), `client/` (with `temporal/`), `infra/`. A concept owns its code, schemas and tests together; file names carry the type. A new Nx project needs a reason a folder cannot serve. Never a `schemas/`, `types/`, or `utils/` tree collecting one kind across concepts.
-- **One output root.** Everything a task produces — bundles, declarations, coverage, test output — goes under `/dist/{projectRoot}/<task>/`, named for the task that produced it, never into a source directory; the published package is the `bundle` task's output. Type checking emits nothing but incremental build info for `src/`.
-- **Node 26, declared once.** `engines.node` and `@tsconfig/node26`; no hand-picked ES target or `lib`.
-- **Verbose, unambiguous names.** `timestamp`, not `ts`; `configuration`, not `cfg`.
-- **Borrow terms before inventing them, and never shorten one** — the Agent SDK's, AgentCore's, or A2A's first, **verbatim**, then this glossary's, then a new one. If a call gets a task and the protocol calls that `GetTask`, it is `GetTask`, not `get` or `status`. Clarity and specificity over brevity. No consumer's domain vocabulary.
-- **Leaf procedure names are `PascalCase`; namespaces are `camelCase`.** `reviewStrategy.SendMessage`, not `reviewStrategy.sendMessage`.
-- **Binary state is a boolean.** An enum only where a third state is genuinely foreseeable, and its values are `SCREAMING_SNAKE_CASE`.
-- **One published package.** AgentForge vends `@beruangai/agentforge` with entry points per environment; internal libraries are never published on their own.
-- **Nx owns the build graph, and AgentForge never duplicates it.** Every build — bundles, images, deploys — is an Nx task with its real inputs declared, so staleness and ordering are Nx's. Write no second dependency graph, content hash or digest comparison. A build run outside the task graph is a consumer's or developer's mistake, not a case to detect, prevent or support.
-- **Credentials belong to the target that uses them.** Each target gets its credentials from `.env.<target>`, never from `.env.local`, which Nx loads into every task. There is no `default` AWS profile, so a task with no `AWS_PROFILE` has none. Tests run as a test-only role in `us-east-2`; prod is `us-west-2` (`.claude/rules/testing.md`).
-- **uuid7 for every id AgentForge mints.** Never uuid4. Ids minted by a dependency are opaque and not reformatted.
-- **Zero silent failures.** Throw and handle. No empty-result fallbacks, no swallowed exceptions, no defaults papering over missing data, no option accepted and dropped.
-- **No legacy support.** Latest stable toolchain; no shims or compatibility bridges.
-- **Minimal public surface.** Expose what consumers need; nothing internal leaks.
-- **Seams, not speculative abstractions.** An interface earns its place when a second implementation exists or two consumers need different ones.
-- **Minimize what a consumer must declare, and never add friction to what it may declare.** A broader scope sets a **default**, not a ceiling: an agentic project's settings are what its procedures start from, and a procedure overrides any of them without ceremony. Do not invent tiers, permissions to override, or distinct verbs for widening — that is load on the consumer for a problem nobody has. **The one exception is where losing a contribution is silent**: guardrail hooks, MCP servers and denied tools stay additive, because a dropped guardrail looks exactly like a passing run.
-- **An overridable default is overridable by value or by callback.** A field with a house default takes `T | ((current: T) => T)` — pass a value to replace it, or a function receiving the default and returning the final, so appending to a list does not mean retyping it. Simple case stays simple; the composing case needs no second field.
-- **TypeScript on Bun.**
+- **Organize by concept, in folders, not projects.** `packages/agentforge` is the one publishing project: `core/`, `server/runtime/`, `server/harness/`, `client/` (with `temporal/`), `infra/`. A concept owns its code, schemas and tests; file names carry the type. Never a `types/` or `utils/` tree. Example agents are their own projects in `examples/`, because each is a consumer.
+- **Imports inside the package use `.ts` extensions**, and `#core/*` for a module in `core/`.
+- **One output root**: `dist/{projectRoot}/<task>/`. The published package is the `bundle` task's output.
+- **Node 26 and TypeScript on Bun**, declared once.
+- **Verbose, unambiguous names.** `timestamp`, not `ts`.
+- **Borrow terms verbatim** — the Agent SDK's, AgentCore's or A2A's first (`GetTask`, not `status`), then the [glossary](docs/GLOSSARY.md). No consumer vocabulary.
+- **Leaf procedure names are `PascalCase`; namespaces `camelCase`.**
+- **Binary state is a boolean**; enum values are `SCREAMING_SNAKE_CASE`.
+- **Nx owns the build graph.** Every build — bundle, image, deploy — is an Nx target with its real inputs; write no second dependency graph or hash.
+- **Credentials belong to the target that uses them**: `.env.<target>`, never `.env.local`. No `default` AWS profile. Tests run as the test-only role in `us-east-2`; prod is `us-west-2` (`.claude/rules/testing.md`).
+- **uuid7 for every id AgentForge mints.**
+- **Zero silent failures.** Throw and handle; no fallback defaults over missing data, no option accepted and dropped.
+- **No legacy support**; latest stable toolchain. **Minimal public surface.**
+- **Seams, not speculative abstractions** — an interface earns its place with a second implementation.
+- **Never add friction to what a consumer may declare.** A broader scope sets a default, not a ceiling. The exception is where losing a contribution is silent: hooks, MCP servers and tool lists compose additively.
+- **Peer ranges**: caret for stable packages, exact for pre-1.0 and beta.
 
 ## Working rules
 
-- **A new ADR is written `proposed`** and the operator accepts it. Never write one as `accepted` yourself, and never treat a proposed one as settled.
-- **An accepted ADR is mutated in place while no code depends on it**, when its reasoning stops holding — not superseded. Say what changed and why in the commit; the decision is still the operator's.
-- **An ADR records a decision, not a history.** A decision that stops being relevant is dropped; one that is replaced is superseded and marked.
-- **[OPEN §x] means undecided.** Do not implement against an open section, and do not resolve one silently. Raise it, or use `AskUserQuestion`.
-- **Ask over assume.** The operator co-authors design decisions.
-- **Never pivot requirements to fix an issue.** If something is stuck, stop and say so.
-- **Complete means done to the fullness of the spec.** Report what was skipped and why.
-- **Decisions live where they are owned.** Structure in `ARCHITECTURE.md`, terms in `GLOSSARY.md`, reasoning in a short MADR ADR written when the decision is made, open questions in `DESIGN_OPTIONS.md`, verified platform facts in `docs/research/` with their date.
-- **Design documents stop above the detail.** Exact signatures, schemas, and thresholds are settled in a capability's proposal; sketches illustrate shape.
-
-## Spec-driven development
-
-**OpenSpec is for behavior, not for everything non-trivial.** A change that adds, alters or removes a behavior a consumer or another layer can observe goes through it: proposal → specs → design → tasks, then verification. Behavior contracts go in `openspec/specs/` and in-flight work in `openspec/changes/`; both are created by the first such change.
-
-**Scaffolding and tooling do not.** A workspace layout, a build target, a lint configuration, a dependency bump, a docs or ADR edit — none has a behavior contract to write, and a proposal for one is ceremony that produces a spec nobody can verify. Do the work, and say what was done in the commit. Milestone **A0 is scaffolding and is explicitly outside OpenSpec**; A1 is where the first behavior lands, and therefore where `openspec/specs/` begins.
-
-Rules in [`openspec/config.yaml`](openspec/config.yaml) and `.claude/rules/openspec.md`. OpenSpec artifacts are `docs` scope in Conventional Commits.
+- **A new ADR is written `proposed`**; the operator accepts it.
+- **Until a consumer depends on it, an accepted ADR is mutated in place** when its reasoning stops holding; after that, a replaced decision is superseded. Say what changed in the commit. The decision is the operator's.
+- **Open questions live in `DESIGN_OPTIONS.md`.** Don't build against one or resolve one silently — raise it.
+- **Ask over assume** on significant decisions; **never pivot a requirement to fix an issue** — if stuck, stop and say so.
+- **Complete means done to the spec.** Report what was skipped and why.
+- **Decisions live where they are owned**: structure in ARCHITECTURE, terms in GLOSSARY, reasoning in a short ADR, platform facts in `docs/research/` with their date.
+- **OpenSpec** (`openspec/`, `.claude/rules/openspec.md`) is available for a behaviour change large enough to want a proposal; A0 and A1 were built without it at the operator's choice. Behaviour is specified by ARCHITECTURE.md and the tests.
 
 ## Related codebases
 
-- **TrendBot's predecessor harness**, in `~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`, runs TrendBot today. Evidence of what hurt, never a specification ([lineage](docs/lineage/predecessor-harness.md)). Port with review; never copy its shape. TrendBot's own drafts are rough; do not take them as fact.
-- **`a2a-claude`, `claude-a2a` and `temporal-agent-harness`** wrap an agent SDK behind a protocol boundary. None is a dependency or a model; [`docs/research/harness-references.md`](docs/research/harness-references.md) records the mechanics worth borrowing from each, and why each differs.
-- **`@aws/nx-plugin`** is the convention AgentForge's own plugin follows; its `ts#agent` generator is built for Strands and is a reference, not a base ([ADR 0010](adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
-- **This workspace's April 2026 packages, research and OpenSpec changes** are gone from the tree; git history keeps them.
+- **TrendBot's predecessor harness** (`~/workspace/PlayTek/trendbot-monorepo/packages/agentforge`) runs TrendBot today — evidence of what hurt, never a specification ([lineage](docs/lineage/predecessor-harness.md)).
+- **`a2a-claude`, `claude-a2a`, `temporal-agent-harness`** — references, not dependencies ([notes](docs/research/harness-references.md)).
+- **`@aws/nx-plugin`** — the conventions AgentForge follows ([ADR 0010](adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).

@@ -26,7 +26,7 @@ Chosen option: **oRPC, contract-first**. A consumer declares one contract; a uti
 * **A caller's per-call values are the client context, not any procedure's input** — `runtimeSessionId` on every call, `idempotencyKey` on `SendMessage` alone, enforced by the client type AgentForge vends
 * **Cross-cutting behaviour is middleware that contributes to a typed context.** A house helper resolves something and adds it; every later middleware and the handler see it typed, without the procedure declaring it. This is what the hand-built literal could not offer
 * **Composite contributions stay additive** — hooks, MCP servers and denied tools concatenate, and replacing rather than adding is explicit at the call site, so no guardrail is lost to ordering
-* **A procedure never names its transport.** The same declaration runs in-process and over a custom link
+* **A procedure never names its transport.** The implementation is called in-process in the task process through oRPC's `call`; the client derives its calls from the contract and speaks A2A itself, so no oRPC link or HTTP handler is involved
 
 ## Consequences
 

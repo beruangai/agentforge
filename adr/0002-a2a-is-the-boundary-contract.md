@@ -25,7 +25,7 @@ Chosen option: **A2A**, because the task lifecycle it standardizes — submit, w
 * AgentForge still owns what A2A leaves open: durable state outside the microVM, the lease and loss, idempotency by a caller-supplied key ([ADR 0009](0009-the-caller-supplies-the-idempotency-key.md)), and the typed failure cause, which rides in a failed task's artifact
 * **The SDK's request handler is wrapped, not used as-is.** It mints the task id and creates the event bus before the executor is reached, so attaching a retry to a running task, refusing an unknown contract hash, and admission control all have to happen in front of it
 * The agent card is generated from the procedures a runtime serves; agent-to-agent discovery is not used, and costs nothing if it ever is
-* What holds against the real platform is settled by spike (`docs/DESIGN_OPTIONS.md` §B, §I)
+* What holds against the real platform is settled by spike (`docs/research/agentcore-runtime-observed.md`, and the tests in `integ/aws/agentcore/`)
 
 ### Consequences
 

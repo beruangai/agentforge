@@ -18,17 +18,16 @@ A microVM is ephemeral: it dies mid-run, it is replaced, and it is torn down aft
 
 ## Decision Outcome
 
-Chosen option: **a durable store outside the microVM, which is the A2A task store**, because the caller then reads state through the same contract it started the task with, and an outcome outlives every part of the system that produced it.
+Chosen option: **DynamoDB, behind A2A's `TaskStore`**, because the caller then reads state through the same contract it started the task with, and an outcome outlives every part of the system that produced it.
 
-* **Writes are fenced, not merely serialized.** A2A's `TaskStore.save` overwrites unconditionally, so the store implementation carries the lease generation in the task's metadata and rejects a write from a stale holder — otherwise a container deriving `lost` and the original writing `succeeded` are two unordered writes and the later one wins
-* The task process is not *given* store credentials, and a caller has none (§REQ708); a child in the same microVM can still reach the execution role, so integrity rests on the microVM boundary
-* Beyond A2A's own fields it keeps: the index by idempotency key that makes attaching possible ([ADR 0009](0009-the-caller-supplies-the-idempotency-key.md)), a **lease** the executor renews while the task process lives, the container instance, the attempt, and the outcome payload
-* **Loss is derived at read time**: an unfinished task with a stale lease is lost. Nothing sweeps, so detection latency is the caller's poll interval, which is what a caller sizes its heartbeat against
-* An outcome over 256 KB fails the task rather than being offloaded, so the outcome lives in the task's own item (`docs/ARCHITECTURE.md` §4)
-* DynamoDB holds it, with seven days' retention; the item shape is `docs/DESIGN_OPTIONS.md` §A
+* One table: a task item (the A2A task, its state, a lease) and an idempotency-key item pointing at the latest attempt ([ADR 0009](0009-the-caller-supplies-the-idempotency-key.md)). Both expire after seven days
+* **A terminal state is never replaced by a different one** — the write is conditional. That is the whole fencing: a loss derived by a reader and a late real outcome cannot both win, and whichever lands first stands
+* **Loss is derived when read**: a live task whose 60-second lease has lapsed is written `LOST`. Nothing sweeps, so detection is bounded by the caller's poll interval plus the lease. The lease is long because a false `LOST` sends a consumer reconciling for nothing; a container stopped by the platform is killed within ~10 s, so a lost task is found within about a minute
+* An outcome over 256 KB fails the task rather than being offloaded, so it always fits the task's item
+* A caller has no store credentials; it reads through A2A (§REQ708). A task process could reach the execution role — integrity rests on the microVM boundary
 
 ### Consequences
 
-* Good, because a caller's redeploy, a container kill, and an idle teardown all stop being data-loss events (§REQ302, §REQ303)
-* Good, because idempotency and loss detection have one home rather than being spread across consumers
-* Bad, because AgentForge now owns a stateful component, its schema, its retention, and its failure modes
+* Good, because a caller's redeploy, a container kill and an idle teardown stop being data-loss events (§REQ302, §REQ303)
+* Good, because idempotency and loss detection have one home
+* Bad, because AgentForge owns a stateful component and its retention

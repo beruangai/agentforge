@@ -4,34 +4,31 @@ date: 2026-09-19
 decision-makers: Jeremy Jonas
 ---
 
-# A process per task, speaking JSON-RPC over a pipe
+# A process per task, over Node IPC
 
 ## Context and Problem Statement
 
-AgentCore decides whether a session is alive from `/ping`, and a blocked `/ping` gets a busy session terminated — synchronous git spawns, backoff sleeps, and per-message logging once stalled it for seconds. Several tasks may run in one container at once, each with its own Claude CLI, shells, and MCP servers, and a cancelled task must leave nothing behind. Where does a task run relative to the server, and how do the two communicate?
+AgentCore decides whether a session is alive from `/ping`, and a blocked `/ping` gets a busy session terminated — synchronous git spawns, backoff sleeps, and per-message logging once stalled it for seconds. Several tasks may run in one container at once, each with its own Claude CLI, shells and MCP servers, and a cancelled task must leave nothing behind. Where does a task run relative to the server, and how do the two talk?
 
 ## Considered Options
 
-* **In the server's process** — least plumbing; relies on nothing in consumer code, middleware, or a tool ever blocking the event loop
-* **A long-lived inner server** — a port, a readiness gate, a proxy, error tunnelling, and detecting a server that is alive but frozen
-* **A process per task**, with the server spawning it
+* **In the server's process** — least plumbing; relies on nothing in consumer code, middleware or a tool ever blocking the event loop
+* **A long-lived inner server** — a port, a readiness gate, a proxy, and detecting a server that is alive but frozen
+* **A process per task**, spawned by the server
 
-For the communication, given a process per task: **a JSON-RPC 2.0 stream over a dedicated pipe**, **the runtime's IPC channel**, or **files on disk**.
+For the channel, given a process per task: **JSON-RPC over a dedicated pipe on fd 3**, **the runtime's IPC channel**, or **files on disk**.
 
 ## Decision Outcome
 
-Chosen option: **a process per task, speaking JSON-RPC 2.0 over a dedicated pipe** — one message per line.
+Chosen option: **a process per task, over the runtime's IPC channel** (`stdio: [..., 'ipc']`, `serialization: 'json'`), in its own process group.
 
-* The process group is the unit of cancellation: `SIGTERM` for a graceful stop that flushes telemetry and records an outcome, then `SIGKILL` to the group, so no subprocess outlives its task. A cancel that arrives before the process exists is caught by a token set before the executor's first `await`
-* The stream opens with a **protocol version** both sides must accept. The executor and the harness come from one package version ([ADR 0008](0008-code-ships-in-the-image.md)), so a mismatch means something is badly wrong — and it is refused before any work rather than surfacing as a decode error mid-task
-* `run` and `cancel` go in; semantic status and artifact events and exactly one outcome come out, which the executor maps to A2A; the exit code is the backstop, and a process that exits without an outcome is recorded as failed with its stderr tail
-* A dedicated pipe rather than stdout, because a stray `console.log` from consumer code or a library would otherwise corrupt the protocol; stdout and stderr stay logs
-* JSON-RPC rather than an ad-hoc frame or a runtime-specific IPC channel, because it is already the vocabulary at the outer boundary, it is trivially faked in tests, and it leaves a task process implementable in another language
-* Each task loads its procedures at its start, from the image the container was deployed with
-* The executor never knows what the process runs — Claude, or plain consumer code. That is what keeps the SDK out of the transport layer
+* In: `run` with the invocation, `cancel`. Out: a `record` per agent run, then exactly one `outcome`. A process that exits without an outcome failed, with the tail of its stderr
+* The process group is the unit of cancellation: `cancel`, a grace, then `SIGKILL` to the group, so nothing a task started outlives it
+* IPC rather than a hand-rolled pipe protocol: Bun and Node both provide it, it is already separate from stdout — a stray `console.log` cannot corrupt it — and it needs no framing, parsing or versioning of AgentForge's own. The executor and the task process come from one package version ([ADR 0008](0008-code-ships-in-the-image.md)), so the messages carry no protocol version
+* The executor runs a command it is configured with and never knows what it runs; the consumer's task entry is where a harness meets its procedures
 
 ### Consequences
 
 * Good, because nothing a task does can stall `/ping`, and a task's leaks, subprocesses and crashes end with it
-* Good, because the boundary is inspectable: a transcript of the pipe is the whole interaction
-* Bad, because every task pays process start and module load, and the outcome must be serializable
+* Good, because the channel is the platform's, not code AgentForge maintains
+* Bad, because every task pays process start and module load (~65 ms measured), and the task process must be a Bun or Node process

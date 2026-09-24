@@ -1,127 +1,91 @@
 # Glossary
 
-Canonical terms. **Borrow before inventing, and never shorten**: the Claude Agent SDK's, AgentCore's, or A2A's term first, verbatim — if a call gets a task and the protocol calls that `GetTask`, it is `GetTask` — then a term here with the same intent, and only then a new one. Clarity and specificity over brevity. A term names a thing or a state, not a command. No consumer's vocabulary enters — a StrategyFoundry *directive* and a TrendBot *directive* are both a **procedure**; a *vault* is a working directory.
+**Borrow before inventing, and never shorten**: the Claude Agent SDK's, AgentCore's or A2A's term first, verbatim — the protocol calls it `GetTask`, so it is `GetTask` — then a term here, and only then a new one. No consumer's vocabulary: a *directive* is a **procedure**, a *vault* is a **working directory**.
 
-## Layers
+## Layers and parts
 
-**Runtime** — Layer 1: the wire, the gateway, the executor, task state, and the client. Distinct from a **runtime session** and from a deployed **agent**.
+**Runtime** — Layer 1: the server, gateway, executor, task store and client. Distinct from a **runtime session** and a deployed **agent**.
 
-**Harness** — Layer 2: procedures, the agent run, the outcome. Knows nothing of the wire or the container.
+**Harness** — Layer 2: running a procedure through the kernel to an outcome.
 
-**Caller** — Whatever starts a task through the client. A Temporal activity in both consumers, through the activity factory, but the runtime never knows that.
+**Caller** — Whatever starts a task through the client; a Temporal activity in both consumers.
 
-**Client** — The caller-agnostic API over the wire: **`SendMessage`** and **`GetTask`** per procedure, **`CancelTask`** at the root, plus an `await` helper that polls `GetTask` to a terminal state. Built on an oRPC client over a link that speaks A2A, so it is typed from the imported contract and nothing else.
+**Client** — `createClient(contract, transport)`: `SendMessage` and `GetTask` per procedure, `CancelTask` at the root, typed by the contract the caller imports. **`awaitTask`** polls `GetTask` to a terminal state.
 
-**Task handle** — What `SendMessage` returns: `taskId`, `contextId` and `TASK_STATE_SUBMITTED`. The same shape for every procedure, and what `GetTask` and `CancelTask` are called with.
+**Transport** — How the client reaches a server: `localTransport(url)` for a container, `agentCoreTransport({ agentRuntimeArn })` for AgentCore.
 
-**Activity factory** — The Temporal adapter over the client: heartbeats while awaiting, and maps cancellation and outcomes to activity terms. First-class, never required.
+**Gateway** — The server's request handler in front of the A2A SDK's: session header, idempotency, attempts, admission, continuity.
+
+**Executor** — Spawns and supervises task processes: the lease, the time budget, cancellation, the process-group kill.
+
+**Task process** — The child process running one task: the consumer's **task entry**, calling `runTaskProcess`.
+
+**Kernel** — `context.runAgent`: one SDK `query()` to a settled, typed outcome.
 
 ## Procedures
 
-**Procedure** — What a consumer declares and AgentForge runs: a contract and an implementation. One contract derives `SendMessage` and `GetTask`, because invocation is asynchronous.
+**Procedure** — A contract and its implementation.
 
-**Contract** — A procedure's name, outer input and output schemas, and hash. An oRPC contract over Zod, so a caller imports it without the implementation. One declaration derives the typed `SendMessage` and `GetTask` calls. The single source of truth every seam is typed by, and with the task protocol the only thing layers 1 and 2 share.
+**Contract** — An oRPC procedure contract over Zod: the outer input and output, and meta such as `timeBudget`. What a caller imports.
 
-**Implementation** — What runs in the container: an optional *before* step, a required *run* step, an optional *after* step.
+**Contract hash** — A hash of a contract's input and output JSON Schema; a container refuses a task whose hash it does not implement.
 
-**Contract hash** — Identifies the contract a task was started against; a container whose image does not implement it refuses the task.
+**Implementation** — The oRPC handler registered through `implementAgent(contract)`. Ordinary code around one or more agent runs.
 
-**Outer contract** — What a procedure's caller sends and receives.
+**Agent contract** — The Zod schema given to `runAgent` as `output`: what the model fills in. The handler builds the outer output from it.
 
-**Agent contract** — What the agent fills in, given to the SDK as its output schema. Often differs from the outer output; an ordinary function maps one to the other.
+**Agent run** — One `context.runAgent({ prompt, output, options })`, recorded as a **run record**.
 
-**`SendMessage` / `GetTask`** — The two oRPC procedures derived from one contract, named as A2A names them. `SendMessage` takes the declared input and returns a task handle; `GetTask` takes a task id and returns a discriminated union on the task's state, so the declared output is reachable only on the `TASK_STATE_COMPLETED` branch.
+**Task context** — What a handler receives beside its input: the ids, the attempt and prior attempt, metadata, the cancellation signal, `runAgent`.
 
-**`CancelTask`** — One root-level procedure, not derived per contract: a task id in, a state out, identically whatever the task was running.
-
-**Client context** — oRPC's term, kept: what a **caller** supplies beside a call's input, and no procedure declares — `runtimeSessionId` on every call, `idempotencyKey` on `SendMessage` alone. Enforced by the client type AgentForge vends. Distinct from the **execution context**, which is the container's side.
-
-**Middleware** — A function wrapping a procedure that may contribute to the **execution context**. What it adds is typed for every later middleware and for the handler, without the procedure declaring it.
-
-**Execution context** — The accumulated, typed values a procedure's handler receives beyond its input, inside the **container**: the caller, the attempt, the lease, and whatever middleware has added. Distinct from the **client context**, which is what the caller supplies from outside.
-
-**Step** — One part of an implementation: before, run, after. A function, not a framework phase.
-
-**Agent run** — A run step written with the `agent()` helper: the prompt, SDK options, agent contract, and the map to outer output.
-
-**Kernel** — What that helper runs: one SDK query to a settled, validated, typed outcome.
-
-**Prompt** — What a session starts from: the SDK's term for the ordered content the procedure composes.
-
-**Helper** — A reusable function a procedure calls — guardrails, telemetry. Optional; nothing is wired by default. Contributions to a composite option are additive.
+**Time budget** — How long a task may run; declared with `timeBudget(seconds)` in the contract's meta, overridable per call, enforced by the executor.
 
 ## Tasks
 
-**Task** — One attempt at one procedure, ending in one outcome. An A2A task on the wire; an asynchronous job to AgentCore, which `/ping` reports as busy.
+**Task** — One attempt at one procedure, ending in one outcome. An A2A task.
 
-**Envelope** — What starts a task, carried as an A2A data part: procedure name, contract hash, outer input, idempotency key, identifiers, correlation ids, and the `metadata` and `tags` every record carries.
+**Envelope** — The data part that starts a task: procedure, contract hash, input, idempotency key, and optionally the continuity key, time budget, metadata and tags.
 
-**Task state** — A2A's own, verbatim: `TASK_STATE_SUBMITTED`, `TASK_STATE_WORKING`, `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, `TASK_STATE_CANCELED`, `TASK_STATE_REJECTED`, and `TASK_STATE_INPUT_REQUIRED` reserved for a pause. AgentForge adds no state of its own.
+**Task state** — A2A's, verbatim: `TASK_STATE_SUBMITTED`, `_WORKING`, `_COMPLETED`, `_FAILED`, `_CANCELED`, `_REJECTED`.
 
-**Metadata and tags** — Free-form fields on every record, propagated from the envelope, for what is worth tracking and never load-bearing. Anything a decision rests on is a typed field instead.
+**Outcome** — How a task ended: the output, a **cause**, cancelled, or rejected with a reason. Carried as the artifact `outcome`.
 
-**Idempotency key** — Supplied by the caller and stable across its retries; the store indexes tasks by it, so starting again with it attaches rather than runs again ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
+**Cause** — `{ code, message, retryable, retryAfter?, payload? }` on a failed task. Codes are `SCREAMING_SNAKE_CASE`: `OUTPUT_INVALID`, `OUTPUT_TOO_LARGE`, `BUDGET_EXHAUSTED`, `TIMED_OUT`, `LOST`, `USAGE_LIMITED`, `CREDENTIAL_EXPIRED`, `PROVIDER_TRANSIENT`, `EXECUTION_ERROR`.
 
-**Continuity key** — An opaque value in the envelope under which only one task may be live at a time. A consumer sets it to whatever must not be written twice at once, usually the Claude session id; layer 1 never interprets it.
+**Idempotency key** — The caller's name for one logical execution; a start with it attaches to its live or completed task ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
 
-**Attempt** — One task under an idempotency key. A new attempt starts only after the previous task failed, was cancelled, or was lost.
+**Attempt** — One task under an idempotency key. A new one starts only once the last failed, was cancelled or was lost, and it is told how.
 
-**Retention** — How long task state is kept for a later start with the same idempotency key to attach to.
+**Continuity key** — Optional and opaque: at most one live task under it per container.
 
-**Gateway** — The runtime server's request handler, in front of the A2A SDK's: validates the envelope, applies idempotency, admission and the contract-hash check, and either returns a running task or admits a new one.
+**Admission limit** — The most tasks a container runs at once; beyond it a start is rejected, never queued.
 
-**Executor** — What spawns and supervises a task process, renews the lease, and publishes events and the outcome. Agnostic of what the task runs.
-
-**Task process** — The process spawned for one task, in its own process group, where the consumer's entrypoint runs the procedure through the harness.
-
-**Task protocol** — The contract between executor and task process: the envelope, events, and the outcome. Shared by layers 1 and 2, with the procedure contract; Zod.
-
-**Task store** — Durable state outside the microVM: A2A's task store, extended with the idempotency index, the lease, and the outcome payload.
-
-**Lease** — A timestamp the executor renews while a task process lives. Stale on an unfinished task means the task is lost.
-
-**Fencing token** — The lease generation, carried in the task's metadata, that a store write must match; it keeps a stale holder from overwriting a newer one.
-
-**Admission limit** — The most tasks an agent runs at once in one container. A task beyond it is rejected, never queued.
-
-**Outcome** — How a task ended: `TASK_STATE_COMPLETED` with the outer output, `TASK_STATE_CANCELED`, or `TASK_STATE_FAILED` carrying its typed **cause** — `OUTPUT_INVALID`, `TIMED_OUT`, `LOST` and the rest (`ARCHITECTURE.md` §4). Cause values are `SCREAMING_SNAKE_CASE`.
-
-**`LOST`** — The cause on a failed task whose container died, derived at read time from a stale lease or a container id that is not the reader's. Its side effects may have happened.
-
-## Agents and delivery
-
-**Agent** (deployed) — One AgentCore runtime: an image extending an agentic base image, the procedures it contains, its card and its stores. The deployable unit, and the strongest isolation available. Where "the agent" means the Claude agent inside a run, the context says so.
-
-**Agentic project** — One Nx project holding an agentic base image and the agents that extend it, each deployed as its own runtime ([ADR 0010](../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)).
-
-**Agentic base image** — A consumer's image layer over AgentForge's base, named for the project that vends it (`{consumer}/{project}`): the skills, tools, MCP servers, prompt foundation, language runtimes and memory a group of agents share. An agent's image extends one ([ADR 0008](../adr/0008-code-ships-in-the-image.md)).
-
-**Agent card** — The A2A discovery document, generated at build time from the procedures an image contains, and served from the image.
-
-**Base image** — What AgentForge ships for consumers to extend, `agentforge/a2a-claude`: Bun, the Claude CLI, and one bundled server. It carries nothing the server does not need, so a change elsewhere in AgentForge does not produce a new one.
-
-**Entry point** — One of the package's exports, scoped to where it may be loaded: `/contract`, `/client`, `/temporal`, `/agent`, `/infra`. AgentForge publishes one package with these, never a family of packages. `/agent` resolves only under the `agentforge-agent` export condition, which an agent build sets and nothing else does. The server is not among them: it is bundled by AgentForge's own build and ships in the base image.
+**Lease** — A time the executor keeps pushing forward while a task process lives. Lapsed on an unfinished task, the task is **`LOST`** — derived when read; its side effects may have happened.
 
 ## Identity
 
-**Runtime session** — AgentCore's `runtimeSessionId`: one microVM with its own compute, memory and filesystem. At most one container at a time per id.
+**Runtime session** — AgentCore's `runtimeSessionId`: one microVM, one container at a time. Required on every call.
 
-**Context** — A2A's `contextId`: a conversation, as a group of related tasks. Always supplied by the client, uuid7 when the caller gives none; the consumer chooses what it groups. Never the idempotency key.
+**Context** — A2A's `contextId`: a conversation of tasks.
 
-**Session** — The Claude Agent SDK's: one transcript, started, resumed or forked by id. One live writer at a time.
+**Session** — The Agent SDK's: one transcript, started or resumed by id.
 
-**`cwd`** — The Claude Agent SDK's working directory, and the **capability root**: which `.claude/` layers compose into a session, and therefore what the agent *is*. Set per procedure; never the data directory.
+**`cwd`** — The SDK's working directory, and the capability root: which `.claude/` layers apply.
 
-**Working directory** — Where a run's files live, reached through additional directories with explicit permissions. It persists by syncing to an object store rather than by being mounted ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)), and it carries no nested `.claude/`. Distinct from **`cwd`**, and it does not scope the transcript — the project key does.
+**Working directory** — Where a run's files live. Persisting it across containers is open (DESIGN_OPTIONS §F).
 
-**Project key** — What scopes a session's transcript in the store, in two parts: an AgentForge prefix, `{consumer}_{agenticProject}_{agent}_`, and a final part **the procedure supplies**. Carried in `CLAUDE_CODE_PROJECT_DIR_NAME`, whose alphabet it must fit. Never inferred from a directory: two procedures of one agent that should share a transcript scope say so by supplying the same final part.
+## Delivery
 
-**Sync strategy** — What a consumer declares about a working directory's persistence: which phases run (**down** before the run, **up** during and at the close — never both at once), delete propagation, cadence, exclusions. Declared per agent, overridable per procedure; AgentForge runs it and guarantees the flush before an outcome.
+**Base image** — `agentforge/a2a-claude`, built from the package's `Dockerfile`: Bun, what the Claude CLI needs, a non-root user.
 
-How these relate is the consumer's choice ([ADR 0007](../adr/0007-identity-is-the-consumers.md)).
+**Agent** (deployed) — One AgentCore runtime serving one image. Where "the agent" means the Claude agent inside a run, the context says so.
+
+**Entry point** — One of the package's exports: `/contract`, `/client`, `/temporal`, `/agent`, `/server`, `/infra`. `/agent` and `/server` resolve only under the `agentforge-agent` condition.
+
+**Example** — An agent in `examples/`, built and verified exactly as a consumer's would be. AgentForge's dogfood.
 
 ## Consumers
 
-**Consumer** — A project that declares procedures and states requirements AgentForge must meet: StrategyFoundry, TrendBot.
+**Consumer** — StrategyFoundry or TrendBot.
 
-**Requirement** — One numbered behavior AgentForge answers to, in [`REQUIREMENTS.md`](REQUIREMENTS.md). Referenced as `§REQ304`: blocked by category a hundred at a time, permanent, never reused. Distinct from an **ADR**, which records why a decision went a particular way, and from a **`DESIGN_OPTIONS.md` section** (`§F`), which is a question still open.
+**Requirement** — A numbered behavior in [REQUIREMENTS.md](REQUIREMENTS.md), cited as `§REQ304`. Distinct from an ADR, which records why, and a DESIGN_OPTIONS section (`§F`), which is still open.

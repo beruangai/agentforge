@@ -18,13 +18,12 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 
 - Declaring procedures: contracts, marshalling, prompt composition, SDK configuration, side effects before and after the run
 - Running a procedure to a settled, validated, typed outcome, with structured input and output throughout
-- Optional helpers for concerns more than one consumer shares
 - Asynchronous invocation by any caller: starting a task, waiting on it, attaching to one already running on a retry, cancelling it — with a Temporal activity factory over it, first-class but not required
 - A2A as the contract between the caller and the runtime
 - Task state that outlives the container: idempotency, loss detection, the outcome
 - Hosting on Bedrock AgentCore Runtime, and the same path locally in Docker
 - A base image consumers extend, layered into their own package and agent images, so a change deploys only what contains it
-- Delivery as an Nx plugin on `@aws/nx-plugin` conventions: generators for an agentic project, an agentic base image, an agent, a procedure and a caller's wiring, a sync generator that keeps a consumer current as AgentForge changes, CDK constructs for an agent with its stores and least-privilege access, and a deploy path that updates only what changed
+- Delivery on `@aws/nx-plugin` conventions: CDK constructs for an agent with its stores and least-privilege access, a deploy path that updates only what changed, and — once the examples show what to generate — generators and a sync generator
 - Recording what each task saw, did and produced
 
 ## Out of scope

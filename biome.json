@@ -89,7 +89,7 @@
                       "aws-cdk-lib",
                       "aws-cdk-lib/**"
                     ],
-                    "message": "core is shared by every seam and imports none of them, and never a platform SDK (ARCHITECTURE.md \u00a71, \u00a710)."
+                    "message": "core is shared by every seam and imports none of them, and never a platform SDK (ARCHITECTURE.md \u00a71, \u00a78)."
                   }
                 ]
               }
@@ -156,7 +156,7 @@
                       "**/infra/**",
                       "@anthropic-ai/claude-agent-sdk"
                     ],
-                    "message": "The client runs in a caller and must never reach the container's code or the Agent SDK (ARCHITECTURE.md \u00a710)."
+                    "message": "The client runs in a caller and must never reach the container's code or the Agent SDK (ARCHITECTURE.md \u00a78)."
                   }
                 ]
               }
@@ -180,7 +180,7 @@
                       "**/client/**",
                       "@anthropic-ai/claude-agent-sdk"
                     ],
-                    "message": "The constructs run in a CDK application and reach nothing that runs in the container or a caller (ARCHITECTURE.md \u00a710)."
+                    "message": "The constructs run in a CDK application and reach nothing that runs in the container or a caller (ARCHITECTURE.md \u00a78)."
                   }
                 ]
               }

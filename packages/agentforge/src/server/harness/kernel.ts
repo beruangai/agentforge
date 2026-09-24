@@ -57,7 +57,7 @@ const drainBoundMilliseconds = 30_000;
 const interruptGraceMilliseconds = 3_000;
 
 /**
- * One `query()` to a settled, typed outcome (ARCHITECTURE.md §7).
+ * One `query()` to a settled, typed outcome (ARCHITECTURE.md §6).
  *
  * Streaming input, so `interrupt()` is reachable; background work off, so a
  * finishing background task cannot publish a second answer; the first result

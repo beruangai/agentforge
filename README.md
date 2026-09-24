@@ -1,41 +1,98 @@
 # AgentForge
 
-A procedure wrapper for the Claude Agent SDK, shared across projects.
+Run a Claude Agent SDK procedure as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — and call it from anything, Temporal included.
 
-A consumer declares a **procedure** — its public contract, the agent's own contract and how one becomes the other, the prompt the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** over A2A, on Bedrock AgentCore Runtime or locally in Docker, and returns a typed, validated outcome. Consumers own what their agents do and how they isolate them; AgentForge owns how they run.
+Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1 delivered — the whole path runs locally against a real model on the [example agent](examples/hello-agent). A2 (AgentCore deploy) is next ([roadmap](docs/ROADMAP.md)).
 
-It is delivered as an Nx plugin: generators, CDK constructs, a base image, and a caller-agnostic client with a Temporal activity factory over it.
+## Define, implement, consume
 
-**Status:** design settled, no implementation yet. The [ADRs](adr/README.md) are accepted — the first eleven on 2026-09-21, the rest as they were decided. Until code exists an accepted ADR is mutated in place rather than superseded, because there is nothing built on it to migrate. What remains open is in [docs/DESIGN_OPTIONS.md](docs/DESIGN_OPTIONS.md), each question with the spike that closes it.
+**1. Define a contract** — what callers import. Plain oRPC and Zod; no Agent SDK.
 
-Built for its consumers, StrategyFoundry and TrendBot, not for public use.
+```ts
+// contract.ts
+import { timeBudget } from '@beruangai/agentforge/contract';
+import { oc } from '@orpc/contract';
+
+export const helloAgent = {
+  summarise: oc
+    .input(z.object({ text: z.string(), resumeSessionId: z.string().optional() }))
+    .output(z.object({ summary: z.string(), words: z.number(), sessionId: z.string() })),
+  sleepThenAnswer: oc.meta(timeBudget(300)).input(…).output(…),
+};
+```
+
+**2. Implement it** — a handler per procedure. `context.runAgent` is one Claude run with structured output; everything around it is ordinary code.
+
+```ts
+// procedures.ts
+import { implementAgent } from '@beruangai/agentforge/agent';
+
+const os = implementAgent(helloAgent);
+export const router = os.router({
+  summarise: os.summarise.handler(async ({ input, context }) => {
+    const run = await context.runAgent({
+      prompt: `Summarise the following text in one sentence.\n\n${input.text}`,
+      output: z.object({ summary: z.string() }),          // what the model fills in
+      options: { cwd: '/home/bun/work', maxTurns: 3, tools: [], resume: input.resumeSessionId },
+    });
+    return { summary: run.output.summary, words: countWords(run.output.summary), sessionId: run.sessionId };
+  }),
+  …
+});
+```
+
+**3. Package it** — two entries and a Dockerfile `FROM agentforge/a2a-claude`.
+
+```ts
+// task.ts — run by the server, once per task
+runTaskProcess({ contract: helloAgent, router });
+// server.ts
+await startServer();
+```
+
+**4. Consume it** — from any process, or as a Temporal activity.
+
+```ts
+const client = createClient(helloAgent, localTransport('http://localhost:9000/'));   // or agentCoreTransport({ agentRuntimeArn })
+const started = await client.summarise.SendMessage({ text }, { runtimeSessionId, idempotencyKey });
+const ended = await awaitTask(client.summarise, started, { runtimeSessionId });
+if (ended.state === 'TASK_STATE_COMPLETED') ended.output.summary;  // typed
+else if (ended.state === 'TASK_STATE_FAILED') ended.cause.code;    // OUTPUT_INVALID, TIMED_OUT, LOST, USAGE_LIMITED, …
+
+// In a Temporal worker: start-or-attach keyed by the workflow run and activity, heartbeats, cancellation, retry guidance
+export const summarise = procedureActivity(client.summarise, {
+  runtimeSessionId: (input) => sessionFor(input),
+  cancelTask: client.CancelTask,
+});
+```
+
+[`examples/hello-agent`](examples/hello-agent) is all of this, complete, with its e2e.
+
+## Work in this repository
+
+```bash
+bunx nx run-many -t typecheck lint test
+```
+
+```bash
+bunx nx run @beruangai/agentforge:integ --configuration=local
+```
+
+```bash
+bunx nx run @beruangai/example-hello-agent:e2e
+```
+
+The e2e builds both images and runs the agent in Docker against a real model; it reads `CLAUDE_CODE_OAUTH_TOKEN` from `.env.integ.local`.
 
 ## Read
 
-| Document | Holds |
+| | |
 |---|---|
-| [docs/SOLUTION_SPACE.md](docs/SOLUTION_SPACE.md) | The problem, what AgentForge is, and what is out of scope |
-| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | The register AgentForge answers to — its own, not a derivation of a consumer's |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The layers, the contract at each boundary, procedures, tasks, the runtime, the harness |
-| [docs/DESIGN_OPTIONS.md](docs/DESIGN_OPTIONS.md) | What is not decided, and the spikes that decide it |
-| [adr/](adr/README.md) | Why each significant decision went the way it did |
-| [docs/GLOSSARY.md](docs/GLOSSARY.md) | Canonical terms |
+| [docs/SOLUTION_SPACE.md](docs/SOLUTION_SPACE.md) | The problem, and what is in and out of scope |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it works: layers, procedures, tasks, the container, the kernel, the package |
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | What AgentForge answers to |
+| [docs/DESIGN_OPTIONS.md](docs/DESIGN_OPTIONS.md) | What is not decided |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones |
-| [docs/research/](docs/research/) | Verified facts about AgentCore, A2A, the Agent SDK and `@aws/nx-plugin` — re-read before relying on one |
-| [docs/lineage/](docs/lineage/) | TrendBot's predecessor harness: the failures it paid for, as evidence |
-
-## Shape
-
-```
-caller (a Temporal activity, or anything) ──A2A──► agent (gateway, executor, durable task state)
-                                                      └─ a process per task ──► harness ──► Claude Agent SDK
-```
-
-Four layers: **runtime** owns the wire and the task's execution host; **harness** owns procedures and the agent run; the **consumer** owns its procedures and its identifiers; the **SDK** owns the agent loop. Layers 1 and 2 never import each other, and only two crossings are protocols — the A2A wire, and the pipe to a task process.
-
-## Consumers
-
-- **StrategyFoundry** — `~/workspace/beruangai/StrategyFoundry`; adopts from day one
-- **TrendBot** — `~/workspace/PlayTek/trendbot-monorepo`; migrates off its predecessor harness once its requirements are met
-
-Their pre-adoption contract drafts are closed. What was settled from them is in [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md), which is now the contract.
+| [adr/](adr/README.md) | Why the significant decisions went the way they did |
+| [docs/GLOSSARY.md](docs/GLOSSARY.md) | Terms |
+| [docs/research/](docs/research/) | Dated, verified platform facts |
