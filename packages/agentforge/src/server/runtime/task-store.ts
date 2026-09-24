@@ -9,6 +9,7 @@ import {
   ResourceInUseException,
   UpdateItemCommand,
   UpdateTimeToLiveCommand,
+  waitUntilTableExists,
 } from '@aws-sdk/client-dynamodb';
 import {
   cause,
@@ -241,24 +242,23 @@ export async function createTaskTable(
   tableName: string,
 ): Promise<void> {
   try {
-    await createTable(client, tableName);
+    await client.send(
+      new CreateTableCommand({
+        TableName: tableName,
+        AttributeDefinitions: [{ AttributeName: 'pk', AttributeType: 'S' }],
+        KeySchema: [{ AttributeName: 'pk', KeyType: 'HASH' }],
+        BillingMode: 'PAY_PER_REQUEST',
+      }),
+    );
   } catch (error) {
+    // Already there: whoever created it owns its configuration.
     if (error instanceof ResourceInUseException) return;
     throw error;
   }
-}
-
-async function createTable(
-  client: DynamoDBClient,
-  tableName: string,
-): Promise<void> {
-  await client.send(
-    new CreateTableCommand({
-      TableName: tableName,
-      AttributeDefinitions: [{ AttributeName: 'pk', AttributeType: 'S' }],
-      KeySchema: [{ AttributeName: 'pk', KeyType: 'HASH' }],
-      BillingMode: 'PAY_PER_REQUEST',
-    }),
+  // TTL cannot be set on a table still CREATING.
+  await waitUntilTableExists(
+    { client, maxWaitTime: 120 },
+    { TableName: tableName },
   );
   await client.send(
     new UpdateTimeToLiveCommand({

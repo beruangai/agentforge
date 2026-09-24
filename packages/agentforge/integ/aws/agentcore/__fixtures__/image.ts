@@ -120,7 +120,7 @@ export async function buildAndPushFixtureImage(
  * fallback. cli-plugins, contexts and buildx are carried across, or buildx
  * disappears.
  */
-async function writeDockerConfigWithEcrCredentialHelper(
+export async function writeDockerConfigWithEcrCredentialHelper(
   dockerConfigDirectory: string,
   registry: string,
 ): Promise<void> {

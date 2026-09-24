@@ -21,6 +21,8 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 ## A2 — The same agent on AgentCore
 
+**Started 2026-09-25**: AgentForge's server runs on a V2 runtime in `us-east-2`, reached through `agentCoreTransport`, with task state in DynamoDB — a typed output and an attach, a cancel, and a `StopRuntimeSession` ending the task `LOST` with the retry running as attempt 2 (`integ/aws/agentcore/agentforge-runtime.test.ts`, no model).
+
 - The construct and deploy path (§D): runtime on V2, its role, the task table, the leaf image in ECR, a deploy that waits for `READY`
 - The uuid-after-restore spike (§H) and the admission default measured (§G)
 - `hello-agent`'s e2e against the deployed runtime through `agentCoreTransport`, including a container stop mid-task ending `LOST` and a retry attaching

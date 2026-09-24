@@ -95,6 +95,10 @@ export interface PreparedFixtureImage {
 export async function prepareFixtureImage(
   resources: AsyncDisposableStack,
   purpose: string,
+  buildImage: (
+    environment: AwsEnvironment,
+    repositoryUri: string,
+  ) => Promise<PushedImage> = buildAndPushFixtureImage,
 ): Promise<PreparedFixtureImage> {
   const environment = await resolveAwsEnvironment();
   await verifyAgentCoreAccess(resources, environment);
@@ -105,7 +109,7 @@ export async function prepareFixtureImage(
     clients,
     names.repositoryName,
   );
-  const image = await buildAndPushFixtureImage(environment, repositoryUri);
+  const image = await buildImage(environment, repositoryUri);
   return { environment, clients, names, image };
 }
 

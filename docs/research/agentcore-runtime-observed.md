@@ -269,3 +269,7 @@ So networking, credentials and the DynamoDB client all survive `SIGTERM`; nothin
 The first version polled DynamoDB **from a laptop** and reported "visibility ≈ 322 ms". That figure conflated four things — the write, DynamoDB's propagation, a **241 ms read RTT from outside AWS**, and a **333 ms apparent clock offset** between two unsynchronised clocks, itself of the same order as the invoke round trip and therefore mostly asymmetric latency rather than skew. None of it was a platform number.
 
 The measurement above uses **one clock and one network**: the container writes and reads back itself. The laptop figure is kept only as the contrast it is — **an external reader's own RTT dominates the lease mechanics by more than twenty times**, so where the reader runs matters far more than anything DynamoDB does.
+
+## AgentForge's own server on V2 — 2026-09-25
+
+`integ/aws/agentcore/agentforge-runtime.test.ts`, first run, all three passing: `agentCoreTransport` (SigV4 through `InvokeAgentRuntime`, `A2A-Version` allowlisted) reached AgentForge's server; a retry with the same idempotency key attached to the completed task; `CancelTask` reached the container running the task. After `StopRuntimeSession`, the next `GetTask` — served by a fresh container reading DynamoDB — answered `LOST` within about 12 s, recorded by the stopped container's own `SIGTERM` shutdown inside the ~10 s window rather than by the lease; the retry ran as attempt 2.
