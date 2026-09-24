@@ -52,13 +52,11 @@ export interface JsonRpcInvocationRequest {
   readonly runtimeSessionId: string;
   readonly method: string;
   readonly params: unknown;
-  /** Added before SigV4 signs, so they are signed and not dropped. */
-  readonly headers?: Readonly<Record<string, string>>;
   /**
-   * `application/json` unless given. `null` sends NO content type, as the AWS
-   * CLI does: the SDK would otherwise send `application/octet-stream`.
+   * Sends `A2A-Version: 1.0`, added before SigV4 signs so it is signed and not
+   * dropped. Without it a strict 1.0 container refuses the call (ADR 0014).
    */
-  readonly contentType?: string | null;
+  readonly a2aVersionHeader: boolean;
 }
 
 /**
@@ -76,14 +74,10 @@ export async function invokeJsonRpc(
   client: BedrockAgentCoreClient,
   request: JsonRpcInvocationRequest,
 ): Promise<Invocation> {
-  const contentType =
-    request.contentType === undefined
-      ? 'application/json'
-      : request.contentType;
   const command = new InvokeAgentRuntimeCommand({
     agentRuntimeArn: request.agentRuntimeArn,
     runtimeSessionId: request.runtimeSessionId,
-    contentType: contentType ?? undefined,
+    contentType: 'application/json',
     accept: 'application/json',
     payload: Buffer.from(
       JSON.stringify({
@@ -94,27 +88,21 @@ export async function invokeJsonRpc(
       }),
     ),
   });
-  const extraHeaders = request.headers ?? {};
-  command.middlewareStack.add(
-    (next) => async (args) => {
-      const httpRequest: unknown = args.request;
-      if (!hasHeaders(httpRequest)) {
-        throw new Error(
-          'the build step carried no HTTP request to add headers to',
-        );
-      }
-      Object.assign(httpRequest.headers, extraHeaders);
-      if (contentType === null) {
-        for (const name of Object.keys(httpRequest.headers)) {
-          if (name.toLowerCase() === 'content-type') {
-            delete httpRequest.headers[name];
-          }
+  if (request.a2aVersionHeader) {
+    command.middlewareStack.add(
+      (next) => async (args) => {
+        const httpRequest: unknown = args.request;
+        if (!hasHeaders(httpRequest)) {
+          throw new Error(
+            'the build step carried no HTTP request to add A2A-Version to',
+          );
         }
-      }
-      return next(args);
-    },
-    { step: 'build', name: 'agentforgeIntegRequestHeaders' },
-  );
+        httpRequest.headers['A2A-Version'] = '1.0';
+        return next(args);
+      },
+      { step: 'build', name: 'agentforgeIntegA2aVersionHeader' },
+    );
+  }
 
   const startedAt = Date.now();
   try {
@@ -216,7 +204,7 @@ export class A2aOverAgentCore {
       runtimeSessionId,
       method,
       params,
-      headers: { 'A2A-Version': '1.0' },
+      a2aVersionHeader: true,
     });
   }
 

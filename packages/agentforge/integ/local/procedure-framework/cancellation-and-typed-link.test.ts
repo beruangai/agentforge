@@ -8,14 +8,8 @@
  * the separate `CancelTask` invocation. Accepting a signal and dropping it
  * would be a silent failure.
  */
-import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createCancellableClient } from './__fixtures__/cancellation-and-typed-link.ts';
-import {
-  type TypecheckResult,
-  typecheck,
-  UNUSED_TS_EXPECT_ERROR_DIRECTIVE,
-} from './__fixtures__/typecheck.ts';
 
 describe('client context through a typed link', () => {
   it('hands the link the caller’s idempotency key beside the input', async () => {
@@ -23,16 +17,19 @@ describe('client context through a typed link', () => {
 
     const handle = await client.SendMessage(
       { strategyId: 'alpha' },
-      { context: { idempotencyKey: 'idem-7' } },
+      { context: { idempotencyKey: 'idempotency-key-strategy-alpha' } },
     );
 
     expect(handle).toStrictEqual({
       taskId: 'task-alpha',
       contextId: 'context-alpha',
-      state: 'SUBMITTED',
+      state: 'TASK_STATE_SUBMITTED',
     });
     expect(seenByLink).toMatchObject([
-      { path: ['SendMessage'], idempotencyKey: 'idem-7' },
+      {
+        path: ['SendMessage'],
+        idempotencyKey: 'idempotency-key-strategy-alpha',
+      },
     ]);
   });
 });
@@ -46,7 +43,10 @@ describe('cancellation', () => {
     const started = performance.now();
     const outcome = await client.RunForMilliseconds(
       { milliseconds: 5_000 },
-      { context: { idempotencyKey: 'idem-8' }, signal: caller.signal },
+      {
+        context: { idempotencyKey: 'idempotency-key-cancelled-run' },
+        signal: caller.signal,
+      },
     );
     const elapsedMilliseconds = performance.now() - started;
 
@@ -71,47 +71,10 @@ describe('cancellation', () => {
 
     const outcome = await client.RunForMilliseconds(
       { milliseconds: 20 },
-      { context: { idempotencyKey: 'idem-9' } },
+      { context: { idempotencyKey: 'idempotency-key-uncancelled-run' } },
     );
 
     expect(outcome).toStrictEqual({ finished: true });
     expect(observations.abortedWhenHandlerReturned).toStrictEqual([false]);
-  });
-});
-
-describe('types of the client context', () => {
-  let result: TypecheckResult;
-
-  beforeAll(() => {
-    result = typecheck(
-      path.join(
-        import.meta.dirname,
-        '__fixtures__/cancellation-and-typed-link.type-probes.ts',
-      ),
-      {
-        fileName: 'cancellation-and-typed-link.negative-control.ts',
-        sourceText: [
-          "import { createCancellableClient } from './cancellation-and-typed-link.ts';",
-          'export async function negativeControl() {',
-          '  const { client } = createCancellableClient();',
-          '  // @ts-expect-error placed on a valid call, so it must be reported as unused',
-          "  await client.SendMessage({ strategyId: 'a' }, { context: { idempotencyKey: 'k' } });",
-          '}',
-        ].join('\n'),
-      },
-    );
-  });
-
-  it('holds every probe under the project’s strict configuration', () => {
-    expect(result.probeDiagnostics).toStrictEqual([]);
-  });
-
-  it('reports a directive on a valid line, so the check can fail', () => {
-    expect(result.negativeControlDiagnostics).toStrictEqual([
-      expect.objectContaining({
-        line: 4,
-        code: UNUSED_TS_EXPECT_ERROR_DIRECTIVE,
-      }),
-    ]);
   });
 });

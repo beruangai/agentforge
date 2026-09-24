@@ -20,12 +20,15 @@
  * session — "keep legacyCompat enabled as a safety net" — was backwards, and
  * this keeps it from coming back.
  *
+ * The permissive column is the control: the same request succeeds there, so a
+ * strict refusal is the configuration's doing, not a malformed probe.
+ *
  * And 1.0 only needs nothing on the client: the SDK's own `ClientFactory` over
  * `JsonRpcTransportFactory`, built from the 1.0-only card, sends
  * `A2A-Version: 1.0` and `SendMessage` by itself.
  */
 import { randomUUIDv7 } from 'node:crypto';
-import { type AgentCard, Role } from '@a2a-js/sdk';
+import { Role } from '@a2a-js/sdk';
 import { ClientFactory, JsonRpcTransportFactory } from '@a2a-js/sdk/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type ProbeRequest, probe } from './__fixtures__/probe.ts';
@@ -145,8 +148,10 @@ describe('A2A 1.0 only, or 1.0 with 0.3 underneath (§I, ADR 0014)', () => {
   let permissive: VersionNegotiationServer;
 
   beforeAll(async () => {
-    strict = await startVersionNegotiationServer({ strict10: true });
-    permissive = await startVersionNegotiationServer({ strict10: false });
+    strict = await startVersionNegotiationServer({ a2aOneZeroOnly: true });
+    permissive = await startVersionNegotiationServer({
+      a2aOneZeroOnly: false,
+    });
   });
 
   afterAll(async () => {
@@ -167,78 +172,58 @@ describe('A2A 1.0 only, or 1.0 with 0.3 underneath (§I, ADR 0014)', () => {
     },
   );
 
-  it('serves one 1.0 interface from the strict card, and 1.0 with 0.3 from the permissive one', async () => {
-    const versionsServedBy = async (server: VersionNegotiationServer) => {
-      const card = (await (
-        await fetch(new URL('.well-known/agent-card.json', server.url))
-      ).json()) as AgentCard;
-      return card.supportedInterfaces.map(
-        (agentInterface) => agentInterface.protocolVersion,
-      );
+  it("the SDK's own client, built from the 1.0-only card, sends A2A-Version: 1.0 and SendMessage by itself, and 1.0 is negotiated", async () => {
+    const sent: { a2aVersion: string | null; method: unknown }[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      sent.push({
+        a2aVersion: new Headers(init?.headers).get('A2A-Version'),
+        method: (JSON.parse(String(init?.body)) as { method: unknown }).method,
+      });
+      return fetch(input, init);
     };
-    expect(await versionsServedBy(strict)).toEqual(['1.0']);
-    expect(await versionsServedBy(permissive)).toEqual(['1.0', '0.3']);
-  });
-
-  it.each([
-    ['strict', () => strict],
-    ['permissive', () => permissive],
-  ] as const)(
-    "the SDK's own client, built from the %s card, sends A2A-Version: 1.0 and SendMessage by itself, and 1.0 is negotiated",
-    async (_name, server) => {
-      const sent: { a2aVersion: string | null; method: unknown }[] = [];
-      const fetchImpl: typeof fetch = async (input, init) => {
-        sent.push({
-          a2aVersion: new Headers(init?.headers).get('A2A-Version'),
-          method: (JSON.parse(String(init?.body)) as { method: unknown })
-            .method,
-        });
-        return fetch(input, init);
-      };
-      const client = await new ClientFactory({
-        transports: [new JsonRpcTransportFactory({ fetchImpl })],
-      }).createFromAgentCard(server().agentCard);
-      const idempotencyKey = `client-${randomUUIDv7()}`;
-      const result = await client.sendMessage({
-        tenant: '',
-        message: {
-          messageId: randomUUIDv7(),
-          contextId: randomUUIDv7(),
-          taskId: '',
-          role: Role.ROLE_USER,
-          parts: [
-            {
-              content: {
-                $case: 'data',
-                value: { runMilliseconds: 50, idempotencyKey },
-              },
-              metadata: undefined,
-              filename: '',
-              mediaType: '',
+    const client = await new ClientFactory({
+      transports: [new JsonRpcTransportFactory({ fetchImpl })],
+    }).createFromAgentCard(strict.agentCard);
+    const idempotencyKey = `client-${randomUUIDv7()}`;
+    const result = await client.sendMessage({
+      tenant: '',
+      message: {
+        messageId: randomUUIDv7(),
+        contextId: randomUUIDv7(),
+        taskId: '',
+        role: Role.ROLE_USER,
+        parts: [
+          {
+            content: {
+              $case: 'data',
+              value: { runMilliseconds: 50, idempotencyKey },
             },
-          ],
-          metadata: undefined,
-          extensions: [],
-          referenceTaskIds: [],
-        },
-        configuration: {
-          acceptedOutputModes: [],
-          taskPushNotificationConfig: undefined,
-          returnImmediately: true,
-        },
+            metadata: undefined,
+            filename: '',
+            mediaType: '',
+          },
+        ],
         metadata: undefined,
-      });
+        extensions: [],
+        referenceTaskIds: [],
+      },
+      configuration: {
+        acceptedOutputModes: [],
+        taskPushNotificationConfig: undefined,
+        returnImmediately: true,
+      },
+      metadata: undefined,
+    });
 
-      expect(sent).toEqual([{ a2aVersion: '1.0', method: 'SendMessage' }]);
-      if (!('status' in result)) {
-        throw new Error(
-          `SendMessage answered a message, not a task: ${JSON.stringify(result)}`,
-        );
-      }
-      expect(result.metadata).toEqual({
-        negotiatedVersion: '1.0',
-        idempotencyKey,
-      });
-    },
-  );
+    expect(sent).toEqual([{ a2aVersion: '1.0', method: 'SendMessage' }]);
+    if (!('status' in result)) {
+      throw new Error(
+        `SendMessage answered a message, not a task: ${JSON.stringify(result)}`,
+      );
+    }
+    expect(result.metadata).toEqual({
+      negotiatedVersion: '1.0',
+      idempotencyKey,
+    });
+  });
 });

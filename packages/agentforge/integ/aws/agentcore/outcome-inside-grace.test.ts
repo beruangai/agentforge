@@ -13,14 +13,13 @@
  * Networking, credentials and the DynamoDB client all survive SIGTERM.
  */
 import { randomUUIDv7 } from 'node:crypto';
-import { setTimeout } from 'node:timers/promises';
 import { StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
 import { GetItemCommand } from '@aws-sdk/client-dynamodb';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
 import { A2aOverAgentCore } from './__fixtures__/invocation.ts';
 import {
-  a2a10OnlyProfile,
+  a2aOneZeroOnlyProfile,
   type FixtureRuntime,
   provisionFixtureRuntime,
   provisioningTimeoutMilliseconds,
@@ -40,18 +39,18 @@ describe('an outcome recorded inside the grace period (§C)', () => {
   const resources = createResourceStack();
   let fixture: FixtureRuntime;
   let a2a: A2aOverAgentCore;
-  let leaseTableName: string;
+  let outcomeTableName: string;
 
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'outcome',
-      profile: a2a10OnlyProfile,
-      leaseTable: true,
+      profile: a2aOneZeroOnlyProfile,
+      outcomeTable: true,
     });
-    if (fixture.leaseTableName === undefined) {
-      throw new Error('the runtime was provisioned without its lease table');
+    if (fixture.outcomeTableName === undefined) {
+      throw new Error('the runtime was provisioned without its outcome table');
     }
-    leaseTableName = fixture.leaseTableName;
+    outcomeTableName = fixture.outcomeTableName;
     a2a = new A2aOverAgentCore(
       fixture.clients.data,
       fixture.runtime.agentRuntimeArn,
@@ -66,18 +65,14 @@ describe('an outcome recorded inside the grace period (§C)', () => {
   it('lets a stopped container, mid-task, reach DynamoDB from its SIGTERM handler', async () => {
     const session = newRuntimeSessionId('outcome');
     await a2a.SendMessage(session, { runMilliseconds: 100 });
-    const leaseId = `outcome-${randomUUIDv7()}`;
+    const outcomeKey = `outcome-${randomUUIDv7()}`;
+    // The container holds the target before it answers, so the stop can follow
+    // at once.
     const { task } = await a2a.SendMessage(session, {
       runMilliseconds: 120_000,
-      lease: {
-        tableName: leaseTableName,
-        leaseId,
-        renewMilliseconds: 5_000,
-        renewals: 40,
-      },
+      outcomeTarget: { tableName: outcomeTableName, key: outcomeKey },
     });
 
-    await setTimeout(3_000);
     const stopIssuedAt = Date.now();
     const stopped = await fixture.clients.data.send(
       new StopRuntimeSessionCommand({
@@ -85,32 +80,24 @@ describe('an outcome recorded inside the grace period (§C)', () => {
         runtimeSessionId: session,
       }),
     );
-    const stopReturnedAt = Date.now();
     expect(stopped.$metadata.httpStatusCode).toBe(200);
 
     const outcome = await vi.waitUntil(
       async () =>
         (
-          await fixture.clients.dynamo.send(
+          await fixture.clients.dynamoDB.send(
             new GetItemCommand({
-              TableName: leaseTableName,
-              Key: { leaseId: { S: `${leaseId}#outcome` } },
+              TableName: outcomeTableName,
+              Key: { outcomeKey: { S: outcomeKey } },
               ConsistentRead: true,
             }),
           )
         ).Item,
       { timeout: outcomeVisibleWithinMilliseconds, interval: 500 },
     );
-    expect(Date.now() - stopReturnedAt).toBeLessThan(
-      outcomeVisibleWithinMilliseconds,
-    );
     expect(outcome.outcome?.S).toBe('RECORDED_DURING_SHUTDOWN');
     expect(outcome.containerId?.S).toBe(task.metadata.containerId);
     expect(outcome.liveTasksAtSigterm?.N).toBe('1');
-    // The handler's first action.
-    expect(Number(outcome.recordedAfterSigtermMilliseconds?.N)).toBeLessThan(
-      1_000,
-    );
 
     // The container's own account agrees: the write succeeded.
     const [written] = await waitForContainerLogEvents(

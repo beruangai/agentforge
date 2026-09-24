@@ -24,7 +24,7 @@ import { z } from 'zod';
 export const taskHandle = z.object({
   taskId: z.string(),
   contextId: z.string(),
-  state: z.literal('SUBMITTED'),
+  state: z.literal('TASK_STATE_SUBMITTED'),
 });
 
 export const taskQuery = z.object({ taskId: z.string() });
@@ -38,10 +38,10 @@ export const failureCause = z.discriminatedUnion('kind', [
 /** A task as `GetTask` answers it: the declared output only where it exists. */
 export function taskState<Output extends z.ZodTypeAny>(output: Output) {
   return z.discriminatedUnion('state', [
-    z.object({ state: z.literal('SUBMITTED') }),
-    z.object({ state: z.literal('WORKING'), startedAt: z.string() }),
-    z.object({ state: z.literal('SUCCEEDED'), output }),
-    z.object({ state: z.literal('FAILED'), cause: failureCause }),
+    z.object({ state: z.literal('TASK_STATE_SUBMITTED') }),
+    z.object({ state: z.literal('TASK_STATE_WORKING'), startedAt: z.string() }),
+    z.object({ state: z.literal('TASK_STATE_COMPLETED'), output }),
+    z.object({ state: z.literal('TASK_STATE_FAILED'), cause: failureCause }),
   ]);
 }
 
@@ -69,9 +69,15 @@ export const summariseCorpus = {
 export const contract = {
   reviewStrategy: split(reviewStrategy),
   summariseCorpus: split(summariseCorpus),
-  CancelTask: oc
-    .input(taskQuery)
-    .output(z.object({ state: z.enum(['CANCELLED', 'SUCCEEDED', 'FAILED']) })),
+  CancelTask: oc.input(taskQuery).output(
+    z.object({
+      state: z.enum([
+        'TASK_STATE_CANCELED',
+        'TASK_STATE_COMPLETED',
+        'TASK_STATE_FAILED',
+      ]),
+    }),
+  ),
 };
 
 export type ReviewStrategyTask = z.infer<

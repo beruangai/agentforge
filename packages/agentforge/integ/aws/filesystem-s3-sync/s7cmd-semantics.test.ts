@@ -106,11 +106,7 @@ describe('s7cmd, pinned, in the base image, against a real bucket', () => {
     const archivePath = await resolveVerifiedS7cmdArchive();
     aws = await resolveAwsForContainer();
     const runId = randomUUIDv7();
-    runHostDirectory = join(
-      taskOutputDirectory('integ'),
-      'filesystem-s3-sync',
-      runId,
-    );
+    runHostDirectory = join(taskOutputDirectory(), 'filesystem-s3-sync', runId);
     await mkdir(runHostDirectory, { recursive: true });
     bucketName = await createScratchBucket(aws, runId);
     suite = {
@@ -126,15 +122,31 @@ describe('s7cmd, pinned, in the base image, against a real bucket', () => {
     };
   });
 
+  // Both steps are attempted, and every failure is reported: one must not
+  // mask the other.
   afterAll(async () => {
-    try {
-      if (aws !== undefined && bucketName !== undefined) {
+    const failures: unknown[] = [];
+    if (aws !== undefined && bucketName !== undefined) {
+      try {
         await deleteScratchBucket(aws.s3, bucketName);
+      } catch (error) {
+        failures.push(error);
       }
-    } finally {
-      if (runHostDirectory !== undefined) {
+    }
+    if (runHostDirectory !== undefined) {
+      try {
         await rm(runHostDirectory, { recursive: true });
+      } catch (error) {
+        failures.push(error);
       }
+    }
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `s7cmd-semantics teardown failed:\n${failures
+          .map((failure) => `  - ${String(failure)}`)
+          .join('\n')}`,
+      );
     }
   });
 

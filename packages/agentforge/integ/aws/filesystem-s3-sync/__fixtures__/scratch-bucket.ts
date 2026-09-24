@@ -24,9 +24,10 @@ import {
   paginateListObjectsV2,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
-
-export const integTag = { Key: 'agentforge:integ', Value: 'true' } as const;
+import {
+  integTag,
+  resolveCallerIdentity,
+} from '../../__fixtures__/aws-account.ts';
 
 export interface AwsForContainer {
   s3: S3Client;
@@ -45,12 +46,7 @@ export async function resolveAwsForContainer(): Promise<AwsForContainer> {
   const s3 = new S3Client({});
   const region = await s3.config.region();
   const credentials = await s3.config.credentials();
-  const identity = await new STSClient({ region }).send(
-    new GetCallerIdentityCommand({}),
-  );
-  if (identity.Account === undefined) {
-    throw new Error('STS GetCallerIdentity returned no Account');
-  }
+  const { accountId } = await resolveCallerIdentity(region);
   const containerEnvironment: Record<string, string> = {
     AWS_ACCESS_KEY_ID: credentials.accessKeyId,
     AWS_SECRET_ACCESS_KEY: credentials.secretAccessKey,
@@ -59,7 +55,7 @@ export async function resolveAwsForContainer(): Promise<AwsForContainer> {
   if (credentials.sessionToken !== undefined) {
     containerEnvironment.AWS_SESSION_TOKEN = credentials.sessionToken;
   }
-  return { s3, region, accountId: identity.Account, containerEnvironment };
+  return { s3, region, accountId, containerEnvironment };
 }
 
 /**

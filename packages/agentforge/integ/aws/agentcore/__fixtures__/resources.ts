@@ -1,3 +1,5 @@
+import { integTag } from '../../__fixtures__/aws-account.ts';
+
 /**
  * What a test file creates in AWS is deferred onto an `AsyncDisposableStack`
  * the moment it exists, and released in `afterAll`, which vitest runs even
@@ -23,7 +25,7 @@ export async function releaseResources(
     const failures = unwrapSuppressedErrors(error);
     throw new AggregateError(
       failures,
-      `${testFile}: teardown left AWS resources behind (tagged agentforge:integ=true):\n${failures
+      `${testFile}: teardown left AWS resources behind (tagged ${integTag.Key}=${integTag.Value}):\n${failures
         .map((failure) =>
           failure instanceof Error
             ? `  - ${failure.message}`

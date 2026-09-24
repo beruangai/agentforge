@@ -11,17 +11,17 @@
  * boundary: iterator -> bytes -> `Uint8Array` chunks -> iterator, the shape
  * `InvokeAgentRuntime`'s response body has.
  *
- * `eventIteratorToStream` yields the EVENT OBJECTS, not encoded bytes — its
- * name suggests otherwise, and the spike's first attempt was wrong because of
- * it. oRPC's SSE encoding lives in its HTTP handler, which AgentForge does not
+ * `asyncIteratorToStream` (v1's `eventIteratorToStream`, a deprecated alias
+ * in v2) yields the EVENT OBJECTS, not encoded bytes — the v1 name suggested
+ * otherwise, and the spike's first attempt was wrong because of it. oRPC's SSE encoding lives in its HTTP handler, which AgentForge does not
  * use, so the wire encoding is ours: `RPCSerializer` per event, one JSON line
  * each.
  */
 import { arrayBuffer } from 'node:stream/consumers';
 import {
+  asyncIteratorToStream,
   type ClientLink,
   createORPCClient,
-  eventIteratorToStream,
   RPCSerializer,
 } from '@orpc/client';
 import { type ContractRouterClient, eventIterator, oc } from '@orpc/contract';
@@ -131,7 +131,7 @@ export function createStreamingClient(delivery: Delivery) {
     if (!isAsyncIteratorObject(iterator)) {
       throw new Error(`${path.join('.')} did not return an event iterator`);
     }
-    const events: ReadableStream<unknown> = eventIteratorToStream(iterator);
+    const events: ReadableStream<unknown> = asyncIteratorToStream(iterator);
     return events.pipeThrough(
       new TransformStream<unknown, Uint8Array>({
         transform(event, controller) {

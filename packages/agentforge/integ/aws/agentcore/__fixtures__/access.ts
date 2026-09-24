@@ -1,7 +1,7 @@
+import { randomUUIDv7 } from 'node:crypto';
 import {
   BedrockAgentCoreControlClient,
   CreateAgentRuntimeCommand,
-  DeleteAgentRuntimeCommand,
   ListAgentRuntimesCommand,
 } from '@aws-sdk/client-bedrock-agentcore-control';
 import {
@@ -15,11 +15,12 @@ import {
   GetAuthorizationTokenCommand,
 } from '@aws-sdk/client-ecr';
 import { GetRoleCommand, IAMClient } from '@aws-sdk/client-iam';
+import { integTag } from '../../__fixtures__/aws-account.ts';
 import {
-  type AwsEnvironment,
-  executionRoleName,
-  integTag,
-} from './aws-environment.ts';
+  agentRuntimeReferenceFrom,
+  deleteAgentRuntimeUntilGone,
+} from './agent-runtime-status.ts';
+import { type AwsEnvironment, executionRoleName } from './aws-environment.ts';
 
 /**
  * Walks EVERY permission the AgentCore tests need, to the end of the path, and
@@ -31,10 +32,13 @@ import {
  * actually blocks `CreateAgentRuntime` is `iam:PassRole`, which was never
  * probed. Half a fix cost the whole AgentCore half of a night. So the decisive
  * probe is the last one: a real `CreateAgentRuntime` with an image URI that
- * does not exist. If IAM is correct it fails on the image or on validation; if
- * IAM is not, it fails on authorization. Either way nothing is created.
+ * does not exist. If IAM is correct it fails validation on the image; if IAM
+ * is not, it fails on authorization. Either way nothing is created — and if
+ * something is, its deletion is deferred onto `resources`, whose release waits
+ * until it is gone.
  */
 export async function verifyAgentCoreAccess(
+  resources: AsyncDisposableStack,
   environment: AwsEnvironment,
 ): Promise<void> {
   const { region } = environment;
@@ -89,7 +93,11 @@ export async function verifyAgentCoreAccess(
     }
   }
 
-  const decisive = await probeCreateAgentRuntime(control, environment);
+  const decisive = await probeCreateAgentRuntime(
+    resources,
+    control,
+    environment,
+  );
   if (decisive !== undefined) failures.push(decisive);
 
   if (failures.length > 0) {
@@ -103,10 +111,12 @@ export async function verifyAgentCoreAccess(
 
 /** Returns what is missing, or `undefined` when the IAM path is clear. */
 async function probeCreateAgentRuntime(
+  resources: AsyncDisposableStack,
   control: BedrockAgentCoreControlClient,
   environment: AwsEnvironment,
 ): Promise<string | undefined> {
-  const probeName = 'agentforge_integ_access_probe';
+  // Unique per call: the AgentCore files run their checks in parallel.
+  const probeName = `agentforge_integ_access_probe_${randomUUIDv7().replaceAll('-', '').slice(-10)}`;
   try {
     const created = await control.send(
       new CreateAgentRuntimeCommand({
@@ -117,42 +127,30 @@ async function probeCreateAgentRuntime(
           },
         },
         roleArn: environment.executionRoleArn,
+        // No `platformVersion`: the probe asks IAM a question, and the default
+        // platform version is where a missing image was refused at once. A V2
+        // create is prepared for minutes, and whether it checks the image
+        // before accepting is not documented.
         networkConfiguration: { networkMode: 'PUBLIC' },
-        tags: { [integTag.key]: integTag.value },
+        tags: { [integTag.Key]: integTag.Value },
       }),
     );
-    // It should not have succeeded against a nonexistent image. Delete it, and
-    // fail: the probe's premise — that it creates nothing — no longer holds.
-    if (created.agentRuntimeId !== undefined) {
-      await control.send(
-        new DeleteAgentRuntimeCommand({
-          agentRuntimeId: created.agentRuntimeId,
-        }),
-      );
-    }
-    return `CreateAgentRuntime SUCCEEDED against a nonexistent image, so the access probe is no longer side-effect free; deletion of ${created.agentRuntimeArn ?? probeName} was requested — confirm it is gone`;
+    // It should not have succeeded against a nonexistent image, so the probe's
+    // premise — that it creates nothing — no longer holds. Fail, and leave its
+    // deletion to the file's teardown, which waits out CREATING and then
+    // DELETING, and fails naming it if it cannot.
+    const runtime = agentRuntimeReferenceFrom(created, probeName);
+    resources.defer(() => deleteAgentRuntimeUntilGone(control, runtime));
+    return `CreateAgentRuntime SUCCEEDED against a nonexistent image, so the access probe is no longer side-effect free; ${runtime.agentRuntimeArn} is deleted in teardown`;
   } catch (error) {
-    if (isAccessDenied(error)) {
-      const message = errorMessage(error);
-      if (message.includes('iam:PassRole')) {
-        return `iam:PassRole on ${environment.executionRoleArn} is denied — ${environment.callerArn} must carry integ/aws/test-role-permissions-policy.json (integ/aws/agentcore/README.md)`;
-      }
-      return describeProbeFailure(
-        'bedrock-agentcore:CreateAgentRuntime',
-        error,
-      );
+    if (isAccessDenied(error) && errorMessage(error).includes('iam:PassRole')) {
+      return `iam:PassRole on ${environment.executionRoleArn} is denied — ${environment.callerArn} must carry integ/aws/test-role-permissions-policy.json (integ/aws/agentcore/README.md)`;
     }
-    if (isCredentialFailure(error)) {
-      return describeProbeFailure(
-        'bedrock-agentcore:CreateAgentRuntime',
-        error,
-      );
-    }
-    if (errorName(error) === 'ConflictException') {
-      return `a runtime named ${probeName} already exists — an earlier probe left it behind; delete it`;
-    }
-    // Failed on the image or on validation, which means authorization passed.
-    return undefined;
+    // Refused on the image, which means authorization passed. Anything else —
+    // throttling, a network failure, a service error — proves nothing about
+    // authorization.
+    if (errorName(error) === 'ValidationException') return undefined;
+    return describeProbeFailure('bedrock-agentcore:CreateAgentRuntime', error);
   }
 }
 

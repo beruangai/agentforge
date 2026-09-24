@@ -41,7 +41,8 @@ export interface CancellationObservations {
   abortedWhenHandlerReturned: boolean[];
 }
 
-export interface LinkObservation {
+/** The caller context and abort signal one call handed the link. */
+export interface CallerContextAndSignalObservation {
   path: string[];
   idempotencyKey: string;
   signal: AbortSignal | undefined;
@@ -74,7 +75,7 @@ export function createCancellableClient() {
     SendMessage: os.SendMessage.handler(async ({ input }) => ({
       taskId: `task-${input.strategyId}`,
       contextId: `context-${input.strategyId}`,
-      state: 'SUBMITTED' as const,
+      state: 'TASK_STATE_SUBMITTED' as const,
     })),
     RunForMilliseconds: os.RunForMilliseconds.handler(
       async ({ input, signal, context }) => {
@@ -98,7 +99,7 @@ export function createCancellableClient() {
     ),
   });
 
-  const seenByLink: LinkObservation[] = [];
+  const seenByLink: CallerContextAndSignalObservation[] = [];
   const link: ClientLink<CallerContext> = {
     async call(path, input, options) {
       // Both are typed off ClientLink — no cast, no `any`.

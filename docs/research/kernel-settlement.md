@@ -2,7 +2,7 @@
 
 **Read against the real SDK on 2026-09-22.** `@anthropic-ai/claude-agent-sdk@0.3.278`, Bun 1.4.0, macOS, the operator's Claude Max subscription, model `claude-sonnet-5` unless a case names another. **Re-run 2026-09-24 against `0.3.280`**, and corrected the same day where the recordings and the SDK's documentation disagreed with what was first written (E1, E2, E4). Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
 
-Source: `spikes/kernel-settlement/`, four runnable spikes, now the integration tests in `packages/agentforge/integ/model/kernel-settlement/` (`nx run @beruangai/agentforge:integ --configuration=model`). Every message of every run is kept as JSONL — then under `spikes/out/`, now under `dist/packages/agentforge/integ/` — so each claim below is evidence rather than recollection. Total model spend: **$1.84**.
+Source: `spikes/kernel-settlement/`, four runnable spikes, now the integration tests in `packages/agentforge/integ/model/kernel-settlement/` (`nx run @beruangai/agentforge:integ --configuration=model`): E1 `foreground-settlement`, E2 `background-settlement`, E3 `in-turn-correction`, E4 `limits-end-with-a-result`. From 2026-09-24 every one but E2's drift detector runs in the kernel's configuration — streaming input, background work off, the input ended on the first result. Every message of every run is kept as JSONL — then under `spikes/out/`, now under `dist/packages/agentforge/integ/` — so each claim below is evidence rather than recollection. Total model spend: **$1.84**.
 
 These are observations of one SDK version on one day. They are re-checked by those tests, not by being trusted.
 
@@ -49,7 +49,7 @@ Cost $0.52. Exactly one `StructuredOutput` call per run; exactly one result per 
 
 **What this does not prove.** It does not prove dispatched work is *safe* generally — only that foreground dispatch does not cost the submission. The risk §REQ206 recorded has moved to E2, not disappeared.
 
-**Corrected 2026-09-24: the subagent case may not have been foreground at all.** Subagents run in the background by default since CLI 2.1.198 — an `Agent` call that omits `run_in_background` launches a background one ([subagents](https://code.claude.com/docs/en/agent-sdk/subagents)) — and the scenario only *asked* the model not to background anything; it never asserted `run_in_background: false` or `task_started.is_backgrounded`. In the closed-input form the result is held until background subagents finish, with a 10-minute idle ceiling after which the partial result is dropped ([headless](https://code.claude.com/docs/en/headless)), so a held background run and a foreground one look alike here. What E1 shows is that the submission survived; not which way the subagents ran.
+**Corrected 2026-09-24: the subagent case may not have been foreground at all.** Subagents run in the background by default since CLI 2.1.198 — an `Agent` call that omits `run_in_background` launches a background one ([subagents](https://code.claude.com/docs/en/agent-sdk/subagents)) — and the scenario only *asked* the model not to background anything; it never asserted `run_in_background: false` or `task_started.is_backgrounded`. In the closed-input form the result is held until background subagents finish, with a 10-minute idle ceiling after which the partial result is dropped ([headless](https://code.claude.com/docs/en/headless)), so a held background run and a foreground one look alike here. What E1 shows is that the submission survived; not which way the subagents ran. **Re-tested from 2026-09-24 in the kernel's configuration** — streaming input, background work off — asserting that every subagent task starts with `is_backgrounded: false`, that none moves to the background, and that the one result carries a schema-valid submission. The control and the known-answer check are not re-asserted: the answer's arithmetic is the model's, not the SDK's.
 
 ## E2 — Background work: the §REQ206 failure changed shape rather than going away
 
@@ -58,6 +58,8 @@ Cost $0.52. Exactly one `StructuredOutput` call per run; exactly one result per 
 The agent backgrounds `sleep 25 && echo finished > background-done.txt`, then submits immediately.
 
 ### Closed input — the string-`prompt` form, `-p`, stdin closed
+
+Not re-tested from 2026-09-24: the kernel never uses closed input.
 
 - **Exactly one result.** `structured_output` present and valid.
 - **No hold-back worth the name**: submission at 5298 ms, result at 5428 ms — 130 ms.
@@ -151,7 +153,7 @@ subtype: "success",  is_error: false,  structured_output: null
 
 Cost $0.43. Each case asserts an observable consequence, not that the argument was passed.
 
-**Re-tested from 2026-09-24: `maxTurns`, `maxBudgetUsd` and `settingSources`** — the bindings that are surprising or have moved between SDK versions. That an unknown option is ignored is recorded below and not re-tested: AgentForge's own boundary refuses an unknown key, which is its unit test, whatever the SDK does. `model`, `disallowedTools`, `cwd` and `systemPrompt` are documented options whose binding is recorded here, not re-asserted; that AgentForge passes each through is its own unit test.
+**Re-tested from 2026-09-24: `maxTurns` and `maxBudgetUsd`**, in streaming input, asserting the first result's `subtype`, `terminal_reason` and `is_error`; whether draining then throws is recorded, not asserted. `settingSources` is a documented option, and its cases depended on the model revealing a word, so it is recorded here and not re-asserted. That an unknown option is ignored is recorded below and not re-tested: AgentForge's own boundary refuses an unknown key, which is its unit test, whatever the SDK does. `model`, `disallowedTools`, `cwd` and `systemPrompt` are documented options whose binding is recorded here, not re-asserted; that AgentForge passes each through is its own unit test.
 
 | Option | Binds | Evidence |
 |---|---|---|

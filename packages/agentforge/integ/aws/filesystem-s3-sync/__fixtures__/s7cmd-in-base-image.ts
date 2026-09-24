@@ -52,7 +52,7 @@ export const s7cmdTargetTriple = 'aarch64-unknown-linux-musl';
  * was verified — which is reported, never repaired by re-downloading.
  */
 const s7cmdCacheDirectory = join(
-  taskOutputDirectory('integ'),
+  taskOutputDirectory(),
   'filesystem-s3-sync',
   's7cmd',
   s7cmdVersion,

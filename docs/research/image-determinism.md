@@ -2,7 +2,9 @@
 
 **Measured on 2026-09-22.** Docker 29.4.1 with BuildKit v0.29.0, buildx v0.33.0, Docker Desktop on macOS arm64, `linux/arm64` targets, base pinned to `oven/bun@sha256:0723…437eb`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §D's central question. No model spend, no AWS.
 
-Source: `spikes/images/` — `setup.sh`, the three-level image tree, and `d1-deterministic-builds.sh`. Carried at A0 into `packages/agentforge/integ/local/image-determinism/`, which re-checks every finding below.
+Source: `spikes/images/` — `setup.sh`, the three-level image tree, and `d1-deterministic-builds.sh`. Carried at A0 into `packages/agentforge/integ/local/image-determinism/`, and retired from it on 2026-09-24.
+
+**Not re-tested from 2026-09-24.** Nothing AgentForge does depends on these findings — Nx decides what is rebuilt, not a digest comparison — so this note stands as dated evidence, and the tests are in git history.
 
 ---
 

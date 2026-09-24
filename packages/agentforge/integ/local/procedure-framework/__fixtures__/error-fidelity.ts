@@ -1,7 +1,12 @@
 /**
- * What survives of an error, in process and across a transport that
+ * What oRPC's own error serialisation carries across a transport that
  * serialises the way `InvokeAgentRuntime` does. Lossy errors across a
  * transport were the stated pain point with tRPC.
+ *
+ * Only an `ORPCError` crosses: `toJSON`, `RPCSerializer`, `isORPCErrorJson`
+ * and `createORPCErrorFromJson` are oRPC's, so what arrives is oRPC's doing.
+ * How a raw error would cross is the link's own code, not oRPC's, and is not
+ * modelled here.
  */
 import {
   type ClientLink,
@@ -12,24 +17,13 @@ import {
   RPCSerializer,
 } from '@orpc/client';
 import type { ContractRouterClient } from '@orpc/contract';
-import { z } from 'zod';
 import { type errorContract, errorRouter } from './error-throwing-router.ts';
 import { callByPath } from './in-memory-hop.ts';
 
-/** What a container can put on the wire about a raw failure. */
-const rawErrorBody = z.object({
-  name: z.string(),
-  message: z.string(),
-  stack: z.string(),
-});
-
 type WireResponse = { ok: true; body: unknown } | { ok: false; body: unknown };
 
-/**
- * A link whose transport serialises. Whether the original stack crosses is the
- * link's choice, which is what `carryStack: false` demonstrates.
- */
-export function createSerialisingClient(options: { carryStack: boolean }) {
+/** A link whose transport serialises every response, error or not. */
+export function createSerialisingClient() {
   const serializer = new RPCSerializer();
 
   async function invokeAgentRuntime(
@@ -48,19 +42,12 @@ export function createSerialisingClient(options: { carryStack: boolean }) {
           body: serializer.serialize(error.toJSON()),
         });
       }
-      if (error instanceof Error) {
-        return JSON.stringify({
-          ok: false,
-          body: serializer.serialize({
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-          }),
-        });
-      }
-      throw new Error('the procedure threw something that is not an Error', {
-        cause: error,
-      });
+      throw new Error(
+        'the procedure threw something that is not an ORPCError',
+        {
+          cause: error,
+        },
+      );
     }
   }
 
@@ -73,16 +60,12 @@ export function createSerialisingClient(options: { carryStack: boolean }) {
       if (response.ok) {
         return body;
       }
-      if (isORPCErrorJson(body)) {
-        throw createORPCErrorFromJson(body);
+      if (!isORPCErrorJson(body)) {
+        throw new Error(
+          `the wire carried an error that is not an ORPCError: ${JSON.stringify(body)}`,
+        );
       }
-      const raw = rawErrorBody.parse(body);
-      const error = new Error(raw.message);
-      error.name = raw.name;
-      if (options.carryStack) {
-        error.stack = raw.stack;
-      }
-      throw error;
+      throw createORPCErrorFromJson(body);
     },
   };
 

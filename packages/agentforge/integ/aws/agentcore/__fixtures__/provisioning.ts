@@ -2,9 +2,6 @@ import { BedrockAgentCoreClient } from '@aws-sdk/client-bedrock-agentcore';
 import {
   BedrockAgentCoreControlClient,
   CreateAgentRuntimeCommand,
-  DeleteAgentRuntimeCommand,
-  GetAgentRuntimeCommand,
-  GetWorkloadIdentityCommand,
 } from '@aws-sdk/client-bedrock-agentcore-control';
 import {
   CloudWatchLogsClient,
@@ -23,11 +20,19 @@ import {
   DeleteRepositoryCommand,
   ECRClient,
 } from '@aws-sdk/client-ecr';
-import { vi } from 'vitest';
+import { integTag } from '../../__fixtures__/aws-account.ts';
 import { verifyAgentCoreAccess } from './access.ts';
 import {
+  type AgentRuntimeReference,
+  agentRuntimeDeletionTimeoutMilliseconds,
+  agentRuntimeReferenceFrom,
+  agentRuntimeStatusTimeoutMilliseconds,
+  deleteAgentRuntimeUntilGone,
+  describeError,
+  waitForAgentRuntimeReady,
+} from './agent-runtime-status.ts';
+import {
   type AwsEnvironment,
-  integTag,
   type ResourceNames,
   resolveAwsEnvironment,
   resourceNamesFor,
@@ -47,12 +52,13 @@ export interface RuntimeProfile {
 /**
  * AgentForge's own configuration (ADR 0014): the card declares one 1.0
  * interface, `legacyCompat` is off, and the runtime allowlists `A2A-Version`.
- * The platform findings — a busy container, one container per session, the
- * stop and its grace period, the lease — do not depend on the protocol
- * version, so they are asserted against what AgentForge will actually run.
+ * The platform findings — a busy container, the provisioning window, the stop,
+ * its grace period and an outcome written inside it — do not depend on the
+ * protocol version, so they are asserted against what AgentForge will
+ * actually run.
  */
-export const a2a10OnlyProfile: RuntimeProfile = {
-  environmentVariables: { A2A_STRICT_10: '1' },
+export const a2aOneZeroOnlyProfile: RuntimeProfile = {
+  environmentVariables: { A2A_ONE_ZERO_ONLY: '1' },
   requestHeaderAllowlist: ['A2A-Version'],
 };
 
@@ -60,7 +66,7 @@ export interface AgentCoreClients {
   readonly control: BedrockAgentCoreControlClient;
   readonly data: BedrockAgentCoreClient;
   readonly logs: CloudWatchLogsClient;
-  readonly dynamo: DynamoDBClient;
+  readonly dynamoDB: DynamoDBClient;
   readonly ecr: ECRClient;
 }
 
@@ -69,7 +75,7 @@ export function createAgentCoreClients(region: string): AgentCoreClients {
     control: new BedrockAgentCoreControlClient({ region }),
     data: new BedrockAgentCoreClient({ region }),
     logs: new CloudWatchLogsClient({ region }),
-    dynamo: new DynamoDBClient({ region }),
+    dynamoDB: new DynamoDBClient({ region }),
     ecr: new ECRClient({ region }),
   };
 }
@@ -91,7 +97,7 @@ export async function prepareFixtureImage(
   purpose: string,
 ): Promise<PreparedFixtureImage> {
   const environment = await resolveAwsEnvironment();
-  await verifyAgentCoreAccess(environment);
+  await verifyAgentCoreAccess(resources, environment);
   const clients = createAgentCoreClients(environment.region);
   const names = resourceNamesFor(purpose);
   const repositoryUri = await createImageRepository(
@@ -105,13 +111,13 @@ export async function prepareFixtureImage(
 
 export interface FixtureRuntime extends PreparedFixtureImage {
   readonly runtime: CreatedAgentRuntime;
-  /** Present when the runtime was provisioned with a lease table. */
-  readonly leaseTableName: string | undefined;
+  /** Present when the runtime was provisioned with an outcome table. */
+  readonly outcomeTableName: string | undefined;
 }
 
 /**
- * Everything one test file needs: the access check, an image, optionally a
- * lease table, and a runtime that has reported READY. Deleted in `afterAll`
+ * Everything one test file needs: the access check, an image, optionally an
+ * outcome table, and a runtime that has reported READY. Deleted in `afterAll`
  * through `releaseResources`.
  */
 export async function provisionFixtureRuntime(
@@ -119,22 +125,22 @@ export async function provisionFixtureRuntime(
   options: {
     purpose: string;
     profile: RuntimeProfile;
-    leaseTable: boolean;
+    outcomeTable: boolean;
   },
 ): Promise<FixtureRuntime> {
   const prepared = await prepareFixtureImage(resources, options.purpose);
-  const leaseTableName = options.leaseTable
-    ? await createLeaseTable(
+  const outcomeTableName = options.outcomeTable
+    ? await createOutcomeTable(
         resources,
         prepared.clients,
-        prepared.names.leaseTableName,
+        prepared.names.outcomeTableName,
       )
     : undefined;
   const runtime = await createAgentRuntime(resources, prepared, {
     profile: options.profile,
   });
-  await waitForAgentRuntimeReady(prepared.clients, runtime);
-  return { ...prepared, runtime, leaseTableName };
+  await waitForAgentRuntimeReady(prepared.clients.control, runtime);
+  return { ...prepared, runtime, outcomeTableName };
 }
 
 async function createImageRepository(
@@ -145,7 +151,7 @@ async function createImageRepository(
   const created = await clients.ecr.send(
     new CreateRepositoryCommand({
       repositoryName,
-      tags: [{ Key: integTag.key, Value: integTag.value }],
+      tags: [integTag],
     }),
   );
   resources.defer(async () => {
@@ -172,30 +178,33 @@ async function createImageRepository(
 }
 
 /**
- * On-demand DynamoDB in the runtime's region, keyed by `leaseId`. The name
- * starts `agentforge-integ-`, which is all the execution role may touch.
+ * On-demand DynamoDB in the runtime's region, keyed by `outcomeKey`, for an
+ * outcome the container writes from its SIGTERM handler. The name starts
+ * `agentforge-integ-`, which is all the execution role may touch.
  */
-async function createLeaseTable(
+async function createOutcomeTable(
   resources: AsyncDisposableStack,
   clients: AgentCoreClients,
   tableName: string,
 ): Promise<string> {
-  await clients.dynamo.send(
+  await clients.dynamoDB.send(
     new CreateTableCommand({
       TableName: tableName,
-      AttributeDefinitions: [{ AttributeName: 'leaseId', AttributeType: 'S' }],
-      KeySchema: [{ AttributeName: 'leaseId', KeyType: 'HASH' }],
+      AttributeDefinitions: [
+        { AttributeName: 'outcomeKey', AttributeType: 'S' },
+      ],
+      KeySchema: [{ AttributeName: 'outcomeKey', KeyType: 'HASH' }],
       BillingMode: 'PAY_PER_REQUEST',
-      Tags: [{ Key: integTag.key, Value: integTag.value }],
+      Tags: [integTag],
     }),
   );
   resources.defer(async () => {
     try {
-      await clients.dynamo.send(
+      await clients.dynamoDB.send(
         new DeleteTableCommand({ TableName: tableName }),
       );
       await waitUntilTableNotExists(
-        { client: clients.dynamo, maxWaitTime: 300 },
+        { client: clients.dynamoDB, maxWaitTime: 300 },
         { TableName: tableName },
       );
     } catch (error) {
@@ -205,22 +214,18 @@ async function createLeaseTable(
     }
   });
   await waitUntilTableExists(
-    { client: clients.dynamo, maxWaitTime: 120 },
+    { client: clients.dynamoDB, maxWaitTime: 120 },
     { TableName: tableName },
   );
   return tableName;
 }
 
-export interface CreatedAgentRuntime {
-  readonly agentRuntimeArn: string;
-  readonly agentRuntimeId: string;
+export interface CreatedAgentRuntime extends AgentRuntimeReference {
   readonly agentRuntimeName: string;
   /** What `CreateAgentRuntime` reported, before any polling. */
   readonly statusAtCreation: string;
-  /** Local clock, immediately before and after `CreateAgentRuntime`. */
-  readonly createIssuedAt: number;
+  /** Local clock, immediately after `CreateAgentRuntime` returned. */
   readonly createReturnedAt: number;
-  readonly workloadIdentityName: string | undefined;
 }
 
 /**
@@ -234,7 +239,6 @@ export async function createAgentRuntime(
   options: { profile: RuntimeProfile },
 ): Promise<CreatedAgentRuntime> {
   const { clients, environment, names, image } = prepared;
-  const createIssuedAt = Date.now();
   const created = await clients.control.send(
     new CreateAgentRuntimeCommand({
       agentRuntimeName: names.agentRuntimeName,
@@ -242,6 +246,10 @@ export async function createAgentRuntime(
         containerConfiguration: { containerUri: image.imageUri },
       },
       roleArn: environment.executionRoleArn,
+      // What AgentForge runs on (docs/research/agentcore-runtime.md §Platform
+      // version V2): every container restored from one snapshot, and a create
+      // that takes minutes.
+      platformVersion: 'V2',
       networkConfiguration: { networkMode: 'PUBLIC' },
       protocolConfiguration: { serverProtocol: 'A2A' },
       requestHeaderConfiguration: {
@@ -252,153 +260,31 @@ export async function createAgentRuntime(
         Object.keys(options.profile.environmentVariables).length > 0
           ? { ...options.profile.environmentVariables }
           : undefined,
-      tags: { [integTag.key]: integTag.value },
+      tags: { [integTag.Key]: integTag.Value },
     }),
   );
   const createReturnedAt = Date.now();
-  const { agentRuntimeArn, agentRuntimeId, status } = created;
-  if (agentRuntimeArn === undefined || agentRuntimeId === undefined) {
-    throw new Error(
-      `CreateAgentRuntime ${names.agentRuntimeName} returned no ARN or id; look for it by name and delete it`,
-    );
-  }
   const runtime: CreatedAgentRuntime = {
-    agentRuntimeArn,
-    agentRuntimeId,
+    ...agentRuntimeReferenceFrom(created, names.agentRuntimeName),
     agentRuntimeName: names.agentRuntimeName,
-    statusAtCreation: String(status),
-    createIssuedAt,
+    statusAtCreation: String(created.status),
     createReturnedAt,
-    workloadIdentityName: created.workloadIdentityDetails?.workloadIdentityArn
-      ?.split('/')
-      .at(-1),
   };
   // Deferred in this order so release runs the runtime first, then its logs.
   resources.defer(() => deleteRuntimeLogGroups(clients, runtime));
-  resources.defer(() => deleteAgentRuntimeUntilGone(clients, runtime));
+  resources.defer(() => deleteAgentRuntimeUntilGone(clients.control, runtime));
   return runtime;
 }
 
-/** Generous: a cold image build dominates, and the runtime reaches READY in ~10 s. */
-export const provisioningTimeoutMilliseconds = 900_000;
-/** A runtime sits in DELETING for about five minutes; its workload identity follows. */
-export const teardownTimeoutMilliseconds = 1_500_000;
-
-const failedStatuses = new Set([
-  'CREATE_FAILED',
-  'UPDATE_FAILED',
-  'DELETE_FAILED',
-]);
-
-export async function waitForAgentRuntimeReady(
-  clients: AgentCoreClients,
-  runtime: CreatedAgentRuntime,
-): Promise<void> {
-  let lastStatus = runtime.statusAtCreation;
-  try {
-    await vi.waitUntil(
-      async () => {
-        const current = await clients.control.send(
-          new GetAgentRuntimeCommand({
-            agentRuntimeId: runtime.agentRuntimeId,
-          }),
-        );
-        lastStatus = String(current.status);
-        if (failedStatuses.has(lastStatus)) {
-          throw new Error(
-            `runtime ${runtime.agentRuntimeArn} is ${lastStatus}: ${current.failureReason ?? 'no failureReason given'}`,
-          );
-        }
-        return lastStatus === 'READY';
-      },
-      { timeout: 300_000, interval: 3_000 },
-    );
-  } catch (error) {
-    throw new Error(
-      `runtime ${runtime.agentRuntimeArn} did not become READY (last status ${lastStatus}): ${describeError(error)}`,
-      { cause: error },
-    );
-  }
-}
-
 /**
- * `DeleteAgentRuntime` returns at once but the runtime sits in DELETING for
- * about five minutes (docs/research/agentcore-runtime-observed.md), so a
- * teardown that returned on the call would leave it outliving the run. This
- * waits until it is gone, and until the workload identity AgentCore minted
- * alongside it is gone too — that one cannot be deleted by the caller.
+ * A cold image build and the access check, then a V2 create, which takes
+ * minutes before READY.
  */
-async function deleteAgentRuntimeUntilGone(
-  clients: AgentCoreClients,
-  runtime: CreatedAgentRuntime,
-): Promise<void> {
-  let lastStatus = 'not yet read';
-  try {
-    // A test may already have deleted it — the provisioning window test does.
-    // Gone is the goal, and a runtime already DELETING is not deleted twice.
-    const current = await clients.control
-      .send(
-        new GetAgentRuntimeCommand({ agentRuntimeId: runtime.agentRuntimeId }),
-      )
-      .catch((error: unknown) => {
-        if (isResourceNotFound(error)) return undefined;
-        throw error;
-      });
-    lastStatus = current === undefined ? 'gone' : String(current.status);
-    if (current !== undefined && lastStatus !== 'DELETING') {
-      await clients.control.send(
-        new DeleteAgentRuntimeCommand({
-          agentRuntimeId: runtime.agentRuntimeId,
-        }),
-      );
-    }
-    await vi.waitUntil(
-      async () => {
-        try {
-          const current = await clients.control.send(
-            new GetAgentRuntimeCommand({
-              agentRuntimeId: runtime.agentRuntimeId,
-            }),
-          );
-          lastStatus = String(current.status);
-          if (lastStatus === 'DELETE_FAILED') {
-            throw new Error(
-              `DELETE_FAILED: ${current.failureReason ?? 'no failureReason given'}`,
-            );
-          }
-          return false;
-        } catch (error) {
-          if (isResourceNotFound(error)) return true;
-          throw error;
-        }
-      },
-      { timeout: 900_000, interval: 10_000 },
-    );
-    const workloadIdentityName = runtime.workloadIdentityName;
-    if (workloadIdentityName !== undefined) {
-      lastStatus = `runtime gone; workload identity ${workloadIdentityName} still listed`;
-      await vi.waitUntil(
-        async () => {
-          try {
-            await clients.control.send(
-              new GetWorkloadIdentityCommand({ name: workloadIdentityName }),
-            );
-            return false;
-          } catch (error) {
-            if (isResourceNotFound(error)) return true;
-            throw error;
-          }
-        },
-        { timeout: 300_000, interval: 10_000 },
-      );
-    }
-  } catch (error) {
-    throw new Error(
-      `runtime ${runtime.agentRuntimeArn} (last status ${lastStatus}): ${describeError(error)}`,
-      { cause: error },
-    );
-  }
-}
+export const provisioningTimeoutMilliseconds =
+  600_000 + agentRuntimeStatusTimeoutMilliseconds;
+/** The runtime's deletion dominates; its log groups, repository and table follow. */
+export const teardownTimeoutMilliseconds =
+  agentRuntimeDeletionTimeoutMilliseconds + 600_000;
 
 /** AgentCore creates the runtime's log groups; they go when it does. */
 async function deleteRuntimeLogGroups(
@@ -423,14 +309,4 @@ async function deleteRuntimeLogGroups(
       cause: error,
     });
   }
-}
-
-function isResourceNotFound(error: unknown): boolean {
-  return error instanceof Error && error.name === 'ResourceNotFoundException';
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error
-    ? `${error.name}: ${error.message}`
-    : String(error);
 }

@@ -20,6 +20,10 @@
  * the start of a turn, so this reads the same listing from the `initialize`
  * control response's `commands`.
  *
+ * `['user','project']` with no repository, and with a `.git` at the agent
+ * level, are asserted in `what-composes.test.ts`, which probes every kind of
+ * marker under those settings.
+ *
  * Findings: docs/research/capability-composition.md (the settingSources table
  * is in the note's first version, commit 17949bc).
  */
@@ -45,7 +49,7 @@ const everyLayer: CapabilityLayerPresence = {
 };
 
 function createTree(testName: string): CapabilityLayerTree {
-  const tree = createCapabilityLayerTree(`l1-${testName}`, {
+  const tree = createCapabilityLayerTree(`nested-scopes-${testName}`, {
     skillsSubagentsAndHooks: false,
   });
   onTestFinished(() => tree.dispose());
@@ -59,9 +63,8 @@ async function discoveredCommandNames(
   options: Partial<Options>,
 ): Promise<string[]> {
   const recording = new QueryRecording(
-    'integ',
     'capability-composition',
-    `l1-nested-scopes-${testName}`,
+    `nested-scopes-${testName}`,
   );
   const { initializationResult } = await readSessionStartWithoutATurn(
     {
@@ -79,18 +82,7 @@ async function discoveredCommandNames(
   return initializationResult.commands.map((command) => command.name);
 }
 
-describe('L1 — nested .claude directories above cwd compose', () => {
-  it("settingSources ['user','project'] loads every layer", async () => {
-    const tree = createTree('user-and-project');
-    const names = await discoveredCommandNames('user-and-project', tree, {
-      settingSources: ['user', 'project'],
-    });
-    expect(
-      layersPresent(names, 'marker-'),
-      `discovery walks up from cwd; commands seen: ${JSON.stringify(names)}`,
-    ).toEqual(everyLayer);
-  });
-
+describe('nested .claude directories above cwd compose', () => {
   it("settingSources ['project'] drops only the user layer", async () => {
     const tree = createTree('project-only');
     const names = await discoveredCommandNames('project-only', tree, {
@@ -109,20 +101,6 @@ describe('L1 — nested .claude directories above cwd compose', () => {
       layersPresent(names, 'marker-'),
       `commands seen: ${JSON.stringify(names)}`,
     ).toEqual(everyLayer);
-  });
-
-  it('a .git at the agent level hides the agentic-project layer above it', async () => {
-    // Load-bearing: an agent image may well contain a git repository, and a
-    // repository root halts discovery for every layer ABOVE it — silently.
-    const tree = createTree('repository-at-agent');
-    tree.plantRepositoryAt('agent');
-    const names = await discoveredCommandNames('repository-at-agent', tree, {
-      settingSources: ['user', 'project'],
-    });
-    expect(
-      layersPresent(names, 'marker-'),
-      `commands seen: ${JSON.stringify(names)}`,
-    ).toEqual({ ...everyLayer, agenticProject: false });
   });
 
   it('additionalDirectories contributes its commands, not only read access', async () => {

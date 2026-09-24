@@ -1,260 +1,178 @@
 /**
- * DESIGN_OPTIONS §E, question 2:
- *   "With background work enabled, does a resumed turn still cancel its tool calls?"
+ * With background work ON, a background completion starts a new turn and
+ * publishes a second result — the drift detector for the reason the kernel
+ * switches background work off (docs/ARCHITECTURE.md §7).
  *
- * The predecessor harness kept everything in the foreground because a turn
- * resumed by background work cancelled its own final submission. The current
- * SDK has an explicit hold-back: a result produced while background work is
- * live is withheld until that work settles, and on a closed-input run the
- * tasks are then killed. This asks what that does to the `structured_output`
- * attachment.
+ * The kernel runs in streaming input and output with
+ * `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`. This runs the same input mode
+ * with the switch left off, has the agent background a command that outlives
+ * its own submission, and holds the input open until the second result. If the
+ * SDK stops starting a turn on a background completion — or starts marking it
+ * differently — this is what says so, and it feeds the open question of
+ * whether background work can be allowed with a deterministic final answer
+ * (docs/DESIGN_OPTIONS.md §E).
  *
- * Two scenarios, both with background work genuinely running when the agent
- * submits:
- *   closed-input        — the string-prompt form (stdin closed), which is what
- *                         AgentForge's kernel would use.
- *   streaming-input     — the async-iterable form (stdin open), where a task
- *                         notification can resume the turn.
- *
- * `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` is not re-tested: it only removes
- * the `run_in_background` parameter, whether the model reaches for it is its
- * choice, and on 2026-09-24 it detached the work through the shell instead.
+ * The assertions are structural and hold whether the model's answers are
+ * right or wrong: two results, the second from a task notification. Closed
+ * input is not tested — the kernel never uses it.
  *
  * Findings: docs/research/kernel-settlement.md, "E2".
  */
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
-import {
-  query,
-  type SDKResultMessage,
-  type SDKTaskNotificationMessage,
-  type SDKUserMessage,
+import type {
+  SDKResultMessage,
+  SDKTaskNotificationMessage,
+  SDKTaskStartedMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import {
+  carrierToolName,
   createSandbox,
   createSubscriptionEnvironment,
   QueryRecording,
+  runWithStreamingInput,
 } from '../../__fixtures__/claude-agent-sdk.ts';
 
-const OutputSchema = z.object({
+const outputSchema = z.object({
   startedBackgroundWork: z
     .boolean()
     .describe('whether a background command was started'),
   note: z.string().describe('one sentence about what was started'),
 });
-const outputJsonSchema = z.toJSONSchema(OutputSchema, { target: 'draft-7' });
+const outputJsonSchema = z.toJSONSchema(outputSchema, { target: 'draft-7' });
 
-// The agent must background something that outlives its own submission, so the
-// hold-back (if any) is observable rather than raced.
-const PROMPT =
+// The agent must background something that outlives its own submission, so
+// its completion arrives after the first result rather than racing it.
+const prompt =
   'Using the Bash tool with run_in_background set to true, start this exact command: ' +
   '`sleep 25 && echo finished > background-done.txt`. ' +
   'Do NOT wait for it and do NOT poll it. The moment the tool returns, immediately give your ' +
   'final structured output saying you started it. Speed matters more than completeness.';
 
-const BACKGROUND_MARKER_FILE = 'background-done.txt';
-const CARRIER_TOOL = 'StructuredOutput';
-
 /**
- * Stdin stays open until `release` is called, which is what distinguishes an
- * open-input session from `-p`. The test releases it once the first result
- * lands, plus a grace window in which a task notification could still resume
- * the turn.
+ * How long after the first result to wait for the second before ending the
+ * input anyway. The command sleeps 25 s from before the first result, so this
+ * is generous; expiring it fails the test with the recording as evidence.
  */
-function streamingPrompt(text: string): {
-  prompt: AsyncIterable<SDKUserMessage>;
-  release: () => void;
-} {
-  const { promise: released, resolve: release } = Promise.withResolvers<void>();
-  async function* generator(): AsyncGenerator<SDKUserMessage> {
-    yield {
-      type: 'user',
-      message: { role: 'user', content: text },
-      parent_tool_use_id: null,
-    };
-    await released;
-  }
-  return { prompt: generator(), release };
-}
+const secondResultDeadlineMilliseconds = 90_000;
 
-type Scenario = {
-  name: 'closed-input' | 'streaming-input';
-  streaming: boolean;
-};
-
-const scenarios: Scenario[] = [
-  { name: 'closed-input', streaming: false },
-  { name: 'streaming-input', streaming: true },
-];
-
-function validStructuredOutput(result: SDKResultMessage): boolean {
-  return (
-    result.subtype === 'success' &&
-    OutputSchema.safeParse(result.structured_output).success
-  );
-}
-
-describe('E2 — background work and the resumed turn', () => {
-  it.each(scenarios)('$name', async (scenario) => {
-    const sandbox = createSandbox(`e2-${scenario.name}`);
+describe('with background work on, a background completion publishes a second result', () => {
+  it('streaming-input', async () => {
+    const sandbox = createSandbox('background-settlement-streaming-input');
     onTestFinished(() => sandbox.dispose());
-    const backgroundMarker = join(
-      sandbox.workingDirectory,
-      BACKGROUND_MARKER_FILE,
-    );
 
-    const streaming = scenario.streaming ? streamingPrompt(PROMPT) : undefined;
     const startedAt = Date.now();
-    let submittedAtMilliseconds: number | undefined;
-    let firstResultAtMilliseconds: number | undefined;
+    let resultCount = 0;
+    let deadlineTimer: NodeJS.Timeout | undefined;
+    let deadlineExpired = false;
+    onTestFinished(() => clearTimeout(deadlineTimer));
 
     const recording = new QueryRecording(
-      'integ',
       'kernel-settlement',
-      `e2-background-settlement-${scenario.name}`,
+      'background-settlement-streaming-input',
     );
-    await recording.drain(
-      query({
-        prompt: streaming ? streaming.prompt : PROMPT,
-        options: {
-          cwd: sandbox.workingDirectory,
-          env: createSubscriptionEnvironment(sandbox.configDirectory),
-          model: 'claude-sonnet-5',
-          allowedTools: ['Bash'],
-          permissionMode: 'bypassPermissions',
-          allowDangerouslySkipPermissions: true,
-          outputFormat: { type: 'json_schema', schema: outputJsonSchema },
-          maxTurns: 12,
-          settingSources: [],
-        },
-      }),
-      (message) => {
-        if (
-          message.type === 'assistant' &&
-          submittedAtMilliseconds === undefined
-        ) {
-          for (const block of message.message.content) {
-            if (block.type === 'tool_use' && block.name === CARRIER_TOOL) {
-              submittedAtMilliseconds = Date.now() - startedAt;
-            }
-          }
+    await runWithStreamingInput(
+      recording,
+      prompt,
+      {
+        cwd: sandbox.workingDirectory,
+        env: createSubscriptionEnvironment(sandbox.configDirectory),
+        model: 'claude-sonnet-5',
+        allowedTools: ['Bash'],
+        permissionMode: 'bypassPermissions',
+        allowDangerouslySkipPermissions: true,
+        outputFormat: { type: 'json_schema', schema: outputJsonSchema },
+        maxTurns: 12,
+        settingSources: [],
+      },
+      (message, endInput) => {
+        if (message.type !== 'result') return;
+        resultCount += 1;
+        if (resultCount === 1) {
+          deadlineTimer = setTimeout(() => {
+            deadlineExpired = true;
+            endInput();
+          }, secondResultDeadlineMilliseconds);
         }
-        if (
-          message.type === 'result' &&
-          firstResultAtMilliseconds === undefined
-        ) {
-          firstResultAtMilliseconds = Date.now() - startedAt;
-          // A streaming-input session never ends on its own. Hold it open past
-          // the result, so a task notification still has a turn to resume;
-          // then close stdin so the run can end.
-          if (streaming) setTimeout(streaming.release, 20_000);
+        if (resultCount === 2) {
+          clearTimeout(deadlineTimer);
+          endInput();
         }
       },
     );
 
-    // Did the backgrounded command live long enough to write its marker?
-    const markerExistsAfterRun = existsSync(backgroundMarker);
-    // Give it the rest of its 25 s to tell killed from merely unfinished.
-    await delay(Math.max(0, 28_000 - (Date.now() - startedAt)));
-    const markerExistsAfter28Seconds = existsSync(backgroundMarker);
-
     const results = recording.resultMessages();
+    const firstResultIndex =
+      results[0] === undefined ? -1 : recording.messages.indexOf(results[0]);
+    const backgroundedTasks = recording.messages.filter(
+      (message): message is SDKTaskStartedMessage =>
+        message.type === 'system' &&
+        message.subtype === 'task_started' &&
+        message.is_backgrounded === true,
+    );
     const taskNotifications = recording.messages.filter(
       (message): message is SDKTaskNotificationMessage =>
         message.type === 'system' && message.subtype === 'task_notification',
     );
-    const toolUses = recording.toolUses();
-    const backgroundedBash = toolUses.filter(
-      (toolUse) =>
-        toolUse.name === 'Bash' &&
-        (toolUse.input as { run_in_background?: unknown }).run_in_background ===
-          true,
-    );
     const evidence = [
-      `results=${results.length} submitted@${submittedAtMilliseconds ?? '-'}ms firstResult@${firstResultAtMilliseconds ?? '-'}ms`,
+      `results=${results.length} origins=${JSON.stringify(results.map((result) => result.origin ?? null))}`,
+      `backgroundedTasks=${backgroundedTasks.length}`,
       `taskNotifications=${JSON.stringify(taskNotifications.map((notification) => notification.status))}`,
-      `marker: afterRun=${markerExistsAfterRun} after28s=${markerExistsAfter28Seconds}`,
+      `carrierSubmissions=${recording.toolUseNames().filter((name) => name === carrierToolName).length}`,
+      `deadlineExpired=${deadlineExpired} elapsed=${Date.now() - startedAt}ms`,
       `see ${recording.logPath}`,
     ].join('; ');
 
+    // Preconditions — the model's choices the scenario depends on. Without
+    // them it tested nothing, and it fails saying so.
     expect(
-      backgroundedBash.length,
-      `the agent attempted a Bash call with run_in_background: true; without it the scenario tested nothing; ${evidence}`,
+      firstResultIndex,
+      `precondition: the run published a result; ${evidence}`,
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      backgroundedTasks.filter(
+        (task) => recording.messages.indexOf(task) < firstResultIndex,
+      ).length,
+      `precondition: the agent started background work before its first result; ${evidence}`,
     ).toBeGreaterThan(0);
+    expect(
+      taskNotifications.filter(
+        (notification) =>
+          recording.messages.indexOf(notification) < firstResultIndex,
+      ),
+      `precondition: the background work was still live when the first result was published; ${evidence}`,
+    ).toEqual([]);
 
-    if (scenario.name === 'closed-input') {
-      expect(
-        results,
-        `closed input yields exactly one result; ${evidence}`,
-      ).toHaveLength(1);
-      const result = recording.onlyResultMessage();
-      expect(result.is_error, evidence).toBe(false);
-      expect(
-        validStructuredOutput(result),
-        `structured_output present and valid; ${evidence}`,
-      ).toBe(true);
-      // Hold-back tasks are killed when the held result is released: with
-      // stdin closed, a stop_task control could never be delivered.
-      expect(
-        taskNotifications.map((notification) => notification.status),
-        `the background task is killed at the result; ${evidence}`,
-      ).toEqual(['stopped']);
-      expect(markerExistsAfterRun, evidence).toBe(false);
-      expect(
-        markerExistsAfter28Seconds,
-        `the killed command never wrote its marker; ${evidence}`,
-      ).toBe(false);
-    }
-
-    if (scenario.name === 'streaming-input') {
-      // The completing task's notification starts a whole new turn, with a
-      // second system/init, which submits again and publishes a second result.
-      // Neither is cancelled; a consumer keeping the last result it sees ships
-      // an answer to a question nobody asked.
-      expect(
-        results,
-        `open input yields a second result; ${evidence}`,
-      ).toHaveLength(2);
-      const [firstResult, secondResult] = results as [
-        SDKResultMessage,
-        SDKResultMessage,
-      ];
-      for (const result of [firstResult, secondResult]) {
-        expect(result.subtype, evidence).toBe('success');
-        expect(result.is_error, evidence).toBe(false);
-        expect(
-          validStructuredOutput(result),
-          `both results carry valid structured_output; ${evidence}`,
-        ).toBe(true);
-      }
-      const firstResultIndex = recording.messages.indexOf(firstResult);
-      const secondResultIndex = recording.messages.indexOf(secondResult);
-      const between = recording.messages.slice(
-        firstResultIndex + 1,
-        secondResultIndex,
-      );
-      expect(
-        between.some(
+    // The drift detector.
+    expect(
+      deadlineExpired,
+      `the second result arrived within ${secondResultDeadlineMilliseconds} ms of the first; ${evidence}`,
+    ).toBe(false);
+    expect(
+      results,
+      `open input yields a second result; ${evidence}`,
+    ).toHaveLength(2);
+    const [firstResult, secondResult] = results as [
+      SDKResultMessage,
+      SDKResultMessage,
+    ];
+    expect(
+      secondResult.origin?.kind,
+      `the second result is marked as started by a task notification; ${evidence}`,
+    ).toBe('task-notification');
+    expect(
+      recording.messages
+        .slice(
+          recording.messages.indexOf(firstResult) + 1,
+          recording.messages.indexOf(secondResult),
+        )
+        .some(
           (message) =>
             message.type === 'system' &&
             message.subtype === 'task_notification' &&
             message.status === 'completed',
         ),
-        `a completed task_notification arrives between the two results; ${evidence}`,
-      ).toBe(true);
-      expect(
-        between.some(
-          (message) => message.type === 'system' && message.subtype === 'init',
-        ),
-        `the resumed turn opens with a second system/init; ${evidence}`,
-      ).toBe(true);
-      expect(
-        markerExistsAfter28Seconds,
-        `the background command completed; ${evidence}`,
-      ).toBe(true);
-    }
+      `a completed task_notification arrives between the two results; ${evidence}`,
+    ).toBe(true);
   });
 });

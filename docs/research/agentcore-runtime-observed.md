@@ -1,8 +1,10 @@
 # AgentCore Runtime — what it actually does
 
+Every observation here, the 2026-09-24 re-run included, was made on platform version V1; from 2026-09-24 the tests provision on V2 and re-check them there.
+
 **Measured on 2026-09-22** against a real runtime in `us-west-2`, and **re-run on 2026-09-24 in `us-east-2`** by the integration tests, which all pass there — every finding below held except the pre-warmed pool, as noted. Account 913756569129: an ARM64 container, `PUBLIC` network mode, `serverProtocol: A2A`, built on `@a2a-js/sdk@1.2.0`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §B, §C's platform half, and the AgentCore half of §I.
 
-This note is **observed behaviour**. [`agentcore-runtime.md`](agentcore-runtime.md) is what the documentation *says*; where the two differ, this note names the difference. Source: `spikes/agentcore/`, carried at A0 into `packages/agentforge/integ/aws/agentcore/`, which re-checks it against the platform. The container mints a container id at process start and returns it on every task, so "the same container" is observed rather than inferred.
+This note is **observed behaviour**. [`agentcore-runtime.md`](agentcore-runtime.md) is what the documentation *says*; where the two differ, this note names the difference. Source: `spikes/agentcore/`, carried at A0 into `packages/agentforge/integ/aws/agentcore/`, which re-checks it against the platform. The container mints a container id — on its first invocation since V2, whose containers are all restored from one snapshot — and returns it on every task, so "the same container" is observed rather than inferred.
 
 No model was called. A "task" is a timer, so every number here is platform cost.
 
@@ -66,7 +68,7 @@ What 1.0-only requires, all of it configuration:
 3. the runtime allowlists **`A2A-Version`**;
 4. **nothing on the client.** The SDK's own `ClientFactory` over `JsonRpcTransportFactory`, built from the 1.0-only card, sends `A2A-Version: 1.0` and the `SendMessage` method **by itself** — measured end to end, server negotiated 1.0.
 
-**Confirmed end to end on the real platform**, not inferred from two halves: a strict 1.0 runtime (`A2A_STRICT_10=1`, `requestHeaderAllowlist: ["A2A-Version"]`) answered `A2A-Version: 1.0` + `SendMessage` with `negotiated=1.0`, and refused the same call without the header.
+**Confirmed end to end on the real platform**, not inferred from two halves: a strict 1.0 runtime (`A2A_ONE_ZERO_ONLY=1`, `requestHeaderAllowlist: ["A2A-Version"]`) answered `A2A-Version: 1.0` + `SendMessage` with `negotiated=1.0`, and refused the same call without the header.
 
 ### The 1.0 wire shape, captured from the SDK's own client
 

@@ -15,14 +15,15 @@ export type FixtureAgentCard = AgentCard & {
 };
 
 /**
- * §I — with `strict10` the card declares ONE interface, 1.0, and the server
+ * §I — with `a2aOneZeroOnly` the card declares ONE interface, 1.0, and the server
  * turns `legacyCompat` off: AgentForge's configuration (ADR 0014). Without it
  * the card declares 1.0 and 0.3, and an absent `A2A-Version` negotiates 0.3 —
- * the permissive configuration the header allowlist was first measured on.
+ * the permissive configuration, kept only as the control that shows what the
+ * strict one refuses.
  */
 export function buildFixtureAgentCard(options: {
   url: string;
-  strict10: boolean;
+  a2aOneZeroOnly: boolean;
 }): FixtureAgentCard {
   const interfaceFor = (protocolVersion: string): AgentInterface => ({
     url: options.url,
@@ -38,7 +39,7 @@ export function buildFixtureAgentCard(options: {
     description: 'AgentCore contract fixture: a task is a timer',
     version: '0.0.0',
     provider: undefined,
-    supportedInterfaces: options.strict10
+    supportedInterfaces: options.a2aOneZeroOnly
       ? [interfaceFor('1.0')]
       : [interfaceFor('1.0'), interfaceFor('0.3')],
     capabilities: {

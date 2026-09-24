@@ -11,19 +11,23 @@
  * ONE container across the CREATING → READY transition. One observation —
  * enough to say a caller must tolerate a multi-second first call, not enough
  * to say a 409 never happens; this keeps checking.
+ *
+ * That was platform version V1. On V2 a create takes minutes while the
+ * snapshot is prepared (docs/research/agentcore-runtime.md §Platform version
+ * V2), so the window is probed for as long as a create may take.
  */
 import { setTimeout } from 'node:timers/promises';
 import { GetAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore-control';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { agentRuntimeStatusTimeoutMilliseconds } from './__fixtures__/agent-runtime-status.ts';
 import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
 import {
   A2aOverAgentCore,
   type Invocation,
   sendMessageParams,
-  taskFrom,
 } from './__fixtures__/invocation.ts';
 import {
-  a2a10OnlyProfile,
+  a2aOneZeroOnlyProfile,
   createAgentRuntime,
   type PreparedFixtureImage,
   prepareFixtureImage,
@@ -34,6 +38,10 @@ import {
   createResourceStack,
   releaseResources,
 } from './__fixtures__/resources.ts';
+
+/** Probing lasts as long as a create may; a blocked invocation adds to it. */
+const windowTimeoutMilliseconds =
+  agentRuntimeStatusTimeoutMilliseconds + 120_000;
 
 interface WindowObservation {
   /** Since `CreateAgentRuntime` returned, when the probe was issued. */
@@ -55,93 +63,92 @@ describe('the AgentCore provisioning window (§B)', () => {
     teardownTimeoutMilliseconds,
   );
 
-  it('blocks an invocation issued while CREATING until it can be served — no 409 — on one container throughout', async () => {
-    const created = await createAgentRuntime(resources, prepared, {
-      profile: a2a10OnlyProfile,
-    });
-    expect(created.statusAtCreation).toBe('CREATING');
-    const a2a = new A2aOverAgentCore(
-      prepared.clients.data,
-      created.agentRuntimeArn,
-    );
-
-    // One session id for the whole window, so the container it lands on can
-    // be compared either side of the transition.
-    const session = newRuntimeSessionId('window');
-    const observations: WindowObservation[] = [];
-    let readyAfterMilliseconds: number | undefined;
-    let firstServedAt: number | undefined;
-    const giveUpAt = created.createReturnedAt + 180_000;
-    while (Date.now() < giveUpAt) {
-      const elapsedMilliseconds = Date.now() - created.createReturnedAt;
-      const { status } = await prepared.clients.control.send(
-        new GetAgentRuntimeCommand({ agentRuntimeId: created.agentRuntimeId }),
-      );
-      const controlPlaneStatus = String(status);
-      if (
-        controlPlaneStatus === 'READY' &&
-        readyAfterMilliseconds === undefined
-      ) {
-        readyAfterMilliseconds = elapsedMilliseconds;
-      }
-      const invocation = await a2a.invoke(
-        session,
-        'SendMessage',
-        sendMessageParams({ runMilliseconds: 100 }),
-      );
-      observations.push({
-        elapsedMilliseconds,
-        controlPlaneStatus,
-        invocation,
+  it(
+    'blocks an invocation issued while CREATING until it can be served — no 409 — on one container throughout',
+    async () => {
+      const created = await createAgentRuntime(resources, prepared, {
+        profile: a2aOneZeroOnlyProfile,
       });
-      if (invocation.delivered) firstServedAt ??= Date.now();
-      // Keep probing past both the first answer and READY, so the session is
-      // seen on either side of the transition.
-      if (
-        firstServedAt !== undefined &&
-        readyAfterMilliseconds !== undefined &&
-        Date.now() > firstServedAt + 8_000
-      ) {
-        break;
-      }
-      await setTimeout(1_000);
-    }
+      expect(created.statusAtCreation).toBe('CREATING');
+      const a2a = new A2aOverAgentCore(
+        prepared.clients.data,
+        created.agentRuntimeArn,
+      );
 
-    const summary = JSON.stringify(
-      observations.map(
-        ({ elapsedMilliseconds, controlPlaneStatus, invocation }) => ({
+      // One session id for the whole window, so the container it lands on can
+      // be compared either side of the transition.
+      const session = newRuntimeSessionId('window');
+      const observations: WindowObservation[] = [];
+      let readyAfterMilliseconds: number | undefined;
+      let firstServedAt: number | undefined;
+      const giveUpAt =
+        created.createReturnedAt + agentRuntimeStatusTimeoutMilliseconds;
+      while (Date.now() < giveUpAt) {
+        const elapsedMilliseconds = Date.now() - created.createReturnedAt;
+        const { status } = await prepared.clients.control.send(
+          new GetAgentRuntimeCommand({
+            agentRuntimeId: created.agentRuntimeId,
+          }),
+        );
+        const controlPlaneStatus = String(status);
+        if (
+          controlPlaneStatus === 'READY' &&
+          readyAfterMilliseconds === undefined
+        ) {
+          readyAfterMilliseconds = elapsedMilliseconds;
+        }
+        const invocation = await a2a.invoke(
+          session,
+          'SendMessage',
+          sendMessageParams({ runMilliseconds: 100 }),
+        );
+        observations.push({
           elapsedMilliseconds,
           controlPlaneStatus,
-          delivered: invocation.delivered,
-          latencyMilliseconds: invocation.latencyMilliseconds,
-          refusal: invocation.delivered
-            ? undefined
-            : `${invocation.httpStatusCode} ${invocation.errorName}`,
-        }),
-      ),
-    );
-    // No refusal of any kind — in particular no 409 RetryableConflictException.
-    expect(
-      observations.filter(({ invocation }) => !invocation.delivered),
-      summary,
-    ).toEqual([]);
-    // The window exists: the first invocation went out while CREATING, and
-    // was served rather than refused.
-    const [first] = observations;
-    expect(first?.controlPlaneStatus, summary).toBe('CREATING');
-    // READY in seconds, not minutes (~10 s measured).
-    expect(readyAfterMilliseconds, summary).toBeDefined();
-    expect(readyAfterMilliseconds).toBeLessThan(60_000);
-    // One container served the session across CREATING → READY.
-    const containers = observations.map(
-      ({ invocation }) =>
-        taskFrom(invocation, 'SendMessage').metadata.containerId,
-    );
-    expect(new Set(containers).size, summary).toBe(1);
-    expect(
-      observations.some(
-        ({ controlPlaneStatus }) => controlPlaneStatus === 'READY',
-      ),
-    ).toBe(true);
-  }, 300_000);
+          invocation,
+        });
+        if (invocation.delivered) firstServedAt ??= Date.now();
+        // Keep probing past both the first answer and READY, so the session is
+        // seen on either side of the transition.
+        if (
+          firstServedAt !== undefined &&
+          readyAfterMilliseconds !== undefined &&
+          Date.now() > firstServedAt + 8_000
+        ) {
+          break;
+        }
+        await setTimeout(1_000);
+      }
+
+      const summary = JSON.stringify(
+        observations.map(
+          ({ elapsedMilliseconds, controlPlaneStatus, invocation }) => ({
+            elapsedMilliseconds,
+            controlPlaneStatus,
+            delivered: invocation.delivered,
+            latencyMilliseconds: invocation.latencyMilliseconds,
+            refusal: invocation.delivered
+              ? undefined
+              : `${invocation.httpStatusCode} ${invocation.errorName}`,
+          }),
+        ),
+      );
+      // No refusal of any kind — in particular no 409 RetryableConflictException.
+      expect(
+        observations.filter(({ invocation }) => !invocation.delivered),
+        summary,
+      ).toEqual([]);
+      // The window exists: the first invocation went out while CREATING, and
+      // was served rather than refused.
+      const [first] = observations;
+      expect(first?.controlPlaneStatus, summary).toBe('CREATING');
+      expect(readyAfterMilliseconds, summary).toBeDefined();
+      expect(
+        observations.some(
+          ({ controlPlaneStatus }) => controlPlaneStatus === 'READY',
+        ),
+      ).toBe(true);
+    },
+    windowTimeoutMilliseconds,
+  );
 });

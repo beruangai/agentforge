@@ -27,7 +27,7 @@ import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
 import type { ContainerLogEventNamed } from './__fixtures__/container-log-events.ts';
 import { A2aOverAgentCore } from './__fixtures__/invocation.ts';
 import {
-  a2a10OnlyProfile,
+  a2aOneZeroOnlyProfile,
   type FixtureRuntime,
   provisionFixtureRuntime,
   provisioningTimeoutMilliseconds,
@@ -55,8 +55,8 @@ describe('the grace period after StopRuntimeSession (§C)', () => {
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'grace',
-      profile: a2a10OnlyProfile,
-      leaseTable: false,
+      profile: a2aOneZeroOnlyProfile,
+      outcomeTable: false,
     });
     a2a = new A2aOverAgentCore(
       fixture.clients.data,

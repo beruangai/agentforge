@@ -1,10 +1,10 @@
 /**
  * Error fidelity — recorded in docs/research/procedure-framework.md.
  *
- * Across a serialising transport the message, the structured `data` and the
- * original stack all arrive, because the link carries them: oRPC does not
- * marshal errors behind the caller's back, so fidelity is the link's choice,
- * and the `Rethrow` plugin is an HTTP-adapter concern AgentForge does not need.
+ * Only what oRPC itself provides: `call` hands a raw error back as itself, with
+ * its original stack, and an `ORPCError` crosses a serialising transport with
+ * its code, message and structured `data`. How a raw error's stack would cross
+ * is the link's own code, and not tested here.
  */
 import { ORPCError } from '@orpc/client';
 import { call } from '@orpc/server';
@@ -32,32 +32,8 @@ describe('in process', () => {
 });
 
 describe('across a serialising transport', () => {
-  it('carries a raw error’s name, message and original stack', async () => {
-    const client = createSerialisingClient({ carryStack: true });
-
-    const rejection = client.ThrowError({ kind: 'RAW' });
-
-    await expect(rejection).rejects.not.toBeInstanceOf(ORPCError);
-    await expect(rejection).rejects.toMatchObject({
-      name: 'Error',
-      message: 'a raw error with a real stack',
-      stack: expect.stringContaining(throwingModulePath),
-    });
-  });
-
-  it('loses the original stack when the link does not carry it — the check can fail', async () => {
-    const client = createSerialisingClient({ carryStack: false });
-
-    const rejection = client.ThrowError({ kind: 'RAW' });
-
-    await expect(rejection).rejects.toMatchObject({
-      message: 'a raw error with a real stack',
-      stack: expect.not.stringContaining(throwingModulePath),
-    });
-  });
-
   it('carries an ORPCError’s code, message and structured data', async () => {
-    const client = createSerialisingClient({ carryStack: true });
+    const client = createSerialisingClient();
 
     const rejection = client.ThrowError({ kind: 'ORPC_ERROR' });
 

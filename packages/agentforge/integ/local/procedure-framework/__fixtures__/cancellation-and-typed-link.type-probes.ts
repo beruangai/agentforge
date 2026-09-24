@@ -1,8 +1,9 @@
 // biome-ignore-all format: a @ts-expect-error covers only the line after it, so reflowing a probe would move its error off that line
 /**
- * Type probes, checked by `tsc` from `cancellation-and-typed-link.test.ts`.
- * Each `@ts-expect-error` must still be an error; one that stops erroring is
- * reported as unused and fails the check.
+ * Type probes, compiled by the `typecheck` target (`tsconfig.spec.json`
+ * includes `integ/`) under the project's strict settings. Each
+ * `@ts-expect-error` must still be an error; one that stops erroring is
+ * reported as unused (TS2578) and fails `typecheck`.
  */
 import { type ClientLink, createORPCClient } from '@orpc/client';
 import type { ContractRouterClient } from '@orpc/contract';
@@ -22,7 +23,7 @@ export async function clientContextProbes() {
   await client.SendMessage({ strategyId: 'a' }, { context: { idempotency: 'a' } });
 
   const handle = await client.SendMessage({ strategyId: 'a' }, { context: { idempotencyKey: 'k' } });
-  expectTypeOf(handle.state).toEqualTypeOf<'SUBMITTED'>();
+  expectTypeOf(handle.state).toEqualTypeOf<'TASK_STATE_SUBMITTED'>();
 }
 
 /**

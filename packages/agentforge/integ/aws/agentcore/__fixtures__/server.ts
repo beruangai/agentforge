@@ -1,10 +1,9 @@
 /**
  * The container the AgentCore integration tests run: an A2A server on
- * AgentCore's contract, carrying the §I gateway and instrumented for §A, §B,
- * §C and §I's pass-through questions. It is the thing AgentCore's behaviour is
- * observed through — NOT AgentForge's server, which is built in A1. No model
- * is called — a "task" is a timer — so the tests are deterministic and cost
- * nothing but compute.
+ * AgentCore's contract, instrumented for §B, §C and §I. It is the thing
+ * AgentCore's behaviour is observed through — NOT AgentForge's server, which is
+ * built in A1. No model is called — a "task" is a timer — so the tests are
+ * deterministic and cost nothing but compute.
  *
  * Bundled with `bun build --target=bun` and run on Bun inside the image.
  *
@@ -13,21 +12,24 @@
  *   GET /ping returning {"status": "Healthy" | "HealthyBusy"}.
  *
  * What it records, so the tests can assert rather than infer:
- *   - a CONTAINER ID minted once at process start, returned on every task, so a
- *     second container serving one runtime session id is detectable (§B)
- *   - every request's header names, to stdout, so `A2A-Version`, custom
- *     headers and `content-type` can be checked for pass-through through
- *     `InvokeAgentRuntime` (§I)
+ *   - a CONTAINER ID, returned on every task, so which container answered is
+ *     observed (§B, §C)
+ *   - every invocation's `A2A-Version`, session id and JSON-RPC method, to
+ *     stdout, so what reached the container is observed (§I)
  *   - live task count, driving /ping (§B)
- *   - SIGTERM receipt and a heartbeat after it, for `StopRuntimeSession` (§C)
+ *   - SIGTERM receipt and a heartbeat after it, for `StopRuntimeSession` (§C),
+ *     and an outcome written from the SIGTERM handler
+ *
+ * Nothing that must differ per container is taken at startup. On platform
+ * version V2 every container is restored from one snapshot taken at the first
+ * healthy `/ping`, so a value minted at process start is the same in every
+ * container (docs/research/agentcore-runtime.md §Platform version V2).
  */
 import { randomUUIDv7 } from 'node:crypto';
 import {
   type AgentCard,
   type Message,
   type Part,
-  type SendMessageRequest,
-  type Task,
   TaskState,
 } from '@a2a-js/sdk';
 import {
@@ -38,14 +40,9 @@ import {
   type ExecutionEventBus,
   InMemoryTaskStore,
   type RequestContext,
-  type ServerCallContext,
 } from '@a2a-js/sdk/server';
 import { jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
-import {
-  DynamoDBClient,
-  GetItemCommand,
-  PutItemCommand,
-} from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import express from 'express';
 import { buildFixtureAgentCard } from '../../../__fixtures__/agent-card.ts';
 import type { ContainerLogEvent } from './container-log-events.ts';
@@ -53,18 +50,27 @@ import {
   type FixtureEnvelope,
   type FixtureTaskMetadata,
   fixtureEnvelopeSchema,
-  type LeaseRequest,
+  type OutcomeTarget,
 } from './envelope.ts';
 
 const port = Number(process.env.A2A_PORT ?? 9000);
-/** A container names itself: a uuid7 at start (ARCHITECTURE.md §4). */
-const containerId = randomUUIDv7();
-const startedAt = Date.now();
+
+let mintedContainerId: string | undefined;
+/**
+ * A container names itself with a uuid7 (ARCHITECTURE.md §4) — minted on first
+ * use, never at startup. Its first use is an invocation or a SIGTERM, both
+ * after a V2 restore; `/ping` and the agent card, which AgentCore may call
+ * before the snapshot, never reach it.
+ */
+function containerId(): string {
+  mintedContainerId ??= randomUUIDv7();
+  return mintedContainerId;
+}
 
 /** Live tasks. `/ping` reports HealthyBusy while any is running (§B). */
 const liveTaskIds = new Set<string>();
 /** Where to record an outcome if SIGTERM arrives (§C). Set by a task. */
-let outcomeTarget: { tableName: string; leaseId: string } | undefined;
+let outcomeTarget: OutcomeTarget | undefined;
 let sigtermAt: number | undefined;
 
 function log(event: ContainerLogEvent): void {
@@ -77,75 +83,11 @@ function describeError(error: unknown): { name: string; message: string } {
     : { name: 'NonError', message: String(error).slice(0, 300) };
 }
 
-const dynamo = new DynamoDBClient({});
-
-type LeaseMeasurement = {
-  writeLatencyMilliseconds: number;
-  visibleAfterMilliseconds: number | null;
-  readBackPolls: number;
-};
-
 /**
- * §A — writes a lease generation, then reads it back FROM INSIDE the microVM
- * until the new generation appears.
- *
- * Measuring visibility from outside AWS conflates four things — the write,
- * DynamoDB's own propagation, the reader's network RTT, and the skew between
- * two unsynchronised clocks. A first attempt from a laptop reported ~322 ms
- * with a 239 ms read RTT and a 333 ms apparent clock offset, which is not a
- * platform figure. Polling here uses ONE clock and one network.
+ * Built at startup but first used after a restore, so its credentials and
+ * connections are resolved in the restored container.
  */
-async function writeLease(
-  lease: LeaseRequest,
-  generation: number,
-  taskId: string,
-): Promise<LeaseMeasurement> {
-  const writeIssuedAt = Date.now();
-  await dynamo.send(
-    new PutItemCommand({
-      TableName: lease.tableName,
-      Item: {
-        leaseId: { S: lease.leaseId },
-        generation: { N: String(generation) },
-        containerId: { S: containerId },
-        taskId: { S: taskId },
-        // The only honest timestamp available: the item is composed before the
-        // write completes, so it cannot carry its own completion time.
-        writeIssuedAt: { N: String(writeIssuedAt) },
-      },
-    }),
-  );
-  const writeLatencyMilliseconds = Date.now() - writeIssuedAt;
-
-  let readBackPolls = 0;
-  let visibleAfterMilliseconds: number | null = null;
-  while (Date.now() - writeIssuedAt <= 10_000) {
-    readBackPolls += 1;
-    const read = await dynamo.send(
-      new GetItemCommand({
-        TableName: lease.tableName,
-        Key: { leaseId: { S: lease.leaseId } },
-      }),
-    );
-    if (Number(read.Item?.generation?.N ?? 0) >= generation) {
-      visibleAfterMilliseconds = Date.now() - writeIssuedAt;
-      break;
-    }
-  }
-
-  log({
-    event: 'lease',
-    containerId,
-    leaseId: lease.leaseId,
-    taskId,
-    generation,
-    writeLatencyMilliseconds,
-    visibleAfterMilliseconds,
-    readBackPolls,
-    writeIssuedAt,
-  });
-  return { writeLatencyMilliseconds, visibleAfterMilliseconds, readBackPolls };
-}
+const dynamoDB = new DynamoDBClient({});
 
 /**
  * FINDING (§I, 2026-09-22): under the 1.0 RPC method name `SendMessage`, a part
@@ -189,19 +131,13 @@ class TimerExecutor implements AgentExecutor {
     const envelope = readEnvelope(requestContext.request.message);
 
     liveTaskIds.add(taskId);
-    if (envelope.lease !== undefined) {
-      outcomeTarget = {
-        tableName: envelope.lease.tableName,
-        leaseId: envelope.lease.leaseId,
-      };
+    if (envelope.outcomeTarget !== undefined) {
+      outcomeTarget = envelope.outcomeTarget;
     }
 
     const metadata: FixtureTaskMetadata = {
-      containerId,
-      containerUptimeMilliseconds: Date.now() - startedAt,
+      containerId: containerId(),
       liveTasks: liveTaskIds.size,
-      idempotencyKey: envelope.idempotencyKey ?? null,
-      runMilliseconds: envelope.runMilliseconds,
       negotiatedVersion: requestContext.context.requestedVersion,
       containerNow: Date.now(),
     };
@@ -222,34 +158,7 @@ class TimerExecutor implements AgentExecutor {
     );
 
     const deadline = Date.now() + envelope.runMilliseconds;
-    let generation = 0;
-    let nextRenewalAt = Date.now();
-    let leaseFailure: { name: string; message: string } | undefined;
     while (Date.now() < deadline && !this.#cancelled.has(taskId)) {
-      const lease = envelope.lease;
-      if (
-        lease !== undefined &&
-        generation < lease.renewals &&
-        Date.now() >= nextRenewalAt
-      ) {
-        generation += 1;
-        nextRenewalAt = Date.now() + lease.renewMilliseconds;
-        try {
-          await writeLease(lease, generation, taskId);
-        } catch (error) {
-          // Zero silent failures: a lease that cannot be written fails the task.
-          leaseFailure = describeError(error);
-          log({
-            event: 'lease-failed',
-            containerId,
-            leaseId: lease.leaseId,
-            generation,
-            errorName: leaseFailure.name,
-            errorMessage: leaseFailure.message,
-          });
-          break;
-        }
-      }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
 
@@ -262,9 +171,7 @@ class TimerExecutor implements AgentExecutor {
         status: {
           state: cancelled
             ? TaskState.TASK_STATE_CANCELED
-            : leaseFailure !== undefined
-              ? TaskState.TASK_STATE_FAILED
-              : TaskState.TASK_STATE_COMPLETED,
+            : TaskState.TASK_STATE_COMPLETED,
           message: undefined,
           timestamp: new Date().toISOString(),
         },
@@ -281,14 +188,14 @@ class TimerExecutor implements AgentExecutor {
 
 const url = process.env.AGENTCORE_RUNTIME_URL ?? `http://0.0.0.0:${port}/`;
 /**
- * §I — refuse 0.3 entirely. With A2A_STRICT_10 the card declares ONE
+ * §I — refuse 0.3 entirely. With A2A_ONE_ZERO_ONLY the card declares ONE
  * interface, 1.0, and `legacyCompat` is off (ADR 0014). With `legacyCompat`
  * ON, a missing `A2A-Version` allowlist entry downgrades every call to 0.3 and
  * everything appears to work on the wrong protocol; OFF, the same mistake
  * fails loudly.
  */
-const strict10 = process.env.A2A_STRICT_10 === '1';
-const agentCard = buildFixtureAgentCard({ url, strict10 });
+const a2aOneZeroOnly = process.env.A2A_ONE_ZERO_ONLY === '1';
+const agentCard = buildFixtureAgentCard({ url, a2aOneZeroOnly });
 
 const executor = new TimerExecutor();
 const inner = new DefaultRequestHandler(
@@ -296,33 +203,6 @@ const inner = new DefaultRequestHandler(
   new InMemoryTaskStore(),
   executor,
 );
-
-/**
- * The §I gateway: idempotency decided before a task id is minted. The A2A SDK
- * mints the task id before the executor is reached, so an executor cannot
- * answer with an already-running task — that has to sit in front of the
- * handler.
- */
-const taskIdByIdempotencyKey = new Map<string, string>();
-
-async function sendMessageOnce(
-  params: SendMessageRequest,
-  context: ServerCallContext,
-): Promise<Message | Task> {
-  const { idempotencyKey } = readEnvelope(params.message);
-  const existingTaskId =
-    idempotencyKey === undefined
-      ? undefined
-      : taskIdByIdempotencyKey.get(idempotencyKey);
-  if (existingTaskId !== undefined) {
-    return await inner.getTask({ tenant: '', id: existingTaskId }, context);
-  }
-  const result = await inner.sendMessage(params, context);
-  if (idempotencyKey !== undefined && 'status' in result) {
-    taskIdByIdempotencyKey.set(idempotencyKey, result.id);
-  }
-  return result;
-}
 
 /**
  * A cancel reaches the executor, never only the SDK's default path, which
@@ -338,7 +218,6 @@ const cancelTaskThroughExecutor: A2ARequestHandler['cancelTask'] = async (
 
 const gateway: A2ARequestHandler = new Proxy(inner, {
   get(target, property, receiver) {
-    if (property === 'sendMessage') return sendMessageOnce;
     if (property === 'cancelTask') return cancelTaskThroughExecutor;
     const value: unknown = Reflect.get(target, property, receiver);
     return typeof value === 'function' ? value.bind(target) : value;
@@ -358,9 +237,10 @@ const app = express();
 // refusing a content type it does not accept.
 app.use(express.json({ limit: '10mb', type: () => true }));
 app.use((request, _response, next) => {
-  // To stdout, so the headers reach CloudWatch and the pass-through questions
-  // (§I) are answerable without reaching into the container.
-  if (request.path !== '/ping') {
+  // To stdout, so what reached the container reaches CloudWatch and §I is
+  // answerable without reaching into the container. Invocations only: the
+  // container id is minted on first use, after a V2 restore.
+  if (request.method === 'POST') {
     const body: unknown = request.body;
     const jsonRpcMethod =
       typeof body === 'object' &&
@@ -371,15 +251,11 @@ app.use((request, _response, next) => {
         : null;
     log({
       event: 'request',
-      containerId,
-      method: request.method,
-      path: request.path,
-      contentType: headerValue(request.headers['content-type']),
+      containerId: containerId(),
       a2aVersion: headerValue(request.headers['a2a-version']),
       runtimeSessionId: headerValue(
         request.headers['x-amzn-bedrock-agentcore-runtime-session-id'],
       ),
-      headerNames: Object.keys(request.headers),
       jsonRpcMethod,
     });
   }
@@ -402,7 +278,7 @@ app.use(
     // AgentCore terminates SigV4 in front of the container; inside, requests
     // are trusted. The microVM boundary is the trust boundary.
     userBuilder: UserBuilder.noAuthentication,
-    legacyCompat: { enabled: !strict10 },
+    legacyCompat: { enabled: !a2aOneZeroOnly },
   }),
 );
 
@@ -411,7 +287,7 @@ process.on('SIGTERM', () => {
   sigtermAt = receivedAt;
   log({
     event: 'sigterm',
-    containerId,
+    containerId: containerId(),
     at: receivedAt,
     liveTasks: liveTaskIds.size,
   });
@@ -421,16 +297,13 @@ process.on('SIGTERM', () => {
   // does is write one, and time it.
   if (outcomeTarget !== undefined) {
     const writeStartedAt = Date.now();
-    dynamo
+    dynamoDB
       .send(
         new PutItemCommand({
           TableName: outcomeTarget.tableName,
           Item: {
-            leaseId: { S: `${outcomeTarget.leaseId}#outcome` },
-            containerId: { S: containerId },
-            recordedAfterSigtermMilliseconds: {
-              N: String(writeStartedAt - receivedAt),
-            },
+            outcomeKey: { S: outcomeTarget.key },
+            containerId: { S: containerId() },
             liveTasksAtSigterm: { N: String(liveTaskIds.size) },
             outcome: { S: 'RECORDED_DURING_SHUTDOWN' },
           },
@@ -440,10 +313,9 @@ process.on('SIGTERM', () => {
         () =>
           log({
             event: 'shutdown-outcome',
-            containerId,
+            containerId: containerId(),
             written: true,
             tookMilliseconds: Date.now() - writeStartedAt,
-            afterSigtermMilliseconds: writeStartedAt - receivedAt,
             errorName: null,
             errorMessage: null,
           }),
@@ -451,10 +323,9 @@ process.on('SIGTERM', () => {
           const described = describeError(error);
           log({
             event: 'shutdown-outcome',
-            containerId,
+            containerId: containerId(),
             written: false,
             tookMilliseconds: Date.now() - writeStartedAt,
-            afterSigtermMilliseconds: writeStartedAt - receivedAt,
             errorName: described.name,
             errorMessage: described.message,
           });
@@ -471,7 +342,7 @@ process.on('SIGTERM', () => {
     const millisecondsSinceSigterm = Date.now() - (sigtermAt ?? receivedAt);
     log({
       event: 'post-sigterm',
-      containerId,
+      containerId: containerId(),
       millisecondsSinceSigterm,
       liveTasks: liveTaskIds.size,
     });
@@ -483,11 +354,4 @@ app.listen(port, '0.0.0.0', (error) => {
   // Express 5 hands a failed listen to the callback; on Bun an absent error
   // arrives as null, not undefined.
   if (error) throw error;
-  log({
-    event: 'listening',
-    containerId,
-    port,
-    strict10,
-    at: Date.now(),
-  });
 });

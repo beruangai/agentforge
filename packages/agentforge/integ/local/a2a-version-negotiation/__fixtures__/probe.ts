@@ -1,12 +1,9 @@
 import { randomUUIDv7 } from 'node:crypto';
 
 /**
- * A fresh idempotency key per probe, echoed back by the fixture, so an answer
- * is proved to carry THIS probe's payload. On the spike's first run a shared
- * constant key made every probe echo the first result through the gateway's
- * idempotency index — reporting the permissive server as negotiating 0.3 for
- * cases that negotiate 1.0. The measurement was defeated by the thing being
- * measured.
+ * A fresh idempotency key per probe, echoed back by the fixture's executor, so
+ * `payloadArrived` proves an answer carries THIS probe's payload rather than
+ * an earlier probe's or none at all.
  */
 function freshPayload(): { runMilliseconds: number; idempotencyKey: string } {
   return { runMilliseconds: 50, idempotencyKey: `probe-${randomUUIDv7()}` };

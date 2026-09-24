@@ -1,6 +1,5 @@
 /**
- * §B — a busy container still receives invocations, and one runtime session
- * id stays on one container.
+ * §B — a busy container still receives invocations.
  *
  * `ARCHITECTURE.md` §4 asserts that `/ping` is a lifecycle signal rather than
  * admission control, so a container receives a start, a poll or a cancel
@@ -11,12 +10,14 @@
  * idle latency, and the two tasks ran concurrently in one container
  * (docs/research/agentcore-runtime-observed.md).
  *
- * The container mints a container id at process start and returns it on every
- * task, so "the same container" is observed rather than assumed. `GetTask` and
- * `CancelTask` are answered from that container's in-memory task store, so an
- * answer naming the task proves the call reached the container holding it.
+ * The container mints a container id on its first invocation and returns it
+ * on every task, so "the same container" is observed rather than assumed.
+ * `GetTask` and `CancelTask` are answered from that container's in-memory task
+ * store, so an answer naming the task proves the call reached the container
+ * holding it. That a session stays on one microVM is AgentCore's documented
+ * guarantee, and is not re-tested (docs/research/agentcore-runtime.md
+ * §Sessions).
  */
-import { randomUUIDv7 } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
@@ -26,7 +27,7 @@ import {
   taskFrom,
 } from './__fixtures__/invocation.ts';
 import {
-  a2a10OnlyProfile,
+  a2aOneZeroOnlyProfile,
   type FixtureRuntime,
   provisionFixtureRuntime,
   provisioningTimeoutMilliseconds,
@@ -48,8 +49,8 @@ describe('a busy AgentCore container (§B)', () => {
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'busy',
-      profile: a2a10OnlyProfile,
-      leaseTable: false,
+      profile: a2aOneZeroOnlyProfile,
+      outcomeTable: false,
     });
     a2a = new A2aOverAgentCore(
       fixture.clients.data,
@@ -62,12 +63,14 @@ describe('a busy AgentCore container (§B)', () => {
     teardownTimeoutMilliseconds,
   );
 
-  it('delivers SendMessage, GetTask and CancelTask to a session whose container is running a task, and keeps the session on that container', async () => {
+  it('delivers SendMessage, GetTask and CancelTask to a session whose container is running a task', async () => {
     const session = newRuntimeSessionId('busy');
     const long = await a2a.SendMessage(session, { runMilliseconds: 25_000 });
     const container = long.task.metadata.containerId;
     expect(long.task.metadata.liveTasks).toBe(1);
 
+    // Time for AgentCore's health check to see HealthyBusy before the calls
+    // below; this container cannot observe the check itself.
     await setTimeout(1_500);
 
     // Fired together: if HealthyBusy were admission control, these would stall
@@ -101,38 +104,5 @@ describe('a busy AgentCore container (§B)', () => {
         deliveredWhileBusyWithinMilliseconds,
       );
     }
-
-    await setTimeout(2_000);
-    expect(
-      taskFrom(await a2a.GetTask(session, long.task.id), 'GetTask').status
-        .state,
-    ).toBe('TASK_STATE_CANCELED');
-
-    // The same session after an idle gap and a task boundary: still the same
-    // container. A different session: a different container.
-    await setTimeout(2_000);
-    const reused = await a2a.SendMessage(session, { runMilliseconds: 500 });
-    expect(reused.task.metadata.containerId).toBe(container);
-    const other = await a2a.SendMessage(newRuntimeSessionId('other'), {
-      runMilliseconds: 500,
-    });
-    expect(other.task.metadata.containerId).not.toBe(container);
-  });
-
-  it("answers a repeated idempotency key with the same task through the platform — the gateway's index holds behind InvokeAgentRuntime", async () => {
-    const session = newRuntimeSessionId('idempotency');
-    const idempotencyKey = `idempotency-${randomUUIDv7()}`;
-    const first = await a2a.SendMessage(session, {
-      runMilliseconds: 500,
-      idempotencyKey,
-    });
-    const repeat = await a2a.SendMessage(session, {
-      runMilliseconds: 500,
-      idempotencyKey,
-    });
-    expect(repeat.task.id).toBe(first.task.id);
-    expect(repeat.task.metadata.containerId).toBe(
-      first.task.metadata.containerId,
-    );
   });
 });

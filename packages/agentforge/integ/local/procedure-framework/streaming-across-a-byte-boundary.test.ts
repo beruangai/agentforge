@@ -2,19 +2,13 @@
  * An oRPC event stream survives a non-HTTP link as bytes, streamed rather than
  * buffered — recorded in docs/research/procedure-framework.md.
  */
-import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 import {
   createStreamingClient,
   type Delivery,
   type progress,
 } from './__fixtures__/streaming-across-a-byte-boundary.ts';
-import {
-  type TypecheckResult,
-  typecheck,
-  UNUSED_TS_EXPECT_ERROR_DIRECTIVE,
-} from './__fixtures__/typecheck.ts';
 
 async function subscribe(delivery: Delivery) {
   const { client, frames, order } = createStreamingClient(delivery);
@@ -60,9 +54,14 @@ describe('an event stream across a byte boundary', () => {
   it('is streamed, not buffered: the caller sees progress before the run ends', async () => {
     const { order } = await subscribe('STREAMED');
 
-    expect(order.indexOf('receive:BEFORE')).toBeLessThan(
-      order.indexOf('encode:AFTER'),
-    );
+    expect(order).toStrictEqual([
+      'encode:BEFORE',
+      'receive:BEFORE',
+      'encode:RUN',
+      'receive:RUN',
+      'encode:AFTER',
+      'receive:AFTER',
+    ]);
   });
 
   it('shows the batched order when the body is buffered — the check can fail', async () => {
@@ -76,9 +75,6 @@ describe('an event stream across a byte boundary', () => {
       'receive:RUN',
       'receive:AFTER',
     ]);
-    expect(order.indexOf('receive:BEFORE')).toBeGreaterThan(
-      order.indexOf('encode:AFTER'),
-    );
   });
 
   it('fails the caller’s iteration on a body that ends mid-frame, after the whole frames', async () => {
@@ -92,42 +88,5 @@ describe('an event stream across a byte boundary', () => {
       }
     }).rejects.toThrow('stream ended mid-frame');
     expect(received).toStrictEqual(['BEFORE', 'RUN']);
-  });
-});
-
-describe('types through a streaming link', () => {
-  let result: TypecheckResult;
-
-  beforeAll(() => {
-    result = typecheck(
-      path.join(
-        import.meta.dirname,
-        '__fixtures__/streaming-across-a-byte-boundary.type-probes.ts',
-      ),
-      {
-        fileName: 'streaming-across-a-byte-boundary.negative-control.ts',
-        sourceText: [
-          "import { createStreamingClient } from './streaming-across-a-byte-boundary.ts';",
-          'export async function negativeControl() {',
-          "  const { client } = createStreamingClient('STREAMED');",
-          '  // @ts-expect-error placed on a valid call, so it must be reported as unused',
-          "  await client.SubscribeToTask({ taskId: 't' });",
-          '}',
-        ].join('\n'),
-      },
-    );
-  });
-
-  it('holds every probe under the project’s strict configuration', () => {
-    expect(result.probeDiagnostics).toStrictEqual([]);
-  });
-
-  it('reports a directive on a valid line, so the check can fail', () => {
-    expect(result.negativeControlDiagnostics).toStrictEqual([
-      expect.objectContaining({
-        line: 4,
-        code: UNUSED_TS_EXPECT_ERROR_DIRECTIVE,
-      }),
-    ]);
   });
 });

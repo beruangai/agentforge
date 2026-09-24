@@ -4,9 +4,11 @@
  *    re-prompting, and does its matcher name a tool that actually exists?"
  *
  * The structured-output submission is carried by a real tool named
- * `StructuredOutput` (established by e1). So a PreToolUse matcher can name it.
- * What is not known is whether intercepting it buys anything now that the SDK
- * validates and re-prompts on its own.
+ * `StructuredOutput` (foreground-settlement.test.ts), so a PreToolUse matcher
+ * can name it. What is asserted here is what a hook over it does that the
+ * SDK's own validation and re-prompting cannot. Every run uses the kernel's
+ * configuration: streaming input, background work off, the input ended on the
+ * first result (docs/ARCHITECTURE.md §7).
  *
  * Two scenarios, the two things AgentForge relies on a hook for:
  *
@@ -14,8 +16,10 @@
  *                        by a PreToolUse denial. Whether the model then complies
  *                        or argues is its choice and varies run to run; what is
  *                        asserted is what holds either way — the denial reaches
- *                        the model verbatim, and a denied submission never
- *                        becomes the result.
+ *                        the model verbatim, a denied submission never becomes
+ *                        the result, and a run that ends with no allowed one
+ *                        ends `success` with no `structured_output`, the shape
+ *                        the kernel maps to OUTPUT_INVALID.
  *   hook-updated-input   the hook repairs the submission via `updatedInput`
  *                        instead of rejecting it — no extra model turn.
  *
@@ -29,20 +33,20 @@
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  type HookCallback,
-  type HookJSONOutput,
-  query,
+import type {
+  HookCallback,
+  HookJSONOutput,
 } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import {
+  backgroundWorkDisabled,
+  carrierToolName,
   createSandbox,
   createSubscriptionEnvironment,
   QueryRecording,
+  runWithStreamingInput,
 } from '../../__fixtures__/claude-agent-sdk.ts';
-
-const CARRIER_TOOL = 'StructuredOutput';
 
 /** Fixture sizes chosen so the sum is not a round number the model can guess. */
 const fixtureFileSizes: Record<string, number> = {
@@ -61,13 +65,13 @@ const baseShape = {
   summary: z.string().describe('a short summary'),
 };
 
-const PROMPT =
+const prompt =
   "Use Bash to list every .txt file in the current directory and get each one's exact byte size. " +
   'Then give your final structured output: every file with its size, the total, and a summary. ' +
   'Write the summary as a normal descriptive sentence.';
 
 /** Cap the correction loop: a rule the model cannot satisfy must not spin forever at the operator's expense. */
-const MAXIMUM_DENIALS = 3;
+const maximumDenials = 3;
 
 type CarrierInput = {
   files?: { name?: string; bytes?: number }[];
@@ -134,7 +138,7 @@ const scenarios = {
 } satisfies Record<string, Scenario>;
 
 async function runScenario(scenario: Scenario) {
-  const sandbox = createSandbox(`e3-${scenario.name}`);
+  const sandbox = createSandbox(`in-turn-correction-${scenario.name}`);
   onTestFinished(() => sandbox.dispose());
   for (const [name, size] of Object.entries(fixtureFileSizes)) {
     writeFileSync(join(sandbox.workingDirectory, name), 'x'.repeat(size));
@@ -172,7 +176,7 @@ async function runScenario(scenario: Scenario) {
       } satisfies HookJSONOutput;
     }
     const reason =
-      denials >= MAXIMUM_DENIALS ? undefined : scenario.check?.(toolInput);
+      denials >= maximumDenials ? undefined : scenario.check?.(toolInput);
     hookCalls.push({
       toolName,
       decision: reason ? 'deny' : 'allow',
@@ -191,29 +195,26 @@ async function runScenario(scenario: Scenario) {
   };
 
   const recording = new QueryRecording(
-    'integ',
     'kernel-settlement',
-    `e3-in-turn-correction-${scenario.name}`,
+    `in-turn-correction-${scenario.name}`,
   );
-  await recording.drain(
-    query({
-      prompt: PROMPT,
-      options: {
-        cwd: sandbox.workingDirectory,
-        env: createSubscriptionEnvironment(sandbox.configDirectory),
-        model: 'claude-sonnet-5',
-        allowedTools: ['Bash'],
-        permissionMode: 'bypassPermissions',
-        allowDangerouslySkipPermissions: true,
-        outputFormat: { type: 'json_schema', schema: outputJsonSchema },
-        maxTurns: 25,
-        settingSources: [],
-        hooks: {
-          PreToolUse: [{ matcher: CARRIER_TOOL, hooks: [preToolUseHook] }],
-        },
-      },
-    }),
-  );
+  await runWithStreamingInput(recording, prompt, {
+    cwd: sandbox.workingDirectory,
+    env: createSubscriptionEnvironment(
+      sandbox.configDirectory,
+      backgroundWorkDisabled,
+    ),
+    model: 'claude-sonnet-5',
+    allowedTools: ['Bash'],
+    permissionMode: 'bypassPermissions',
+    allowDangerouslySkipPermissions: true,
+    outputFormat: { type: 'json_schema', schema: outputJsonSchema },
+    maxTurns: 25,
+    settingSources: [],
+    hooks: {
+      PreToolUse: [{ matcher: carrierToolName, hooks: [preToolUseHook] }],
+    },
+  });
 
   const result = recording.onlyResultMessage();
   const structuredOutput = (
@@ -221,7 +222,7 @@ async function runScenario(scenario: Scenario) {
   ) as CarrierInput | null | undefined;
   const carrierToolUses = recording
     .toolUses()
-    .filter((toolUse) => toolUse.name === CARRIER_TOOL);
+    .filter((toolUse) => toolUse.name === carrierToolName);
   const evidence = [
     `subtype=${result.subtype} is_error=${result.is_error} num_turns=${result.num_turns}`,
     `carrierSubmissions=${carrierToolUses.length} hookCalls=${JSON.stringify(hookCalls.map((call) => call.decision))}`,
@@ -232,8 +233,8 @@ async function runScenario(scenario: Scenario) {
 
   expect(
     recording.firstSystemInitMessage().tools,
-    `'${CARRIER_TOOL}' is advertised in system/init.tools; ${evidence}`,
-  ).toContain(CARRIER_TOOL);
+    `'${carrierToolName}' is advertised in system/init.tools; ${evidence}`,
+  ).toContain(carrierToolName);
 
   return {
     recording,
@@ -260,13 +261,13 @@ function carrierErrorTexts(
     .map((toolResult) => toolResult.text);
 }
 
-describe('E3 — in-turn PreToolUse rejection over StructuredOutput', () => {
+describe('in-turn PreToolUse rejection over StructuredOutput', () => {
   it(scenarios.hookOnlyRule.name, async () => {
     const run = await runScenario(scenarios.hookOnlyRule);
     expect(
       new Set(run.hookCalls.map((call) => call.toolName)),
       `the hook sees the carrier under its emitted name; ${run.evidence}`,
-    ).toEqual(new Set([CARRIER_TOOL]));
+    ).toEqual(new Set([carrierToolName]));
     expect(
       run.denials,
       `the cross-field rule was denied in-turn; ${run.evidence}`,
@@ -287,9 +288,9 @@ describe('E3 — in-turn PreToolUse rejection over StructuredOutput', () => {
       ),
       `every denial reason reaches the model verbatim; ${run.evidence}`,
     ).toHaveLength(run.denials);
-    // The model may comply or argue until it gives up (a success with no
-    // output, which the kernel treats as OUTPUT_INVALID). Either way, a
-    // submission the hook denied never becomes the result.
+    // The model may comply or argue until it gives up. Both outcomes are
+    // asserted: what is delivered is a submission the hook allowed, or the run
+    // ends a success with no output, which the kernel maps to OUTPUT_INVALID.
     const deniedInputs = run.hookCalls
       .filter((call) => call.decision === 'deny')
       .map((call) => call.input);
@@ -305,6 +306,11 @@ describe('E3 — in-turn PreToolUse rejection over StructuredOutput', () => {
         deniedInputs,
         `the delivered output is not a submission the hook denied; ${run.evidence}`,
       ).not.toContainEqual(run.structuredOutput);
+    } else {
+      expect(
+        { subtype: run.result.subtype, isError: run.result.is_error },
+        `a run that ends with no structured_output ends an ordinary success — OUTPUT_INVALID to the kernel; ${run.evidence}`,
+      ).toEqual({ subtype: 'success', isError: false });
     }
   });
 

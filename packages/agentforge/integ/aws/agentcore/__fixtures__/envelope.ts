@@ -8,12 +8,12 @@
  */
 import { z } from 'zod';
 
-export const leaseRequestSchema = z
+/** Where the container records an outcome from its SIGTERM handler (§C). */
+export const outcomeTargetSchema = z
   .object({
     tableName: z.string().min(1),
-    leaseId: z.string().min(1),
-    renewMilliseconds: z.number().int().positive(),
-    renewals: z.number().int().positive(),
+    /** The row's `outcomeKey`, the table's partition key. */
+    key: z.string().min(1),
   })
   .strict();
 
@@ -21,14 +21,11 @@ export const fixtureEnvelopeSchema = z
   .object({
     /** How long the task runs. A timer, never a model call. */
     runMilliseconds: z.number().int().nonnegative(),
-    /** Decided by the gateway before a task id is minted (§I). */
-    idempotencyKey: z.string().min(1).optional(),
-    /** §A — write and renew a lease from inside the microVM while the task runs. */
-    lease: leaseRequestSchema.optional(),
+    outcomeTarget: outcomeTargetSchema.optional(),
   })
   .strict();
 
-export type LeaseRequest = z.infer<typeof leaseRequestSchema>;
+export type OutcomeTarget = z.infer<typeof outcomeTargetSchema>;
 export type FixtureEnvelope = z.infer<typeof fixtureEnvelopeSchema>;
 
 /**
@@ -37,13 +34,10 @@ export type FixtureEnvelope = z.infer<typeof fixtureEnvelopeSchema>;
  * returns what the CREATING container reported, not the answering one.
  */
 export const fixtureTaskMetadataSchema = z.object({
-  /** Minted once at process start, so a second container is detectable (§B). */
+  /** Minted on the container's first invocation, so a second container is detectable (§B). */
   containerId: z.string(),
-  containerUptimeMilliseconds: z.number(),
   /** Tasks live in this container at the moment it answered, this one included. */
   liveTasks: z.number(),
-  idempotencyKey: z.string().nullable(),
-  runMilliseconds: z.number(),
   /** The version the A2A SDK negotiated for the request that created the task. */
   negotiatedVersion: z.string(),
   /**

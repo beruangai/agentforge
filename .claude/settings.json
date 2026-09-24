@@ -39,16 +39,10 @@
       }
     ]
   },
-  "claudeMdExcludes": [
-    "packages/**"
-  ],
+  "claudeMdExcludes": ["packages/**"],
   "permissions": {
     "defaultMode": "auto",
-    "allow": [
-      "Bash(openspec *)",
-      "Bash(ls *)",
-      "Edit(./**)"
-    ],
+    "allow": ["Bash(openspec *)", "Bash(ls *)", "Edit(./**)"],
     "deny": [
       "Read(**/.env.local)",
       "Read(**/.env.*.local)",

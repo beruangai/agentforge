@@ -80,8 +80,10 @@ const scenarios: Scenario[] = [
     },
   },
   {
-    // The agentic-project layer drops out of skills, commands and subagents —
-    // and nothing else changes.
+    // Load-bearing: an agent image may well contain a git repository, and a
+    // repository root halts discovery for every layer ABOVE it — silently. The
+    // agentic-project layer drops out of skills, commands and subagents — and
+    // nothing else changes.
     name: 'repository-at-agent-level',
     plantRepositoryAtAgent: true,
     options: {},
@@ -112,18 +114,17 @@ const scenarios: Scenario[] = [
   },
 ];
 
-describe('L2 — which kinds of configuration compose, and where each stops', () => {
+describe('which kinds of configuration compose, and where each stops', () => {
   it.each(scenarios)('$name', async (scenario) => {
-    const tree = createCapabilityLayerTree(`l2-${scenario.name}`, {
+    const tree = createCapabilityLayerTree(`what-composes-${scenario.name}`, {
       skillsSubagentsAndHooks: true,
     });
     onTestFinished(() => tree.dispose());
     if (scenario.plantRepositoryAtAgent) tree.plantRepositoryAt('agent');
 
     const recording = new QueryRecording(
-      'integ',
       'capability-composition',
-      `l2-what-composes-${scenario.name}`,
+      `what-composes-${scenario.name}`,
     );
     const { initializationResult, sessionStartHookResponses } =
       await readSessionStartWithoutATurn(

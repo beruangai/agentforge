@@ -1,20 +1,11 @@
 import { randomUUIDv7 } from 'node:crypto';
-import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
-
-/**
- * Everything these tests create in AWS carries this tag, and is deleted by the
- * test file that created it, so nothing outlives a run.
- */
-export const integTag = { key: 'agentforge:integ', value: 'true' } as const;
+import { resolveCallerIdentity } from '../../__fixtures__/aws-account.ts';
 
 /**
  * The execution role AgentCore assumes. It needs an ADMIN identity to create,
  * which the tests do not have — see integ/aws/agentcore/README.md.
  */
 export const executionRoleName = 'agentforge-integ-agentcore-execution';
-
-/** The execution role may touch only DynamoDB tables named with this prefix. */
-export const leaseTableNamePrefix = 'agentforge-integ-';
 
 export interface AwsEnvironment {
   readonly accountId: string;
@@ -38,20 +29,13 @@ export async function resolveAwsEnvironment(): Promise<AwsEnvironment> {
       'AWS_REGION is not set; run through `nx run @beruangai/agentforge:integ`, which loads it from .env.integ',
     );
   }
-  const identity = await new STSClient({ region }).send(
-    new GetCallerIdentityCommand({}),
-  );
-  if (identity.Account === undefined || identity.Arn === undefined) {
-    throw new Error(
-      `STS GetCallerIdentity returned no Account or Arn: ${JSON.stringify(identity)}`,
-    );
-  }
+  const { accountId, callerArn } = await resolveCallerIdentity(region);
   return {
-    accountId: identity.Account,
+    accountId,
     region,
-    callerArn: identity.Arn,
-    executionRoleArn: `arn:aws:iam::${identity.Account}:role/${executionRoleName}`,
-    registry: `${identity.Account}.dkr.ecr.${region}.amazonaws.com`,
+    callerArn,
+    executionRoleArn: `arn:aws:iam::${accountId}:role/${executionRoleName}`,
+    registry: `${accountId}.dkr.ecr.${region}.amazonaws.com`,
   };
 }
 
@@ -67,7 +51,8 @@ export async function resolveAwsEnvironment(): Promise<AwsEnvironment> {
 export interface ResourceNames {
   readonly agentRuntimeName: string;
   readonly repositoryName: string;
-  readonly leaseTableName: string;
+  /** `agentforge-integ-*`, the only DynamoDB tables the execution role may touch. */
+  readonly outcomeTableName: string;
 }
 
 export function resourceNamesFor(purpose: string): ResourceNames {
@@ -87,7 +72,7 @@ export function resourceNamesFor(purpose: string): ResourceNames {
   return {
     agentRuntimeName,
     repositoryName: `agentforge/integ-${hyphenated}-${suffix}`,
-    leaseTableName: `${leaseTableNamePrefix}lease-${hyphenated}-${suffix}`,
+    outcomeTableName: `agentforge-integ-outcome-${hyphenated}-${suffix}`,
   };
 }
 

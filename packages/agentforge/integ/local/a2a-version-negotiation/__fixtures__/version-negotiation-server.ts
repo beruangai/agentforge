@@ -87,7 +87,8 @@ class RecordingExecutor implements AgentExecutor {
 }
 
 export async function startVersionNegotiationServer(options: {
-  strict10: boolean;
+  /** One 1.0 interface and `legacyCompat` off; otherwise 1.0 and 0.3, `legacyCompat` on. */
+  a2aOneZeroOnly: boolean;
 }): Promise<VersionNegotiationServer> {
   const app = express();
   const server = app.listen(0, '127.0.0.1');
@@ -95,7 +96,10 @@ export async function startVersionNegotiationServer(options: {
   const { port } = server.address() as AddressInfo;
   const url = `http://127.0.0.1:${port}/`;
 
-  const agentCard = buildFixtureAgentCard({ url, strict10: options.strict10 });
+  const agentCard = buildFixtureAgentCard({
+    url,
+    a2aOneZeroOnly: options.a2aOneZeroOnly,
+  });
   const executor = new RecordingExecutor();
   app.get('/.well-known/agent-card.json', (_request, response) => {
     response.json(agentCard);
@@ -108,7 +112,7 @@ export async function startVersionNegotiationServer(options: {
         executor,
       ),
       userBuilder: UserBuilder.noAuthentication,
-      legacyCompat: { enabled: !options.strict10 },
+      legacyCompat: { enabled: !options.a2aOneZeroOnly },
     }),
   );
 

@@ -4,6 +4,8 @@ What AgentForge relies on from AgentCore and AgentCore does not document: a busy
 
 No model is called. The container in `__fixtures__/server.ts` is an A2A server whose "task" is a timer — the thing AgentCore's behaviour is observed through, not AgentForge's server.
 
+Every runtime runs on **platform version V2**, as AgentForge does: every container is restored from one snapshot taken at the first healthy `/ping` ([`agentcore-runtime.md`](../../../../../docs/research/agentcore-runtime.md) §Platform version V2). So the container mints nothing at startup — its container id is minted on its first invocation, after the restore — or every container would report the same one. The access probe alone stays on the default platform version; `__fixtures__/access.ts` says why.
+
 ## Running
 
 From the repository root, `nx run @beruangai/agentforge:integ`. Nx loads `.env.integ` — `AWS_PROFILE=agentforge--test-integ`, `AWS_REGION=us-east-2` — into the `integ` task and no other, so no other task holds these credentials, and nothing anywhere falls back to a `default` profile. That profile assumes the `AgentForgeTestInteg` role from your `agentforge` SSO session, so sign in with `aws sso login --profile agentforge`; if the session has lapsed the run fails on credentials rather than working around it. The code reads the account from STS; the policy documents name it, `913756569129`, because a policy is only well formed with its account and region written out.
@@ -16,9 +18,9 @@ Before provisioning anything, every file runs the access check in `__fixtures__/
 
 ## What each file creates, and removes
 
-Every file provisions its own resources in `beforeAll` and deletes them in `afterAll`, all tagged `agentforge:integ=true`: an ECR repository `agentforge/integ-<purpose>-<suffix>`, a runtime `agentforge_integ_<purpose>_<suffix>`, its log groups, and — for the grace-outcome test — a DynamoDB table `agentforge-integ-lease-<purpose>-<suffix>`.
+Every file provisions its own resources in `beforeAll` and deletes them in `afterAll`, all tagged `agentforge:integ=true`: an ECR repository `agentforge/integ-<purpose>-<suffix>`, a runtime `agentforge_integ_<purpose>_<suffix>`, its log groups, and — for `outcome-inside-grace.test.ts` — a DynamoDB table `agentforge-integ-outcome-<purpose>-<suffix>`.
 
-Deleting a runtime is slow: it sits in DELETING for about five minutes, and teardown waits until it and its workload identity are gone rather than returning on the call. Expect each file to take several minutes beyond its tests. The files run in parallel with one another (`vitest.integ.mts`), so the whole directory takes about as long as its slowest file. A teardown that cannot delete something fails the run and names what is left. To check by tag afterwards:
+Runtimes are slow at both ends. On V2 a create takes minutes before READY while the snapshot is prepared, and a runtime sat in DELETING for about five minutes on V1. Teardown waits out a runtime still CREATING — deleting it then is a `ConflictException`, which would leak it — and then until it and its workload identity are gone, rather than returning on the call. Expect each file to take ten minutes or more beyond its tests. The files run in parallel with one another (`vitest.integ.mts`), so the whole directory takes about as long as its slowest file. A teardown that cannot delete something fails the run and names what is left. To check by tag afterwards:
 
 ```bash
 aws resourcegroupstaggingapi get-resources \

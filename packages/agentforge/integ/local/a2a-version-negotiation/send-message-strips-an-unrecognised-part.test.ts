@@ -5,18 +5,14 @@
  * `{ content: { $case: 'data', value } }`, which is the SDK's INTERNAL
  * representation and was never a wire shape in either protocol version.
  * Measured on 2026-09-22 (docs/research/agentcore-runtime-observed.md),
- * varying one thing at a time:
+ * varying one thing at a time: the silent strip is triggered by the 1.0 method
+ * name `SendMessage`, not by the negotiated version. Choosing 1.0 puts
+ * AgentForge permanently on the method name that exhibits it, which is why a
+ * part reader must throw on a part it cannot decode.
  *
- *   | RPC method   | Part shape                         | Result                              |
- *   | message/send | { kind: 'data', data }             | works, under 0.3 and 1.0            |
- *   | message/send | { content: { $case: 'data', … } }  | rejected, -32602                    |
- *   | SendMessage  | { content: { $case: 'data', … } }  | ACCEPTED, content silently gone     |
- *   | SendMessage  | { kind: 'data', data }             | works                               |
- *
- * The silent strip is triggered by the 1.0 method name `SendMessage` — with
- * `A2A-Version: 1.0` and without it alike — not by the negotiated version.
- * Choosing 1.0 puts AgentForge permanently on the method name that exhibits
- * it, which is why a part reader must throw on a part it cannot decode.
+ * Asserted only on the strict 1.0 server — AgentForge's configuration. The
+ * `message/send` and permissive-server rows of that measurement are recorded
+ * in the note, not re-tested: AgentForge never runs them.
  *
  * And the 1.0 wire shape, captured from the SDK's own client: method
  * `SendMessage`, role `"ROLE_USER"`, a data part `{ data }` — no `kind`, no
@@ -35,15 +31,13 @@ import {
 
 describe('what SendMessage does to a part it does not recognise (§I)', () => {
   let strict: VersionNegotiationServer;
-  let permissive: VersionNegotiationServer;
 
   beforeAll(async () => {
-    strict = await startVersionNegotiationServer({ strict10: true });
-    permissive = await startVersionNegotiationServer({ strict10: false });
+    strict = await startVersionNegotiationServer({ a2aOneZeroOnly: true });
   });
 
   afterAll(async () => {
-    await Promise.all([strict.close(), permissive.close()]);
+    await strict.close();
   });
 
   /** The part the executor was handed for the most recent message. */
@@ -57,51 +51,28 @@ describe('what SendMessage does to a part it does not recognise (§I)', () => {
     return last.parts[0];
   }
 
-  it('rejects the protobuf part shape under message/send', async () => {
-    expect(
-      await probe(permissive.url, {
-        method: 'message/send',
-        partShape: 'protobuf',
-        a2aVersion: undefined,
-        role: 'user',
-      }),
-    ).toMatchObject({ kind: 'error', code: -32602 });
+  it('accepts the protobuf part shape under SendMessage and delivers it with its content silently gone', async () => {
+    const outcome = await probe(strict.url, {
+      method: 'SendMessage',
+      partShape: 'protobuf',
+      a2aVersion: '1.0',
+      role: 1,
+    });
+    // No error at any layer: a task, carrying none of the payload.
+    expect(outcome).toMatchObject({ kind: 'task', payloadArrived: false });
+    expect(lastReceivedPart(strict)?.content).toBeUndefined();
   });
 
-  it.each([
-    ['permissive, A2A-Version: 1.0', () => permissive, '1.0'],
-    ['permissive, no A2A-Version', () => permissive, undefined],
-    [
-      'strict, A2A-Version: 1.0 — AgentForge’s configuration',
-      () => strict,
-      '1.0',
-    ],
-  ] as const)(
-    'accepts the protobuf part shape under SendMessage and delivers it with its content silently gone (%s)',
-    async (_label, server, a2aVersion) => {
-      const outcome = await probe(server().url, {
-        method: 'SendMessage',
-        partShape: 'protobuf',
-        a2aVersion,
-        role: 1,
-      });
-      // No error at any layer: a task, carrying none of the payload.
-      expect(outcome).toMatchObject({ kind: 'task', payloadArrived: false });
-      const part = lastReceivedPart(server());
-      expect(part?.content).toBeUndefined();
-    },
-  );
-
-  it('delivers the wire part shape under SendMessage intact', async () => {
+  it('delivers the wire part shape under SendMessage intact — the check can fail', async () => {
     expect(
-      await probe(permissive.url, {
+      await probe(strict.url, {
         method: 'SendMessage',
         partShape: 'wire',
         a2aVersion: '1.0',
         role: 'user',
       }),
     ).toMatchObject({ kind: 'task', payloadArrived: true });
-    expect(lastReceivedPart(permissive)?.content?.$case).toBe('data');
+    expect(lastReceivedPart(strict)?.content?.$case).toBe('data');
   });
 
   it("puts a data part on the wire as { data } from the SDK's own client — neither the specification's { kind, data } nor its own { content }", async () => {

@@ -28,7 +28,7 @@ import {
   sendMessageParams,
 } from './__fixtures__/invocation.ts';
 import {
-  a2a10OnlyProfile,
+  a2aOneZeroOnlyProfile,
   type FixtureRuntime,
   provisionFixtureRuntime,
   provisioningTimeoutMilliseconds,
@@ -51,8 +51,8 @@ describe('A2A 1.0 only, through AgentCore (ADR 0014)', () => {
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'a2a_1_0_only',
-      profile: a2a10OnlyProfile,
-      leaseTable: false,
+      profile: a2aOneZeroOnlyProfile,
+      outcomeTable: false,
     });
     a2a = new A2aOverAgentCore(
       fixture.clients.data,
@@ -109,6 +109,7 @@ describe('A2A 1.0 only, through AgentCore (ADR 0014)', () => {
       runtimeSessionId: session,
       method: 'SendMessage',
       params: sendMessageParams({ runMilliseconds: 200 }),
+      a2aVersionHeader: false,
     });
     expect(invocation).toMatchObject({
       delivered: false,
@@ -136,7 +137,10 @@ describe('A2A 1.0 only, through AgentCore (ADR 0014)', () => {
     // with every URL pointing at the invocation endpoint.
     const expected: unknown = JSON.parse(
       JSON.stringify(
-        buildFixtureAgentCard({ url: invocationEndpoint, strict10: true }),
+        buildFixtureAgentCard({
+          url: invocationEndpoint,
+          a2aOneZeroOnly: true,
+        }),
       ),
     );
     expect(agentCard).toEqual(expected);

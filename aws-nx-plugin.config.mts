@@ -1,4 +1,4 @@
-import { AwsNxPluginConfig } from '@aws/nx-plugin';
+import type { AwsNxPluginConfig } from '@aws/nx-plugin';
 
 export default {
   iac: { provider: 'cdk' },

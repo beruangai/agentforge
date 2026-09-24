@@ -20,9 +20,9 @@ So: can one contract be split by a utility into two typed procedures, with the t
 | The client is typed **through** that link | **yes** — 3 further probes, all genuine |
 | Middleware contributing **typed** context | **yes** — `context.lease.holder` read in a later middleware with **no cast** |
 | Raw errors survive in-process | **yes**, with stack |
-| Errors survive a **serialising** transport | **yes** — message, structured `data` *and* the original stack |
+| Errors survive a **serialising** transport | **yes** — message and structured `data`; the stack too, because the spike's link carried it |
 
-Every type probe is backed by a **negative control**: a directive placed on a valid line, confirmed to be reported as unused. Without that, a passing probe proves nothing — and the first run of the control was itself broken (it pointed at the wrong config), which is why it is stated here rather than assumed.
+Every type probe is backed by a **negative control**: a directive placed on a valid line, confirmed to be reported as unused. Without that, a passing probe proves nothing — and the first run of the control was itself broken (it pointed at the wrong config), which is why it is stated here rather than assumed. In the tree the probes are the `*.type-probes.ts` fixtures under `integ/local/procedure-framework/`, held by the `typecheck` target: a `@ts-expect-error` on a line that compiles is itself an error, so no separate control is kept.
 
 The split utility, entire:
 

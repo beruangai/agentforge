@@ -51,7 +51,8 @@ export type AgentForgeClient = {
   CancelTask: ContractRouterClient<(typeof contract)['CancelTask'], Routed>;
 };
 
-export interface LinkObservation {
+/** The per-call client context one call handed the link. */
+export interface PerCallContextObservation {
   path: string;
   /** What becomes the AgentCore session header. */
   runtimeSessionId: string;
@@ -68,13 +69,13 @@ export function createAgentForgeClient() {
       SendMessage: os.reviewStrategy.SendMessage.handler(async () => {
         const taskId = randomUUIDv7();
         reviewStrategyTasks.set(taskId, {
-          state: 'WORKING',
+          state: 'TASK_STATE_WORKING',
           startedAt: '2026-09-23T00:00:00.000Z',
         });
         return {
           taskId,
           contextId: randomUUIDv7(),
-          state: 'SUBMITTED' as const,
+          state: 'TASK_STATE_SUBMITTED' as const,
         };
       }),
       GetTask: os.reviewStrategy.GetTask.handler(async ({ input }) => {
@@ -89,19 +90,19 @@ export function createAgentForgeClient() {
       SendMessage: os.summariseCorpus.SendMessage.handler(async () => ({
         taskId: randomUUIDv7(),
         contextId: randomUUIDv7(),
-        state: 'SUBMITTED' as const,
+        state: 'TASK_STATE_SUBMITTED' as const,
       })),
       GetTask: os.summariseCorpus.GetTask.handler(async () => ({
-        state: 'SUBMITTED' as const,
+        state: 'TASK_STATE_SUBMITTED' as const,
       })),
     },
     CancelTask: os.CancelTask.handler(async ({ input }) => {
       cancelledTaskIds.push(input.taskId);
-      return { state: 'CANCELLED' as const };
+      return { state: 'TASK_STATE_CANCELED' as const };
     }),
   });
 
-  const seenByLink: LinkObservation[] = [];
+  const seenByLink: PerCallContextObservation[] = [];
   /** The link takes the LOOSER context; the client's own type is the gate. */
   const link: ClientLink<Routed & { idempotencyKey?: string }> = {
     async call(path, input, options) {

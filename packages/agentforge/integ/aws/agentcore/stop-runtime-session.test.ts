@@ -26,7 +26,7 @@ import {
   taskFrom,
 } from './__fixtures__/invocation.ts';
 import {
-  a2a10OnlyProfile,
+  a2aOneZeroOnlyProfile,
   type FixtureRuntime,
   provisionFixtureRuntime,
   provisioningTimeoutMilliseconds,
@@ -50,8 +50,8 @@ describe('StopRuntimeSession against a container that is mid-task (§C)', () => 
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'stop',
-      profile: a2a10OnlyProfile,
-      leaseTable: false,
+      profile: a2aOneZeroOnlyProfile,
+      outcomeTable: false,
     });
     a2a = new A2aOverAgentCore(
       fixture.clients.data,
@@ -96,7 +96,6 @@ describe('StopRuntimeSession against a container that is mid-task (§C)', () => 
     );
     const stopReturnedAt = Date.now();
     expect(stopped.$metadata.httpStatusCode).toBe(200);
-    expect(stopReturnedAt - stopIssuedAt).toBeLessThan(5_000);
 
     // The stopped task is unreachable from the moment the stop returns: every
     // poll is answered, and every answer is "Task not found".

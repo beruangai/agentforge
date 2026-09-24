@@ -1,8 +1,9 @@
 // biome-ignore-all format: a @ts-expect-error covers only the line after it, so reflowing a probe would move its error off that line
 /**
- * Type probes, checked by `tsc` from `custom-link-and-typed-context.test.ts`.
- * Each `@ts-expect-error` must still be an error; one that stops erroring is
- * reported as unused and fails the check.
+ * Type probes, compiled by the `typecheck` target (`tsconfig.spec.json`
+ * includes `integ/`) under the project's strict settings. Each
+ * `@ts-expect-error` must still be an error; one that stops erroring is
+ * reported as unused (TS2578) and fails `typecheck`.
  */
 import { expectTypeOf } from 'vitest';
 import {
@@ -25,7 +26,7 @@ export async function clientTypeProbes() {
     strategyId: 'a',
     depth: 1,
   });
-  expectTypeOf(handle.state).toEqualTypeOf<'SUBMITTED'>();
+  expectTypeOf(handle.state).toEqualTypeOf<'TASK_STATE_SUBMITTED'>();
 }
 
 /**
@@ -53,6 +54,6 @@ export const handlerSeesTypedContext =
     return {
       taskId: 'task',
       contextId: 'context',
-      state: 'SUBMITTED' as const,
+      state: 'TASK_STATE_SUBMITTED' as const,
     };
   });

@@ -82,7 +82,7 @@ export function createLinkedClient(containerContext: ContainerContext) {
           });
           const taskId = `task-${input.strategyId}`;
           tasks.set(taskId, {
-            state: 'SUCCEEDED',
+            state: 'TASK_STATE_COMPLETED',
             output: {
               verdict: input.depth > 2 ? 'PASS' : 'FAIL',
               score: input.depth * 10,
@@ -91,7 +91,7 @@ export function createLinkedClient(containerContext: ContainerContext) {
           return {
             taskId,
             contextId: `context-${taskId}`,
-            state: 'SUBMITTED' as const,
+            state: 'TASK_STATE_SUBMITTED' as const,
           };
         },
       ),
@@ -137,34 +137,30 @@ export function createLinkedClient(containerContext: ContainerContext) {
 }
 
 /**
- * How many times one call runs a builder's middleware, by where the router is
- * assembled. Observed on 2.0.0-beta.38 and beta.39: `.router()` on a builder
- * that carries middleware prepends it to procedures that already carry it.
+ * How many times one call runs a builder's middleware when the router is
+ * assembled on the base implementer, as AgentForge assembles it. Assembling on
+ * the middlewared builder instead runs it twice — oRPC v2's documented
+ * behaviour ("automatic deduplication removed"), recorded in
+ * docs/research/procedure-framework.md rather than tested.
  */
-export async function countMiddlewareRuns(
-  assembledOn: 'BASE_IMPLEMENTER' | 'MIDDLEWARED_IMPLEMENTER',
-): Promise<number> {
+export async function countMiddlewareRuns(): Promise<number> {
   let runs = 0;
   const counted = base.use(async ({ next }) => {
     runs += 1;
     return next();
   });
-  const procedures = {
+  const router = base.router({
     reviewStrategy: {
       SendMessage: counted.reviewStrategy.SendMessage.handler(async () => ({
         taskId: 'task',
         contextId: 'context',
-        state: 'SUBMITTED' as const,
+        state: 'TASK_STATE_SUBMITTED' as const,
       })),
       GetTask: counted.reviewStrategy.GetTask.handler(async () => ({
-        state: 'SUBMITTED' as const,
+        state: 'TASK_STATE_SUBMITTED' as const,
       })),
     },
-  };
-  const router =
-    assembledOn === 'BASE_IMPLEMENTER'
-      ? base.router(procedures)
-      : counted.router(procedures);
+  });
   await createRouterClient(router, {
     context: { idempotencyKey: 'k', attempt: 1 },
   }).reviewStrategy.SendMessage({ strategyId: 'a', depth: 1 });

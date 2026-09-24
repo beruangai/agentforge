@@ -459,7 +459,7 @@ agentforge/
         │   └── infra/              # CDK constructs → /infra
         └── integ/                  # by what a test needs, then per concept
             ├── local/              #   Docker: a2a-version-negotiation/, procedure-framework/,
-            │                       #     capability-composition/, image-determinism/
+            │                       #     capability-composition/
             ├── aws/                #   the test role: agentcore/, filesystem-s3-sync/
             └── model/              #   the subscription token: kernel-settlement/
 ```

@@ -96,7 +96,7 @@ Three cases the implementation must cover whichever way the spike goes: a cancel
 
 ## §D — Image layering and deploy granularity *(LAYERING AND THE BUILD CHAIN SETTLED; the deploy path OPEN)*
 
-**Settled: [ADR 0008](../adr/0008-code-ships-in-the-image.md) holds.** Measured over a real three-level tree — one AgentForge base, one agentic base, three agents — on the **manifest digests a registry serves**. Findings in [`research/image-determinism.md`](research/image-determinism.md); now `packages/agentforge/integ/local/image-determinism/`.
+**Settled: [ADR 0008](../adr/0008-code-ships-in-the-image.md) holds.** Measured over a real three-level tree — one AgentForge base, one agentic base, three agents — on the **manifest digests a registry serves**. Findings in [`research/image-determinism.md`](research/image-determinism.md); carried at A0 into `packages/agentforge/integ/local/image-determinism/` and retired from it on 2026-09-24, because nothing AgentForge does depends on them.
 
 - An unchanged rebuild is **byte-identical**: all five digests unmoved across two full rebuilds.
 - A change to one agent **does not spread**: `agent-a` moved; `agent-b`, `agent-c` and the agentic base were identical.
@@ -304,7 +304,7 @@ Not open questions — deliberately not being worked until something asks for th
 | Task-process protocol, cancellation, group kill | §C, §G | **done** — retired at A0 ([ADR 0004](../adr/0004-a-process-per-task.md)); git history `d3f08b7` |
 | Procedure framework: the split, custom link, typed context, streaming, cancellation | §N | **done** — `packages/agentforge/integ/local/procedure-framework/` |
 | A2A server assembly, the wrapping gateway, client signing | §I | **done** — retired at A0; the gateway's own tests replace it; git history `d3f08b7` |
-| Image layering and bundler determinism | §D | **done** — `packages/agentforge/integ/local/image-determinism/` |
+| Image layering and bundler determinism | §D | **done** — retired on 2026-09-24; findings in [`research/image-determinism.md`](research/image-determinism.md) |
 | Capability composition up the image chain | §L | **done** — `packages/agentforge/integ/local/capability-composition/` |
 | Working-directory sync semantics | §F | **done** — `packages/agentforge/integ/aws/filesystem-s3-sync/` |
 | Busy-container reachability, concurrency, container-per-session | §B | **done** — `packages/agentforge/integ/aws/agentcore/`; container-per-session is AgentCore's documented guarantee and not re-tested |

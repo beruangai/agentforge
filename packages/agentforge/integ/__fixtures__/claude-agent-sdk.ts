@@ -1,8 +1,9 @@
 /**
  * Shared Agent SDK fixtures for the integ tier. Resolves the
  * operator's subscription token, gives each run an isolated config directory
- * and working directory, and records every SDK message so a failing assertion
- * points at evidence rather than a recollection.
+ * and working directory, runs a query in the kernel's input mode, and records
+ * every SDK message so a failing assertion points at evidence rather than a
+ * recollection.
  */
 
 import {
@@ -24,7 +25,7 @@ import {
   type SDKSystemMessage,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { type TestTier, taskOutputDirectory } from './task-output-directory.ts';
+import { taskOutputDirectory } from './task-output-directory.ts';
 
 /**
  * The operator's subscription token. `TEMP_CLAUDE_CODE_OAUTH_TOKEN` is
@@ -86,6 +87,22 @@ export function createSandbox(name: string): Sandbox {
   };
 }
 
+/**
+ * The tool that carries a structured-output submission under
+ * `outputFormat: { type: 'json_schema' }` — its emitted name, advertised in
+ * `system/init.tools` (docs/research/kernel-settlement.md).
+ */
+export const carrierToolName = 'StructuredOutput';
+
+/**
+ * What the kernel passes through `env` on every query: removes
+ * `run_in_background` from Bash and the subagent tool, and turns off
+ * auto-backgrounding (docs/ARCHITECTURE.md §7).
+ */
+export const backgroundWorkDisabled: Record<string, string> = {
+  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
+};
+
 /** The environment for a run billed to the operator's subscription. */
 export function createSubscriptionEnvironment(
   configDirectory: string,
@@ -127,15 +144,15 @@ export type ToolResult = {
 
 /**
  * Every message of one run, appended to
- * `dist/packages/agentforge/<tier>/<concept>/<name>.jsonl` as it arrives, so the evidence survives
- * a throw or a timeout.
+ * `dist/packages/agentforge/integ/<concept>/<name>.jsonl` as it arrives, so the
+ * evidence survives a throw or a timeout.
  */
 export class QueryRecording {
   readonly messages: SDKMessage[] = [];
   readonly logPath: string;
 
-  constructor(tier: TestTier, concept: string, name: string) {
-    const directory = join(taskOutputDirectory(tier), concept);
+  constructor(concept: string, name: string) {
+    const directory = join(taskOutputDirectory(), concept);
     mkdirSync(directory, { recursive: true });
     this.logPath = join(directory, `${name}.jsonl`);
     writeFileSync(this.logPath, '');
@@ -164,13 +181,24 @@ export class QueryRecording {
     );
   }
 
+  /**
+   * Appends how draining ended when a test records it rather than asserting
+   * it — the error's text, or that it ended without one.
+   */
+  appendDrainOutcome(drainError: unknown): void {
+    appendFileSync(
+      this.logPath,
+      `${JSON.stringify({ type: 'drain_outcome', threw: drainError !== undefined, error: drainError === undefined ? null : String(drainError) })}\n`,
+    );
+  }
+
   resultMessages(): SDKResultMessage[] {
     return this.messages.filter(
       (message): message is SDKResultMessage => message.type === 'result',
     );
   }
 
-  /** The only result of a closed-input run; throws if there is not exactly one. */
+  /** The only result of the run; throws if there is not exactly one. */
   onlyResultMessage(): SDKResultMessage {
     const results = this.resultMessages();
     if (results.length !== 1) {
@@ -370,5 +398,110 @@ export async function readSessionStartWithoutATurn(
     } finally {
       windowTimer.abort();
     }
+  }
+}
+
+export type StreamingPrompt = {
+  /** Yields one user message, then holds the input open until `endInput`. */
+  prompt: AsyncIterable<SDKUserMessage>;
+  /** Ends the input: the prompt returns, and the SDK closes the CLI's stdin. Idempotent. */
+  endInput: () => void;
+};
+
+/**
+ * The kernel's input mode: a streaming prompt that yields one user message —
+ * a string or content blocks — and then stays open, as
+ * `readSessionStartWithoutATurn`'s never-yielding prompt does, until the
+ * caller ends it.
+ */
+export function createStreamingPrompt(
+  content: SDKUserMessage['message']['content'],
+): StreamingPrompt {
+  const { promise: inputEnded, resolve: endInput } =
+    Promise.withResolvers<void>();
+  async function* promptThatStaysOpen(): AsyncGenerator<SDKUserMessage> {
+    yield {
+      type: 'user',
+      message: { role: 'user', content },
+      parent_tool_use_id: null,
+    };
+    await inputEnded;
+  }
+  return { prompt: promptThatStaysOpen(), endInput: () => endInput() };
+}
+
+/**
+ * Decides, per message, when to end the input. The kernel ends it on the first
+ * result, which is the default.
+ */
+export type EndInputPolicy = (
+  message: SDKMessage,
+  endInput: () => void,
+) => void;
+
+export const endInputOnFirstResult: EndInputPolicy = (message, endInput) => {
+  if (message.type === 'result') endInput();
+};
+
+/** How long the process may take to exit once its input has ended. */
+const exitBoundMilliseconds = 60_000;
+
+/** The process was still running `exitBoundMilliseconds` after its input ended. */
+export class ProcessOutlivedItsInputError extends Error {}
+
+/**
+ * Runs one query the way the kernel does: streaming input and output, one
+ * user message, the input held open until `endInputPolicy` ends it, then read
+ * to process exit under a bound. A throw from the iterator propagates
+ * unchanged; a process that outlives the bound is closed and fails the run.
+ */
+export async function runWithStreamingInput(
+  recording: QueryRecording,
+  content: SDKUserMessage['message']['content'],
+  options: Options,
+  endInputPolicy: EndInputPolicy = endInputOnFirstResult,
+): Promise<void> {
+  const input = createStreamingPrompt(content);
+  const { promise: inputEnded, resolve: markInputEnded } =
+    Promise.withResolvers<void>();
+  const endInput = (): void => {
+    input.endInput();
+    markInputEnded();
+  };
+
+  const session = query({ prompt: input.prompt, options });
+  const drained = recording.drain(session, (message) =>
+    endInputPolicy(message, endInput),
+  );
+  // Captured, so a drain that fails after the bound fired is reported with it
+  // rather than as an unhandled rejection.
+  const drainFailure = drained.then(
+    () => undefined,
+    (error: unknown) => error,
+  );
+  const exitBoundTimer = new AbortController();
+
+  try {
+    await Promise.race([drained, failWhenTheProcessOutlivesItsInput()]);
+  } finally {
+    exitBoundTimer.abort();
+    input.endInput();
+  }
+
+  async function failWhenTheProcessOutlivesItsInput(): Promise<void> {
+    await inputEnded;
+    try {
+      await delay(exitBoundMilliseconds, undefined, {
+        signal: exitBoundTimer.signal,
+      });
+    } catch (error) {
+      if (exitBoundTimer.signal.aborted) return;
+      throw error;
+    }
+    session.close();
+    throw new ProcessOutlivedItsInputError(
+      `the process did not exit within ${exitBoundMilliseconds} ms of its input ending; see ${recording.logPath}`,
+      { cause: await drainFailure },
+    );
   }
 }
