@@ -1,5 +1,21 @@
 /**
- * `@beruangai/agentforge/client` — the caller-agnostic A2A client, typed by an
- * imported contract, over `InvokeAgentRuntime` or a local container.
+ * `@beruangai/agentforge/client` — the caller-agnostic client, typed by the
+ * contract a caller imports, over a local container or AgentCore.
  */
-export {};
+export {
+  type AgentForgeClient,
+  awaitTask,
+  createClient,
+  type ProcedureClient,
+  type Routed,
+  type Starting,
+  type TaskView,
+  type TerminalTaskView,
+} from './client.ts';
+export {
+  AgentForgeRequestError,
+  agentCoreTransport,
+  localTransport,
+  type TaskMethod,
+  type Transport,
+} from './transport.ts';

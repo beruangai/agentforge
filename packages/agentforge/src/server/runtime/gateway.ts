@@ -1,0 +1,196 @@
+import { randomUUIDv7 } from 'node:crypto';
+import type { Message, SendMessageRequest, Task } from '@a2a-js/sdk';
+import { RequestMalformedError } from '@a2a-js/sdk/errors';
+import type {
+  A2ARequestHandler,
+  DefaultRequestHandler,
+  ServerCallContext,
+} from '@a2a-js/sdk/server';
+import { runtimeSessionHeader } from '#core/contract/envelope.ts';
+import { isTerminal, type PriorAttempt } from '#core/contract/task.ts';
+import {
+  finishedTask,
+  newTask,
+  outcomeOf,
+  readEnvelope,
+  stateOf,
+} from './a2a-task.ts';
+import {
+  type Admission,
+  admissionMetadataKey,
+  type TaskProcessExecutor,
+} from './executor.ts';
+import type { DynamoDBTaskStore } from './task-store.ts';
+
+export interface GatewayConfig {
+  readonly inner: DefaultRequestHandler;
+  readonly executor: TaskProcessExecutor;
+  readonly store: DynamoDBTaskStore;
+  /** Tasks this container runs at once; a start beyond it is rejected, never queued. */
+  readonly admissionLimit: number;
+}
+
+/**
+ * The request handler in front of the A2A SDK's. The SDK mints a task id
+ * before its executor runs, so everything that decides whether a start is a
+ * new task — idempotency, admission, continuity — happens here, before
+ * delegating. A cancel always reaches the executor, never only the SDK's
+ * default path.
+ */
+export function createGateway(config: GatewayConfig): A2ARequestHandler {
+  const pendingByKey = new Map<string, Promise<unknown>>();
+
+  async function sendMessage(
+    params: SendMessageRequest,
+    context: ServerCallContext,
+  ): Promise<Message | Task> {
+    let envelope: ReturnType<typeof readEnvelope>;
+    try {
+      envelope = readEnvelope(params.message);
+    } catch (error) {
+      throw new RequestMalformedError(
+        `not an AgentForge start: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const sessionHeader = headerOf(context, runtimeSessionHeader);
+    if (sessionHeader === undefined) {
+      throw new RequestMalformedError(
+        `the ${runtimeSessionHeader} header is required`,
+      );
+    }
+    const runtimeSessionId: string = sessionHeader;
+    // One start per key at a time in this container; the store's conditional
+    // write settles a race across containers.
+    const key = envelope.idempotencyKey;
+    const previous = pendingByKey.get(key) ?? Promise.resolve();
+    const current = previous.then(
+      () => start(),
+      () => start(),
+    );
+    pendingByKey.set(key, current);
+    try {
+      return await current;
+    } finally {
+      if (pendingByKey.get(key) === current) pendingByKey.delete(key);
+    }
+
+    async function start(): Promise<Message | Task> {
+      const existingId = await config.store.taskIdForKey(key);
+      const existing =
+        existingId === undefined
+          ? undefined
+          : await config.store.load(existingId);
+      let attempt = 1;
+      let priorAttempt: PriorAttempt | undefined;
+      if (existing !== undefined) {
+        const state = stateOf(existing);
+        // A live or completed task is the answer to a retry: attach to it.
+        if (!isTerminal(state) || state === 'TASK_STATE_COMPLETED')
+          return existing;
+        const outcome = outcomeOf(existing);
+        attempt = Number(existing.metadata?.attempt ?? 1) + 1;
+        priorAttempt = {
+          taskId: existing.id,
+          state,
+          ...(outcome?.state === 'TASK_STATE_FAILED'
+            ? { cause: outcome.cause }
+            : {}),
+        };
+      }
+      const contextId = params.message?.contextId || randomUUIDv7();
+      if (config.executor.liveCount >= config.admissionLimit) {
+        return await reject(
+          contextId,
+          `the container is at its admission limit of ${config.admissionLimit} tasks`,
+        );
+      }
+      if (
+        envelope.continuityKey !== undefined &&
+        config.executor.hasLiveContinuityKey(envelope.continuityKey)
+      ) {
+        return await reject(
+          contextId,
+          `a task under continuity key "${envelope.continuityKey}" is already running`,
+        );
+      }
+      const admission: Admission = { runtimeSessionId, attempt, priorAttempt };
+      const message = params.message;
+      if (message === undefined)
+        throw new RequestMalformedError('the request carries no message');
+      const started = await config.inner.sendMessage(
+        {
+          ...params,
+          message: {
+            ...message,
+            contextId,
+            metadata: {
+              ...message.metadata,
+              [admissionMetadataKey]: admission,
+            },
+          },
+          configuration: {
+            acceptedOutputModes: [],
+            taskPushNotificationConfig: undefined,
+            ...params.configuration,
+            returnImmediately: true,
+          },
+        },
+        context,
+      );
+      if (!('status' in started)) {
+        throw new Error(
+          'the executor answered a start with a message, not a task',
+        );
+      }
+      await config.store.bindKey(key, started.id, existingId);
+      return started;
+    }
+  }
+
+  /** A refusal is a task, so the caller gets a typed reason rather than an error string. */
+  async function reject(contextId: string, reason: string): Promise<Task> {
+    const task = finishedTask(
+      newTask({
+        id: randomUUIDv7(),
+        contextId,
+        state: 'TASK_STATE_SUBMITTED',
+        metadata: {},
+      }),
+      { state: 'TASK_STATE_REJECTED', reason },
+    );
+    await config.store.save(task);
+    return task;
+  }
+
+  const cancelTask: A2ARequestHandler['cancelTask'] = async (
+    params,
+    context,
+  ) => {
+    if (config.executor.isLive(params.id)) {
+      await config.executor.stop(params.id, 'cancel');
+    }
+    // Not running here: it is finished, or its container is gone and its
+    // lease will say so. Either way the stored task is the answer.
+    return await config.inner.getTask({ ...params, historyLength: 0 }, context);
+  };
+
+  return new Proxy(config.inner, {
+    get(target, property, receiver) {
+      if (property === 'sendMessage') return sendMessage;
+      if (property === 'cancelTask') return cancelTask;
+      const value: unknown = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
+
+function headerOf(
+  context: ServerCallContext,
+  name: string,
+): string | undefined {
+  const headers = context.state.get('headers');
+  if (typeof headers !== 'object' || headers === null) return undefined;
+  const value = (headers as Record<string, unknown>)[name];
+  if (Array.isArray(value)) return value.join(',');
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
