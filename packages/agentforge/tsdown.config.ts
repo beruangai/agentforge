@@ -12,8 +12,12 @@ const bundleDirectory = '../../dist/packages/agentforge/bundle';
 /**
  * One package, five entry points. Code shared between entry points is split
  * into common chunks rather than duplicated into each, and every dependency
- * stays external — only this repository's own source is bundled. The syntax
- * target comes from `engines.node`, the one place Node 26 is declared.
+ * stays external — only this repository's own source is bundled. tsdown
+ * externalises only what the manifest declares and inlines anything else with
+ * no more than an info line, so `onlyBundle: []` turns an import of an
+ * undeclared package into a failed build rather than a copy of it shipped to
+ * consumers. The syntax target comes from `engines.node`, the one place Node 26
+ * is declared.
  */
 export default defineConfig({
   entry: {
@@ -24,6 +28,7 @@ export default defineConfig({
     infra: 'src/infra/index.ts',
   },
   format: 'esm',
+  deps: { onlyBundle: [] },
   platform: 'node',
   tsconfig: 'tsconfig.lib.json',
   dts: true,

@@ -13,7 +13,7 @@ import {
 } from '@orpc/client';
 import type { ContractRouterClient } from '@orpc/contract';
 import { z } from 'zod';
-import { errorContract, errorRouter } from './error-throwing-router.ts';
+import { type errorContract, errorRouter } from './error-throwing-router.ts';
 import { callByPath } from './in-memory-hop.ts';
 
 /** What a container can put on the wire about a raw failure. */

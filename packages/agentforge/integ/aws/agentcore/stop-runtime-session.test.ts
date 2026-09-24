@@ -129,6 +129,9 @@ describe('StopRuntimeSession against a container that is mid-task (§C)', () => 
       (events) => events.length > 0,
       120_000,
     );
+    if (sigterm === undefined) {
+      throw new Error('waitForContainerLogEvents returned no sigterm event');
+    }
     expect(sigterm.liveTasks).toBe(1);
     const sigtermOnThisClock = sigterm.at - containerClockOffset;
     expect(sigtermOnThisClock).toBeGreaterThan(

@@ -7,13 +7,10 @@
     "CLAUDE_CODE_DISABLE_1M_CONTEXT": "0",
     "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "500000",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "90",
-
     "CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS": "5000",
-
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_ENABLE_TASKS": "1",
     "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
-
     "ENABLE_CLAUDEAI_MCP_SERVERS": "false"
   },
   "enabledPlugins": {
@@ -21,12 +18,37 @@
   },
   "worktree": {
     "baseRef": "head",
-    "symlinkDirectories": ["node_modules", ".nx", ".local"]
+    "symlinkDirectories": [
+      "node_modules",
+      "packages/agentforge/node_modules",
+      ".nx/cache",
+      ".local"
+    ]
   },
-  "claudeMdExcludes": ["packages/**"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/seed-worktree-local.sh\" \"${CLAUDE_PROJECT_DIR:-}\"",
+            "timeout": 30,
+            "statusMessage": "Linking machine-local files into the worktree"
+          }
+        ]
+      }
+    ]
+  },
+  "claudeMdExcludes": [
+    "packages/**"
+  ],
   "permissions": {
     "defaultMode": "auto",
-    "allow": ["Bash(openspec *)", "Bash(ls *)", "Edit(./**)"],
+    "allow": [
+      "Bash(openspec *)",
+      "Bash(ls *)",
+      "Edit(./**)"
+    ],
     "deny": [
       "Read(**/.env.local)",
       "Read(**/.env.*.local)",

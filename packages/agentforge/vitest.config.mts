@@ -9,7 +9,7 @@ export default defineConfig({
     watch: false,
     environment: 'node',
     include: ['src/**/*.{test,spec}.ts'],
-    passWithNoTests: true,
+    passWithNoTests: false,
     reporters: ['default'],
     coverage: {
       reportsDirectory: '../../dist/packages/agentforge/test/coverage',

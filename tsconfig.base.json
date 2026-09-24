@@ -1,14 +1,16 @@
 {
   "extends": "@tsconfig/node26/tsconfig.json",
   "compilerOptions": {
+    "exactOptionalPropertyTypes": true,
     "isolatedModules": true,
-    "moduleResolution": "nodenext",
     "noEmit": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
-    "skipLibCheck": true,
-    "strict": true
+    "noUnusedParameters": true,
+    "strict": true,
+    "verbatimModuleSyntax": true
   }
 }

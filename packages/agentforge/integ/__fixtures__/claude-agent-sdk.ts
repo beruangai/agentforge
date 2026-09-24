@@ -269,6 +269,7 @@ export async function readSessionStartWithoutATurn(
 ): Promise<SessionStart> {
   const { promise: promptReleased, resolve: releasePrompt } =
     Promise.withResolvers<void>();
+  // biome-ignore lint/correctness/useYield: a prompt that never yields is the point — no turn may start.
   async function* promptThatNeverYields(): AsyncGenerator<SDKUserMessage> {
     await promptReleased;
   }
@@ -300,50 +301,74 @@ export async function readSessionStartWithoutATurn(
     }
   });
 
-  try {
-    const initializationResult = await session.initializationResult();
-    recording.appendControlResponse('initialize', initializationResult);
-    if (awaitSessionStartHooks) {
-      const windowMilliseconds = 30_000;
-      const windowTimer = new AbortController();
-      try {
-        await Promise.race([
-          hooksSettled,
-          delay(windowMilliseconds, undefined, {
-            signal: windowTimer.signal,
-          }).then(() => {
-            throw new Error(
-              `no SessionStart hook batch settled within ${windowMilliseconds} ms (started ${startedHookIds.size}, answered ${answeredHookIds.size}); see ${recording.logPath}`,
-            );
-          }),
-        ]);
-      } finally {
-        windowTimer.abort();
-      }
-    }
-    return { initializationResult, sessionStartHookResponses };
-  } finally {
+  // The drain's own failure, captured rather than awaited raw, so that a
+  // failure reading the session start is never replaced by a second one.
+  const drainFailure = drained.then(
+    () => undefined,
+    (error: unknown) => error,
+  );
+  const endSession = async (): Promise<unknown> => {
     session.close();
     releasePrompt();
-    await drained;
-    const turnMessages = recording.messages.filter(
-      (message) =>
-        message.type === 'assistant' ||
-        message.type === 'result' ||
-        (message.type === 'system' && message.subtype === 'init'),
-    );
-    if (turnMessages.length > 0) {
-      throw new Error(
-        `a turn ran although no prompt was sent (${turnMessages.map((message) => message.type).join(', ')}); see ${recording.logPath}`,
-      );
+    return drainFailure;
+  };
+
+  let initializationResult: SDKControlInitializeResponse;
+  try {
+    initializationResult = await session.initializationResult();
+    recording.appendControlResponse('initialize', initializationResult);
+    if (awaitSessionStartHooks) {
+      await awaitHookBatch();
     }
-    const unansweredHookIds = [...startedHookIds].filter(
-      (hookId) => !answeredHookIds.has(hookId),
+  } catch (error) {
+    const drainError = await endSession();
+    throw drainError === undefined
+      ? error
+      : new AggregateError(
+          [error, drainError],
+          `reading the session start failed, and so did draining the session; see ${recording.logPath}`,
+        );
+  }
+  const drainError = await endSession();
+  if (drainError !== undefined) throw drainError;
+
+  const turnMessages = recording.messages.filter(
+    (message) =>
+      message.type === 'assistant' ||
+      message.type === 'result' ||
+      (message.type === 'system' && message.subtype === 'init'),
+  );
+  if (turnMessages.length > 0) {
+    throw new Error(
+      `a turn ran although no prompt was sent (${turnMessages.map((message) => message.type).join(', ')}); see ${recording.logPath}`,
     );
-    if (awaitSessionStartHooks && unansweredHookIds.length > 0) {
-      throw new Error(
-        `SessionStart hooks started after the batch was taken as settled: ${unansweredHookIds.join(', ')}; see ${recording.logPath}`,
-      );
+  }
+  const unansweredHookIds = [...startedHookIds].filter(
+    (hookId) => !answeredHookIds.has(hookId),
+  );
+  if (awaitSessionStartHooks && unansweredHookIds.length > 0) {
+    throw new Error(
+      `SessionStart hooks started after the batch was taken as settled: ${unansweredHookIds.join(', ')}; see ${recording.logPath}`,
+    );
+  }
+  return { initializationResult, sessionStartHookResponses };
+
+  async function awaitHookBatch(): Promise<void> {
+    const windowMilliseconds = 30_000;
+    const windowTimer = new AbortController();
+    try {
+      await Promise.race([
+        hooksSettled,
+        delay(windowMilliseconds, undefined, {
+          signal: windowTimer.signal,
+        }).then(() => {
+          throw new Error(
+            `no SessionStart hook batch settled within ${windowMilliseconds} ms (started ${startedHookIds.size}, answered ${answeredHookIds.size}); see ${recording.logPath}`,
+          );
+        }),
+      ]);
+    } finally {
+      windowTimer.abort();
     }
   }
 }

@@ -19,11 +19,9 @@
         "{projectRoot}/integ/**/*",
         "{projectRoot}/*.mts",
         "{projectRoot}/*.ts",
+        "{projectRoot}/package.json",
         "{projectRoot}/tsconfig*.json",
-        "{workspaceRoot}/tsconfig.base.json",
-        {
-          "externalDependencies": ["typescript"]
-        }
+        "{workspaceRoot}/tsconfig.base.json"
       ],
       "outputs": ["{workspaceRoot}/dist/{projectRoot}/typecheck"],
       "options": {
@@ -35,12 +33,7 @@
     "bundle": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "production",
-        {
-          "externalDependencies": ["tsdown"]
-        }
-      ],
+      "inputs": ["production"],
       "outputs": ["{workspaceRoot}/dist/{projectRoot}/bundle"],
       "options": {
         "command": "tsdown && publint run ../../dist/packages/agentforge/bundle --strict --pack npm",
@@ -48,7 +41,8 @@
       }
     },
     "test": {
-      "executor": "@nx/vitest:test",
+      "executor": "nx:run-commands",
+      "cache": true,
       "inputs": [
         "{projectRoot}/src/**/*",
         "{projectRoot}/package.json",
@@ -57,29 +51,34 @@
         "{workspaceRoot}/tsconfig.base.json",
         "sharedGlobals",
         {
-          "externalDependencies": ["vitest", "typescript"]
+          "runtime": "node --version"
+        },
+        {
+          "runtime": "bun --version"
         }
       ],
       "outputs": ["{workspaceRoot}/dist/{projectRoot}/test"],
       "options": {
-        "configFile": "{projectRoot}/vitest.config.mts"
+        "command": "vitest run --config vitest.config.mts",
+        "cwd": "{projectRoot}"
       }
     },
     "integ": {
-      "executor": "@nx/vitest:test",
+      "executor": "nx:run-commands",
       "cache": false,
       "options": {
-        "configFile": "{projectRoot}/vitest.integ.mts"
+        "command": "vitest run --config vitest.integ.mts",
+        "cwd": "{projectRoot}"
       },
       "configurations": {
         "local": {
-          "testFiles": ["integ/local"]
+          "args": "--project=@beruangai/agentforge:integ:local"
         },
         "aws": {
-          "testFiles": ["integ/aws"]
+          "args": "--project=@beruangai/agentforge:integ:aws*"
         },
         "model": {
-          "testFiles": ["integ/model"]
+          "args": "--project=@beruangai/agentforge:integ:model"
         }
       }
     },
@@ -87,29 +86,12 @@
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": ["biome"],
-      "dependsOn": ["format"],
       "options": {
-        "command": "biome lint {projectRoot}"
+        "command": "biome check {projectRoot}"
       },
       "configurations": {
         "fix": {
           "command": "biome check --write {projectRoot}"
-        },
-        "skip-lint": {
-          "command": "node -e \"\""
-        }
-      }
-    },
-    "format": {
-      "executor": "nx:run-commands",
-      "cache": true,
-      "inputs": ["biome"],
-      "options": {
-        "command": "biome format {projectRoot}"
-      },
-      "configurations": {
-        "fix": {
-          "command": "biome format --write {projectRoot}"
         },
         "skip-lint": {
           "command": "node -e \"\""

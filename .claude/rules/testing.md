@@ -31,21 +31,24 @@ The question is *would we want to be told when this changes*, not *did a spike p
 
 **Test what AgentForge relies on and the platform does not guarantee.** A documented guarantee is trusted, not re-tested — that each AgentCore session gets its own microVM is AgentCore's promise, not a finding. An observation nothing depends on — a warm pool, a latency, an exact list of forwarded headers — is a dated research note, not an assertion. A test earns its place when all three hold: AgentForge's design rests on the answer, the documentation is silent, ambiguous or wrong about it, and the answer can move. Whether AgentForge passes an option through is its own unit test; whether the SDK then honours a documented option is the SDK's.
 
-Each tier is its own target and its own vitest config, so the guard is the target rather than a conditional inside a test. They use the `@nx/vitest:test` executor; the `@nx/vitest` inference plugin is not registered, so no `test-ci` or per-file targets appear:
+Each tier is its own target and its own vitest config, so the guard is the target rather than a conditional inside a test. They are `nx:run-commands` targets running `vitest run`: `@nx/vitest:test` is deprecated for Nx 24 and ignored a target's declared external inputs, and the inference plugin would add `test-ci` and per-file targets nobody runs:
 
 ```json
-"test":  { "executor": "@nx/vitest:test",
-           "inputs": ["{projectRoot}/src/**/*", "{projectRoot}/vitest.config.mts", "..."],
+"test":  { "executor": "nx:run-commands", "cache": true,
+           "inputs": ["{projectRoot}/src/**/*", "{projectRoot}/vitest.config.mts", "...",
+                      { "runtime": "node --version" }, { "runtime": "bun --version" }],
            "outputs": ["{workspaceRoot}/dist/{projectRoot}/test"],
-           "options": { "configFile": "{projectRoot}/vitest.config.mts" } },
-"integ": { "executor": "@nx/vitest:test", "cache": false,
-           "options": { "configFile": "{projectRoot}/vitest.integ.mts" },
-           "configurations": { "local": { "testFiles": ["integ/local"] },
-                               "aws":   { "testFiles": ["integ/aws"] },
-                               "model": { "testFiles": ["integ/model"] } } }
+           "options": { "command": "vitest run --config vitest.config.mts", "cwd": "{projectRoot}" } },
+"integ": { "executor": "nx:run-commands", "cache": false,
+           "options": { "command": "vitest run --config vitest.integ.mts", "cwd": "{projectRoot}" },
+           "configurations": { "local": { "args": "--project=@beruangai/agentforge:integ:local" },
+                               "aws":   { "args": "--project=@beruangai/agentforge:integ:aws*" },
+                               "model": { "args": "--project=@beruangai/agentforge:integ:model" } } }
 ```
 
-**`cache: false` on `integ` is load-bearing** (and on `e2e` when it exists). `nx.json` gives every `@nx/vitest:test` target `cache: true`, and a platform's or a model's behaviour is not an input Nx can hash — so a cached green run would be replayed without ever reaching AgentCore, S3 or the model, which is a silent pass. Run a subset with `--testFiles=integ/<dimension>/<concept>` or `-- -t <name>`.
+**A cached target hashes every external dependency** — no `externalDependencies` list narrows it — so a bump of any package it could load re-runs it; a list that names only the obvious tool is how a cached green result survives a dependency change. A target that shells out to a runtime declares it as a `runtime` input.
+
+**`cache: false` on `integ` is load-bearing** (and on `e2e` when it exists). A platform's or a model's behaviour is not an input Nx can hash, so a cached green run would be replayed without ever reaching AgentCore, S3 or the model, which is a silent pass. Run a subset by path or name after `--`: `nx run @beruangai/agentforge:integ -- integ/model/kernel-settlement/in-turn-correction` or `-- -t <name>`.
 
 `vitest.integ.mts` has one vitest project per dimension, each including only its folder, running one file at a time with long timeouts because they shell out to containers and the platform:
 

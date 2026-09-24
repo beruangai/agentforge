@@ -42,7 +42,7 @@ export default defineConfig({
     passWithNoTests: false,
     projects: [
       {
-        root: unit.root,
+        root: import.meta.dirname,
         test: {
           ...integration,
           name: '@beruangai/agentforge:integ:local',
@@ -51,7 +51,7 @@ export default defineConfig({
         },
       },
       {
-        root: unit.root,
+        root: import.meta.dirname,
         test: {
           ...integration,
           name: '@beruangai/agentforge:integ:aws',
@@ -61,7 +61,7 @@ export default defineConfig({
         },
       },
       {
-        root: unit.root,
+        root: import.meta.dirname,
         test: {
           ...integration,
           name: '@beruangai/agentforge:integ:aws:agentcore',
@@ -70,7 +70,7 @@ export default defineConfig({
         },
       },
       {
-        root: unit.root,
+        root: import.meta.dirname,
         test: {
           ...integration,
           name: '@beruangai/agentforge:integ:model',

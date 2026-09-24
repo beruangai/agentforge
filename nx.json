@@ -18,26 +18,26 @@
       "!{projectRoot}/integ/**"
     ],
     "sharedGlobals": [],
-    "biome": ["default", "{workspaceRoot}/biome.json"]
+    "biome": [
+      "default",
+      "{workspaceRoot}/biome.json"
+    ]
   },
   "parallel": 8,
   "targetDefaults": {
     "test": {
-      "dependsOn": ["^build"],
-      "inputs": ["default"]
-    },
-    "@nx/vitest:test": {
-      "cache": true,
-      "inputs": ["default", "^production"],
-      "configurations": {
-        "update-snapshot": {
-          "args": "--update"
-        }
-      }
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "default"
+      ]
     },
     "build": {
       "cache": true,
-      "inputs": ["default"]
+      "inputs": [
+        "default"
+      ]
     }
   }
 }

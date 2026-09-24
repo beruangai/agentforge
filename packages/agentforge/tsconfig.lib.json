@@ -2,10 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "incremental": true,
-    "tsBuildInfoFile": "../../dist/packages/agentforge/typecheck/tsconfig.lib.tsbuildinfo",
-    "types": [
-      "node"
-    ]
+    "tsBuildInfoFile": "../../dist/packages/agentforge/typecheck/tsconfig.lib.tsbuildinfo"
   },
   "include": [
     "src/**/*.ts"
