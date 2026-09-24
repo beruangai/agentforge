@@ -116,6 +116,7 @@ export async function runAgent<Output>(
     rateLimitResetsAt: undefined,
     assistantError: undefined,
     mirrorError: undefined,
+    deadMatchers: [],
   };
   let result: SDKResultMessage | undefined;
   let drainDeadline: number | undefined;
@@ -130,6 +131,17 @@ export async function runAgent<Output>(
       }
       if (next.done) break;
       observe(next.value, observed);
+      if (next.value.type === 'system' && next.value.subtype === 'init') {
+        observed.deadMatchers = deadToolMatchers(
+          spec.options?.hooks,
+          next.value.tools,
+        );
+        if (observed.deadMatchers.length > 0) {
+          // Before the first turn: no tool may run with a guardrail missing.
+          abortController.abort();
+          break;
+        }
+      }
       if (next.value.type === 'result' && result === undefined) {
         result = next.value;
         drainDeadline = Date.now() + drainBoundMilliseconds;
@@ -167,6 +179,14 @@ export async function runAgent<Output>(
   context.onRecord(record);
 
   if (canceled) throw new TaskCanceled();
+  if (observed.deadMatchers.length > 0) {
+    throw new TaskFailure(
+      cause(
+        'EXECUTION_ERROR',
+        `hook matchers that match no tool this session has, and would never fire: ${observed.deadMatchers.join('; ')}`,
+      ),
+    );
+  }
   if (observed.mirrorError !== undefined) {
     throw new TaskFailure(
       cause(
@@ -192,6 +212,54 @@ interface Observed {
   rateLimitResetsAt: number | undefined;
   assistantError: string | undefined;
   mirrorError: string | undefined;
+  deadMatchers: string[];
+}
+
+/** The hook events whose matcher is tested against a tool name. */
+const toolHookEvents = [
+  'PreToolUse',
+  'PostToolUse',
+  'PostToolUseFailure',
+  'PermissionRequest',
+  'PermissionDenied',
+] as const;
+
+/** Only these characters, and a matcher is a list of exact names. */
+const exactMatcherPattern = /^[A-Za-z0-9_\- ,|]*$/;
+
+/**
+ * Whether a hook matcher selects a tool, as Claude Code evaluates it: `*`,
+ * empty or omitted matches everything; a matcher of word characters, `-`,
+ * spaces, `,` and `|` is a list of exact names; anything else is an
+ * unanchored JavaScript regular expression.
+ */
+export function matcherSelects(
+  matcher: string | undefined,
+  tool: string,
+): boolean {
+  if (matcher === undefined || matcher === '' || matcher === '*') return true;
+  if (exactMatcherPattern.test(matcher)) {
+    return matcher.split(/[|,]/).some((name) => name.trim() === tool);
+  }
+  return new RegExp(matcher).test(tool);
+}
+
+/**
+ * Tool-event matchers that select none of the session's tools. Such a hook
+ * fires zero times and reports nothing — a guardrail that looks exactly like
+ * a passing run — so the run fails instead.
+ */
+export function deadToolMatchers(
+  hooks: Options['hooks'],
+  tools: readonly string[],
+): string[] {
+  return toolHookEvents.flatMap((event) =>
+    (hooks?.[event] ?? [])
+      .filter(
+        (entry) => !tools.some((tool) => matcherSelects(entry.matcher, tool)),
+      )
+      .map((entry) => `${event} "${entry.matcher}"`),
+  );
 }
 
 function observe(message: SDKMessage, observed: Observed): void {

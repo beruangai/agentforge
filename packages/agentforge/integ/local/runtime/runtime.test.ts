@@ -114,6 +114,17 @@ describe('the runtime', () => {
     });
   });
 
+  it('refuses a key reused in another runtime session', async () => {
+    const context = starting();
+    await client.echo.SendMessage({ text: 'hello' }, context);
+    await expect(
+      client.echo.SendMessage(
+        { text: 'hello' },
+        { ...routed(), idempotencyKey: context.idempotencyKey },
+      ),
+    ).rejects.toThrow(/in another runtime session/);
+  });
+
   it('starts a new attempt once the previous one failed, telling it how', async () => {
     const context = starting();
     const first = await awaitTask(

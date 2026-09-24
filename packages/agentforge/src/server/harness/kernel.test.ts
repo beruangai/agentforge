@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { init, result, scriptedQuery } from './__fixtures__/scripted-query.ts';
-import { runAgent, TaskCanceled, TaskFailure } from './kernel.ts';
+import {
+  deadToolMatchers,
+  matcherSelects,
+  runAgent,
+  TaskCanceled,
+  TaskFailure,
+} from './kernel.ts';
 
 const output = z.object({ answer: z.string() });
 
@@ -127,5 +133,60 @@ describe('runAgent', () => {
     setTimeout(() => controller.abort(), 20);
     await expect(promise).rejects.toBeInstanceOf(TaskCanceled);
     expect(scripted.interrupted()).toBe(true);
+  });
+});
+
+describe('hook matchers', () => {
+  it('evaluates a matcher as Claude Code does', () => {
+    expect(matcherSelects(undefined, 'Bash')).toBe(true);
+    expect(matcherSelects('*', 'Bash')).toBe(true);
+    expect(matcherSelects('Edit|Write', 'Write')).toBe(true);
+    expect(matcherSelects('Edit, Write', 'Write')).toBe(true);
+    // Exact characters only: compared whole, never as a prefix.
+    expect(matcherSelects('mcp__memory', 'mcp__memory__create_entities')).toBe(
+      false,
+    );
+    // Any other character: an unanchored regular expression.
+    expect(
+      matcherSelects('mcp__memory__.*', 'mcp__memory__create_entities'),
+    ).toBe(true);
+    expect(matcherSelects('Edit.*', 'NotebookEdit')).toBe(true);
+  });
+
+  it('names each tool-event matcher that selects no tool', () => {
+    const hook = { hooks: [async () => ({})] };
+    expect(
+      deadToolMatchers(
+        {
+          PreToolUse: [
+            { ...hook, matcher: 'Bash' },
+            { ...hook, matcher: 'StructuredOuput' },
+          ],
+          Stop: [{ ...hook, matcher: 'anything' }],
+        },
+        ['Bash', 'StructuredOutput'],
+      ),
+    ).toEqual(['PreToolUse "StructuredOuput"']);
+  });
+
+  it('fails the run before its first turn when a guardrail would never fire', async () => {
+    const scripted = scriptedQuery([
+      init(),
+      result({ structured_output: { answer: 'unguarded' } }),
+    ]);
+    const promise = runAgent(
+      {
+        prompt: 'q',
+        output,
+        options: {
+          hooks: {
+            PreToolUse: [{ matcher: 'Bash', hooks: [async () => ({})] }],
+          },
+        },
+      },
+      { signal: new AbortController().signal, onRecord: () => undefined },
+      scripted.query,
+    );
+    await expect(promise).rejects.toThrow(/PreToolUse "Bash"/);
   });
 });

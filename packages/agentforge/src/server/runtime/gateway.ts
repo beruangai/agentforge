@@ -83,6 +83,14 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
       let attempt = 1;
       let priorAttempt: PriorAttempt | undefined;
       if (existing !== undefined) {
+        // A key is one logical execution, and an execution lives in one
+        // session: reuse across sessions is a caller's bug, never an attach.
+        const existingSession = existing.metadata?.runtimeSessionId;
+        if (existingSession !== runtimeSessionId) {
+          throw new RequestMalformedError(
+            `idempotency key "${key}" names task ${existing.id} in another runtime session`,
+          );
+        }
         const state = stateOf(existing);
         // A live or completed task is the answer to a retry: attach to it.
         if (!isTerminal(state) || state === 'TASK_STATE_COMPLETED')
