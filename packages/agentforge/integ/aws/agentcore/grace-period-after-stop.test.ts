@@ -8,12 +8,14 @@
  * holding a SHORT task and one a LONG one. A fixed window kills both at the
  * same offset; an idle-triggered kill follows each task.
  *
- * Measured on 2026-09-22 (docs/research/agentcore-runtime-observed.md): the
- * 4 s task's container survived 62.6 s after SIGTERM, idle; the 240 s task's
- * survived 61.0 s, still busy. Across three observations 56.0, 61.0 and
- * 62.6 s: a nominal 60 seconds plus jitter, not tied to the workload.
- * Finishing early does not release the container, and being busy — `/ping`
- * answering HealthyBusy — does not extend it.
+ * Measured on platform version V1, 2026-09-22: a nominal 60 s — 56.0, 61.0
+ * and 62.6 s across three observations. On V2, 2026-09-24, twice: the idle
+ * container died 9.5 s after SIGTERM and the busy one 10.0 s after
+ * (docs/research/agentcore-runtime-observed.md). A fixed window either way —
+ * finishing early does not release the container, and being busy — `/ping`
+ * answering HealthyBusy — does not extend it — but on V2 it is about ten
+ * seconds, inside the 15 s the documentation gives an idle or lifetime
+ * termination.
  *
  * The container deliberately does NOT exit on SIGTERM; it logs a heartbeat
  * every 500 ms, so the moment it is killed is the last beat. The heartbeat
@@ -39,11 +41,14 @@ import {
 } from './__fixtures__/resources.ts';
 import { waitForContainerLogEvents } from './__fixtures__/runtime-logs.ts';
 
-/** 56.0–62.6 s observed: a nominal 60 s and a few seconds of jitter. */
-const graceWindow = { atLeastMilliseconds: 50_000, atMostMilliseconds: 75_000 };
-/** Both observed windows within 1.6 s of each other. */
-const sameOffsetWithinMilliseconds = 10_000;
-/** Read once both containers must be dead if the window holds, with time for CloudWatch to ingest. */
+/** 9.5–10.0 s observed on V2; the documentation's 15 s for other terminations, with margin. */
+const graceWindow = { atLeastMilliseconds: 7_000, atMostMilliseconds: 20_000 };
+/** Both V2 windows within 0.5 s of each other. */
+const sameOffsetWithinMilliseconds = 3_000;
+/**
+ * Read once both containers must be dead, with time for CloudWatch to ingest —
+ * long enough that a return to V1's ~60 s shows as a failure, not a timeout.
+ */
 const readHeartbeatsAfterStopMilliseconds = 130_000;
 const logClockMarginMilliseconds = 60_000;
 
@@ -69,7 +74,7 @@ describe('the grace period after StopRuntimeSession (§C)', () => {
     teardownTimeoutMilliseconds,
   );
 
-  it('kills a stopped container about 60 seconds after SIGTERM, whether its task finished long before or is still running', async () => {
+  it('kills a stopped container about ten seconds after SIGTERM, whether its task finished long before or is still running', async () => {
     const [short, long] = await Promise.all(
       [
         { label: 'short', runMilliseconds: 4_000 },
@@ -130,11 +135,15 @@ describe('the grace period after StopRuntimeSession (§C)', () => {
     const shortLastBeat = await lastBeatOf(short.containerId);
     const longLastBeat = await lastBeatOf(long.containerId);
 
+    const summary = JSON.stringify({
+      short: shortLastBeat,
+      long: longLastBeat,
+    });
     for (const lastBeat of [shortLastBeat, longLastBeat]) {
-      expect(lastBeat.millisecondsSinceSigterm).toBeGreaterThanOrEqual(
+      expect(lastBeat.millisecondsSinceSigterm, summary).toBeGreaterThanOrEqual(
         graceWindow.atLeastMilliseconds,
       );
-      expect(lastBeat.millisecondsSinceSigterm).toBeLessThanOrEqual(
+      expect(lastBeat.millisecondsSinceSigterm, summary).toBeLessThanOrEqual(
         graceWindow.atMostMilliseconds,
       );
     }

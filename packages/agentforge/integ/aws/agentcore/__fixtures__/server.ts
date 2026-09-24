@@ -291,8 +291,8 @@ process.on('SIGTERM', () => {
     at: receivedAt,
     liveTasks: liveTaskIds.size,
   });
-  // §C — is the grace period USABLE? Knowing a container has ~60 seconds is
-  // only half the answer; what matters is whether it can still reach the
+  // §C — is the grace period USABLE? Knowing how long a container has is only
+  // half the answer; what matters is whether it can still reach the
   // network and record an outcome in them. So the first thing the handler
   // does is write one, and time it.
   if (outcomeTarget !== undefined) {

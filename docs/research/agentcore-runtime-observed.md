@@ -1,6 +1,22 @@
 # AgentCore Runtime — what it actually does
 
-Every observation here, the 2026-09-24 re-run included, was made on platform version V1; from 2026-09-24 the tests provision on V2 and re-check them there.
+Every observation below was made on platform version V1 unless it says otherwise. **On V2, 2026-09-24, two of them no longer hold** — the section that follows — and every other finding the tests assert held: a busy container receives `SendMessage`, `GetTask` and `CancelTask`; SIGTERM arrives at once on `StopRuntimeSession` and the session moves to a fresh container; the network and credentials work inside the grace period; A2A 1.0 only, through AgentCore.
+
+## Platform version V2 — what changed, 2026-09-24
+
+Measured by the integration tests in `us-east-2`, the grace period twice.
+
+| | V1 | V2 |
+|---|---|---|
+| `CreateAgentRuntime` → `READY` | ~10 s | **~184 s** |
+| An invocation while `CREATING` | blocks ~5.8 s, then served | **refused at once**: HTTP 400, JSON-RPC `-32052` "Validation error - Invalid request data" |
+| First invocation after `READY` | — | refused once more; the next, ~1.7 s later, served |
+| Kill after SIGTERM from `StopRuntimeSession` | ~60 s (56.0–62.6 s) | **~10 s** — 9.5 s idle, 10.0 s busy, the same in both runs |
+
+- **The provisioning refusal has the shape of a caller's mistake.** Neither version returns the documented retryable 409; V2 answers with a 400 and a validation error a client cannot tell from a bad request. Nothing may route to a runtime before it is `READY`, and a first call just after `READY` can still be refused.
+- **The grace window is still fixed, not tied to the workload** — the idle and the busy container died within 0.5 s of each other — **but it is about ten seconds**, inside the 15 s the documentation gives an idle or lifetime termination ([agentcore-runtime.md](agentcore-runtime.md)). Everything below that reasons from "about a minute" is V1's.
+- **An outcome written first thing in the SIGTERM handler still lands** on V2.
+
 
 **Measured on 2026-09-22** against a real runtime in `us-west-2`, and **re-run on 2026-09-24 in `us-east-2`** by the integration tests, which all pass there — every finding below held except the pre-warmed pool, as noted. Account 913756569129: an ARM64 container, `PUBLIC` network mode, `serverProtocol: A2A`, built on `@a2a-js/sdk@1.2.0`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §B, §C's platform half, and the AgentCore half of §I.
 
@@ -162,7 +178,7 @@ With a **25-second task live** and `/ping` reporting `HealthyBusy`, three furthe
 
 The gateway's idempotency index also held over the real platform: the same key sent twice returned **the same task id**.
 
-### The provisioning window returns no 409 — it blocks
+### The provisioning window returns no 409 — it blocks (V1)
 
 `InvokeAgentRuntime` was called repeatedly from the instant `CreateAgentRuntime` returned, on one session id:
 
@@ -197,7 +213,7 @@ So the platform *is* cooperative at the edge — a real SIGTERM, delivered while
 
 **A stop is therefore not a cancel.** The consumer's side-effect recovery cannot be driven through the session after a stop, because the session no longer points at the process doing the work. Anything that must survive a stop has to be outside the container before the stop lands.
 
-### The grace period is fixed at about a minute, and being busy does not extend it
+### The grace period is fixed at about a minute, and being busy does not extend it (V1; ~10 s on V2)
 
 The container deliberately does **not** exit on SIGTERM; it logs a heartbeat every 500 ms, so the moment it is killed is the last beat.
 
@@ -216,11 +232,11 @@ The first run could not distinguish a fixed window from "killed once it stops re
 
 Across three observations the window was 56.0 s, 61.0 s and 62.6 s — consistent with a nominal 60 seconds plus a few seconds of jitter, not tied to the workload.
 
-**The number that matters to a consumer: a stopped run has about a minute, and then it is gone.** Side-effect recovery that cannot complete inside ~60 seconds must not be attempted in the container at all.
+**The number that matters to a consumer: a stopped run has about a minute on V1 — about ten seconds on V2 — and then it is gone.** Side-effect recovery that cannot complete inside that window must not be attempted in the container at all.
 
-### And the minute is usable
+### And the window is usable
 
-Knowing a container has 60 seconds is only half an answer — what matters is whether it can still reach the network in them. It can. The container writes an outcome row to DynamoDB **from inside its `SIGTERM` handler**, and with a 120-second task still running:
+Knowing how long a container has is only half an answer — what matters is whether it can still reach the network in them. It can. The container writes an outcome row to DynamoDB **from inside its `SIGTERM` handler**, and with a 120-second task still running:
 
 | | |
 |---|---|

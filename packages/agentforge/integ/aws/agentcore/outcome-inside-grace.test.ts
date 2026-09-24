@@ -1,7 +1,8 @@
 /**
  * §C — is the grace period USABLE?
  *
- * Knowing a stopped container has about 60 seconds is only half an answer. The
+ * Knowing how long a stopped container has — about ten seconds on V2 — is
+ * only half an answer. The
  * design question is whether it can still reach the network in them and record
  * an outcome — because if it cannot, "a side effect's recovery is the
  * consumer's" has nowhere to run and `LOST` is the only honest state.
@@ -10,7 +11,8 @@
  * 120 s task still running, the container wrote an outcome row to DynamoDB
  * from inside its SIGTERM handler — its first action, 0 ms after the signal —
  * and the row was visible 3.5 s after `StopRuntimeSession` returned.
- * Networking, credentials and the DynamoDB client all survive SIGTERM.
+ * Networking, credentials and the DynamoDB client all survive SIGTERM. Held
+ * on V2, 2026-09-24.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
