@@ -8,6 +8,5 @@ COPY --chown=bun workspace/ ./
 RUN bun install --frozen-lockfile --linker hoisted --filter @beruangai/agentforge
 COPY --chown=bun source/ packages/agentforge/
 WORKDIR /home/bun/app/packages/agentforge
-ENV AGENTFORGE_AGENT_NAME=runtime-integ \
-    AGENTFORGE_TASK_COMMAND='["bun","integ/local/runtime/__fixtures__/task-entry.ts"]'
+ENV AGENTFORGE_AGENT_NAME=runtime-integ
 CMD ["bun", "integ/aws/agentcore/__fixtures__/agentforge-server.ts"]

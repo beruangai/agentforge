@@ -14,9 +14,12 @@ export interface Transport {
 
 /** A JSON-RPC error the agent answered with. */
 export class AgentForgeRequestError extends Error {
+  readonly method: TaskMethod;
+  readonly code: number | undefined;
+
   constructor(
-    readonly method: TaskMethod,
-    readonly code: number | undefined,
+    method: TaskMethod,
+    code: number | undefined,
     message: string,
     options?: ErrorOptions,
   ) {
@@ -24,6 +27,8 @@ export class AgentForgeRequestError extends Error {
       `${method}: ${code === undefined ? '' : `${code} `}${message}`,
       options,
     );
+    this.method = method;
+    this.code = code;
     this.name = 'AgentForgeRequestError';
   }
 }

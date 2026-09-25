@@ -1,4 +1,5 @@
-// The container's entry: AgentForge's server, configured from the environment.
+// The container's entry: AgentForge's server, running `task.ts` once per task.
+// Everything else comes from the environment.
 import { startServer } from '@beruangai/agentforge/server';
 
-await startServer();
+await startServer({ taskEntry: new URL('./task.ts', import.meta.url) });

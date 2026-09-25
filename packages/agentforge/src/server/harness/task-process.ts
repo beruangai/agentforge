@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import type { RouterContract } from '@orpc/contract';
 import { call, implement, type Router } from '@orpc/server';
 import {
@@ -126,7 +127,15 @@ export async function executeProcedure(
     }
     return { state: 'TASK_STATE_COMPLETED', output };
   } catch (error) {
-    return outcomeOf(error, options.signal);
+    const outcome = outcomeOf(error, options.signal);
+    if (outcome.state === 'TASK_STATE_FAILED') {
+      // Whole, in the container log; the cause carries a cut of it.
+      console.error(
+        `task ${options.invocation.taskId} failed: ${outcome.cause.code}`,
+        error,
+      );
+    }
+    return outcome;
   }
 }
 
@@ -152,7 +161,10 @@ function outcomeOf(error: unknown, signal: AbortSignal): Outcome {
     /output/i.test(error.message)
       ? 'OUTPUT_INVALID'
       : 'EXECUTION_ERROR';
-  return { state: 'TASK_STATE_FAILED', cause: cause(code, message) };
+  return {
+    state: 'TASK_STATE_FAILED',
+    cause: cause(code, message, { stackTrace: inspect(error, { depth: 8 }) }),
+  };
 }
 
 function lookup(

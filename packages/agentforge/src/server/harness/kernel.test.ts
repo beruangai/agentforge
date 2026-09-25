@@ -48,6 +48,35 @@ describe('runAgent', () => {
     expect(agentRun.sessionId).toBe('s-42');
     expect(records).toHaveLength(1);
     expect(agentRun.record.options).toEqual({ maxTurns: 3 });
+    expect(agentRun.record).not.toHaveProperty('prompt');
+    expect(agentRun.record.promptHash).toEqual(expect.any(String));
+  });
+
+  it('refuses an agent contract whose root is not an object, before the run', async () => {
+    const scripted = scriptedQuery([]);
+    await expect(
+      runAgent(
+        { prompt: 'q', output: z.array(z.string()) },
+        { signal: new AbortController().signal, onRecord: () => undefined },
+        scripted.query,
+      ),
+    ).rejects.toThrow(/wrapNonObjectOutput/);
+    expect(scripted.calls).toHaveLength(0);
+  });
+
+  it('sends an opted-in non-object root wrapped, and returns it unwrapped', async () => {
+    const scripted = scriptedQuery([
+      result({ structured_output: { output: ['a', 'b'] } }),
+    ]);
+    const agentRun = await runAgent(
+      { prompt: 'q', output: z.array(z.string()), wrapNonObjectOutput: true },
+      { signal: new AbortController().signal, onRecord: () => undefined },
+      scripted.query,
+    );
+    expect(agentRun.output).toEqual(['a', 'b']);
+    expect(scripted.calls[0]?.options.outputFormat).toMatchObject({
+      schema: { type: 'object', required: ['output'] },
+    });
   });
 
   it('switches background work off and sets the output format', async () => {

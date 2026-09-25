@@ -31,7 +31,7 @@ export interface Admission {
 export const ADMISSION_METADATA_KEY = 'agentforge.admission';
 
 export interface ExecutorConfig {
-  /** The command that starts a task process: the consumer's task entry. */
+  /** The command that starts a task process: the runtime, its flags, the consumer's task entry. */
   readonly taskCommand: readonly string[];
   readonly defaultTimeBudgetSeconds: number;
   /** How long a stopping task process gets before its process group is killed. */
@@ -59,7 +59,11 @@ const STDERR_TAIL_BYTES = 4_000;
 export class TaskProcessExecutor implements AgentExecutor {
   readonly #live = new Map<string, LiveTask>();
 
-  constructor(private readonly config: ExecutorConfig) {}
+  readonly #config: ExecutorConfig;
+
+  constructor(config: ExecutorConfig) {
+    this.#config = config;
+  }
 
   get liveCount(): number {
     return this.#live.size;
@@ -112,8 +116,8 @@ export class TaskProcessExecutor implements AgentExecutor {
     let stderrTail = '';
 
     const child = spawn(
-      this.config.taskCommand[0] ?? '',
-      this.config.taskCommand.slice(1),
+      this.#config.taskCommand[0] ?? '',
+      this.#config.taskCommand.slice(1),
       {
         stdio: ['ignore', 'inherit', 'pipe', 'ipc'],
         detached: true,
@@ -157,12 +161,12 @@ export class TaskProcessExecutor implements AgentExecutor {
     );
 
     const lease = setInterval(() => {
-      this.config.store.renewLease(taskId).catch((error: unknown) => {
+      this.#config.store.renewLease(taskId).catch((error: unknown) => {
         console.error(`task ${taskId}: the lease could not be renewed`, error);
       });
     }, LEASE_RENEWAL_MILLISECONDS);
     const budgetSeconds =
-      envelope.timeBudgetSeconds ?? this.config.defaultTimeBudgetSeconds;
+      envelope.timeBudgetSeconds ?? this.#config.defaultTimeBudgetSeconds;
     const budget = setTimeout(() => {
       void this.stop(taskId, 'timeout');
     }, budgetSeconds * 1000);
@@ -179,7 +183,7 @@ export class TaskProcessExecutor implements AgentExecutor {
       const finished = finishedTask(submitted, outcome, { runs: records });
       // Stored before it is published, so a caller reading the store after a
       // cancel or a poll sees the end, not the SDK's write still in flight.
-      await this.config.store.save(finished);
+      await this.#config.store.save(finished);
       eventBus.publish(AgentEvent.task(finished));
     } finally {
       clearInterval(lease);
@@ -208,7 +212,7 @@ export class TaskProcessExecutor implements AgentExecutor {
     }
     const kill = setTimeout(
       () => killGroup(live.child),
-      this.config.graceMilliseconds,
+      this.#config.graceMilliseconds,
     );
     await live.finished;
     clearTimeout(kill);

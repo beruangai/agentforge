@@ -35,18 +35,21 @@ const RETENTION_SECONDS = 7 * 24 * 60 * 60;
  * derived lost cannot overwrite it — the later write is refused, not raced.
  */
 export class DynamoDBTaskStore implements TaskStore {
-  constructor(
-    private readonly client: DynamoDBClient,
-    private readonly tableName: string,
-  ) {}
+  readonly #client: DynamoDBClient;
+  readonly #tableName: string;
+
+  constructor(client: DynamoDBClient, tableName: string) {
+    this.#client = client;
+    this.#tableName = tableName;
+  }
 
   async save(task: Task, _context?: ServerCallContext): Promise<void> {
     const state = stateOf(task);
     const now = Date.now();
     try {
-      await this.client.send(
+      await this.#client.send(
         new UpdateItemCommand({
-          TableName: this.tableName,
+          TableName: this.#tableName,
           Key: { pk: { S: taskKey(task.id) } },
           UpdateExpression: isTerminal(state)
             ? 'SET #task = :task, #state = :state, expiresAt = :expiresAt REMOVE leaseExpiresAt'
@@ -96,9 +99,9 @@ export class DynamoDBTaskStore implements TaskStore {
       ),
     });
     try {
-      await this.client.send(
+      await this.#client.send(
         new PutItemCommand({
-          TableName: this.tableName,
+          TableName: this.#tableName,
           Item: {
             pk: { S: taskKey(taskId) },
             task: { S: JSON.stringify(Task.toJSON(lost)) },
@@ -131,9 +134,9 @@ export class DynamoDBTaskStore implements TaskStore {
   }
 
   async renewLease(taskId: string): Promise<void> {
-    await this.client.send(
+    await this.#client.send(
       new UpdateItemCommand({
-        TableName: this.tableName,
+        TableName: this.#tableName,
         Key: { pk: { S: taskKey(taskId) } },
         UpdateExpression: 'SET leaseExpiresAt = :lease',
         ConditionExpression: `attribute_exists(pk) AND NOT (#state IN (${TERMINAL_PLACEHOLDERS}))`,
@@ -148,9 +151,9 @@ export class DynamoDBTaskStore implements TaskStore {
 
   /** The latest task started under an idempotency key. */
   async taskIdForKey(idempotencyKey: string): Promise<string | undefined> {
-    const response = await this.client.send(
+    const response = await this.#client.send(
       new GetItemCommand({
-        TableName: this.tableName,
+        TableName: this.#tableName,
         Key: { pk: { S: idempotencyKeyKey(idempotencyKey) } },
         ConsistentRead: true,
       }),
@@ -167,9 +170,9 @@ export class DynamoDBTaskStore implements TaskStore {
     taskId: string,
     previousTaskId: string | undefined,
   ): Promise<void> {
-    await this.client.send(
+    await this.#client.send(
       new PutItemCommand({
-        TableName: this.tableName,
+        TableName: this.#tableName,
         Item: {
           pk: { S: idempotencyKeyKey(idempotencyKey) },
           taskId: { S: taskId },
@@ -195,9 +198,9 @@ export class DynamoDBTaskStore implements TaskStore {
   ): Promise<
     { task: Task; state: TaskStateName; leaseExpiresAt: number } | undefined
   > {
-    const response = await this.client.send(
+    const response = await this.#client.send(
       new GetItemCommand({
-        TableName: this.tableName,
+        TableName: this.#tableName,
         Key: { pk: { S: taskKey(taskId) } },
         ConsistentRead: true,
       }),

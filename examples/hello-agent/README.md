@@ -6,8 +6,8 @@ AgentForge's own agent: the smallest thing a consumer would ship, built and veri
 |---|---|
 | `src/contract.ts` | The contract callers import: two procedures, one with a declared time budget |
 | `src/procedures.ts` | The implementation: each handler calls `context.runAgent` once |
-| `src/task.ts` | The task entry the server runs once per task |
-| `src/server.ts` | The container's entry |
+| `src/task.ts` | The task entry: the server runs it once per task, in its own process |
+| `src/server.ts` | The container's entry: starts the server and names `task.ts` as its task entry |
 | `Dockerfile` | `FROM agentforge/a2a-claude`, dependencies from the workspace lockfile, the published bundle in place of the workspace link |
 | `e2e/` | The whole path against a real model: the client, and the Temporal activity |
 

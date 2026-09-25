@@ -189,17 +189,20 @@ export function sendMessageParams(envelope: FixtureEnvelope): unknown {
  * `SendMessage`, `GetTask`, `CancelTask`.
  */
 export class A2aOverAgentCore {
-  constructor(
-    private readonly client: BedrockAgentCoreClient,
-    readonly agentRuntimeArn: string,
-  ) {}
+  readonly #client: BedrockAgentCoreClient;
+  readonly agentRuntimeArn: string;
+
+  constructor(client: BedrockAgentCoreClient, agentRuntimeArn: string) {
+    this.#client = client;
+    this.agentRuntimeArn = agentRuntimeArn;
+  }
 
   invoke(
     runtimeSessionId: string,
     method: 'SendMessage' | 'GetTask' | 'CancelTask',
     params: unknown,
   ): Promise<Invocation> {
-    return invokeJsonRpc(this.client, {
+    return invokeJsonRpc(this.#client, {
       agentRuntimeArn: this.agentRuntimeArn,
       runtimeSessionId,
       method,

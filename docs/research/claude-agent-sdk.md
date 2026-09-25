@@ -41,7 +41,7 @@ From [Manage sessions](https://code.claude.com/docs/en/sessions#name-the-project
 Established against the current SDK, superseding the predecessor harness's workarounds:
 
 - `outputFormat: { type: 'json_schema', schema }` is native. The SDK validates and re-prompts on its own; exhausting its retries surfaces as `error_max_structured_output_retries`.
-- Schemas must target **draft-07** — `z.toJSONSchema(schema, { target: 'draft-7' })`. `format` is accepted as an annotation.
+- **Verified 2026-09-25** (`@anthropic-ai/sdk` 0.128.0, `integ/model/structured-output/`): the kernel converts through the SDK's `transformJSONSchema`, which walks `$defs` (not draft-07's `definitions`, so Zod's default target is used), throws on a node with no `type` and no union (so reuse is inlined), closes every object, rewrites `oneOf` as `anyOf`, and folds `enum`, `const` and any unsupported keyword into the description — the kernel puts `enum` and `const` back. The backend accepted `format: uri | uuid | date-time` that day, contrary to the predecessor's finding that `uri` was refused. Structured output is a tool, so its schema's root must be an object.
 - An invalid schema now fails at startup rather than being ignored (since CLI v2.1.205).
 
 What remains for AgentForge is the outer validation and the typed `output_invalid` outcome, not a pile of conversion workarounds.

@@ -51,12 +51,19 @@ export type CauseCode = (typeof CAUSE_CODES)[number];
 export const CauseSchema = z.object({
   code: z.enum(CAUSE_CODES),
   message: z.string(),
+  /** What would resolve it: the first thing to try. */
+  suggestedAction: z.string(),
   /** Whether running a new attempt could succeed. */
   retryable: z.boolean(),
   /** ISO time before which a retry is pointless. */
   retryAfter: z.string().optional(),
   /** What the agent produced, when it did not conform. */
   payload: z.unknown().optional(),
+  /**
+   * The error behind it, with its stack and cause chain, cut to
+   * `STACK_TRACE_CAP_BYTES`. The container log holds it whole.
+   */
+  stackTrace: z.string().optional(),
 });
 export type Cause = z.infer<typeof CauseSchema>;
 
@@ -72,12 +79,57 @@ const RETRYABLE_BY_CODE: Record<CauseCode, boolean> = {
   EXECUTION_ERROR: false,
 };
 
+const SUGGESTED_ACTION_BY_CODE: Record<CauseCode, string> = {
+  OUTPUT_INVALID:
+    'Compare `payload` with the agent contract. A contract the agent keeps missing usually asks too much of one answer: flatten or split it, and say what each field means in the prompt or with `.describe()` (§REQ102, §REQ103).',
+  OUTPUT_TOO_LARGE:
+    "Keep the outer contract to what the caller branches on — identifiers, verdicts, references. Write bulk results where the caller can read them (a file, object storage) and return a reference; never the agent's whole output (§REQ102, ADR 0006).",
+  BUDGET_EXHAUSTED:
+    'Raise `maxTurns` or `maxBudgetUsd` for the procedure, or narrow what the prompt asks for.',
+  TIMED_OUT:
+    "Raise the procedure's time budget — `timeBudget(seconds)` in its contract, or per call — or narrow what the prompt asks for (§REQ202).",
+  LOST: 'Reconcile any side effects the attempt may have made, then retry under the same idempotency key; the next attempt receives this one as `priorAttempt` (§REQ303, §REQ503).',
+  USAGE_LIMITED:
+    "Retry after `retryAfter`, when the subscription's usage limit resets.",
+  CREDENTIAL_EXPIRED:
+    "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ705).",
+  PROVIDER_TRANSIENT: 'Retry with backoff.',
+  EXECUTION_ERROR:
+    'Read `stackTrace`, and the container log for the whole error; fix the procedure, its options, or the layer that threw.',
+};
+
+/** The most of a stack trace a cause carries. */
+export const STACK_TRACE_CAP_BYTES = 4 * 1024;
+
 export function cause(
   code: CauseCode,
   message: string,
-  extra: Partial<Pick<Cause, 'retryAfter' | 'payload'>> = {},
+  extra: Partial<
+    Pick<Cause, 'retryAfter' | 'payload' | 'suggestedAction' | 'stackTrace'>
+  > = {},
 ): Cause {
-  return { code, message, retryable: RETRYABLE_BY_CODE[code], ...extra };
+  return {
+    code,
+    message,
+    suggestedAction: SUGGESTED_ACTION_BY_CODE[code],
+    retryable: RETRYABLE_BY_CODE[code],
+    ...extra,
+    ...(extra.stackTrace === undefined
+      ? {}
+      : { stackTrace: truncate(extra.stackTrace, STACK_TRACE_CAP_BYTES) }),
+  };
+}
+
+/** Cut to at most `capBytes` of UTF-8, saying so. */
+function truncate(text: string, capBytes: number): string {
+  const encoder = new TextEncoder();
+  const encoded = encoder.encode(text);
+  if (encoded.byteLength <= capBytes) return text;
+  const marker = `\n… cut at ${capBytes} of ${encoded.byteLength} bytes`;
+  const kept = new TextDecoder()
+    .decode(encoded.subarray(0, capBytes - encoder.encode(marker).byteLength))
+    .replace(/\uFFFD$/, '');
+  return kept + marker;
 }
 
 /** How a task ended, as the task process reports it and the artifact carries it. */
@@ -91,7 +143,9 @@ export type Outcome = z.infer<typeof OutcomeSchema>;
 
 /** What one agent run recorded (§REQ601). */
 export const RunRecordSchema = z.object({
-  prompt: z.unknown(),
+  /** The prompt as sent, hashed; the container log and the transcript hold it whole. */
+  promptHash: z.string(),
+  promptBytes: z.number(),
   options: z.record(z.string(), z.unknown()),
   sessionId: z.string().optional(),
   numberOfTurns: z.number().optional(),

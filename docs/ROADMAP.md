@@ -27,11 +27,18 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - The uuid-after-restore spike (§H) and the admission default measured (§G)
 - `hello-agent`'s e2e against the deployed runtime through `agentCoreTransport`, including a container stop mid-task ending `LOST` and a retry attaching
 - Telemetry and per-agent metrics (§T)
-- Cross-container resume (§F), if a consumer needs it before A3
+- Cross-container resume (§F), if a consumer needs it before A4
 
 **Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop.
 
-## A3 — Consumers
+## A3 — Built-in capabilities
+
+Common guardrails a procedure opts into rather than writes, each acting **within the agent's turn** so the agent can fix what it finds before it answers — never a check after the run that can only fail it.
+
+- A stop guard for predefined cases: the files the procedure expects exist, before the agent may stop
+- Each lands on an example agent first; what it needs enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator
+
+## A4 — Consumers
 
 - StrategyFoundry adopts; TrendBot migrates off its predecessor harness
 - What either lacks enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator, and lands on an example first

@@ -6,7 +6,7 @@
 export {
   type RunningServer,
   type ServerConfig,
-  serverConfigFromEnvironment,
+  type ServerOptions,
   startServer,
 } from './server.ts';
 export { createTaskTable, DynamoDBTaskStore } from './task-store.ts';

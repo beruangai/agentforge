@@ -53,10 +53,7 @@ beforeAll(async () => {
   tableName = await dynamoDB.createTable();
   server = await startServer({
     agentName: 'runtime-integ',
-    taskCommand: [
-      'bun',
-      join(import.meta.dirname, '__fixtures__', 'task-entry.ts'),
-    ],
+    taskEntry: join(import.meta.dirname, '__fixtures__', 'task-entry.ts'),
     tableName,
     dynamoDBEndpoint: dynamoDB.endpoint,
     admissionLimit: 3,

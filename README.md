@@ -31,8 +31,8 @@ const os = implementAgent(helloAgent);
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
     const run = await context.runAgent({
-      prompt: `Summarise the following text in one sentence.\n\n${input.text}`,
-      output: z.object({ summary: z.string() }),          // what the model fills in
+      prompt: ['Summarise the text in one sentence.', { tag: 'text', context: input.text }],
+      output: z.object({ summary: z.string() }),          // what the model fills in; an object root
       options: { cwd: '/home/bun/work', maxTurns: 3, tools: [], resume: input.resumeSessionId },
     });
     return { summary: run.output.summary, words: countWords(run.output.summary), sessionId: run.sessionId };
@@ -46,8 +46,8 @@ export const router = os.router({
 ```ts
 // task.ts — run by the server, once per task
 runTaskProcess({ contract: helloAgent, router });
-// server.ts
-await startServer();
+// server.ts — the container's entry; names the task entry, the rest from the environment
+await startServer({ taskEntry: new URL('./task.ts', import.meta.url) });
 ```
 
 **4. Consume it** — from any process, or as a Temporal activity.

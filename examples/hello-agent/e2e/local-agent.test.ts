@@ -69,8 +69,24 @@ describe('hello-agent, locally', () => {
     const [run] = ended.runs;
     expect(run?.sessionId).toBe(firstSessionId);
     expect(run?.totalCostUsd).toBeGreaterThan(0);
-    expect(JSON.stringify(run?.prompt)).toContain(
-      'Summarise the following text',
+    // The record carries the prompt's hash; the container log, the prompt whole.
+    expect(run?.promptBytes).toBeGreaterThan(0);
+    const logged = agent
+      .logs()
+      .split('\n')
+      .filter((line) => line.includes('"agentforge.prompt"'))
+      .map((line) => JSON.parse(line.slice(line.indexOf('{'))));
+    expect(logged).toContainEqual(
+      expect.objectContaining({
+        promptHash: run?.promptHash,
+        prompt: [
+          { type: 'text', text: 'Summarise the text in one sentence.' },
+          {
+            type: 'text',
+            text: expect.stringMatching(/^<text>\n[\s\S]+\n<\/text>$/),
+          },
+        ],
+      }),
     );
   });
 

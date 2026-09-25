@@ -11,6 +11,5 @@ RUN bun install --frozen-lockfile --production --linker hoisted --filter @beruan
 COPY --chown=bun dist/packages/agentforge/bundle/ packages/agentforge/
 COPY --chown=bun examples/hello-agent/src examples/hello-agent/src
 WORKDIR /home/bun/app/examples/hello-agent
-ENV AGENTFORGE_AGENT_NAME=hello-agent \
-    AGENTFORGE_TASK_COMMAND='["bun","--conditions=agentforge-agent","src/task.ts"]'
+ENV AGENTFORGE_AGENT_NAME=hello-agent
 CMD ["bun", "--conditions=agentforge-agent", "src/server.ts"]

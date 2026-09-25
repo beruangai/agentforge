@@ -6,7 +6,6 @@
  */
 export {
   type AgentOptions,
-  type AgentPrompt,
   type AgentRun,
   type AgentRunSpec,
   runAgent,
@@ -14,6 +13,16 @@ export {
   TaskFailure,
 } from './kernel.ts';
 export { composeOptions } from './options.ts';
+export {
+  type AgentPrompt,
+  type CacheBreakpoint,
+  type CommandBlock,
+  type ContentBlock,
+  type ContextBlock,
+  type ContextDocument,
+  documentBlock,
+  type PromptContent,
+} from './prompt.ts';
 export {
   executeProcedure,
   implementAgent,

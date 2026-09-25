@@ -10,7 +10,10 @@ const CWD = '/home/bun/work';
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
     const run = await context.runAgent({
-      prompt: `Summarise the following text in one sentence.\n\n${input.text}`,
+      prompt: [
+        'Summarise the text in one sentence.',
+        { tag: 'text', context: input.text },
+      ],
       output: z.object({
         summary: z.string().describe('One sentence summarising the text'),
       }),

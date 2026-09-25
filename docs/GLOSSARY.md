@@ -50,7 +50,7 @@
 
 **Outcome** — How a task ended: the output, a **cause**, cancelled, or rejected with a reason. Carried as the artifact `outcome`.
 
-**Cause** — `{ code, message, retryable, retryAfter?, payload? }` on a failed task. Codes are `SCREAMING_SNAKE_CASE`: `OUTPUT_INVALID`, `OUTPUT_TOO_LARGE`, `BUDGET_EXHAUSTED`, `TIMED_OUT`, `LOST`, `USAGE_LIMITED`, `CREDENTIAL_EXPIRED`, `PROVIDER_TRANSIENT`, `EXECUTION_ERROR`.
+**Cause** — `{ code, message, suggestedAction, retryable, retryAfter?, payload?, stackTrace? }` on a failed task. Codes are `SCREAMING_SNAKE_CASE`: `OUTPUT_INVALID`, `OUTPUT_TOO_LARGE`, `BUDGET_EXHAUSTED`, `TIMED_OUT`, `LOST`, `USAGE_LIMITED`, `CREDENTIAL_EXPIRED`, `PROVIDER_TRANSIENT`, `EXECUTION_ERROR`.
 
 **Idempotency key** — The caller's name for one logical execution; a start with it attaches to its live or completed task ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
 

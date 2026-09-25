@@ -51,7 +51,7 @@ export function finishedTask(
   const artifact: Artifact = {
     artifactId: OUTCOME_ARTIFACT_ID,
     name: 'outcome',
-    description: '',
+    description: 'How the task ended: its typed output, or why it failed',
     parts: [
       {
         content: { $case: 'data', value: outcome },

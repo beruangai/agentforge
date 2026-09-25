@@ -1,5 +1,6 @@
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
+import { fileURLToPath } from 'node:url';
 import type { AgentCard } from '@a2a-js/sdk';
 import { DefaultRequestHandler } from '@a2a-js/sdk/server';
 import { jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
@@ -12,8 +13,12 @@ import { createTaskTable, DynamoDBTaskStore } from './task-store.ts';
 export interface ServerConfig {
   /** The agent's name, on its card and in its records. */
   readonly agentName: string;
-  /** The command that starts a task process — the consumer's task entry. */
-  readonly taskCommand: readonly string[];
+  /**
+   * The consumer's task entry: the module that calls `runTaskProcess`, run
+   * once per task by this same runtime with the same flags, so its export
+   * conditions carry over. `new URL('./task.ts', import.meta.url)`.
+   */
+  readonly taskEntry: string | URL;
   /** The DynamoDB table holding task state. */
   readonly tableName: string;
   /** A DynamoDB endpoint other than AWS's — DynamoDB Local, in development. */
@@ -27,11 +32,17 @@ export interface ServerConfig {
   readonly host: string;
 }
 
+/** The task entry, and anything else the environment should not decide. */
+export type ServerOptions = Pick<ServerConfig, 'taskEntry'> &
+  Partial<ServerConfig>;
+
 /**
- * The configuration from the environment, which is how a container gets it.
- * A missing required value fails here, loudly, rather than at first use.
+ * The configuration: what the server entry passes, the rest from the
+ * environment, which is how a container gets it. A missing required value
+ * fails here, loudly, rather than at first use.
  */
-export function serverConfigFromEnvironment(
+function serverConfig(
+  options: ServerOptions,
   environment: NodeJS.ProcessEnv = process.env,
 ): ServerConfig {
   const required = (name: string): string => {
@@ -50,18 +61,22 @@ export function serverConfigFromEnvironment(
     }
     return parsed;
   };
-  const endpoint = environment.AGENTFORGE_DYNAMODB_ENDPOINT;
+  const endpoint =
+    options.dynamoDBEndpoint ?? environment.AGENTFORGE_DYNAMODB_ENDPOINT;
   return {
-    agentName: required('AGENTFORGE_AGENT_NAME'),
-    taskCommand: JSON.parse(required('AGENTFORGE_TASK_COMMAND')) as string[],
-    tableName: required('AGENTFORGE_TABLE_NAME'),
+    taskEntry: options.taskEntry,
+    agentName: options.agentName ?? required('AGENTFORGE_AGENT_NAME'),
+    tableName: options.tableName ?? required('AGENTFORGE_TABLE_NAME'),
     ...(endpoint === undefined || endpoint === ''
       ? {}
       : { dynamoDBEndpoint: endpoint }),
-    admissionLimit: positive('AGENTFORGE_ADMISSION_LIMIT', 4),
-    defaultTimeBudgetSeconds: positive('AGENTFORGE_TIME_BUDGET_SECONDS', 3_600),
-    port: positive('AGENTFORGE_PORT', 9_000),
-    host: environment.AGENTFORGE_HOST ?? '0.0.0.0',
+    admissionLimit:
+      options.admissionLimit ?? positive('AGENTFORGE_ADMISSION_LIMIT', 4),
+    defaultTimeBudgetSeconds:
+      options.defaultTimeBudgetSeconds ??
+      positive('AGENTFORGE_TIME_BUDGET_SECONDS', 3_600),
+    port: options.port ?? positive('AGENTFORGE_PORT', 9_000),
+    host: options.host ?? environment.AGENTFORGE_HOST ?? '0.0.0.0',
   };
 }
 
@@ -78,8 +93,9 @@ const GRACE_MILLISECONDS = 5_000;
  * `POST /`, the card, and `/ping` reporting busy while any task runs.
  */
 export async function startServer(
-  config: ServerConfig = serverConfigFromEnvironment(),
+  options: ServerOptions,
 ): Promise<RunningServer> {
+  const config = serverConfig(options);
   const dynamoDB = new DynamoDBClient(
     config.dynamoDBEndpoint === undefined
       ? {}
@@ -92,7 +108,13 @@ export async function startServer(
   }
   const store = new DynamoDBTaskStore(dynamoDB, config.tableName);
   const executor = new TaskProcessExecutor({
-    taskCommand: config.taskCommand,
+    taskCommand: [
+      process.execPath,
+      ...process.execArgv,
+      config.taskEntry instanceof URL
+        ? fileURLToPath(config.taskEntry)
+        : config.taskEntry,
+    ],
     defaultTimeBudgetSeconds: config.defaultTimeBudgetSeconds,
     graceMilliseconds: GRACE_MILLISECONDS,
     store,

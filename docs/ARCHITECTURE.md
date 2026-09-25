@@ -63,7 +63,7 @@ const os = implementAgent(helloAgent);
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
     const run = await context.runAgent({
-      prompt: `Summarise …\n\n${input.text}`,
+      prompt: ['Summarise the text…', { tag: 'text', context: input.text }],
       output: z.object({ summary: z.string() }),    // the agent contract
       options: { cwd, maxTurns: 3, tools: [] },      // the SDK's own Options
     });
@@ -76,11 +76,11 @@ export const router = os.router({
 
 **The client derives the calls, named as A2A names them.** `client.summarise.SendMessage(input, { runtimeSessionId, idempotencyKey })` returns a task view; `client.summarise.GetTask(taskId, { runtimeSessionId })` returns a union on the task's state, with the typed output reachable only on `TASK_STATE_COMPLETED`; `client.CancelTask(taskId, { runtimeSessionId })` sits at the root because nothing about cancelling is a procedure's. `awaitTask` polls `GetTask` to a terminal state. The output is parsed against the caller's own contract.
 
-**The contract hash** is a hash of the input and output JSON Schema. The container refuses a task whose hash it does not implement, before any work (§REQ104). Meta does not move it.
+**The contract hash** is `ohash` of the input and output JSON Schema. The container refuses a task whose hash it does not implement, before any work (§REQ104). Meta does not move it.
 
 **The time budget** is declared with the procedure (`oc.meta(timeBudget(seconds))`) and overridable per call; without either, the agent's default applies (§REQ202). The executor enforces it — a wedged process cannot time itself out.
 
-**Options are the SDK's own type**, minus the two the kernel owns (`outputFormat`, `abortController`). `composeOptions(…parts)` merges house defaults with a procedure's: scalars replace, while **hooks, MCP servers, allowed and disallowed tools, and env are additive**, and an MCP server named twice throws — so no guardrail is lost to ordering (§REQ204).
+**Options are the SDK's own type**, minus the two the kernel owns (`outputFormat`, `abortController`). `composeOptions(…parts)` deep-merges house defaults with a procedure's (`ts-deepmerge`): scalars replace, plain objects such as `env` merge key by key, and **every list accumulates without duplicates** — hooks per event, allowed and disallowed tools, and any other array, so a narrower part cannot remove an entry a broader one set. An MCP server named twice throws. No guardrail is lost to ordering (§REQ204).
 
 **Side effects and their recovery are the consumer's.** A handler sees `attempt` and `priorAttempt` (its state and, for a failure, its cause). `LOST` means side effects may have happened.
 
@@ -108,6 +108,8 @@ export const router = os.router({
 | `PROVIDER_TRANSIENT` | yes | A provider 5xx or overload |
 | `EXECUTION_ERROR` | no | Anything else: a crash (with its stderr tail), a handler error, a mirror error, a dead guardrail |
 
+Every cause carries a `suggestedAction` — what to try first, per code, or specific to the failure (a dead guardrail says how to fix its matcher). A cause from a thrown error carries its `stackTrace` with the cause chain, cut to 4 KB; the task process logs the whole error to the container log.
+
 A handler can end its task with any cause by throwing `TaskFailure`. A domain-level "no" is a successful output, never a failure (§REQ502).
 
 **Lifecycle.**
@@ -125,9 +127,9 @@ A handler can end its task with any cause by throwing `TaskFailure`. A domain-le
 
 ## 5. The container
 
-One Bun process runs the server — Express and `@a2a-js/sdk`, assembled rather than inherited ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md)) — on AgentCore's contract: `0.0.0.0:9000`, JSON-RPC on `POST /`, the card at `/.well-known/agent-card.json`, `/ping`. It is configured from the environment (`AGENTFORGE_AGENT_NAME`, `AGENTFORGE_TASK_COMMAND`, `AGENTFORGE_TABLE_NAME`, and optionally the admission limit, default 4; the default time budget, 3600 s; and a DynamoDB endpoint for local runs, where it also creates the table).
+One Bun process runs the server — Express and `@a2a-js/sdk`, assembled rather than inherited ([ADR 0012](../adr/0012-the-server-is-assembled-not-inherited.md)) — on AgentCore's contract: `0.0.0.0:9000`, JSON-RPC on `POST /`, the card at `/.well-known/agent-card.json`, `/ping`. The consumer's server entry names its task entry — `startServer({ taskEntry: new URL('./task.ts', import.meta.url) })` — and the rest comes from the environment (`AGENTFORGE_AGENT_NAME`, `AGENTFORGE_TABLE_NAME`, and optionally the admission limit, default 4; the default time budget, 3600 s; and a DynamoDB endpoint for local runs, where it also creates the table).
 
-Each task is a child process running the consumer's task entry. The server's event loop never runs agent work, so nothing a task does delays `/ping` (§REQ707).
+Each task is a child process running the task entry under the server's own runtime and flags (`process.execPath`, `process.execArgv`), so `--conditions=agentforge-agent` carries over. The source is erasable TypeScript only (`erasableSyntaxOnly`), so the same entry runs on Bun in an image and on Node under vitest. The server's event loop never runs agent work, so nothing a task does delays `/ping` (§REQ707).
 
 **Platform version V2.** Every container is restored from one snapshot taken after startup, so nothing that must differ per container is minted at startup — every id is minted per request. A stopped container is killed about ten seconds after `SIGTERM`, busy or not; the server stops every task on `SIGTERM` inside that window, and anything that cannot finish there is left to the lease. Invocations during the ~3-minute `CREATING` window are refused, so a deploy waits for `READY` and a probe ([research](research/agentcore-runtime-observed.md)).
 
@@ -137,12 +139,12 @@ Each task is a child process running the consumer's task entry. The server's eve
 
 `context.runAgent({ prompt, output, options })` is one `query()` to a settled, typed outcome:
 
-- **Streaming input**: one user message, held open until the first result, so `interrupt()` is reachable. The prompt is a string or content blocks.
-- **Structured output**: the agent contract becomes `outputFormat` (JSON Schema draft-07). A `success` result with no conforming `structured_output` is `OUTPUT_INVALID`, never success.
+- **Streaming input**: one user message, held open until the first result, so `interrupt()` is reachable. The prompt is a string, content blocks, context blocks (a tagged fragment each) or a slash command with its context and documents; a document that cannot be read fails the run.
+- **Structured output**: the agent contract becomes `outputFormat` through the Anthropic SDK's `transformJSONSchema` — inlined, input side, `enum` and `const` kept as constraints rather than folded into prose. The root must be an object: another root throws unless the run passes `wrapNonObjectOutput`, which nests it under `output` on the wire and unwraps it before parsing. A record (keys the contract does not name) throws, since every object is closed. A `success` result with no conforming `structured_output` is `OUTPUT_INVALID`, never success.
 - **One outcome**: background work is off (`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`), the first result is the outcome, and the stream is then drained for up to 30 s so a late `mirror_error` is still seen (§REQ206).
 - **Classification from fields, never text**: the result's `subtype` and `api_error_status`, an assistant message's `error`, a rejected `rate_limit_event`'s `resetsAt`.
 - **Dead guardrails fail the run.** On `init`, every tool-event hook matcher (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionDenied`) is evaluated against `init.tools` as Claude Code evaluates it. One that selects no tool would never fire, so the run fails before its first turn.
-- **Each run is recorded**: the prompt, the options as passed (env values and hook callbacks reduced to names), the session id, duration, turns, cost, `modelUsage` and terminal reason (§REQ601).
+- **Each run is recorded**: the prompt's hash and size, the options as passed (env values and hook callbacks reduced to names, the system prompt to its hash), the session id, duration, turns, cost, `modelUsage` and terminal reason. The prompt as sent is logged whole to the container log under its hash, and is in the transcript (§REQ601).
 
 ## 7. Images and delivery
 

@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
 import {
   type AnyProcedureContract,
   defineMeta,
   type RouterContract,
 } from '@orpc/contract';
+import { hash as ohash } from 'ohash';
 import { z } from 'zod';
 
 const [timeBudgetMeta, readTimeBudget] = defineMeta(
@@ -92,32 +92,14 @@ export function outputSchemaOf(contract: AnyProcedureContract): z.ZodType {
   return schemasOf(contract, 'outputSchemas');
 }
 
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (typeof value === 'object' && value !== null) {
-    return `{${Object.keys(value)
-      .sort()
-      .map(
-        (key) =>
-          `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`,
-      )
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
 /**
  * A procedure's contract hash: its input and output as JSON Schema, hashed.
  * A container refuses a task whose hash its own contract does not match
  * (§REQ104), so a caller built against a different shape fails before work.
  */
 export function contractHash(contract: AnyProcedureContract): string {
-  const shape = {
+  return ohash({
     input: z.toJSONSchema(inputSchemaOf(contract), { io: 'input' }),
     output: z.toJSONSchema(outputSchemaOf(contract), { io: 'output' }),
-  };
-  return createHash('sha256')
-    .update(canonical(shape))
-    .digest('hex')
-    .slice(0, 16);
+  });
 }

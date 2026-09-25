@@ -1,6 +1,7 @@
 {
   "extends": "@tsconfig/node26/tsconfig.json",
   "compilerOptions": {
+    "erasableSyntaxOnly": true,
     "exactOptionalPropertyTypes": true,
     "isolatedModules": true,
     "noEmit": true,

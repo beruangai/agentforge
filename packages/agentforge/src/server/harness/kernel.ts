@@ -1,24 +1,38 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { inspect } from 'node:util';
 import {
   type Options,
   type SDKMessage,
   type SDKResultMessage,
-  type SDKUserMessage,
   query as sdkQuery,
 } from '@anthropic-ai/claude-agent-sdk';
+import { hash as ohash } from 'ohash';
 import { z } from 'zod';
 import { type Cause, cause, type RunRecord } from '#core/contract/task.ts';
+import {
+  type AgentPrompt,
+  createStreamingInput,
+  createUserMessage,
+} from './prompt.ts';
+import {
+  structuredOutputWireSchema,
+  unwrapStructuredOutput,
+} from './structured-output.ts';
 
 /** The SDK options a procedure may set; the kernel owns the rest. */
 export type AgentOptions = Omit<Options, 'outputFormat' | 'abortController'>;
 
-export type AgentPrompt = string | SDKUserMessage['message']['content'];
-
 export interface AgentRunSpec<Output> {
-  /** What the agent is asked. Content blocks for anything beyond text. */
+  /** What the agent is asked: text, content blocks, context blocks and commands. */
   readonly prompt: AgentPrompt;
-  /** The agent contract: what the agent itself fills in (§REQ102). */
+  /** The agent contract: what the agent itself fills in (§REQ102). Its root must be an object. */
   readonly output: z.ZodType<Output>;
+  /**
+   * Opts in to sending a contract whose root is not an object nested under
+   * one property, unwrapped before it is parsed. Off by default: such a root
+   * is usually a contract to rewrite, not to wrap.
+   */
+  readonly wrapNonObjectOutput?: boolean;
   readonly options?: AgentOptions;
 }
 
@@ -30,8 +44,11 @@ export interface AgentRun<Output> {
 
 /** A run that ended on its own terms without an answer: the task fails with this cause. */
 export class TaskFailure extends Error {
-  constructor(readonly taskCause: Cause) {
+  readonly taskCause: Cause;
+
+  constructor(taskCause: Cause) {
     super(`${taskCause.code}: ${taskCause.message}`);
+    this.taskCause = taskCause;
     this.name = 'TaskFailure';
   }
 }
@@ -72,18 +89,27 @@ export async function runAgent<Output>(
 ): Promise<AgentRun<Output>> {
   if (context.signal.aborted) throw new TaskCanceled();
   const startedAt = Date.now();
+  const wire = structuredOutputWireSchema(spec.output, {
+    wrapNonObjectOutput: spec.wrapNonObjectOutput ?? false,
+  });
+  const message = await createUserMessage(
+    spec.prompt,
+    spec.options?.cwd ?? process.cwd(),
+  );
+  const promptHash = ohash(message.message.content);
+  // The prompt as sent, whole, in the container log (§REQ601); the record
+  // carries its hash.
+  console.log(
+    JSON.stringify({
+      event: 'agentforge.prompt',
+      promptHash,
+      prompt: message.message.content,
+      systemPrompt: spec.options?.systemPrompt,
+    }),
+  );
   const abortController = new AbortController();
   const { promise: inputEnded, resolve: endInput } =
     Promise.withResolvers<void>();
-
-  async function* prompt(): AsyncGenerator<SDKUserMessage> {
-    yield {
-      type: 'user',
-      message: { role: 'user', content: spec.prompt },
-      parent_tool_use_id: null,
-    };
-    await inputEnded;
-  }
 
   const options: Options = {
     ...spec.options,
@@ -92,13 +118,13 @@ export async function runAgent<Output>(
       ...spec.options?.env,
       CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
     },
-    outputFormat: {
-      type: 'json_schema',
-      schema: z.toJSONSchema(spec.output, { target: 'draft-7' }),
-    },
+    outputFormat: { type: 'json_schema', schema: wire.schema },
     abortController,
   };
-  const session = query({ prompt: prompt(), options });
+  const session = query({
+    prompt: createStreamingInput(message, inputEnded),
+    options,
+  });
 
   let canceled = false;
   const onAbort = (): void => {
@@ -159,7 +185,8 @@ export async function runAgent<Output>(
   }
 
   const record: RunRecord = {
-    prompt: spec.prompt,
+    promptHash,
+    promptBytes: Buffer.byteLength(JSON.stringify(message.message.content)),
     options: recordableOptions(spec.options),
     ...(observed.sessionId === undefined
       ? {}
@@ -184,6 +211,10 @@ export async function runAgent<Output>(
       cause(
         'EXECUTION_ERROR',
         `hook matchers that match no tool this session has, and would never fire: ${observed.deadMatchers.join('; ')}`,
+        {
+          suggestedAction:
+            'Make each matcher name a tool the session has: check the tool names in `allowedTools`, `mcp__<server>__<tool>` for an MCP tool, and the matcher syntax — letters, digits, `_`, `-`, spaces, `,` and `|` are an exact list; anything else is a regular expression.',
+        },
       ),
     );
   }
@@ -200,11 +231,15 @@ export async function runAgent<Output>(
       cause(
         'EXECUTION_ERROR',
         `the run ended without a result: ${describe(streamError)}`,
+        streamError === undefined
+          ? {}
+          : { stackTrace: inspect(streamError, { depth: 8 }) },
       ),
     );
   }
   const sessionId = observed.sessionId ?? result.session_id;
-  return { output: settle(result, spec.output, observed), sessionId, record };
+  const output = settle(result, spec.output, observed, wire.wrapped);
+  return { output, sessionId, record };
 }
 
 interface Observed {
@@ -312,6 +347,7 @@ export function settle<Output>(
   result: SDKResultMessage,
   schema: z.ZodType<Output>,
   observed: Pick<Observed, 'rateLimitResetsAt' | 'assistantError'>,
+  wrapped = false,
 ): Output {
   if (result.subtype === 'success' && !result.is_error) {
     if (
@@ -324,7 +360,9 @@ export function settle<Output>(
         }),
       );
     }
-    const parsed = schema.safeParse(result.structured_output);
+    const parsed = schema.safeParse(
+      unwrapStructuredOutput(result.structured_output, wrapped),
+    );
     if (!parsed.success) {
       throw new TaskFailure(
         cause('OUTPUT_INVALID', z.prettifyError(parsed.error), {
@@ -408,6 +446,8 @@ function recordableOptions(
           ),
         ]),
       );
+    } else if (key === 'systemPrompt') {
+      recorded.systemPrompt = ohash(value);
     } else if (key === 'mcpServers') {
       recorded.mcpServers = Object.keys(value ?? {});
     } else if (
