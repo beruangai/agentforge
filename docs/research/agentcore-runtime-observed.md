@@ -273,3 +273,7 @@ The measurement above uses **one clock and one network**: the container writes a
 ## AgentForge's own server on V2 — 2026-09-25
 
 `integ/aws/agentcore/agentforge-runtime.test.ts`, first run, all three passing: `agentCoreTransport` (SigV4 through `InvokeAgentRuntime`, `A2A-Version` allowlisted) reached AgentForge's server; a retry with the same idempotency key attached to the completed task; `CancelTask` reached the container running the task. After `StopRuntimeSession`, the next `GetTask` — served by a fresh container reading DynamoDB — answered `LOST` within about 12 s, recorded by the stopped container's own `SIGTERM` shutdown inside the ~10 s window rather than by the lease; the retry ran as attempt 2.
+
+## Deployed through the construct — 2026-09-25
+
+`agentforge-runtime.test.ts` now deploys through `AgentRuntime` with the CDK CLI. **CloudFormation honours `PlatformVersion: V2`** — `GetAgentRuntime` reports `V2` — though its reference lists the property without a description and the CDK's bundled schema does not know it. The readiness probe held the deploy until the runtime answered, and the first call after it was served. **Ids minted in containers restored from one V2 snapshot differ:** eight fresh sessions at once, each a restored container, minted task ids (Bun's `randomUUIDv7`) whose random tails were all distinct, so Bun's random source is reseeded after a restore (DESIGN_OPTIONS §H, closed). The deploy, the five tests and the destroy took about eleven minutes.

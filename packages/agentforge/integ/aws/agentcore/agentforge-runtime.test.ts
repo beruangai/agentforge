@@ -1,93 +1,98 @@
 /**
- * AgentForge's own server on AgentCore V2, reached through the client's
+ * AgentForge's own server on AgentCore V2, deployed through the `AgentRuntime`
+ * construct with the CDK CLI and reached through the client's
  * `agentCoreTransport` — SigV4, the session header, `A2A-Version` through the
- * allowlist — with task state in real DynamoDB. No model: the procedures are
- * the runtime fixture's. What only AgentCore can show: a start and its retry
- * attach through the platform, a cancel reaches the container running the
- * task, and a platform stop ends the task `LOST` — read by a fresh container
- * from the store — after which a retry runs as the next attempt.
+ * allowlist — with task state in the table the construct deploys. No model:
+ * the procedures are the runtime fixture's. What only a deployment can show:
+ * CloudFormation honours `PlatformVersion`, which its reference lists without
+ * describing; the deploy returns only once the runtime serves, so the first
+ * call succeeds; ids minted in containers restored from one snapshot differ
+ * (DESIGN_OPTIONS §H); a start and its retry attach through the platform; a
+ * cancel reaches the container running the task; and a platform stop ends the
+ * task `LOST` — read by a fresh container from the store — after which a
+ * retry runs as the next attempt.
  */
 import { setTimeout as delay } from 'node:timers/promises';
 import { StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
-import {
-  DeleteTableCommand,
-  waitUntilTableNotExists,
-} from '@aws-sdk/client-dynamodb';
+import { GetAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore-control';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { awaitTask, createClient } from '../../../src/client/client.ts';
 import { agentCoreTransport } from '../../../src/client/transport.ts';
-import { createTaskTable } from '../../../src/server/runtime/task-store.ts';
 import { runtimeContract } from '../../local/runtime/__fixtures__/contract.ts';
 import {
-  describeError,
-  waitForAgentRuntimeReady,
-} from './__fixtures__/agent-runtime-status.ts';
-import { buildAndPushAgentForgeRuntimeImage } from './__fixtures__/agentforge-runtime-image.ts';
-import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
+  DEPLOYMENT_TIMEOUT_MILLISECONDS,
+  deployAgentForgeRuntime,
+} from './__fixtures__/agentforge-runtime-deployment.ts';
 import {
-  createAgentRuntime,
-  PROVISIONING_TIMEOUT_MILLISECONDS,
-  type PreparedFixtureImage,
-  prepareFixtureImage,
-  TEARDOWN_TIMEOUT_MILLISECONDS,
+  newRuntimeSessionId,
+  resolveAwsEnvironment,
+  resourceNamesFor,
+} from './__fixtures__/aws-environment.ts';
+import {
+  type AgentCoreClients,
+  createAgentCoreClients,
 } from './__fixtures__/provisioning.ts';
 import {
   createResourceStack,
   releaseResources,
 } from './__fixtures__/resources.ts';
 
+/** Fresh sessions at once, each a container restored from the one snapshot. */
+const RESTORED_CONTAINERS = 8;
+
 describe("AgentForge's server on AgentCore", () => {
   const resources = createResourceStack();
-  let prepared: PreparedFixtureImage;
+  let clients: AgentCoreClients;
   let agentRuntimeArn: string;
   let client: ReturnType<typeof createClient<typeof runtimeContract>>;
 
   beforeAll(async () => {
-    prepared = await prepareFixtureImage(
+    const environment = await resolveAwsEnvironment();
+    clients = createAgentCoreClients(environment.region);
+    ({ agentRuntimeArn } = await deployAgentForgeRuntime(
       resources,
-      'agentforge',
-      buildAndPushAgentForgeRuntimeImage,
-    );
-    const tableName = prepared.names.outcomeTableName;
-    const { dynamoDB } = prepared.clients;
-    await createTaskTable(dynamoDB, tableName);
-    resources.defer(async () => {
-      try {
-        await dynamoDB.send(new DeleteTableCommand({ TableName: tableName }));
-        await waitUntilTableNotExists(
-          { client: dynamoDB, maxWaitTime: 300 },
-          { TableName: tableName },
-        );
-      } catch (error) {
-        throw new Error(
-          `DynamoDB table ${tableName}: ${describeError(error)}`,
-          {
-            cause: error,
-          },
-        );
-      }
-    });
-    const runtime = await createAgentRuntime(resources, prepared, {
-      profile: {
-        environmentVariables: { AGENTFORGE_TABLE_NAME: tableName },
-        requestHeaderAllowlist: ['A2A-Version'],
-      },
-    });
-    await waitForAgentRuntimeReady(prepared.clients.control, runtime);
-    agentRuntimeArn = runtime.agentRuntimeArn;
+      clients,
+      resourceNamesFor('agentforge'),
+    ));
     client = createClient(
       runtimeContract,
-      agentCoreTransport({
-        agentRuntimeArn,
-        region: prepared.environment.region,
-      }),
+      agentCoreTransport({ agentRuntimeArn, region: environment.region }),
     );
-  }, PROVISIONING_TIMEOUT_MILLISECONDS);
+  }, DEPLOYMENT_TIMEOUT_MILLISECONDS);
 
   afterAll(
     () => releaseResources(resources, 'agentforge-runtime'),
-    TEARDOWN_TIMEOUT_MILLISECONDS,
+    DEPLOYMENT_TIMEOUT_MILLISECONDS,
   );
+
+  it('runs on platform version V2, as the construct declares', async () => {
+    const agentRuntimeId = agentRuntimeArn.split('/').at(-1);
+    const runtime = await clients.control.send(
+      new GetAgentRuntimeCommand({ agentRuntimeId }),
+    );
+    expect(runtime.platformVersion).toBe('V2');
+  });
+
+  it('mints distinct ids in containers restored from one snapshot', async () => {
+    const started = await Promise.all(
+      Array.from({ length: RESTORED_CONTAINERS }, () =>
+        client.echo.SendMessage(
+          { text: 'restored' },
+          {
+            runtimeSessionId: newRuntimeSessionId('restored'),
+            idempotencyKey: newRuntimeSessionId('key'),
+          },
+        ),
+      ),
+    );
+    // Each task id is a uuid7 minted by that container's first request. Its
+    // leading 48 bits are the time, so compare the random tail: a random
+    // source not reseeded after the restore repeats it across containers.
+    const randomTails = started.map(({ taskId }) =>
+      taskId.replaceAll('-', '').slice(16),
+    );
+    expect(new Set(randomTails).size).toBe(RESTORED_CONTAINERS);
+  });
 
   it('runs a procedure to its typed output, and attaches a retry to it', async () => {
     const context = {
@@ -134,7 +139,7 @@ describe("AgentForge's server on AgentCore", () => {
       context,
     );
     await delay(2_000);
-    await prepared.clients.data.send(
+    await clients.data.send(
       new StopRuntimeSessionCommand({
         agentRuntimeArn,
         runtimeSessionId: context.runtimeSessionId,

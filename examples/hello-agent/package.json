@@ -13,6 +13,9 @@
     "@temporalio/activity": "catalog:",
     "@temporalio/common": "catalog:",
     "@temporalio/testing": "catalog:",
+    "aws-cdk": "catalog:",
+    "aws-cdk-lib": "catalog:",
+    "constructs": "catalog:",
     "vitest": "catalog:"
   }
 }

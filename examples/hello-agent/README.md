@@ -14,6 +14,7 @@ AgentForge's own agent: the smallest thing a consumer would ship, built and veri
 | `task.ts` | The task entry: the server runs it once per task, in its own process |
 | `server.ts` | The container's entry: starts the server and names `task.ts` as its task entry |
 | `Dockerfile` | `FROM agentforge/a2a-claude`, plus the member and its lock, installed frozen |
+| `infra/app.ts` | The deployment: one `AgentRuntime` serving this directory's image |
 | `e2e/` | The whole path against a real model: the client, and the Temporal activity |
 
 ```bash
@@ -21,3 +22,9 @@ bunx nx run @beruangai/example-hello-agent:e2e
 ```
 
 That builds AgentForge's bundle, the base image's lock and image, this agent's lock, then this image, runs it beside DynamoDB Local, and drives it through `@beruangai/agentforge/client`. The subscription token comes from `.env.integ.local` and reaches the container by name only. A run costs a few cents.
+
+```bash
+bunx nx run @beruangai/example-hello-agent:deploy
+```
+
+Deploys the stack `agentforge-example-hello-agent` to `us-east-2` as the test role (`.env.integ`), through the CDK bootstrap roles; it returns once the runtime serves, and writes the runtime's ARN to `dist/examples/hello-agent/deploy/outputs.json`. `destroy` removes it. The target runs `cdk` with an empty throwaway Docker configuration: the asset publish runs `docker login`, and Docker Desktop's keychain helper would otherwise wait on a keychain prompt no one sees. Its procedures need the subscription token in the runtime, which is not deployed yet, so a deployed hello-agent serves the protocol but cannot yet run an agent.

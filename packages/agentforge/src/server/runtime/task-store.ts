@@ -17,6 +17,10 @@ import {
   type TaskState as TaskStateName,
   TERMINAL_TASK_STATES,
 } from '#core/contract/task.ts';
+import {
+  TASK_TABLE_PARTITION_KEY,
+  TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
+} from '#core/task-table.ts';
 import { finishedTask, stateOf } from './a2a-task.ts';
 
 /** A task whose lease has not been renewed for this long is lost (§REQ303). */
@@ -248,8 +252,12 @@ export async function createTaskTable(
     await client.send(
       new CreateTableCommand({
         TableName: tableName,
-        AttributeDefinitions: [{ AttributeName: 'pk', AttributeType: 'S' }],
-        KeySchema: [{ AttributeName: 'pk', KeyType: 'HASH' }],
+        AttributeDefinitions: [
+          { AttributeName: TASK_TABLE_PARTITION_KEY, AttributeType: 'S' },
+        ],
+        KeySchema: [
+          { AttributeName: TASK_TABLE_PARTITION_KEY, KeyType: 'HASH' },
+        ],
         BillingMode: 'PAY_PER_REQUEST',
       }),
     );
@@ -266,7 +274,10 @@ export async function createTaskTable(
   await client.send(
     new UpdateTimeToLiveCommand({
       TableName: tableName,
-      TimeToLiveSpecification: { AttributeName: 'expiresAt', Enabled: true },
+      TimeToLiveSpecification: {
+        AttributeName: TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
+        Enabled: true,
+      },
     }),
   );
 }

@@ -76,6 +76,44 @@
         "cwd": "{projectRoot}",
         "envFile": "{workspaceRoot}/.env.integ.local"
       }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        "lock",
+        {
+          "projects": ["@beruangai/agentforge"],
+          "target": "image"
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/examples/hello-agent/deploy"],
+      "options": {
+        "command": "export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk --app \"bun --conditions=@beruangai/source infra/app.ts\" --output ../../dist/examples/hello-agent/cdk.out --no-notices deploy --require-approval never --outputs-file ../../dist/examples/hello-agent/deploy/outputs.json",
+        "cwd": "{projectRoot}",
+        "envFile": "{workspaceRoot}/.env.integ",
+        "env": {
+          "CDK_DISABLE_CLI_TELEMETRY": "true"
+        }
+      }
+    },
+    "destroy": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        {
+          "projects": ["@beruangai/agentforge"],
+          "target": "image"
+        }
+      ],
+      "options": {
+        "command": "cdk --app \"bun --conditions=@beruangai/source infra/app.ts\" --output ../../dist/examples/hello-agent/cdk.out --no-notices destroy --force",
+        "cwd": "{projectRoot}",
+        "envFile": "{workspaceRoot}/.env.integ",
+        "env": {
+          "CDK_DISABLE_CLI_TELEMETRY": "true"
+        }
+      }
     }
   }
 }

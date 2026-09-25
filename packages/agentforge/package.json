@@ -62,7 +62,9 @@
     "@aws-sdk/client-bedrock-agentcore": "^3.1138.0",
     "@temporalio/activity": "^1.24.0",
     "@temporalio/common": "^1.24.0",
-    "@anthropic-ai/sdk": "0.128.0"
+    "@anthropic-ai/sdk": "0.128.0",
+    "aws-cdk-lib": "^2.270.0",
+    "constructs": "^10.8.1"
   },
   "peerDependenciesMeta": {
     "@orpc/server": {
@@ -91,6 +93,12 @@
     },
     "@anthropic-ai/sdk": {
       "optional": true
+    },
+    "aws-cdk-lib": {
+      "optional": true
+    },
+    "constructs": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -117,6 +125,9 @@
     "@temporalio/workflow": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
+    "aws-cdk": "catalog:",
+    "aws-cdk-lib": "catalog:",
+    "constructs": "catalog:",
     "express": "catalog:",
     "publint": "catalog:",
     "tsdown": "catalog:",

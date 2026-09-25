@@ -37,7 +37,15 @@ export default defineConfig({
   outDir: bundleDirectory,
   clean: true,
   fixedExtension: false,
-  copy: ['README.md', 'Dockerfile'],
+  copy: [
+    'README.md',
+    'Dockerfile',
+    // The construct's readiness probe, a Lambda asset beside `infra.js`.
+    {
+      from: 'src/infra/readiness-probe/index.mjs',
+      to: `${bundleDirectory}/readiness-probe`,
+    },
+  ],
   hooks: {
     'build:done': writePublishedManifest,
   },

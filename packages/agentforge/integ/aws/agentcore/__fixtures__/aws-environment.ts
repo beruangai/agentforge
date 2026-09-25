@@ -53,6 +53,8 @@ export interface ResourceNames {
   readonly repositoryName: string;
   /** `agentforge-integ-*`, the only DynamoDB tables the execution role may touch. */
   readonly outcomeTableName: string;
+  /** A CloudFormation stack, for a runtime deployed through the construct. */
+  readonly stackName: string;
 }
 
 export function resourceNamesFor(purpose: string): ResourceNames {
@@ -73,6 +75,7 @@ export function resourceNamesFor(purpose: string): ResourceNames {
     agentRuntimeName,
     repositoryName: `agentforge/integ-${hyphenated}-${suffix}`,
     outcomeTableName: `agentforge-integ-outcome-${hyphenated}-${suffix}`,
+    stackName: `agentforge-integ-${hyphenated}-${suffix}`,
   };
 }
 

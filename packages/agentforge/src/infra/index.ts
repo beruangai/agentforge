@@ -1,4 +1,4 @@
 /**
  * `@beruangai/agentforge/infra` — the CDK constructs.
  */
-export {};
+export { AgentRuntime, type AgentRuntimeProps } from './agent-runtime.ts';

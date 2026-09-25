@@ -131,7 +131,7 @@ One Bun process runs the server — Express and `@a2a-js/sdk`, assembled rather 
 
 Each task is a child process running the task entry under the server's own runtime and flags (`process.execPath`, `process.execArgv`), so `--conditions=agentforge-agent` carries over. The source is erasable TypeScript only (`erasableSyntaxOnly`), so the same entry runs on Bun in an image and on Node under vitest. The server's event loop never runs agent work, so nothing a task does delays `/ping` (§REQ707).
 
-**Platform version V2.** Every container is restored from one snapshot taken after startup, so nothing that must differ per container is minted at startup — every id is minted per request. A stopped container is killed about ten seconds after `SIGTERM`, busy or not; the server stops every task on `SIGTERM` inside that window, and anything that cannot finish there is left to the lease. Invocations during the ~3-minute `CREATING` window are refused, so a deploy waits for `READY` and a probe ([research](research/agentcore-runtime-observed.md)).
+**Platform version V2.** Every container is restored from one snapshot taken after startup, so nothing that must differ per container is minted at startup — every id is minted per request. A stopped container is killed about ten seconds after `SIGTERM`, busy or not; the server stops every task on `SIGTERM` inside that window, and anything that cannot finish there is left to the lease. Invocations during the ~3-minute `CREATING` window are refused, and the first just after `READY` can be, so a deploy waits for the runtime to serve (§7). Ids minted after a restore are distinct: Bun reseeds its random source ([research](research/agentcore-runtime-observed.md)).
 
 **Credentials are in the environment.** The Agent SDK reads the subscription token there (§REQ705); AWS credentials for the store come from the runtime's role. AgentForge never emits either (§REQ603). The agent's own shell can read the environment; that is recorded, not mitigated (DESIGN_OPTIONS §O). Guardrail hooks are cooperative, not a sandbox.
 
@@ -159,7 +159,9 @@ Every layer is a workspace member with its own `package.json` — `agentforge`, 
 
 The **working directory** — where a run's files live — has no default: the procedure chooses it, adds it with `additionalDirectories`, and keeps the cwd its agent's directory so the `.claude/` layers still apply.
 
-The CLI refuses to run tools unattended as root, and its Bash tool needs `bash` named by `SHELL`; the base image provides both. The deploy path is A2 (DESIGN_OPTIONS §D).
+The CLI refuses to run tools unattended as root, and its Bash tool needs `bash` named by `SHELL`; the base image provides both.
+
+**Deploying is one construct**, `AgentRuntime` from `/infra`: the CDK L2 `Runtime` over A2A with `PlatformVersion: V2` set by property override (CloudFormation takes it; the CDK does not type it yet), `A2A-Version` added to the header allowlist, and the task table — the task store's own key and expiry, from `core/` — named to the server in `AGENTFORGE_TABLE_NAME`. Everything else the L2 takes is the consumer's. The agent's image is a CDK asset built from its `Dockerfile`, as `@aws/nx-plugin` does, into the bootstrap's one asset repository. A **readiness probe** — a Lambda that is its own custom resource handler, updated with every new runtime version — asks the runtime for an unknown task until AgentForge's server answers "Task not found", so `cdk deploy` returns only once the agent serves, in any pipeline. `grantInvoke` gives a caller `InvokeAgentRuntime` on this agent alone (§REQ708). An example's `deploy` target runs `cdk deploy` on its `infra/app.ts`.
 
 ## 8. The package
 
@@ -172,7 +174,7 @@ One published package, `@beruangai/agentforge`, with an entry point per environm
 | `/temporal` | A Temporal worker | `procedureActivity` |
 | `/agent` | The agent's task entry | `implementAgent`, `runTaskProcess`, `composeOptions`, `TaskFailure`, the kernel |
 | `/server` | The agent's server entry | `startServer` |
-| `/infra` | A CDK app | The constructs (A2) |
+| `/infra` | A CDK app | `AgentRuntime` |
 
 `/agent` and `/server` resolve only under the `agentforge-agent` export condition, so a worker's build cannot import them. Every entry also carries a `@beruangai/source` condition pointing at its source, for projects inside this workspace, and publishing strips it. What only one environment needs — the Agent SDK, the A2A SDK, Express, the AWS clients, Temporal — is an optional peer; oRPC and Zod are required peers, so a consumer's schemas and AgentForge's are one copy. Peer ranges are caret for stable packages and exact for pre-1.0 and beta ones.
 
@@ -182,7 +184,7 @@ packages/agentforge/          @beruangai/agentforge — the one Nx project that 
   src/server/runtime/         layer 1: server, gateway, executor, task store
   src/server/harness/         layer 2: implementAgent, task process, kernel
   src/client/                 the client and transports; temporal/ the activity
-  src/infra/                  CDK constructs (A2)
+  src/infra/                  the AgentRuntime construct and its readiness probe
   integ/{local,aws,model}/    integration tests, by what they need
   Dockerfile                  the base image
 examples/hello-agent/         AgentForge's own agent: the consumer path, verified end to end

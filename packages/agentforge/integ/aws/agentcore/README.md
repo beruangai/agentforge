@@ -20,6 +20,8 @@ Before provisioning anything, every file runs the access check in `__fixtures__/
 
 Every file provisions its own resources in `beforeAll` and deletes them in `afterAll`, all tagged `agentforge:integ=true`: an ECR repository `agentforge/integ-<purpose>-<suffix>`, a runtime `agentforge_integ_<purpose>_<suffix>`, its log groups, and — for `outcome-inside-grace.test.ts` — a DynamoDB table `agentforge-integ-outcome-<purpose>-<suffix>`.
 
+`agentforge-runtime.test.ts` instead deploys a CloudFormation stack `agentforge-integ-agentforge-<suffix>` through AgentForge's `AgentRuntime` construct with the CDK CLI, as a consumer deploys an agent, and destroys it after; its image goes to the CDK bootstrap's asset repository, which `cdk gc` prunes. The asset publish runs `docker login`, so the CLI runs with an empty temporary Docker configuration: the short-lived ECR login never reaches your own configuration or keychain.
+
 Runtimes are slow at both ends. On V2 a create takes minutes before READY while the snapshot is prepared, and a runtime sat in DELETING for about five minutes on V1. Teardown waits out a runtime still CREATING — deleting it then is a `ConflictException`, which would leak it — and then until it and its workload identity are gone, rather than returning on the call. Expect each file to take ten minutes or more beyond its tests. The files run in parallel with one another (`vitest.integ.mts`), so the whole directory takes about as long as its slowest file. A teardown that cannot delete something fails the run and names what is left. To check by tag afterwards:
 
 ```bash
@@ -73,6 +75,12 @@ aws iam put-role-policy --role-name agentforge-integ-agentcore-execution \
   --policy-document "file://$FIXTURES/execution-role-permissions-policy.json"
 ```
 
+
+**3. The CDK bootstrap**, for `agentforge-runtime.test.ts` and the examples' `deploy` targets. The test role deploys by assuming the bootstrap roles (`DeployThroughTheCdkBootstrapRolesInTheTestRegion` in its policy); they trust the account, so nothing else is needed. Bootstrapped 2026-09-25 with the default `AdministratorAccess` execution policy, so a deploy through them can create anything in `us-east-2` — acceptable for a region that holds only tests:
+
+```bash
+bunx cdk bootstrap aws://913756569129/us-east-2
+```
 
 ### Replaced
 

@@ -290,10 +290,13 @@ export const PROVISIONING_TIMEOUT_MILLISECONDS =
 export const TEARDOWN_TIMEOUT_MILLISECONDS =
   AGENT_RUNTIME_DELETION_TIMEOUT_MILLISECONDS + 600_000;
 
-/** AgentCore creates the runtime's log groups; they go when it does. */
-async function deleteRuntimeLogGroups(
+/**
+ * AgentCore creates the runtime's log groups; they go when it does. A runtime's
+ * id begins with its name, so a name alone matches its groups too.
+ */
+export async function deleteRuntimeLogGroups(
   clients: AgentCoreClients,
-  runtime: CreatedAgentRuntime,
+  runtime: Pick<AgentRuntimeReference, 'agentRuntimeId'>,
 ): Promise<void> {
   const prefix = runtimeLogGroupNamePrefix(runtime.agentRuntimeId);
   try {
