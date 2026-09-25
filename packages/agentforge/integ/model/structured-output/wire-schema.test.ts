@@ -5,7 +5,8 @@
  * `transformJSONSchema` and the backend do not document together, and either
  * can move: `enum` and `const` kept as constraints after the transform folded
  * them into prose, a `format` sent as-is (TrendBot once found the backend
- * refusing `uri`; it accepted it on 2026-09-25), and a root union nested under
+ * refusing `uri`; on 2026-09-25 the run engaged structured output with it,
+ * though the CLI does not enforce it), and a root union nested under
  * one property when a run opts in. One contract carries all of them.
  *
  * What is asserted holds whichever branch the model picks: the run completes,

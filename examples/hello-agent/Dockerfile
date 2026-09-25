@@ -1,15 +1,8 @@
-# The agent's image: FROM AgentForge's base, dependencies installed from the
-# workspace lockfile — nothing is bundled — and the agent's source run by Bun.
-# Built from the workspace root (see project.json's `image` target).
+# The agent's image: FROM AgentForge's base, which already carries AgentForge
+# and every package this agent imports, so the image is its source and how to
+# start it. An agent needing more installs only that, from its own lockfile.
 FROM agentforge/a2a-claude:local
-WORKDIR /home/bun/app
-COPY --chown=bun package.json bun.lock ./
-COPY --chown=bun packages/agentforge/package.json packages/agentforge/
-COPY --chown=bun examples/hello-agent/package.json examples/hello-agent/
-RUN bun install --frozen-lockfile --production --linker hoisted --filter @beruangai/example-hello-agent
-# The published package in place of the workspace link: what a consumer gets.
-COPY --chown=bun dist/packages/agentforge/bundle/ packages/agentforge/
-COPY --chown=bun examples/hello-agent/src examples/hello-agent/src
-WORKDIR /home/bun/app/examples/hello-agent
+WORKDIR /agentic/agent
+COPY --chown=bun src src
 ENV AGENTFORGE_AGENT_NAME=hello-agent
 CMD ["bun", "--conditions=agentforge-agent", "src/server.ts"]

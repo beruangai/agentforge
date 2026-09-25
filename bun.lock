@@ -27,14 +27,8 @@
       "name": "@beruangai/example-hello-agent",
       "version": "0.0.0",
       "dependencies": {
-        "@a2a-js/sdk": "catalog:",
-        "@anthropic-ai/claude-agent-sdk": "catalog:",
-        "@anthropic-ai/sdk": "catalog:",
-        "@aws-sdk/client-dynamodb": "catalog:",
         "@beruangai/agentforge": "workspace:*",
         "@orpc/contract": "catalog:",
-        "@orpc/server": "catalog:",
-        "express": "catalog:",
         "zod": "catalog:",
       },
       "devDependencies": {

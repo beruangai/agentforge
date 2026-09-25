@@ -33,7 +33,7 @@ export const router = os.router({
     const run = await context.runAgent({
       prompt: ['Summarise the text in one sentence.', { tag: 'text', context: input.text }],
       output: z.object({ summary: z.string() }),          // what the model fills in; an object root
-      options: { cwd: '/home/bun/work', maxTurns: 3, tools: [], resume: input.resumeSessionId },
+      options: { cwd: '/mnt/workspace', maxTurns: 3, tools: [], resume: input.resumeSessionId },
     });
     return { summary: run.output.summary, words: countWords(run.output.summary), sessionId: run.sessionId };
   }),

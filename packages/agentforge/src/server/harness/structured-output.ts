@@ -68,8 +68,14 @@ export function unwrapStructuredOutput(
  * A Zod schema as the JSON Schema structured output accepts, through the
  * Anthropic SDK's own `transformJSONSchema` (verified against 0.128.0,
  * 2026-09-25): it keeps only what the tool surface supports, forces
- * `additionalProperties: false`, keeps the `format`s the backend supports,
- * and folds every other keyword into the description as prose.
+ * `additionalProperties: false`, keeps the `format`s it lists, and folds
+ * every other keyword into the description as prose.
+ *
+ * The CLI validates a submission against this schema in the turn and has
+ * the agent retry, which is what makes a kept constraint worth more than
+ * prose: `type`, `required`, `enum` and `const` are enforced there. `format`
+ * is not (2026-09-25) — it reaches the model as a hint, and only the contract's
+ * own parse after the run catches a bad value.
  *
  * - **Zod's default target, not draft-07**: the transform walks `$defs`, and
  *   draft-07's `definitions` would be folded into prose, leaving every `$ref`

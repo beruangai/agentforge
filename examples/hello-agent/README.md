@@ -8,11 +8,11 @@ AgentForge's own agent: the smallest thing a consumer would ship, built and veri
 | `src/procedures.ts` | The implementation: each handler calls `context.runAgent` once |
 | `src/task.ts` | The task entry: the server runs it once per task, in its own process |
 | `src/server.ts` | The container's entry: starts the server and names `task.ts` as its task entry |
-| `Dockerfile` | `FROM agentforge/a2a-claude`, dependencies from the workspace lockfile, the published bundle in place of the workspace link |
+| `Dockerfile` | `FROM agentforge/a2a-claude` — which carries AgentForge and everything this agent imports — plus its source |
 | `e2e/` | The whole path against a real model: the client, and the Temporal activity |
 
 ```bash
 bunx nx run @beruangai/example-hello-agent:e2e
 ```
 
-That builds AgentForge's bundle and base image, then this image, runs it beside DynamoDB Local, and drives it through `@beruangai/agentforge/client`. The subscription token comes from `.env.integ.local` and reaches the container by name only. A run costs a few cents.
+That builds AgentForge's bundle, its tarball and the base image, then this image, runs it beside DynamoDB Local, and drives it through `@beruangai/agentforge/client`. The subscription token comes from `.env.integ.local` and reaches the container by name only. A run costs a few cents.

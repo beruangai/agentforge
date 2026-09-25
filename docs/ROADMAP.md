@@ -42,4 +42,5 @@ Common guardrails a procedure opts into rather than writes, each acting **within
 
 - StrategyFoundry adopts; TrendBot migrates off its predecessor harness
 - What either lacks enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator, and lands on an example first
-- The plugin's generators and sync generator (§K), extracted from what the examples and the first consumer wired by hand
+- A second example in the plugin's shape — an agentic project with nested agents, each layer its own image — built by hand first; `hello-agent` stays flat, the minimal consumer
+- The plugin's generators and sync generator (§K), designed from that example, which the plugin then manages in this repository so its sync and updates are dogfooded here

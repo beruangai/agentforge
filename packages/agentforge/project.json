@@ -40,6 +40,26 @@
         "cwd": "{projectRoot}"
       }
     },
+    "tarball": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["bundle"],
+      "inputs": [
+        {
+          "dependentTasksOutputFiles": "**/*"
+        },
+        "{projectRoot}/tarball.ts",
+        "{workspaceRoot}/package.json",
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/tarball"],
+      "options": {
+        "command": "bun tarball.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
     "test": {
       "executor": "nx:run-commands",
       "cache": true,
@@ -80,7 +100,8 @@
         "model": {
           "args": "--project=@beruangai/agentforge:integ:model"
         }
-      }
+      },
+      "dependsOn": ["tarball"]
     },
     "lint": {
       "executor": "nx:run-commands",
@@ -101,8 +122,9 @@
     "image": {
       "executor": "nx:run-commands",
       "cache": false,
+      "dependsOn": ["tarball"],
       "options": {
-        "command": "docker build --platform linux/arm64 -t agentforge/a2a-claude:local .",
+        "command": "docker build --platform linux/arm64 -f Dockerfile -t agentforge/a2a-claude:local ../../dist/packages/agentforge/tarball",
         "cwd": "{projectRoot}"
       }
     }

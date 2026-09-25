@@ -33,16 +33,12 @@
       "dependsOn": [
         {
           "projects": ["@beruangai/agentforge"],
-          "target": "bundle"
-        },
-        {
-          "projects": ["@beruangai/agentforge"],
           "target": "image"
         }
       ],
       "options": {
-        "command": "docker build --platform linux/arm64 -f examples/hello-agent/Dockerfile -t agentforge-examples/hello-agent:local .",
-        "cwd": "{workspaceRoot}"
+        "command": "docker build --platform linux/arm64 -t agentforge-examples/hello-agent:local .",
+        "cwd": "{projectRoot}"
       }
     },
     "e2e": {

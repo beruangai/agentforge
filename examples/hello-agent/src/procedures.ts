@@ -4,8 +4,8 @@ import { helloAgent } from './contract.ts';
 
 const os = implementAgent(helloAgent);
 
-/** Where the agent works; a fixed directory, so a session resumes against the same project. */
-const CWD = '/home/bun/work';
+/** Where the agent works — the base image's workspace — so a session resumes against the same project. */
+const CWD = '/mnt/workspace';
 
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
