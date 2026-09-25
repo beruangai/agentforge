@@ -33,7 +33,7 @@ export const router = os.router({
     const run = await context.runAgent({
       prompt: ['Summarise the text in one sentence.', { tag: 'text', context: input.text }],
       output: z.object({ summary: z.string() }),          // what the model fills in; an object root
-      options: { cwd: '/mnt/workspace', maxTurns: 3, tools: [], resume: input.resumeSessionId },
+      options: { maxTurns: 3, tools: [], resume: input.resumeSessionId },
     });
     return { summary: run.output.summary, words: countWords(run.output.summary), sessionId: run.sessionId };
   }),
@@ -41,7 +41,7 @@ export const router = os.router({
 });
 ```
 
-**3. Package it** — two entries and a Dockerfile `FROM agentforge/a2a-claude`.
+**3. Package it** — two entries, a `package.json` and its generated `bun.lock` (the container workspace's, up to this agent), and a Dockerfile `FROM agentforge/a2a-claude` that copies them to `/workspace/agentic/agent` and installs.
 
 ```ts
 // task.ts — run by the server, once per task

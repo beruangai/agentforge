@@ -4,13 +4,6 @@
   "private": true,
   "type": "module",
   "description": "AgentForge's agentic-project example: a shared layer and two agents nested in one project, hand-built in the shape the Nx plugin will generate.",
-  "imports": {
-    "#agentic/*": "./src/*"
-  },
-  "exports": {
-    "./reviewer": "./agents/reviewer/src/contract.ts",
-    "./fixer": "./agents/fixer/src/contract.ts"
-  },
   "dependencies": {
     "@beruangai/agentforge": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",

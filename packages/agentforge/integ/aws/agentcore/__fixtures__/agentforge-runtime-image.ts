@@ -10,15 +10,17 @@ import {
 
 const PACKAGE_ROOT = join(import.meta.dirname, '..', '..', '..', '..');
 const WORKSPACE_ROOT = join(PACKAGE_ROOT, '..', '..');
-/** The base image's build context; the `integ` target depends on `tarball`. */
-const TARBALL_DIRECTORY = join(
+/** The base image's build context; the `integ` target depends on `bundle`. */
+const BUNDLE_DIRECTORY = join(
   WORKSPACE_ROOT,
-  'dist/packages/agentforge/tarball',
+  'dist/packages/agentforge/bundle',
 );
+/** The base image's `container` context: the workspace root's manifest and lock. */
+const CONTAINER_DIRECTORY = join(PACKAGE_ROOT, 'container', 'workspace');
 
 /**
  * AgentForge's base image, from the package's own `Dockerfile` over the
- * `tarball` task's output, and over it an image running AgentForge's server
+ * `bundle` task's output and the `container-lock` task's, and over it an image running AgentForge's server
  * from source with the runtime fixture's procedures — no model. Pushed to ECR through the credential helper, as the
  * fixture image is; the context is a temporary directory.
  */
@@ -70,8 +72,10 @@ export async function buildAndPushAgentForgeRuntimeImage(
         join(PACKAGE_ROOT, 'Dockerfile'),
         '--tag',
         baseImage,
+        '--build-context',
+        `container=${CONTAINER_DIRECTORY}`,
         '--load',
-        TARBALL_DIRECTORY,
+        BUNDLE_DIRECTORY,
       ],
       { purpose: `Building ${baseImage}`, environment: dockerEnvironment },
     );

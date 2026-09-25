@@ -7,5 +7,5 @@
     "tsBuildInfoFile": "../../dist/examples/hello-agent/typecheck/tsconfig.tsbuildinfo",
     "incremental": true
   },
-  "include": ["src/**/*.ts", "e2e/**/*.ts", "vitest.e2e.mts"]
+  "include": ["files/**/*.ts", "e2e/**/*.ts", "vitest.e2e.mts"]
 }

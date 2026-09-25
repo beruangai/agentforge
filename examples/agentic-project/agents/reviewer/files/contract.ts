@@ -1,8 +1,8 @@
 import { timeBudget } from '@beruangai/agentforge/contract';
+import { HOUSE_RULE_IDS } from '@example/agentic-project/house-rules';
+import { SourceFileSchema } from '@example/agentic-project/source-file';
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
-import { HOUSE_RULE_IDS } from '#agentic/house-rules.ts';
-import { WorkspaceFileSchema } from '#agentic/workspace-file.ts';
 
 export const FindingSchema = z.object({
   rule: z.enum(HOUSE_RULE_IDS),
@@ -14,7 +14,7 @@ export const FindingSchema = z.object({
 export const reviewer = {
   Review: oc
     .meta(timeBudget(300))
-    .input(WorkspaceFileSchema)
+    .input(SourceFileSchema)
     .output(
       z.object({
         clean: z.boolean(),

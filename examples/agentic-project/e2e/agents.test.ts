@@ -15,8 +15,8 @@ import {
   type LocalAgent,
   startLocalAgent,
 } from '../../__fixtures__/local-agent.ts';
-import { fixer } from '../agents/fixer/src/contract.ts';
-import { reviewer } from '../agents/reviewer/src/contract.ts';
+import { fixer } from '../agents/fixer/files/contract.ts';
+import { reviewer } from '../agents/reviewer/files/contract.ts';
 
 const FILE = {
   filename: 'add.ts',
@@ -81,7 +81,7 @@ describe('the agentic project', () => {
     ).toBe(true);
   });
 
-  it('fixes a file in the workspace, and returns it', async () => {
+  it('fixes a file in its working directory, and returns it', async () => {
     const started = await fixerClient.Fix.SendMessage(FILE, {
       runtimeSessionId: RUNTIME_SESSION_ID,
       idempotencyKey: randomUUIDv7(),

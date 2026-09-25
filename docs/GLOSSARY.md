@@ -72,15 +72,15 @@
 
 **`cwd`** — The SDK's working directory, and the capability root: which `.claude/` layers apply.
 
-**Working directory** — Where a run's files live. Persisting it across containers is open (DESIGN_OPTIONS §F).
+**Working directory** — Where a run's files live: chosen by the procedure, with no default, and added to the run with `additionalDirectories`. Persisting it across containers is open (DESIGN_OPTIONS §F).
 
 ## Delivery
 
-**Base image** — `agentforge/a2a-claude`, built from the package's `Dockerfile` over the **tarball**: Bun, what the Claude CLI needs, a non-root user, and AgentForge with its runtime peers installed globally, at `/node_modules`.
+**Container workspace** — `/workspace` in every image: a Bun workspace whose members are the layers — `agentforge`, `agentic`, `agentic/agent` — each installed by the image that adds it, from a lock of the whole workspace up to it.
 
-**Agentic project** — One project holding an **agentic layer** and the agents nested in it; its **agentic base image** is `FROM` the base image and puts the layer at `/agentic` — dependencies, shared modules, MCP servers, skills, `CLAUDE.md`. Each agent's image adds its source at `/agentic/agent`.
+**Base image** — `agentforge/a2a-claude`, built from the package's `Dockerfile` over the bundle: Bun, what the Claude CLI needs, a non-root user, and the container workspace with AgentForge and its runtime peers.
 
-**Workspace** — `/mnt/workspace`: what an agent edits, and each run's `cwd` by default. Where it is configured is open (DESIGN_OPTIONS §W).
+**Agentic project** — One project holding an **agentic layer** and the agents nested in it; its **agentic base image** is `FROM` the base image and adds the layer as the member at `/workspace/agentic` — dependencies, shared modules, MCP servers, and a `.claude/` with skills and `CLAUDE.md`. Each agent's image adds its member at `/workspace/agentic/agent`, its cwd.
 
 **Agent** (deployed) — One AgentCore runtime serving one image. Where "the agent" means the Claude agent inside a run, the context says so.
 

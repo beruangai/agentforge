@@ -2,7 +2,7 @@
   "name": "@beruangai/example-hello-agent",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "sourceRoot": "examples/hello-agent/src",
+  "sourceRoot": "examples/hello-agent/files",
   "tags": ["example"],
   "targets": {
     "typecheck": {
@@ -27,10 +27,36 @@
         "command": "biome check {projectRoot}"
       }
     },
+    "lock": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": [
+        {
+          "projects": ["@beruangai/agentforge"],
+          "target": "container-lock"
+        }
+      ],
+      "inputs": [
+        "{projectRoot}/files/package.json",
+        "{workspaceRoot}/packages/agentforge/container/**/*",
+        {
+          "dependentTasksOutputFiles": "**/package.json"
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/files/bun.lock"],
+      "options": {
+        "command": "bun ../../packages/agentforge/container/workspace-lock.ts --root ../../packages/agentforge/container/workspace/package.json --member agentforge=../../dist/packages/agentforge/bundle --member agentic/agent=files --seed ../../packages/agentforge/container/workspace/bun.lock --out files/bun.lock",
+        "cwd": "{projectRoot}"
+      }
+    },
     "image": {
       "executor": "nx:run-commands",
       "cache": false,
       "dependsOn": [
+        "lock",
         {
           "projects": ["@beruangai/agentforge"],
           "target": "image"

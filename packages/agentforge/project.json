@@ -40,23 +40,26 @@
         "cwd": "{projectRoot}"
       }
     },
-    "tarball": {
+    "container-lock": {
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["bundle"],
       "inputs": [
-        {
-          "dependentTasksOutputFiles": "**/*"
-        },
-        "{projectRoot}/tarball.ts",
+        "{projectRoot}/container/*.ts",
         "{workspaceRoot}/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json"
+        },
         {
           "runtime": "bun --version"
         }
       ],
-      "outputs": ["{workspaceRoot}/dist/{projectRoot}/tarball"],
+      "outputs": [
+        "{projectRoot}/container/workspace/package.json",
+        "{projectRoot}/container/workspace/bun.lock"
+      ],
       "options": {
-        "command": "bun tarball.ts",
+        "command": "bun container/base-lock.ts",
         "cwd": "{projectRoot}"
       }
     },
@@ -101,7 +104,7 @@
           "args": "--project=@beruangai/agentforge:integ:model"
         }
       },
-      "dependsOn": ["tarball"]
+      "dependsOn": ["container-lock"]
     },
     "lint": {
       "executor": "nx:run-commands",
@@ -122,9 +125,9 @@
     "image": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["tarball"],
+      "dependsOn": ["container-lock"],
       "options": {
-        "command": "docker build --platform linux/arm64 -f Dockerfile -t agentforge/a2a-claude:local ../../dist/packages/agentforge/tarball",
+        "command": "docker build --platform linux/arm64 -f Dockerfile --build-context container=container/workspace -t agentforge/a2a-claude:local ../../dist/packages/agentforge/bundle",
         "cwd": "{projectRoot}"
       }
     }

@@ -27,25 +27,70 @@
         "command": "biome check {projectRoot}"
       }
     },
-    "manifest": {
+    "lock": {
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": [
         {
           "projects": ["@beruangai/agentforge"],
-          "target": "tarball"
+          "target": "container-lock"
         }
       ],
       "inputs": [
-        "{projectRoot}/package.json",
-        "{projectRoot}/image-manifest.ts",
-        "{workspaceRoot}/package.json",
-        { "dependentTasksOutputFiles": "**/package.json" },
-        { "runtime": "bun --version" }
+        "{projectRoot}/base/files/package.json",
+        "{workspaceRoot}/packages/agentforge/container/**/*",
+        {
+          "dependentTasksOutputFiles": "**/package.json"
+        },
+        {
+          "runtime": "bun --version"
+        }
       ],
-      "outputs": ["{workspaceRoot}/dist/examples/agentic-project/manifest"],
+      "outputs": ["{projectRoot}/base/files/bun.lock"],
       "options": {
-        "command": "bun image-manifest.ts",
+        "command": "bun ../../packages/agentforge/container/workspace-lock.ts --root ../../packages/agentforge/container/workspace/package.json --member agentforge=../../dist/packages/agentforge/bundle --member agentic=base/files --seed ../../packages/agentforge/container/workspace/bun.lock --out base/files/bun.lock",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "lock-reviewer": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["lock"],
+      "inputs": [
+        "{projectRoot}/base/files/package.json",
+        "{projectRoot}/agents/reviewer/files/package.json",
+        "{workspaceRoot}/packages/agentforge/container/**/*",
+        {
+          "dependentTasksOutputFiles": "**/package.json"
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/agents/reviewer/files/bun.lock"],
+      "options": {
+        "command": "bun ../../packages/agentforge/container/workspace-lock.ts --root ../../packages/agentforge/container/workspace/package.json --member agentforge=../../dist/packages/agentforge/bundle --member agentic=base/files --member agentic/agent=agents/reviewer/files --seed base/files/bun.lock --out agents/reviewer/files/bun.lock",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "lock-fixer": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["lock"],
+      "inputs": [
+        "{projectRoot}/base/files/package.json",
+        "{projectRoot}/agents/fixer/files/package.json",
+        "{workspaceRoot}/packages/agentforge/container/**/*",
+        {
+          "dependentTasksOutputFiles": "**/package.json"
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/agents/fixer/files/bun.lock"],
+      "options": {
+        "command": "bun ../../packages/agentforge/container/workspace-lock.ts --root ../../packages/agentforge/container/workspace/package.json --member agentforge=../../dist/packages/agentforge/bundle --member agentic=base/files --member agentic/agent=agents/fixer/files --seed base/files/bun.lock --out agents/fixer/files/bun.lock",
         "cwd": "{projectRoot}"
       }
     },
@@ -53,21 +98,21 @@
       "executor": "nx:run-commands",
       "cache": false,
       "dependsOn": [
-        "manifest",
+        "lock",
         {
           "projects": ["@beruangai/agentforge"],
           "target": "image"
         }
       ],
       "options": {
-        "command": "docker build --platform linux/arm64 --build-context manifest=../../dist/examples/agentic-project/manifest -t agentforge-examples/agentic-project:local .",
+        "command": "docker build --platform linux/arm64 -t agentforge-examples/agentic-project:local base",
         "cwd": "{projectRoot}"
       }
     },
     "image-reviewer": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["image"],
+      "dependsOn": ["lock-reviewer", "image"],
       "options": {
         "command": "docker build --platform linux/arm64 -t agentforge-examples/agentic-project-reviewer:local agents/reviewer",
         "cwd": "{projectRoot}"
@@ -76,7 +121,7 @@
     "image-fixer": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["image"],
+      "dependsOn": ["lock-fixer", "image"],
       "options": {
         "command": "docker build --platform linux/arm64 -t agentforge-examples/agentic-project-fixer:local agents/fixer",
         "cwd": "{projectRoot}"

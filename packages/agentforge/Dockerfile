@@ -1,31 +1,29 @@
 # The AgentForge base image, `agentforge/a2a-claude`: Bun, what the Claude
-# Code CLI needs at run time, and AgentForge installed into Bun's global
-# directory with the peers its server and harness import. An agent's image is
-# built FROM it and adds only its own source and what the base lacks.
+# Code CLI needs at run time, and the container's `/workspace` — a Bun
+# workspace whose root depends on the peers AgentForge's server and harness
+# import, with AgentForge itself as the member at `/workspace/agentforge`.
 #
-# The build context is the `tarball` task's output: the packed package, and
-# the manifest and lockfile that pin its peers.
+# An agentic project's image adds its member at `/workspace/agentic`, and an
+# agent's image its member at `/workspace/agentic/agent`; each copies in its
+# own lock of the whole workspace and installs, so a layer bakes in only what
+# it adds and every layer resolves shared packages to one copy.
+#
+# Build context: the published bundle, which becomes the `agentforge` member.
+# The `container` context holds the root manifest and its lock.
 ARG BUN_IMAGE=docker.io/oven/bun:1.4.0-alpine@sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb
 FROM ${BUN_IMAGE}
 # The Claude CLI's Bash tool refuses busybox sh; it needs bash, named by SHELL.
 RUN apk add --no-cache bash git ca-certificates ripgrep \
- && mkdir -p /agentic/agent /mnt/workspace /home/bun/.bun/install/global \
- && chown -R bun:bun /agentic /mnt/workspace /home/bun/.bun \
- && ln -s /home/bun/.bun/install/global/node_modules /node_modules
+ && mkdir -p /workspace/agentforge /workspace/agentic/agent \
+ && chown -R bun:bun /workspace
 # The CLI refuses to run tools unattended as root; the image never runs as root.
 USER bun
-WORKDIR /home/bun/.bun/install/global
-COPY --chown=bun package.json bun.lock *.tgz ./
-# A global install is not on the resolution path. Linked in above it as
-# /node_modules, it resolves as any package does — ESM conditions, one copy
-# shared with AgentForge — and its presence keeps Bun from auto-installing an
-# import from npm at run time. NODE_PATH does neither: Bun resolves it with
-# CommonJS conditions. /agentic is the consumer's: an agentic project's
-# /agentic/node_modules and an agent's /agentic/agent/node_modules resolve
-# first.
+WORKDIR /workspace
+COPY --from=container --chown=bun package.json bun.lock ./
+COPY --chown=bun . agentforge/
 RUN bun install --frozen-lockfile --production
+# Each run's cwd: the agent's own directory, so every layer's `.claude/`
+# composes up the tree from it.
+WORKDIR /workspace/agentic/agent
 ENV SHELL=/bin/bash AGENTFORGE_PORT=9000
-# The agent's code is /agentic/agent, read-only in intent; what the agent
-# edits is /mnt/workspace, its `cwd`.
-WORKDIR /agentic/agent
 EXPOSE 9000

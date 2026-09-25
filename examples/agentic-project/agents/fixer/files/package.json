@@ -1,0 +1,13 @@
+{
+  "name": "@example/fixer-agent",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@beruangai/agentforge": "workspace:*",
+    "@example/agentic-project": "workspace:*"
+  },
+  "peerDependencies": {
+    "@orpc/contract": "2.0.0-beta.39",
+    "zod": "^4.6.5"
+  }
+}

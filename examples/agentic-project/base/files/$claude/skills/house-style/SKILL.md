@@ -1,6 +1,6 @@
 ---
 name: house-style
-description: The house style for TypeScript source, with rule ids R1–R3. Use it whenever reviewing or changing a file in the workspace.
+description: The house style for TypeScript source, with rule ids R1–R3. Use it whenever reviewing or changing a source file.
 ---
 
 # House style

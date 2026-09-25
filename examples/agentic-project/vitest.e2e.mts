@@ -7,7 +7,8 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   root: import.meta.dirname,
-  resolve: { conditions: ['@beruangai/source'] },
+  // The tsconfig's `paths` map the agentic layer's package name to its files.
+  resolve: { conditions: ['@beruangai/source'], tsconfigPaths: true },
   ssr: { resolve: { conditions: ['@beruangai/source'] } },
   test: {
     name: '@beruangai/example-agentic-project:e2e',

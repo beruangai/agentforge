@@ -3,7 +3,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { HOUSE_RULE_IDS, HOUSE_RULES } from '#agentic/house-rules.ts';
+import { HOUSE_RULE_IDS, HOUSE_RULES } from '../house-rules.ts';
 
 const server = new McpServer({ name: 'house', version: '1.0.0' });
 

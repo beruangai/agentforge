@@ -4,9 +4,6 @@ import { helloAgent } from './contract.ts';
 
 const os = implementAgent(helloAgent);
 
-/** Where the agent works — the base image's workspace — so a session resumes against the same project. */
-const CWD = '/mnt/workspace';
-
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
     const run = await context.runAgent({
@@ -18,7 +15,6 @@ export const router = os.router({
         summary: z.string().describe('One sentence summarising the text'),
       }),
       options: {
-        cwd: CWD,
         maxTurns: 3,
         tools: [],
         ...(input.resumeSessionId === undefined
@@ -37,7 +33,6 @@ export const router = os.router({
       prompt: `Run the shell command \`sleep ${input.seconds}\` with the Bash tool, then answer "done".`,
       output: z.object({ answer: z.string() }),
       options: {
-        cwd: CWD,
         maxTurns: 4,
         tools: ['Bash'],
         allowedTools: ['Bash'],
