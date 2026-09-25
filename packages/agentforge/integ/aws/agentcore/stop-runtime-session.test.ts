@@ -26,11 +26,11 @@ import {
   taskFrom,
 } from './__fixtures__/invocation.ts';
 import {
-  a2aOneZeroOnlyProfile,
+  A2A_ONE_ZERO_ONLY_PROFILE,
   type FixtureRuntime,
+  PROVISIONING_TIMEOUT_MILLISECONDS,
   provisionFixtureRuntime,
-  provisioningTimeoutMilliseconds,
-  teardownTimeoutMilliseconds,
+  TEARDOWN_TIMEOUT_MILLISECONDS,
 } from './__fixtures__/provisioning.ts';
 import {
   createResourceStack,
@@ -39,8 +39,8 @@ import {
 import { waitForContainerLogEvents } from './__fixtures__/runtime-logs.ts';
 
 /** Prompt, not deferred to the end of the grace period (~400 ms measured). */
-const sigtermWithinMillisecondsOfTheStop = 5_000;
-const logClockMarginMilliseconds = 60_000;
+const SIGTERM_WITHIN_MILLISECONDS_OF_THE_STOP = 5_000;
+const LOG_CLOCK_MARGIN_MILLISECONDS = 60_000;
 
 describe('StopRuntimeSession against a container that is mid-task (§C)', () => {
   const resources = createResourceStack();
@@ -50,18 +50,18 @@ describe('StopRuntimeSession against a container that is mid-task (§C)', () => 
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'stop',
-      profile: a2aOneZeroOnlyProfile,
+      profile: A2A_ONE_ZERO_ONLY_PROFILE,
       outcomeTable: false,
     });
     a2a = new A2aOverAgentCore(
       fixture.clients.data,
       fixture.runtime.agentRuntimeArn,
     );
-  }, provisioningTimeoutMilliseconds);
+  }, PROVISIONING_TIMEOUT_MILLISECONDS);
 
   afterAll(
     () => releaseResources(resources, 'stop-runtime-session'),
-    teardownTimeoutMilliseconds,
+    TEARDOWN_TIMEOUT_MILLISECONDS,
   );
 
   it('SIGTERMs the busy container at once, and the session then reaches a fresh container that never knew the task', async () => {
@@ -123,7 +123,7 @@ describe('StopRuntimeSession against a container that is mid-task (§C)', () => 
         agentRuntimeId: fixture.runtime.agentRuntimeId,
         eventName: 'sigterm',
         containerId: victim,
-        startTime: stopIssuedAt - logClockMarginMilliseconds,
+        startTime: stopIssuedAt - LOG_CLOCK_MARGIN_MILLISECONDS,
       },
       (events) => events.length > 0,
       120_000,
@@ -137,7 +137,9 @@ describe('StopRuntimeSession against a container that is mid-task (§C)', () => 
       stopIssuedAt - offsetUncertainty,
     );
     expect(sigtermOnThisClock).toBeLessThan(
-      stopReturnedAt + sigtermWithinMillisecondsOfTheStop + offsetUncertainty,
+      stopReturnedAt +
+        SIGTERM_WITHIN_MILLISECONDS_OF_THE_STOP +
+        offsetUncertainty,
     );
   }, 240_000);
 });

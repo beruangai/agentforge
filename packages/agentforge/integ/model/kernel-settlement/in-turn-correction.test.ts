@@ -10,7 +10,7 @@
  * configuration: streaming input, background work off, the input ended on the
  * first result (docs/ARCHITECTURE.md §7).
  *
- * Two scenarios, the two things AgentForge relies on a hook for:
+ * Two SCENARIOS, the two things AgentForge relies on a hook for:
  *
  *   hook-only-rule       a cross-field rule draft-07 cannot express, enforced
  *                        by a PreToolUse denial. Whether the model then complies
@@ -40,8 +40,8 @@ import type {
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import {
-  backgroundWorkDisabled,
-  carrierToolName,
+  BACKGROUND_WORK_DISABLED,
+  CARRIER_TOOL_NAME,
   createSandbox,
   createSubscriptionEnvironment,
   QueryRecording,
@@ -49,13 +49,13 @@ import {
 } from '../../__fixtures__/claude-agent-sdk.ts';
 
 /** Fixture sizes chosen so the sum is not a round number the model can guess. */
-const fixtureFileSizes: Record<string, number> = {
+const FIXTURE_FILE_SIZES: Record<string, number> = {
   'alpha.txt': 137,
   'beta.txt': 2891,
   'gamma.txt': 15043,
 };
 
-const baseShape = {
+const BaseOutputShape = {
   files: z
     .array(z.object({ name: z.string(), bytes: z.number().int() }))
     .describe(
@@ -65,13 +65,13 @@ const baseShape = {
   summary: z.string().describe('a short summary'),
 };
 
-const prompt =
+const PROMPT =
   "Use Bash to list every .txt file in the current directory and get each one's exact byte size. " +
   'Then give your final structured output: every file with its size, the total, and a summary. ' +
   'Write the summary as a normal descriptive sentence.';
 
 /** Cap the correction loop: a rule the model cannot satisfy must not spin forever at the operator's expense. */
-const maximumDenials = 3;
+const MAXIMUM_DENIALS = 3;
 
 type CarrierInput = {
   files?: { name?: string; bytes?: number }[];
@@ -96,7 +96,7 @@ type Scenario = {
   repair?: (input: CarrierInput) => CarrierInput | undefined;
 };
 
-// Cross-field AND unstated in the prompt or the schema: draft-07 cannot
+// Cross-field AND unstated in the PROMPT or the schema: draft-07 cannot
 // express it, and the model cannot guess it, so the denial path is guaranteed
 // to be exercised rather than merely available.
 const checkTotalInWholeKilobytes = (
@@ -126,7 +126,7 @@ const repairToFiveWords = (input: CarrierInput): CarrierInput | undefined => {
   };
 };
 
-const scenarios = {
+const SCENARIOS = {
   hookOnlyRule: {
     name: 'hook-only-rule',
     check: checkTotalInWholeKilobytes,
@@ -140,11 +140,11 @@ const scenarios = {
 async function runScenario(scenario: Scenario) {
   const sandbox = createSandbox(`in-turn-correction-${scenario.name}`);
   onTestFinished(() => sandbox.dispose());
-  for (const [name, size] of Object.entries(fixtureFileSizes)) {
+  for (const [name, size] of Object.entries(FIXTURE_FILE_SIZES)) {
     writeFileSync(join(sandbox.workingDirectory, name), 'x'.repeat(size));
   }
 
-  const outputJsonSchema = z.toJSONSchema(z.object(baseShape), {
+  const OUTPUT_JSON_SCHEMA = z.toJSONSchema(z.object(BaseOutputShape), {
     target: 'draft-7',
     io: 'input',
   });
@@ -176,7 +176,7 @@ async function runScenario(scenario: Scenario) {
       } satisfies HookJSONOutput;
     }
     const reason =
-      denials >= maximumDenials ? undefined : scenario.check?.(toolInput);
+      denials >= MAXIMUM_DENIALS ? undefined : scenario.check?.(toolInput);
     hookCalls.push({
       toolName,
       decision: reason ? 'deny' : 'allow',
@@ -198,21 +198,21 @@ async function runScenario(scenario: Scenario) {
     'kernel-settlement',
     `in-turn-correction-${scenario.name}`,
   );
-  await runWithStreamingInput(recording, prompt, {
+  await runWithStreamingInput(recording, PROMPT, {
     cwd: sandbox.workingDirectory,
     env: createSubscriptionEnvironment(
       sandbox.configDirectory,
-      backgroundWorkDisabled,
+      BACKGROUND_WORK_DISABLED,
     ),
     model: 'claude-sonnet-5',
     allowedTools: ['Bash'],
     permissionMode: 'bypassPermissions',
     allowDangerouslySkipPermissions: true,
-    outputFormat: { type: 'json_schema', schema: outputJsonSchema },
+    outputFormat: { type: 'json_schema', schema: OUTPUT_JSON_SCHEMA },
     maxTurns: 25,
     settingSources: [],
     hooks: {
-      PreToolUse: [{ matcher: carrierToolName, hooks: [preToolUseHook] }],
+      PreToolUse: [{ matcher: CARRIER_TOOL_NAME, hooks: [preToolUseHook] }],
     },
   });
 
@@ -222,7 +222,7 @@ async function runScenario(scenario: Scenario) {
   ) as CarrierInput | null | undefined;
   const carrierToolUses = recording
     .toolUses()
-    .filter((toolUse) => toolUse.name === carrierToolName);
+    .filter((toolUse) => toolUse.name === CARRIER_TOOL_NAME);
   const evidence = [
     `subtype=${result.subtype} is_error=${result.is_error} num_turns=${result.num_turns}`,
     `carrierSubmissions=${carrierToolUses.length} hookCalls=${JSON.stringify(hookCalls.map((call) => call.decision))}`,
@@ -233,8 +233,8 @@ async function runScenario(scenario: Scenario) {
 
   expect(
     recording.firstSystemInitMessage().tools,
-    `'${carrierToolName}' is advertised in system/init.tools; ${evidence}`,
-  ).toContain(carrierToolName);
+    `'${CARRIER_TOOL_NAME}' is advertised in system/init.tools; ${evidence}`,
+  ).toContain(CARRIER_TOOL_NAME);
 
   return {
     recording,
@@ -262,12 +262,12 @@ function carrierErrorTexts(
 }
 
 describe('in-turn PreToolUse rejection over StructuredOutput', () => {
-  it(scenarios.hookOnlyRule.name, async () => {
-    const run = await runScenario(scenarios.hookOnlyRule);
+  it(SCENARIOS.hookOnlyRule.name, async () => {
+    const run = await runScenario(SCENARIOS.hookOnlyRule);
     expect(
       new Set(run.hookCalls.map((call) => call.toolName)),
       `the hook sees the carrier under its emitted name; ${run.evidence}`,
-    ).toEqual(new Set([carrierToolName]));
+    ).toEqual(new Set([CARRIER_TOOL_NAME]));
     expect(
       run.denials,
       `the cross-field rule was denied in-turn; ${run.evidence}`,
@@ -314,8 +314,8 @@ describe('in-turn PreToolUse rejection over StructuredOutput', () => {
     }
   });
 
-  it(scenarios.hookUpdatedInput.name, async () => {
-    const run = await runScenario(scenarios.hookUpdatedInput);
+  it(SCENARIOS.hookUpdatedInput.name, async () => {
+    const run = await runScenario(SCENARIOS.hookUpdatedInput);
     const repairs = run.hookCalls.filter(
       (call) => call.decision === 'updatedInput',
     );

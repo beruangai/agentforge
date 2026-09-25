@@ -15,9 +15,9 @@ import {
 } from '#core/contract/task.ts';
 import {
   type ExecutorMessage,
+  TASK_PROCESS_ENVIRONMENT_VARIABLE,
   type TaskInvocation,
   type TaskProcessMessage,
-  taskProcessEnvironmentVariable,
 } from '#core/task-protocol/messages.ts';
 import { finishedTask, newTask, readEnvelope, TaskState } from './a2a-task.ts';
 import type { DynamoDBTaskStore } from './task-store.ts';
@@ -28,7 +28,7 @@ export interface Admission {
   readonly attempt: number;
   readonly priorAttempt: PriorAttempt | undefined;
 }
-export const admissionMetadataKey = 'agentforge.admission';
+export const ADMISSION_METADATA_KEY = 'agentforge.admission';
 
 export interface ExecutorConfig {
   /** The command that starts a task process: the consumer's task entry. */
@@ -48,8 +48,8 @@ interface LiveTask {
   stopReason: StopReason | undefined;
 }
 
-const leaseRenewalMilliseconds = 20_000;
-const stderrTailBytes = 4_000;
+const LEASE_RENEWAL_MILLISECONDS = 20_000;
+const STDERR_TAIL_BYTES = 4_000;
 
 /**
  * Runs each task in a process of its own, in its own process group, so a
@@ -82,7 +82,7 @@ export class TaskProcessExecutor implements AgentExecutor {
     const { taskId, contextId } = requestContext;
     const message = requestContext.userMessage;
     const envelope = readEnvelope(message);
-    const admission = message.metadata?.[admissionMetadataKey] as
+    const admission = message.metadata?.[ADMISSION_METADATA_KEY] as
       | Admission
       | undefined;
     if (admission === undefined) {
@@ -118,7 +118,7 @@ export class TaskProcessExecutor implements AgentExecutor {
         stdio: ['ignore', 'inherit', 'pipe', 'ipc'],
         detached: true,
         serialization: 'json',
-        env: { ...process.env, [taskProcessEnvironmentVariable]: '1' },
+        env: { ...process.env, [TASK_PROCESS_ENVIRONMENT_VARIABLE]: '1' },
       },
     );
     const live: LiveTask = {
@@ -131,7 +131,7 @@ export class TaskProcessExecutor implements AgentExecutor {
 
     child.stderr?.on('data', (chunk: Buffer) => {
       process.stderr.write(chunk);
-      stderrTail = (stderrTail + chunk.toString()).slice(-stderrTailBytes);
+      stderrTail = (stderrTail + chunk.toString()).slice(-STDERR_TAIL_BYTES);
     });
     child.on('message', (received: TaskProcessMessage) => {
       if (received.type === 'record') records.push(received.record);
@@ -160,7 +160,7 @@ export class TaskProcessExecutor implements AgentExecutor {
       this.config.store.renewLease(taskId).catch((error: unknown) => {
         console.error(`task ${taskId}: the lease could not be renewed`, error);
       });
-    }, leaseRenewalMilliseconds);
+    }, LEASE_RENEWAL_MILLISECONDS);
     const budgetSeconds =
       envelope.timeBudgetSeconds ?? this.config.defaultTimeBudgetSeconds;
     const budget = setTimeout(() => {

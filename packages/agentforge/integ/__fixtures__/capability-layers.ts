@@ -23,13 +23,13 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-export const capabilityLayerNames = [
+export const CAPABILITY_LAYER_NAMES = [
   'user',
   'agenticProject',
   'agent',
   'procedure',
 ] as const;
-export type CapabilityLayerName = (typeof capabilityLayerNames)[number];
+export type CapabilityLayerName = (typeof CAPABILITY_LAYER_NAMES)[number];
 
 export type CapabilityLayerPresence = Record<CapabilityLayerName, boolean>;
 
@@ -81,7 +81,7 @@ export function createCapabilityLayerTree(
     procedure: workingDirectory,
   };
   const layerDirectories = Object.fromEntries(
-    capabilityLayerNames.map((layer) => [
+    CAPABILITY_LAYER_NAMES.map((layer) => [
       layer,
       join(layerHomes[layer], '.claude'),
     ]),
@@ -90,7 +90,7 @@ export function createCapabilityLayerTree(
 
   mkdirSync(hookMarkerDirectory, { recursive: true });
   mkdirSync(workingDirectory, { recursive: true });
-  for (const layer of capabilityLayerNames) {
+  for (const layer of CAPABILITY_LAYER_NAMES) {
     const directory = layerDirectories[layer];
     const token = markerToken(layer);
     mkdirSync(join(directory, 'commands'), { recursive: true });
@@ -169,7 +169,7 @@ export function layersPresent(
 ): CapabilityLayerPresence {
   const nameSet = new Set(names);
   return Object.fromEntries(
-    capabilityLayerNames.map((layer) => [
+    CAPABILITY_LAYER_NAMES.map((layer) => [
       layer,
       nameSet.has(`${prefix}${markerToken(layer)}`),
     ]),

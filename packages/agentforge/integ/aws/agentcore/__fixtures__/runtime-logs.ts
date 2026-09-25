@@ -7,7 +7,7 @@ import { vi } from 'vitest';
 import {
   type ContainerLogEventName,
   type ContainerLogEventNamed,
-  containerLogEventSchema,
+  ContainerLogEventSchema,
 } from './container-log-events.ts';
 
 /**
@@ -58,7 +58,7 @@ export async function readContainerLogEvents<
         { logGroupName, startTime: query.startTime, filterPattern },
       )) {
         for (const logEvent of page.events ?? []) {
-          const parsed = containerLogEventSchema.safeParse(
+          const parsed = ContainerLogEventSchema.safeParse(
             JSON.parse(logEvent.message ?? 'null'),
           );
           if (!parsed.success || parsed.data.event !== query.eventName) {

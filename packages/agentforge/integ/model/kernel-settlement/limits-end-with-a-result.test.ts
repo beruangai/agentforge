@@ -16,7 +16,7 @@ import type { Options, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import {
-  backgroundWorkDisabled,
+  BACKGROUND_WORK_DISABLED,
   createSandbox,
   createSubscriptionEnvironment,
   ProcessOutlivedItsInputError,
@@ -24,7 +24,7 @@ import {
   runWithStreamingInput,
 } from '../../__fixtures__/claude-agent-sdk.ts';
 
-const outputJsonSchema = z.toJSONSchema(z.object({ answer: z.string() }), {
+const OUTPUT_JSON_SCHEMA = z.toJSONSchema(z.object({ answer: z.string() }), {
   target: 'draft-7',
 });
 
@@ -40,7 +40,7 @@ const echoCommandsOneAtATime = (count: number): string =>
   Array.from({ length: count }, (_, index) => `\`echo ${index}\``).join(', ') +
   '. Then answer "done".';
 
-const scenarios: Scenario[] = [
+const SCENARIOS: Scenario[] = [
   {
     name: 'maxTurns',
     prompt: echoCommandsOneAtATime(8),
@@ -64,7 +64,7 @@ const scenarios: Scenario[] = [
 ];
 
 describe('a turn or budget limit ends the run with a result', () => {
-  it.each(scenarios)('$name', async (scenario) => {
+  it.each(SCENARIOS)('$name', async (scenario) => {
     const sandbox = createSandbox(`limits-end-with-a-result-${scenario.name}`);
     onTestFinished(() => sandbox.dispose());
     const recording = new QueryRecording(
@@ -76,13 +76,13 @@ describe('a turn or budget limit ends the run with a result', () => {
       cwd: sandbox.workingDirectory,
       env: createSubscriptionEnvironment(
         sandbox.configDirectory,
-        backgroundWorkDisabled,
+        BACKGROUND_WORK_DISABLED,
       ),
       model: 'claude-sonnet-5',
       allowedTools: ['Bash'],
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
-      outputFormat: { type: 'json_schema', schema: outputJsonSchema },
+      outputFormat: { type: 'json_schema', schema: OUTPUT_JSON_SCHEMA },
       settingSources: [],
       ...scenario.limit,
     }).then(

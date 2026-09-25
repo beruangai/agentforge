@@ -5,8 +5,8 @@
  */
 export {
   type Envelope,
-  envelopeSchema,
-  runtimeSessionHeader,
+  EnvelopeSchema,
+  RUNTIME_SESSION_HEADER,
 } from './envelope.ts';
 export {
   contractHash,
@@ -19,19 +19,19 @@ export {
   timeBudgetOf,
 } from './procedures.ts';
 export {
+  CAUSE_CODES,
   type Cause,
   type CauseCode,
+  CauseSchema,
   cause,
-  causeCodes,
-  causeSchema,
   isTerminal,
   type Outcome,
-  outcomeSchema,
+  OutcomeSchema,
   type PriorAttempt,
-  priorAttemptSchema,
+  PriorAttemptSchema,
   type RunRecord,
-  runRecordSchema,
+  RunRecordSchema,
+  TASK_STATES,
   type TaskState,
-  taskStates,
-  terminalTaskStates,
+  TERMINAL_TASK_STATES,
 } from './task.ts';

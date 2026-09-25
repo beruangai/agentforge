@@ -57,14 +57,14 @@ type Scenario = {
 };
 
 /** settings.json and hooks: `<cwd>/.claude/` and the user scope only. */
-const hooksFromCwdAndUserOnly: CapabilityLayerPresence = {
+const HOOKS_FROM_CWD_AND_USER_ONLY: CapabilityLayerPresence = {
   user: true,
   agenticProject: false,
   agent: false,
   procedure: true,
 };
 
-const scenarios: Scenario[] = [
+const SCENARIOS: Scenario[] = [
   {
     name: 'no-repository-anywhere',
     plantRepositoryAtAgent: false,
@@ -76,7 +76,7 @@ const scenarios: Scenario[] = [
         agent: true,
         procedure: true,
       },
-      hooks: hooksFromCwdAndUserOnly,
+      hooks: HOOKS_FROM_CWD_AND_USER_ONLY,
     },
   },
   {
@@ -94,7 +94,7 @@ const scenarios: Scenario[] = [
         agent: true,
         procedure: true,
       },
-      hooks: hooksFromCwdAndUserOnly,
+      hooks: HOOKS_FROM_CWD_AND_USER_ONLY,
     },
   },
   {
@@ -109,13 +109,13 @@ const scenarios: Scenario[] = [
         agent: true,
         procedure: true,
       },
-      hooks: hooksFromCwdAndUserOnly,
+      hooks: HOOKS_FROM_CWD_AND_USER_ONLY,
     },
   },
 ];
 
 describe('which kinds of configuration compose, and where each stops', () => {
-  it.each(scenarios)('$name', async (scenario) => {
+  it.each(SCENARIOS)('$name', async (scenario) => {
     const tree = createCapabilityLayerTree(`what-composes-${scenario.name}`, {
       skillsSubagentsAndHooks: true,
     });

@@ -29,11 +29,11 @@ import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
 import type { ContainerLogEventNamed } from './__fixtures__/container-log-events.ts';
 import { A2aOverAgentCore } from './__fixtures__/invocation.ts';
 import {
-  a2aOneZeroOnlyProfile,
+  A2A_ONE_ZERO_ONLY_PROFILE,
   type FixtureRuntime,
+  PROVISIONING_TIMEOUT_MILLISECONDS,
   provisionFixtureRuntime,
-  provisioningTimeoutMilliseconds,
-  teardownTimeoutMilliseconds,
+  TEARDOWN_TIMEOUT_MILLISECONDS,
 } from './__fixtures__/provisioning.ts';
 import {
   createResourceStack,
@@ -42,15 +42,15 @@ import {
 import { waitForContainerLogEvents } from './__fixtures__/runtime-logs.ts';
 
 /** 9.5–10.0 s observed on V2; the documentation's 15 s for other terminations, with margin. */
-const graceWindow = { atLeastMilliseconds: 7_000, atMostMilliseconds: 20_000 };
+const GRACE_WINDOW = { atLeastMilliseconds: 7_000, atMostMilliseconds: 20_000 };
 /** Both V2 windows within 0.5 s of each other. */
-const sameOffsetWithinMilliseconds = 3_000;
+const SAME_OFFSET_WITHIN_MILLISECONDS = 3_000;
 /**
  * Read once both containers must be dead, with time for CloudWatch to ingest —
  * long enough that a return to V1's ~60 s shows as a failure, not a timeout.
  */
-const readHeartbeatsAfterStopMilliseconds = 130_000;
-const logClockMarginMilliseconds = 60_000;
+const READ_HEARTBEATS_AFTER_STOP_MILLISECONDS = 130_000;
+const LOG_CLOCK_MARGIN_MILLISECONDS = 60_000;
 
 describe('the grace period after StopRuntimeSession (§C)', () => {
   const resources = createResourceStack();
@@ -60,18 +60,18 @@ describe('the grace period after StopRuntimeSession (§C)', () => {
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'grace',
-      profile: a2aOneZeroOnlyProfile,
+      profile: A2A_ONE_ZERO_ONLY_PROFILE,
       outcomeTable: false,
     });
     a2a = new A2aOverAgentCore(
       fixture.clients.data,
       fixture.runtime.agentRuntimeArn,
     );
-  }, provisioningTimeoutMilliseconds);
+  }, PROVISIONING_TIMEOUT_MILLISECONDS);
 
   afterAll(
     () => releaseResources(resources, 'grace-period-after-stop'),
-    teardownTimeoutMilliseconds,
+    TEARDOWN_TIMEOUT_MILLISECONDS,
   );
 
   it('kills a stopped container about ten seconds after SIGTERM, whether its task finished long before or is still running', async () => {
@@ -109,7 +109,7 @@ describe('the grace period after StopRuntimeSession (§C)', () => {
     await setTimeout(
       Math.max(
         0,
-        stopIssuedAt + readHeartbeatsAfterStopMilliseconds - Date.now(),
+        stopIssuedAt + READ_HEARTBEATS_AFTER_STOP_MILLISECONDS - Date.now(),
       ),
     );
     const lastBeatOf = async (
@@ -121,7 +121,7 @@ describe('the grace period after StopRuntimeSession (§C)', () => {
           agentRuntimeId: fixture.runtime.agentRuntimeId,
           eventName: 'post-sigterm',
           containerId,
-          startTime: stopIssuedAt - logClockMarginMilliseconds,
+          startTime: stopIssuedAt - LOG_CLOCK_MARGIN_MILLISECONDS,
         },
         (events) => events.length > 0,
         60_000,
@@ -141,10 +141,10 @@ describe('the grace period after StopRuntimeSession (§C)', () => {
     });
     for (const lastBeat of [shortLastBeat, longLastBeat]) {
       expect(lastBeat.millisecondsSinceSigterm, summary).toBeGreaterThanOrEqual(
-        graceWindow.atLeastMilliseconds,
+        GRACE_WINDOW.atLeastMilliseconds,
       );
       expect(lastBeat.millisecondsSinceSigterm, summary).toBeLessThanOrEqual(
-        graceWindow.atMostMilliseconds,
+        GRACE_WINDOW.atMostMilliseconds,
       );
     }
     // Finishing early did not release it: idle for most of a minute.
@@ -157,6 +157,6 @@ describe('the grace period after StopRuntimeSession (§C)', () => {
         shortLastBeat.millisecondsSinceSigterm -
           longLastBeat.millisecondsSinceSigterm,
       ),
-    ).toBeLessThan(sameOffsetWithinMilliseconds);
+    ).toBeLessThan(SAME_OFFSET_WITHIN_MILLISECONDS);
   }, 360_000);
 });

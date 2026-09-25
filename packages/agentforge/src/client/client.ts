@@ -15,10 +15,10 @@ import {
 } from '#core/contract/procedures.ts';
 import {
   type Cause,
-  outcomeSchema,
+  OutcomeSchema,
   type RunRecord,
+  TASK_STATES,
   type TaskState,
-  taskStates,
 } from '#core/contract/task.ts';
 import type { Transport } from './transport.ts';
 
@@ -187,7 +187,7 @@ function taskView<Output>(
 ): TaskView<Output> {
   const task = value as WireTask;
   const state = task.status?.state as TaskState | undefined;
-  if (state === undefined || !taskStates.includes(state)) {
+  if (state === undefined || !TASK_STATES.includes(state)) {
     throw new Error(`the agent answered a task in state ${String(state)}`);
   }
   const base: TaskViewBase = {
@@ -202,7 +202,7 @@ function taskView<Output>(
   const data = task.artifacts?.find(
     (artifact) => artifact.artifactId === 'outcome',
   )?.parts?.[0]?.data;
-  const outcome = outcomeSchema.parse(data);
+  const outcome = OutcomeSchema.parse(data);
   switch (outcome.state) {
     case 'TASK_STATE_COMPLETED':
       return {

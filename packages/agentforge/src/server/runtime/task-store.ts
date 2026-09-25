@@ -15,14 +15,14 @@ import {
   cause,
   isTerminal,
   type TaskState as TaskStateName,
-  terminalTaskStates,
+  TERMINAL_TASK_STATES,
 } from '#core/contract/task.ts';
 import { finishedTask, stateOf } from './a2a-task.ts';
 
 /** A task whose lease has not been renewed for this long is lost (§REQ303). */
-export const leaseMilliseconds = 60_000;
+export const LEASE_MILLISECONDS = 60_000;
 /** How long a task, and the idempotency key naming it, are kept. */
-const retentionSeconds = 7 * 24 * 60 * 60;
+const RETENTION_SECONDS = 7 * 24 * 60 * 60;
 
 /**
  * A2A's task store over one DynamoDB table keyed by `pk`, extended with what
@@ -53,18 +53,18 @@ export class DynamoDBTaskStore implements TaskStore {
             : 'SET #task = :task, #state = :state, expiresAt = :expiresAt, leaseExpiresAt = :lease',
           // A repeat of the same end is allowed: the executor saves the final
           // task itself, and the A2A SDK then saves its own copy of it.
-          ConditionExpression: `attribute_not_exists(#state) OR NOT (#state IN (${terminalPlaceholders})) OR #state = :state`,
+          ConditionExpression: `attribute_not_exists(#state) OR NOT (#state IN (${TERMINAL_PLACEHOLDERS})) OR #state = :state`,
           ExpressionAttributeNames: { '#task': 'task', '#state': 'state' },
           ExpressionAttributeValues: {
             ':task': { S: JSON.stringify(Task.toJSON(task)) },
             ':state': { S: state },
             ':expiresAt': {
-              N: String(Math.floor(now / 1000) + retentionSeconds),
+              N: String(Math.floor(now / 1000) + RETENTION_SECONDS),
             },
             ...(isTerminal(state)
               ? {}
-              : { ':lease': { N: String(now + leaseMilliseconds) } }),
-            ...terminalValues,
+              : { ':lease': { N: String(now + LEASE_MILLISECONDS) } }),
+            ...TERMINAL_VALUES,
           },
         }),
       );
@@ -104,7 +104,7 @@ export class DynamoDBTaskStore implements TaskStore {
             task: { S: JSON.stringify(Task.toJSON(lost)) },
             state: { S: 'TASK_STATE_FAILED' },
             expiresAt: {
-              N: String(Math.floor(Date.now() / 1000) + retentionSeconds),
+              N: String(Math.floor(Date.now() / 1000) + RETENTION_SECONDS),
             },
           },
           ConditionExpression: '#state = :state AND leaseExpiresAt = :lease',
@@ -136,11 +136,11 @@ export class DynamoDBTaskStore implements TaskStore {
         TableName: this.tableName,
         Key: { pk: { S: taskKey(taskId) } },
         UpdateExpression: 'SET leaseExpiresAt = :lease',
-        ConditionExpression: `attribute_exists(pk) AND NOT (#state IN (${terminalPlaceholders}))`,
+        ConditionExpression: `attribute_exists(pk) AND NOT (#state IN (${TERMINAL_PLACEHOLDERS}))`,
         ExpressionAttributeNames: { '#state': 'state' },
         ExpressionAttributeValues: {
-          ':lease': { N: String(Date.now() + leaseMilliseconds) },
-          ...terminalValues,
+          ':lease': { N: String(Date.now() + LEASE_MILLISECONDS) },
+          ...TERMINAL_VALUES,
         },
       }),
     );
@@ -174,7 +174,7 @@ export class DynamoDBTaskStore implements TaskStore {
           pk: { S: idempotencyKeyKey(idempotencyKey) },
           taskId: { S: taskId },
           expiresAt: {
-            N: String(Math.floor(Date.now() / 1000) + retentionSeconds),
+            N: String(Math.floor(Date.now() / 1000) + RETENTION_SECONDS),
           },
         },
         ConditionExpression:
@@ -217,12 +217,12 @@ export class DynamoDBTaskStore implements TaskStore {
   }
 }
 
-const terminalStates = [...terminalTaskStates];
-const terminalPlaceholders = terminalStates
-  .map((_, index) => `:terminal${index}`)
-  .join(', ');
-const terminalValues = Object.fromEntries(
-  terminalStates.map((state, index) => [`:terminal${index}`, { S: state }]),
+const TERMINAL_STATES = [...TERMINAL_TASK_STATES];
+const TERMINAL_PLACEHOLDERS = TERMINAL_STATES.map(
+  (_, index) => `:terminal${index}`,
+).join(', ');
+const TERMINAL_VALUES = Object.fromEntries(
+  TERMINAL_STATES.map((state, index) => [`:terminal${index}`, { S: state }]),
 );
 
 function taskKey(taskId: string): string {

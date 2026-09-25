@@ -18,8 +18,11 @@ import {
 
 let agent: LocalAgent;
 let client: ReturnType<typeof createClient<typeof helloAgent>>;
-const runtimeSessionId = `e2e-${randomUUIDv7()}`;
-const poll = { runtimeSessionId, pollIntervalMilliseconds: 1_000 };
+const RUNTIME_SESSION_ID = `e2e-${randomUUIDv7()}`;
+const POLL_OPTIONS = {
+  runtimeSessionId: RUNTIME_SESSION_ID,
+  pollIntervalMilliseconds: 1_000,
+};
 
 beforeAll(async () => {
   agent = await startLocalAgent();
@@ -36,7 +39,10 @@ describe('hello-agent, locally', () => {
   let firstSessionId: string;
 
   it('runs a procedure to its validated, typed output, and records the run', async () => {
-    const context = { runtimeSessionId, idempotencyKey: randomUUIDv7() };
+    const context = {
+      runtimeSessionId: RUNTIME_SESSION_ID,
+      idempotencyKey: randomUUIDv7(),
+    };
     const started = await client.summarise.SendMessage(
       {
         text: 'AgentForge runs a Claude agent procedure as an asynchronous task and returns a typed outcome.',
@@ -49,7 +55,7 @@ describe('hello-agent, locally', () => {
     );
     expect(again.taskId).toBe(started.taskId);
 
-    const ended = await awaitTask(client.summarise, started, poll);
+    const ended = await awaitTask(client.summarise, started, POLL_OPTIONS);
     if (ended.state !== 'TASK_STATE_COMPLETED') {
       throw new Error(
         `expected completion, got ${JSON.stringify(ended)}\n${agent.logs()}`,
@@ -74,9 +80,9 @@ describe('hello-agent, locally', () => {
         text: 'Now summarise the same text again, more briefly.',
         resumeSessionId: firstSessionId,
       },
-      { runtimeSessionId, idempotencyKey: randomUUIDv7() },
+      { runtimeSessionId: RUNTIME_SESSION_ID, idempotencyKey: randomUUIDv7() },
     );
-    const ended = await awaitTask(client.summarise, started, poll);
+    const ended = await awaitTask(client.summarise, started, POLL_OPTIONS);
     if (ended.state !== 'TASK_STATE_COMPLETED') {
       throw new Error(
         `expected completion, got ${JSON.stringify(ended)}\n${agent.logs()}`,
@@ -86,7 +92,10 @@ describe('hello-agent, locally', () => {
   });
 
   it('cancels a run mid-turn, and the container is idle again', async () => {
-    const context = { runtimeSessionId, idempotencyKey: randomUUIDv7() };
+    const context = {
+      runtimeSessionId: RUNTIME_SESSION_ID,
+      idempotencyKey: randomUUIDv7(),
+    };
     const started = await client.sleepThenAnswer.SendMessage(
       { seconds: 120 },
       context,

@@ -9,11 +9,11 @@
  * The tag is kept for the reader; with both present, the digest is what every
  * consumer resolves. It is the OCI index, so `linux/arm64` is chosen from it.
  */
-export const pinnedBunBaseImage = {
+export const PINNED_BUN_BASE_IMAGE = {
   repository: 'docker.io/oven/bun',
   tag: '1.4.0-alpine',
   indexDigest:
     'sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb',
 } as const;
 
-export const pinnedBunBaseImageReference = `${pinnedBunBaseImage.repository}:${pinnedBunBaseImage.tag}@${pinnedBunBaseImage.indexDigest}`;
+export const PINNED_BUN_BASE_IMAGE_REFERENCE = `${PINNED_BUN_BASE_IMAGE.repository}:${PINNED_BUN_BASE_IMAGE.tag}@${PINNED_BUN_BASE_IMAGE.indexDigest}`;

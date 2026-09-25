@@ -37,7 +37,7 @@ import {
   type VersionNegotiationServer,
 } from './__fixtures__/version-negotiation-server.ts';
 
-const versionNotSupported = {
+const VERSION_NOT_SUPPORTED = {
   kind: 'error',
   code: -32009,
   message: expect.stringContaining(
@@ -45,7 +45,7 @@ const versionNotSupported = {
   ),
 } as const;
 
-const matrix: {
+const MATRIX: {
   label: string;
   request: ProbeRequest;
   strict: unknown;
@@ -59,7 +59,7 @@ const matrix: {
       a2aVersion: undefined,
       role: 'user',
     },
-    strict: versionNotSupported,
+    strict: VERSION_NOT_SUPPORTED,
     permissive: {
       kind: 'task',
       negotiatedVersion: '0.3',
@@ -74,7 +74,7 @@ const matrix: {
       a2aVersion: '0.3',
       role: 'user',
     },
-    strict: versionNotSupported,
+    strict: VERSION_NOT_SUPPORTED,
     permissive: {
       kind: 'task',
       negotiatedVersion: '0.3',
@@ -104,7 +104,7 @@ const matrix: {
       a2aVersion: undefined,
       role: 'user',
     },
-    strict: versionNotSupported,
+    strict: VERSION_NOT_SUPPORTED,
     permissive: {
       kind: 'task',
       negotiatedVersion: '0.3',
@@ -119,7 +119,7 @@ const matrix: {
       a2aVersion: '0.3',
       role: 'user',
     },
-    strict: versionNotSupported,
+    strict: VERSION_NOT_SUPPORTED,
     permissive: {
       kind: 'task',
       negotiatedVersion: '0.3',
@@ -158,7 +158,7 @@ describe('A2A 1.0 only, or 1.0 with 0.3 underneath (§I, ADR 0014)', () => {
     await Promise.all([strict.close(), permissive.close()]);
   });
 
-  it.each(matrix)(
+  it.each(MATRIX)(
     'strict refuses what permissive downgrades: $label',
     async ({
       request,

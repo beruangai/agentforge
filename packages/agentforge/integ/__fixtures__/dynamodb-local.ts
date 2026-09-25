@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 import { createTaskTable } from '../../src/server/runtime/task-store.ts';
 
 /** Pinned by digest: what the local store is tested against. */
-export const dynamoDBLocalImage =
+export const DYNAMODB_LOCAL_IMAGE =
   'amazon/dynamodb-local:3.1.0@sha256:7ef4a2c45b58c2901e70a4f28e0953a422c2c631baaaf5e2c15e0805740c7752';
 
 export interface DynamoDBLocal {
@@ -29,7 +29,7 @@ export async function startDynamoDBLocal(): Promise<DynamoDBLocal> {
       name,
       '-p',
       '127.0.0.1::8000',
-      dynamoDBLocalImage,
+      DYNAMODB_LOCAL_IMAGE,
       '-jar',
       'DynamoDBLocal.jar',
       '-inMemory',

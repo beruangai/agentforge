@@ -41,7 +41,7 @@ import {
   readSessionStartWithoutATurn,
 } from '../../__fixtures__/claude-agent-sdk.ts';
 
-const everyLayer: CapabilityLayerPresence = {
+const EVERY_LAYER: CapabilityLayerPresence = {
   user: true,
   agenticProject: true,
   agent: true,
@@ -91,7 +91,7 @@ describe('nested .claude directories above cwd compose', () => {
     expect(
       layersPresent(names, 'marker-'),
       `['project'] excludes the user layer and keeps every nested level; commands seen: ${JSON.stringify(names)}`,
-    ).toEqual({ ...everyLayer, user: false });
+    ).toEqual({ ...EVERY_LAYER, user: false });
   });
 
   it('settingSources omitted (the default) loads every layer', async () => {
@@ -100,7 +100,7 @@ describe('nested .claude directories above cwd compose', () => {
     expect(
       layersPresent(names, 'marker-'),
       `commands seen: ${JSON.stringify(names)}`,
-    ).toEqual(everyLayer);
+    ).toEqual(EVERY_LAYER);
   });
 
   it('additionalDirectories contributes its commands, not only read access', async () => {

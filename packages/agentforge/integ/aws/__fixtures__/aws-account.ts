@@ -6,7 +6,7 @@ import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
  * killed run leaves behind is found by it (integ/aws/agentcore/README.md).
  * Shaped as ECR, DynamoDB and S3 take a tag; AgentCore takes a map.
  */
-export const integTag = { Key: 'agentforge:integ', Value: 'true' } as const;
+export const INTEG_TAG = { Key: 'agentforge:integ', Value: 'true' } as const;
 
 export interface CallerIdentity {
   readonly accountId: string;

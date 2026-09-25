@@ -26,10 +26,10 @@ import { buildAndPushAgentForgeRuntimeImage } from './__fixtures__/agentforge-ru
 import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
 import {
   createAgentRuntime,
+  PROVISIONING_TIMEOUT_MILLISECONDS,
   type PreparedFixtureImage,
   prepareFixtureImage,
-  provisioningTimeoutMilliseconds,
-  teardownTimeoutMilliseconds,
+  TEARDOWN_TIMEOUT_MILLISECONDS,
 } from './__fixtures__/provisioning.ts';
 import {
   createResourceStack,
@@ -82,11 +82,11 @@ describe("AgentForge's server on AgentCore", () => {
         region: prepared.environment.region,
       }),
     );
-  }, provisioningTimeoutMilliseconds);
+  }, PROVISIONING_TIMEOUT_MILLISECONDS);
 
   afterAll(
     () => releaseResources(resources, 'agentforge-runtime'),
-    teardownTimeoutMilliseconds,
+    TEARDOWN_TIMEOUT_MILLISECONDS,
   );
 
   it('runs a procedure to its typed output, and attaches a retry to it', async () => {

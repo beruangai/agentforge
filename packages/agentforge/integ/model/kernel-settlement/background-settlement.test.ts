@@ -26,24 +26,24 @@ import type {
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import {
-  carrierToolName,
+  CARRIER_TOOL_NAME,
   createSandbox,
   createSubscriptionEnvironment,
   QueryRecording,
   runWithStreamingInput,
 } from '../../__fixtures__/claude-agent-sdk.ts';
 
-const outputSchema = z.object({
+const OutputSchema = z.object({
   startedBackgroundWork: z
     .boolean()
     .describe('whether a background command was started'),
   note: z.string().describe('one sentence about what was started'),
 });
-const outputJsonSchema = z.toJSONSchema(outputSchema, { target: 'draft-7' });
+const OUTPUT_JSON_SCHEMA = z.toJSONSchema(OutputSchema, { target: 'draft-7' });
 
 // The agent must background something that outlives its own submission, so
 // its completion arrives after the first result rather than racing it.
-const prompt =
+const PROMPT =
   'Using the Bash tool with run_in_background set to true, start this exact command: ' +
   '`sleep 25 && echo finished > background-done.txt`. ' +
   'Do NOT wait for it and do NOT poll it. The moment the tool returns, immediately give your ' +
@@ -54,7 +54,7 @@ const prompt =
  * input anyway. The command sleeps 25 s from before the first result, so this
  * is generous; expiring it fails the test with the recording as evidence.
  */
-const secondResultDeadlineMilliseconds = 90_000;
+const SECOND_RESULT_DEADLINE_MILLISECONDS = 90_000;
 
 describe('with background work on, a background completion publishes a second result', () => {
   it('streaming-input', async () => {
@@ -73,7 +73,7 @@ describe('with background work on, a background completion publishes a second re
     );
     await runWithStreamingInput(
       recording,
-      prompt,
+      PROMPT,
       {
         cwd: sandbox.workingDirectory,
         env: createSubscriptionEnvironment(sandbox.configDirectory),
@@ -81,7 +81,7 @@ describe('with background work on, a background completion publishes a second re
         allowedTools: ['Bash'],
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
-        outputFormat: { type: 'json_schema', schema: outputJsonSchema },
+        outputFormat: { type: 'json_schema', schema: OUTPUT_JSON_SCHEMA },
         maxTurns: 12,
         settingSources: [],
       },
@@ -92,7 +92,7 @@ describe('with background work on, a background completion publishes a second re
           deadlineTimer = setTimeout(() => {
             deadlineExpired = true;
             endInput();
-          }, secondResultDeadlineMilliseconds);
+          }, SECOND_RESULT_DEADLINE_MILLISECONDS);
         }
         if (resultCount === 2) {
           clearTimeout(deadlineTimer);
@@ -118,7 +118,7 @@ describe('with background work on, a background completion publishes a second re
       `results=${results.length} origins=${JSON.stringify(results.map((result) => result.origin ?? null))}`,
       `backgroundedTasks=${backgroundedTasks.length}`,
       `taskNotifications=${JSON.stringify(taskNotifications.map((notification) => notification.status))}`,
-      `carrierSubmissions=${recording.toolUseNames().filter((name) => name === carrierToolName).length}`,
+      `carrierSubmissions=${recording.toolUseNames().filter((name) => name === CARRIER_TOOL_NAME).length}`,
       `deadlineExpired=${deadlineExpired} elapsed=${Date.now() - startedAt}ms`,
       `see ${recording.logPath}`,
     ].join('; ');
@@ -146,7 +146,7 @@ describe('with background work on, a background completion publishes a second re
     // The drift detector.
     expect(
       deadlineExpired,
-      `the second result arrived within ${secondResultDeadlineMilliseconds} ms of the first; ${evidence}`,
+      `the second result arrived within ${SECOND_RESULT_DEADLINE_MILLISECONDS} ms of the first; ${evidence}`,
     ).toBe(false);
     expect(
       results,

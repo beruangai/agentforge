@@ -20,13 +20,13 @@ import {
   DeleteRepositoryCommand,
   ECRClient,
 } from '@aws-sdk/client-ecr';
-import { integTag } from '../../__fixtures__/aws-account.ts';
+import { INTEG_TAG } from '../../__fixtures__/aws-account.ts';
 import { verifyAgentCoreAccess } from './access.ts';
 import {
+  AGENT_RUNTIME_DELETION_TIMEOUT_MILLISECONDS,
+  AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS,
   type AgentRuntimeReference,
-  agentRuntimeDeletionTimeoutMilliseconds,
   agentRuntimeReferenceFrom,
-  agentRuntimeStatusTimeoutMilliseconds,
   deleteAgentRuntimeUntilGone,
   describeError,
   waitForAgentRuntimeReady,
@@ -57,7 +57,7 @@ export interface RuntimeProfile {
  * protocol version, so they are asserted against what AgentForge will
  * actually run.
  */
-export const a2aOneZeroOnlyProfile: RuntimeProfile = {
+export const A2A_ONE_ZERO_ONLY_PROFILE: RuntimeProfile = {
   environmentVariables: { A2A_ONE_ZERO_ONLY: '1' },
   requestHeaderAllowlist: ['A2A-Version'],
 };
@@ -155,7 +155,7 @@ async function createImageRepository(
   const created = await clients.ecr.send(
     new CreateRepositoryCommand({
       repositoryName,
-      tags: [integTag],
+      tags: [INTEG_TAG],
     }),
   );
   resources.defer(async () => {
@@ -199,7 +199,7 @@ async function createOutcomeTable(
       ],
       KeySchema: [{ AttributeName: 'outcomeKey', KeyType: 'HASH' }],
       BillingMode: 'PAY_PER_REQUEST',
-      Tags: [integTag],
+      Tags: [INTEG_TAG],
     }),
   );
   resources.defer(async () => {
@@ -264,7 +264,7 @@ export async function createAgentRuntime(
         Object.keys(options.profile.environmentVariables).length > 0
           ? { ...options.profile.environmentVariables }
           : undefined,
-      tags: { [integTag.Key]: integTag.Value },
+      tags: { [INTEG_TAG.Key]: INTEG_TAG.Value },
     }),
   );
   const createReturnedAt = Date.now();
@@ -284,11 +284,11 @@ export async function createAgentRuntime(
  * A cold image build and the access check, then a V2 create, which takes
  * minutes before READY.
  */
-export const provisioningTimeoutMilliseconds =
-  600_000 + agentRuntimeStatusTimeoutMilliseconds;
+export const PROVISIONING_TIMEOUT_MILLISECONDS =
+  600_000 + AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS;
 /** The runtime's deletion dominates; its log groups, repository and table follow. */
-export const teardownTimeoutMilliseconds =
-  agentRuntimeDeletionTimeoutMilliseconds + 600_000;
+export const TEARDOWN_TIMEOUT_MILLISECONDS =
+  AGENT_RUNTIME_DELETION_TIMEOUT_MILLISECONDS + 600_000;
 
 /** AgentCore creates the runtime's log groups; they go when it does. */
 async function deleteRuntimeLogGroups(

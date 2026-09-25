@@ -13,24 +13,24 @@ import { vi } from 'vitest';
  * prepared (docs/research/agentcore-runtime.md §Platform version V2), and a
  * runtime sat in DELETING for about five minutes on V1.
  */
-export const agentRuntimeStatusTimeoutMilliseconds = 900_000;
-const workloadIdentityGoneTimeoutMilliseconds = 300_000;
+export const AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS = 900_000;
+const WORKLOAD_IDENTITY_GONE_TIMEOUT_MILLISECONDS = 300_000;
 
 /**
  * The longest `deleteAgentRuntimeUntilGone` can take: waiting out CREATING,
  * then DELETING, then the workload identity.
  */
-export const agentRuntimeDeletionTimeoutMilliseconds =
-  2 * agentRuntimeStatusTimeoutMilliseconds +
-  workloadIdentityGoneTimeoutMilliseconds;
+export const AGENT_RUNTIME_DELETION_TIMEOUT_MILLISECONDS =
+  2 * AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS +
+  WORKLOAD_IDENTITY_GONE_TIMEOUT_MILLISECONDS;
 
-const failedStatuses = new Set([
+const FAILED_STATUSES = new Set([
   'CREATE_FAILED',
   'UPDATE_FAILED',
   'DELETE_FAILED',
 ]);
 /** `UpdateAgentRuntime` or `DeleteAgentRuntime` before one of these is a ConflictException. */
-const inProgressStatuses = new Set(['CREATING', 'UPDATING']);
+const IN_PROGRESS_STATUSES = new Set(['CREATING', 'UPDATING']);
 
 export interface AgentRuntimeReference {
   readonly agentRuntimeArn: string;
@@ -91,14 +91,14 @@ export async function waitForAgentRuntimeReady(
         const current = await readAgentRuntime(control, runtime.agentRuntimeId);
         if (current === undefined) throw new Error('it no longer exists');
         lastStatus = current.status;
-        if (failedStatuses.has(lastStatus)) {
+        if (FAILED_STATUSES.has(lastStatus)) {
           throw new Error(
             `${lastStatus}: ${current.failureReason ?? 'no failureReason given'}`,
           );
         }
         return lastStatus === 'READY';
       },
-      { timeout: agentRuntimeStatusTimeoutMilliseconds, interval: 5_000 },
+      { timeout: AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS, interval: 5_000 },
     );
   } catch (error) {
     throw new Error(
@@ -129,9 +129,9 @@ export async function deleteAgentRuntimeUntilGone(
       async () => {
         const current = await readAgentRuntime(control, runtime.agentRuntimeId);
         lastStatus = current === undefined ? 'gone' : current.status;
-        return !inProgressStatuses.has(lastStatus);
+        return !IN_PROGRESS_STATUSES.has(lastStatus);
       },
-      { timeout: agentRuntimeStatusTimeoutMilliseconds, interval: 10_000 },
+      { timeout: AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS, interval: 10_000 },
     );
     if (lastStatus !== 'gone' && lastStatus !== 'DELETING') {
       await control.send(
@@ -152,7 +152,7 @@ export async function deleteAgentRuntimeUntilGone(
         }
         return false;
       },
-      { timeout: agentRuntimeStatusTimeoutMilliseconds, interval: 10_000 },
+      { timeout: AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS, interval: 10_000 },
     );
     const workloadIdentityName = runtime.workloadIdentityName;
     if (workloadIdentityName !== undefined) {
@@ -169,7 +169,10 @@ export async function deleteAgentRuntimeUntilGone(
             throw error;
           }
         },
-        { timeout: workloadIdentityGoneTimeoutMilliseconds, interval: 10_000 },
+        {
+          timeout: WORKLOAD_IDENTITY_GONE_TIMEOUT_MILLISECONDS,
+          interval: 10_000,
+        },
       );
     }
   } catch (error) {

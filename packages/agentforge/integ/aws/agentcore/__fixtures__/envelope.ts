@@ -9,7 +9,7 @@
 import { z } from 'zod';
 
 /** Where the container records an outcome from its SIGTERM handler (§C). */
-export const outcomeTargetSchema = z
+export const OutcomeTargetSchema = z
   .object({
     tableName: z.string().min(1),
     /** The row's `outcomeKey`, the table's partition key. */
@@ -17,23 +17,23 @@ export const outcomeTargetSchema = z
   })
   .strict();
 
-export const fixtureEnvelopeSchema = z
+export const FixtureEnvelopeSchema = z
   .object({
     /** How long the task runs. A timer, never a model call. */
     runMilliseconds: z.number().int().nonnegative(),
-    outcomeTarget: outcomeTargetSchema.optional(),
+    outcomeTarget: OutcomeTargetSchema.optional(),
   })
   .strict();
 
-export type OutcomeTarget = z.infer<typeof outcomeTargetSchema>;
-export type FixtureEnvelope = z.infer<typeof fixtureEnvelopeSchema>;
+export type OutcomeTarget = z.infer<typeof OutcomeTargetSchema>;
+export type FixtureEnvelope = z.infer<typeof FixtureEnvelopeSchema>;
 
 /**
  * What the container reports on the task it creates, as the task's metadata.
  * The task store keeps the metadata of the first `task` event, so `GetTask`
  * returns what the CREATING container reported, not the answering one.
  */
-export const fixtureTaskMetadataSchema = z.object({
+export const FixtureTaskMetadataSchema = z.object({
   /** Minted on the container's first invocation, so a second container is detectable (§B). */
   containerId: z.string(),
   /** Tasks live in this container at the moment it answered, this one included. */
@@ -48,4 +48,4 @@ export const fixtureTaskMetadataSchema = z.object({
   containerNow: z.number(),
 });
 
-export type FixtureTaskMetadata = z.infer<typeof fixtureTaskMetadataSchema>;
+export type FixtureTaskMetadata = z.infer<typeof FixtureTaskMetadataSchema>;

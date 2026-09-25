@@ -21,11 +21,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
 import { A2aOverAgentCore } from './__fixtures__/invocation.ts';
 import {
-  a2aOneZeroOnlyProfile,
+  A2A_ONE_ZERO_ONLY_PROFILE,
   type FixtureRuntime,
+  PROVISIONING_TIMEOUT_MILLISECONDS,
   provisionFixtureRuntime,
-  provisioningTimeoutMilliseconds,
-  teardownTimeoutMilliseconds,
+  TEARDOWN_TIMEOUT_MILLISECONDS,
 } from './__fixtures__/provisioning.ts';
 import {
   createResourceStack,
@@ -34,8 +34,8 @@ import {
 import { waitForContainerLogEvents } from './__fixtures__/runtime-logs.ts';
 
 /** The spike gave up after 12 s; the row appeared at 3.5 s. */
-const outcomeVisibleWithinMilliseconds = 12_000;
-const logClockMarginMilliseconds = 60_000;
+const OUTCOME_VISIBLE_WITHIN_MILLISECONDS = 12_000;
+const LOG_CLOCK_MARGIN_MILLISECONDS = 60_000;
 
 describe('an outcome recorded inside the grace period (§C)', () => {
   const resources = createResourceStack();
@@ -46,7 +46,7 @@ describe('an outcome recorded inside the grace period (§C)', () => {
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'outcome',
-      profile: a2aOneZeroOnlyProfile,
+      profile: A2A_ONE_ZERO_ONLY_PROFILE,
       outcomeTable: true,
     });
     if (fixture.outcomeTableName === undefined) {
@@ -57,11 +57,11 @@ describe('an outcome recorded inside the grace period (§C)', () => {
       fixture.clients.data,
       fixture.runtime.agentRuntimeArn,
     );
-  }, provisioningTimeoutMilliseconds);
+  }, PROVISIONING_TIMEOUT_MILLISECONDS);
 
   afterAll(
     () => releaseResources(resources, 'outcome-inside-grace'),
-    teardownTimeoutMilliseconds,
+    TEARDOWN_TIMEOUT_MILLISECONDS,
   );
 
   it('lets a stopped container, mid-task, reach DynamoDB from its SIGTERM handler', async () => {
@@ -95,7 +95,7 @@ describe('an outcome recorded inside the grace period (§C)', () => {
             }),
           )
         ).Item,
-      { timeout: outcomeVisibleWithinMilliseconds, interval: 500 },
+      { timeout: OUTCOME_VISIBLE_WITHIN_MILLISECONDS, interval: 500 },
     );
     expect(outcome.outcome?.S).toBe('RECORDED_DURING_SHUTDOWN');
     expect(outcome.containerId?.S).toBe(task.metadata.containerId);
@@ -108,7 +108,7 @@ describe('an outcome recorded inside the grace period (§C)', () => {
         agentRuntimeId: fixture.runtime.agentRuntimeId,
         eventName: 'shutdown-outcome',
         containerId: task.metadata.containerId,
-        startTime: stopIssuedAt - logClockMarginMilliseconds,
+        startTime: stopIssuedAt - LOG_CLOCK_MARGIN_MILLISECONDS,
       },
       (events) => events.length > 0,
       120_000,

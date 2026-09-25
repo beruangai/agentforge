@@ -15,12 +15,12 @@ import {
   GetAuthorizationTokenCommand,
 } from '@aws-sdk/client-ecr';
 import { GetRoleCommand, IAMClient } from '@aws-sdk/client-iam';
-import { integTag } from '../../__fixtures__/aws-account.ts';
+import { INTEG_TAG } from '../../__fixtures__/aws-account.ts';
 import {
   agentRuntimeReferenceFrom,
   deleteAgentRuntimeUntilGone,
 } from './agent-runtime-status.ts';
-import { type AwsEnvironment, executionRoleName } from './aws-environment.ts';
+import { type AwsEnvironment, EXECUTION_ROLE_NAME } from './aws-environment.ts';
 
 /**
  * Walks EVERY permission the AgentCore tests need, to the end of the path, and
@@ -81,7 +81,7 @@ export async function verifyAgentCoreAccess(
   // what matters, and the decisive probe below checks it.
   try {
     await new IAMClient({ region }).send(
-      new GetRoleCommand({ RoleName: executionRoleName }),
+      new GetRoleCommand({ RoleName: EXECUTION_ROLE_NAME }),
     );
   } catch (error) {
     if (errorName(error) === 'NoSuchEntityException') {
@@ -132,7 +132,7 @@ async function probeCreateAgentRuntime(
         // create is prepared for minutes, and whether it checks the image
         // before accepting is not documented.
         networkConfiguration: { networkMode: 'PUBLIC' },
-        tags: { [integTag.Key]: integTag.Value },
+        tags: { [INTEG_TAG.Key]: INTEG_TAG.Value },
       }),
     );
     // It should not have succeeded against a nonexistent image, so the probe's

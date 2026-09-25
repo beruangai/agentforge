@@ -26,15 +26,15 @@ import type {
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import {
-  backgroundWorkDisabled,
-  carrierToolName,
+  BACKGROUND_WORK_DISABLED,
+  CARRIER_TOOL_NAME,
   createSandbox,
   createSubscriptionEnvironment,
   QueryRecording,
   runWithStreamingInput,
 } from '../../__fixtures__/claude-agent-sdk.ts';
 
-const outputSchema = z.object({
+const OutputSchema = z.object({
   fileCount: z
     .number()
     .int()
@@ -43,10 +43,10 @@ const outputSchema = z.object({
   names: z.array(z.string()).describe('the file names, sorted'),
 });
 
-const outputJsonSchema = z.toJSONSchema(outputSchema, { target: 'draft-7' });
+const OUTPUT_JSON_SCHEMA = z.toJSONSchema(OutputSchema, { target: 'draft-7' });
 
 /** Something to dispatch work over. */
-const fixtureFileSizes: Record<string, number> = {
+const FIXTURE_FILE_SIZES: Record<string, number> = {
   'a.txt': 10,
   'b.txt': 20,
   'c.txt': 30,
@@ -66,7 +66,7 @@ type Scenario = {
   ) => void;
 };
 
-const scenarios: Scenario[] = [
+const SCENARIOS: Scenario[] = [
   {
     // Subagents run in the background by default since CLI 2.1.198; with
     // background work off, they must run in the foreground.
@@ -120,10 +120,10 @@ const scenarios: Scenario[] = [
 ];
 
 describe('a final submission survives dispatched work, with background work off', () => {
-  it.each(scenarios)('$name', async (scenario) => {
+  it.each(SCENARIOS)('$name', async (scenario) => {
     const sandbox = createSandbox(`foreground-settlement-${scenario.name}`);
     onTestFinished(() => sandbox.dispose());
-    for (const [name, size] of Object.entries(fixtureFileSizes)) {
+    for (const [name, size] of Object.entries(FIXTURE_FILE_SIZES)) {
       writeFileSync(join(sandbox.workingDirectory, name), 'x'.repeat(size));
     }
 
@@ -135,13 +135,13 @@ describe('a final submission survives dispatched work, with background work off'
       cwd: sandbox.workingDirectory,
       env: createSubscriptionEnvironment(
         sandbox.configDirectory,
-        backgroundWorkDisabled,
+        BACKGROUND_WORK_DISABLED,
       ),
       model: 'claude-sonnet-5',
       allowedTools: scenario.allowedTools,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
-      outputFormat: { type: 'json_schema', schema: outputJsonSchema },
+      outputFormat: { type: 'json_schema', schema: OUTPUT_JSON_SCHEMA },
       maxTurns: 40,
       settingSources: [],
     });
@@ -160,7 +160,7 @@ describe('a final submission survives dispatched work, with background work off'
     expect(
       recording.firstSystemInitMessage().tools,
       'the carrier is advertised in system/init.tools, so the kernel can assert it at startup',
-    ).toContain(carrierToolName);
+    ).toContain(CARRIER_TOOL_NAME);
 
     scenario.assertDispatchHappened(recording, taskStartedMessages);
 
@@ -209,13 +209,13 @@ describe('a final submission survives dispatched work, with background work off'
     // The SDK re-prompts a schema-invalid submission itself, so more than one
     // is legitimate.
     expect(
-      toolUses.filter((toolUse) => toolUse.name === carrierToolName).length,
-      `at least one ${carrierToolName} submission; ${evidence}`,
+      toolUses.filter((toolUse) => toolUse.name === CARRIER_TOOL_NAME).length,
+      `at least one ${CARRIER_TOOL_NAME} submission; ${evidence}`,
     ).toBeGreaterThanOrEqual(1);
     const structuredOutput =
       result.subtype === 'success' ? result.structured_output : undefined;
     expect(
-      outputSchema.safeParse(structuredOutput).success,
+      OutputSchema.safeParse(structuredOutput).success,
       `structured_output survived and validates: ${JSON.stringify(structuredOutput)}; ${evidence}`,
     ).toBe(true);
   });

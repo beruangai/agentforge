@@ -27,11 +27,11 @@ import {
   taskFrom,
 } from './__fixtures__/invocation.ts';
 import {
-  a2aOneZeroOnlyProfile,
+  A2A_ONE_ZERO_ONLY_PROFILE,
   type FixtureRuntime,
+  PROVISIONING_TIMEOUT_MILLISECONDS,
   provisionFixtureRuntime,
-  provisioningTimeoutMilliseconds,
-  teardownTimeoutMilliseconds,
+  TEARDOWN_TIMEOUT_MILLISECONDS,
 } from './__fixtures__/provisioning.ts';
 import {
   createResourceStack,
@@ -39,7 +39,7 @@ import {
 } from './__fixtures__/resources.ts';
 
 /** A call held behind the 25-second task would take tens of seconds. */
-const deliveredWhileBusyWithinMilliseconds = 5_000;
+const DELIVERED_WHILE_BUSY_WITHIN_MILLISECONDS = 5_000;
 
 describe('a busy AgentCore container (§B)', () => {
   const resources = createResourceStack();
@@ -49,18 +49,18 @@ describe('a busy AgentCore container (§B)', () => {
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'busy',
-      profile: a2aOneZeroOnlyProfile,
+      profile: A2A_ONE_ZERO_ONLY_PROFILE,
       outcomeTable: false,
     });
     a2a = new A2aOverAgentCore(
       fixture.clients.data,
       fixture.runtime.agentRuntimeArn,
     );
-  }, provisioningTimeoutMilliseconds);
+  }, PROVISIONING_TIMEOUT_MILLISECONDS);
 
   afterAll(
     () => releaseResources(resources, 'busy-container-receives-invocations'),
-    teardownTimeoutMilliseconds,
+    TEARDOWN_TIMEOUT_MILLISECONDS,
   );
 
   it('delivers SendMessage, GetTask and CancelTask to a session whose container is running a task', async () => {
@@ -101,7 +101,7 @@ describe('a busy AgentCore container (§B)', () => {
       delivered(cancelled, 'CancelTask'),
     ]) {
       expect(invocation.latencyMilliseconds).toBeLessThan(
-        deliveredWhileBusyWithinMilliseconds,
+        DELIVERED_WHILE_BUSY_WITHIN_MILLISECONDS,
       );
     }
   });

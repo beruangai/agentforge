@@ -26,8 +26,8 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
   name: string;
   exports: Record<string, unknown>;
 };
-const agentCondition = 'agentforge-agent';
-const openEntryPoints = ['contract', 'client', 'temporal', 'infra'];
+const AGENT_CONDITION = 'agentforge-agent';
+const OPEN_ENTRY_POINTS = ['contract', 'client', 'temporal', 'infra'];
 
 /** Every file an export target names, however deeply its conditions nest. */
 function exportTargets(value: unknown): string[] {
@@ -137,7 +137,7 @@ describe('/agent', () => {
   });
 
   it('resolves in Node under the agent condition', () => {
-    const result = nodeImport(specifier, [agentCondition]);
+    const result = nodeImport(specifier, [AGENT_CONDITION]);
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
   });
@@ -148,8 +148,8 @@ describe('/agent', () => {
 
   it('resolves for TypeScript under the agent condition, to its declarations', () => {
     expect(
-      typescriptResolve(specifier, [agentCondition])?.resolvedFileName,
-    ).toBe(installedFile(declarationsTarget('./agent', agentCondition)));
+      typescriptResolve(specifier, [AGENT_CONDITION])?.resolvedFileName,
+    ).toBe(installedFile(declarationsTarget('./agent', AGENT_CONDITION)));
   });
 
   it('does not bundle with Bun without the agent condition', () => {
@@ -159,13 +159,13 @@ describe('/agent', () => {
   });
 
   it('bundles with Bun under the agent condition', () => {
-    const result = bunBuild(specifier, [agentCondition]);
+    const result = bunBuild(specifier, [AGENT_CONDITION]);
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
   });
 });
 
-describe.each(openEntryPoints)('/%s', (entryPoint) => {
+describe.each(OPEN_ENTRY_POINTS)('/%s', (entryPoint) => {
   const specifier = `${packageJson.name}/${entryPoint}`;
 
   it('resolves in Node with no condition', () => {
@@ -183,7 +183,7 @@ describe.each(openEntryPoints)('/%s', (entryPoint) => {
 
 describe('the package root', () => {
   it('exports nothing, so every import names its environment', () => {
-    const result = nodeImport(packageJson.name, [agentCondition]);
+    const result = nodeImport(packageJson.name, [AGENT_CONDITION]);
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('ERR_PACKAGE_PATH_NOT_EXPORTED');
   });

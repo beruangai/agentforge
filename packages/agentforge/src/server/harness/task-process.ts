@@ -50,7 +50,7 @@ export function implementAgent<Contract extends RouterContract>(
 }
 
 /** An outcome larger than this is refused: return references instead. */
-const outcomeCapBytes = 256 * 1024;
+const OUTCOME_CAP_BYTES = 256 * 1024;
 
 export interface ExecuteOptions {
   readonly contract: RouterContract;
@@ -115,12 +115,12 @@ export async function executeProcedure(
       signal: options.signal,
     });
     const bytes = Buffer.byteLength(JSON.stringify(output ?? null));
-    if (bytes > outcomeCapBytes) {
+    if (bytes > OUTCOME_CAP_BYTES) {
       return {
         state: 'TASK_STATE_FAILED',
         cause: cause(
           'OUTPUT_TOO_LARGE',
-          `the outcome is ${bytes} bytes; the cap is ${outcomeCapBytes}`,
+          `the outcome is ${bytes} bytes; the cap is ${OUTCOME_CAP_BYTES}`,
         ),
       };
     }

@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from 'node:crypto';
-import { runtimeSessionHeader } from '#core/contract/envelope.ts';
+import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
 
 export type TaskMethod = 'SendMessage' | 'GetTask' | 'CancelTask';
 
@@ -76,7 +76,7 @@ export function localTransport(url: string): Transport {
         headers: {
           'content-type': 'application/json',
           'a2a-version': '1.0',
-          [runtimeSessionHeader]: runtimeSessionId,
+          [RUNTIME_SESSION_HEADER]: runtimeSessionId,
         },
         body: requestBody(method, params),
       });

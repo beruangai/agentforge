@@ -1,6 +1,6 @@
 import type { AgentCard, AgentInterface } from '@a2a-js/sdk';
 
-export const fixtureAgentName = 'agentforge-integ-fixture';
+export const FIXTURE_AGENT_NAME = 'agentforge-integ-fixture';
 
 /**
  * The 1.0 card, plus the three top-level fields a 0.3 card carried
@@ -35,7 +35,7 @@ export function buildFixtureAgentCard(options: {
     protocolVersion: '1.0',
     url: options.url,
     preferredTransport: 'JSONRPC',
-    name: fixtureAgentName,
+    name: FIXTURE_AGENT_NAME,
     description: 'AgentCore contract fixture: a task is a timer',
     version: '0.0.0',
     provider: undefined,

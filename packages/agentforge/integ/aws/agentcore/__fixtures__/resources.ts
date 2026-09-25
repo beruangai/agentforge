@@ -1,4 +1,4 @@
-import { integTag } from '../../__fixtures__/aws-account.ts';
+import { INTEG_TAG } from '../../__fixtures__/aws-account.ts';
 
 /**
  * What a test file creates in AWS is deferred onto an `AsyncDisposableStack`
@@ -25,7 +25,7 @@ export async function releaseResources(
     const failures = unwrapSuppressedErrors(error);
     throw new AggregateError(
       failures,
-      `${testFile}: teardown left AWS resources behind (tagged ${integTag.Key}=${integTag.Value}):\n${failures
+      `${testFile}: teardown left AWS resources behind (tagged ${INTEG_TAG.Key}=${INTEG_TAG.Value}):\n${failures
         .map((failure) =>
           failure instanceof Error
             ? `  - ${failure.message}`

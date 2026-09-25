@@ -21,7 +21,7 @@
 import { setTimeout } from 'node:timers/promises';
 import { GetAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore-control';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { agentRuntimeStatusTimeoutMilliseconds } from './__fixtures__/agent-runtime-status.ts';
+import { AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS } from './__fixtures__/agent-runtime-status.ts';
 import { newRuntimeSessionId } from './__fixtures__/aws-environment.ts';
 import {
   A2aOverAgentCore,
@@ -29,12 +29,12 @@ import {
   sendMessageParams,
 } from './__fixtures__/invocation.ts';
 import {
-  a2aOneZeroOnlyProfile,
+  A2A_ONE_ZERO_ONLY_PROFILE,
   createAgentRuntime,
+  PROVISIONING_TIMEOUT_MILLISECONDS,
   type PreparedFixtureImage,
   prepareFixtureImage,
-  provisioningTimeoutMilliseconds,
-  teardownTimeoutMilliseconds,
+  TEARDOWN_TIMEOUT_MILLISECONDS,
 } from './__fixtures__/provisioning.ts';
 import {
   createResourceStack,
@@ -42,12 +42,12 @@ import {
 } from './__fixtures__/resources.ts';
 
 /** Probing lasts as long as a create may, and past READY until served. */
-const windowTimeoutMilliseconds =
-  agentRuntimeStatusTimeoutMilliseconds + 120_000;
+const WINDOW_TIMEOUT_MILLISECONDS =
+  AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS + 120_000;
 /** One refusal after READY was observed, the next probe ~1.7 s later served. */
-const servedWithinMillisecondsOfReady = 30_000;
+const SERVED_WITHIN_MILLISECONDS_OF_READY = 30_000;
 /** What V2 answered to every invocation while CREATING. */
-const refusalWhileCreating = { httpStatusCode: 400, jsonRpcCode: -32052 };
+const REFUSAL_WHILE_CREATING = { httpStatusCode: 400, jsonRpcCode: -32052 };
 
 interface WindowObservation {
   /** Since `CreateAgentRuntime` returned, when the probe was issued. */
@@ -62,18 +62,18 @@ describe('the AgentCore provisioning window (§B)', () => {
 
   beforeAll(async () => {
     prepared = await prepareFixtureImage(resources, 'window');
-  }, provisioningTimeoutMilliseconds);
+  }, PROVISIONING_TIMEOUT_MILLISECONDS);
 
   afterAll(
     () => releaseResources(resources, 'provisioning-window'),
-    teardownTimeoutMilliseconds,
+    TEARDOWN_TIMEOUT_MILLISECONDS,
   );
 
   it(
     'refuses every invocation while CREATING as a bad request, not a retryable 409, and serves the session soon after READY',
     async () => {
       const created = await createAgentRuntime(resources, prepared, {
-        profile: a2aOneZeroOnlyProfile,
+        profile: A2A_ONE_ZERO_ONLY_PROFILE,
       });
       expect(created.statusAtCreation).toBe('CREATING');
       const a2a = new A2aOverAgentCore(
@@ -87,7 +87,7 @@ describe('the AgentCore provisioning window (§B)', () => {
       let readyAfterMilliseconds: number | undefined;
       let firstServedAt: number | undefined;
       const giveUpAt =
-        created.createReturnedAt + agentRuntimeStatusTimeoutMilliseconds;
+        created.createReturnedAt + AGENT_RUNTIME_STATUS_TIMEOUT_MILLISECONDS;
       while (Date.now() < giveUpAt) {
         const elapsedMilliseconds = Date.now() - created.createReturnedAt;
         const { status } = await prepared.clients.control.send(
@@ -149,10 +149,10 @@ describe('the AgentCore provisioning window (§B)', () => {
         expect(invocation.delivered, summary).toBe(false);
         if (invocation.delivered) continue;
         expect(invocation.httpStatusCode, summary).toBe(
-          refusalWhileCreating.httpStatusCode,
+          REFUSAL_WHILE_CREATING.httpStatusCode,
         );
         expect(invocation.jsonRpcError?.code, summary).toBe(
-          refusalWhileCreating.jsonRpcCode,
+          REFUSAL_WHILE_CREATING.jsonRpcCode,
         );
       }
       // Once READY, the session is served soon, and stays served.
@@ -165,7 +165,7 @@ describe('the AgentCore provisioning window (§B)', () => {
         throw new Error(`the session was never served: ${summary}`);
       }
       expect(served.elapsedMilliseconds, summary).toBeLessThanOrEqual(
-        readyAfterMilliseconds + servedWithinMillisecondsOfReady,
+        readyAfterMilliseconds + SERVED_WITHIN_MILLISECONDS_OF_READY,
       );
       expect(
         observations
@@ -174,6 +174,6 @@ describe('the AgentCore provisioning window (§B)', () => {
         summary,
       ).toEqual([]);
     },
-    windowTimeoutMilliseconds,
+    WINDOW_TIMEOUT_MILLISECONDS,
   );
 });

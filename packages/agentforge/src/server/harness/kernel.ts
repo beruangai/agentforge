@@ -52,9 +52,9 @@ export interface KernelContext {
 export type QueryFunction = typeof sdkQuery;
 
 /** How long the process may keep running after its input ends. */
-const drainBoundMilliseconds = 30_000;
+const DRAIN_BOUND_MILLISECONDS = 30_000;
 /** How long an interrupt has to settle before the run is aborted outright. */
-const interruptGraceMilliseconds = 3_000;
+const INTERRUPT_GRACE_MILLISECONDS = 3_000;
 
 /**
  * One `query()` to a settled, typed outcome (ARCHITECTURE.md §6).
@@ -106,7 +106,7 @@ export async function runAgent<Output>(
     void session.interrupt().catch(() => undefined);
     setTimeout(
       () => abortController.abort(),
-      interruptGraceMilliseconds,
+      INTERRUPT_GRACE_MILLISECONDS,
     ).unref();
   };
   context.signal.addEventListener('abort', onAbort, { once: true });
@@ -144,7 +144,7 @@ export async function runAgent<Output>(
       }
       if (next.value.type === 'result' && result === undefined) {
         result = next.value;
-        drainDeadline = Date.now() + drainBoundMilliseconds;
+        drainDeadline = Date.now() + DRAIN_BOUND_MILLISECONDS;
         endInput();
       }
     }
@@ -216,7 +216,7 @@ interface Observed {
 }
 
 /** The hook events whose matcher is tested against a tool name. */
-const toolHookEvents = [
+const TOOL_HOOK_EVENTS = [
   'PreToolUse',
   'PostToolUse',
   'PostToolUseFailure',
@@ -225,7 +225,7 @@ const toolHookEvents = [
 ] as const;
 
 /** Only these characters, and a matcher is a list of exact names. */
-const exactMatcherPattern = /^[A-Za-z0-9_\- ,|]*$/;
+const EXACT_MATCHER_PATTERN = /^[A-Za-z0-9_\- ,|]*$/;
 
 /**
  * Whether a hook matcher selects a tool, as Claude Code evaluates it: `*`,
@@ -238,7 +238,7 @@ export function matcherSelects(
   tool: string,
 ): boolean {
   if (matcher === undefined || matcher === '' || matcher === '*') return true;
-  if (exactMatcherPattern.test(matcher)) {
+  if (EXACT_MATCHER_PATTERN.test(matcher)) {
     return matcher.split(/[|,]/).some((name) => name.trim() === tool);
   }
   return new RegExp(matcher).test(tool);
@@ -253,7 +253,7 @@ export function deadToolMatchers(
   hooks: Options['hooks'],
   tools: readonly string[],
 ): string[] {
-  return toolHookEvents.flatMap((event) =>
+  return TOOL_HOOK_EVENTS.flatMap((event) =>
     (hooks?.[event] ?? [])
       .filter(
         (entry) => !tools.some((tool) => matcherSelects(entry.matcher, tool)),
@@ -299,7 +299,7 @@ async function nextBefore(
   }
 }
 
-const credentialErrors = new Set([
+const CREDENTIAL_ERRORS = new Set([
   'authentication_failed',
   'oauth_org_not_allowed',
   'account_on_hold',
@@ -358,7 +358,7 @@ export function settle<Output>(
       : result.errors.join('; ') || result.subtype;
   const assistantError = observed.assistantError;
   if (
-    (assistantError !== undefined && credentialErrors.has(assistantError)) ||
+    (assistantError !== undefined && CREDENTIAL_ERRORS.has(assistantError)) ||
     status === 401 ||
     status === 403
   ) {

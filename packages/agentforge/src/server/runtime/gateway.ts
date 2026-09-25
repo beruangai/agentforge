@@ -6,7 +6,7 @@ import type {
   DefaultRequestHandler,
   ServerCallContext,
 } from '@a2a-js/sdk/server';
-import { runtimeSessionHeader } from '#core/contract/envelope.ts';
+import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
 import { isTerminal, type PriorAttempt } from '#core/contract/task.ts';
 import {
   finishedTask,
@@ -16,8 +16,8 @@ import {
   stateOf,
 } from './a2a-task.ts';
 import {
+  ADMISSION_METADATA_KEY,
   type Admission,
-  admissionMetadataKey,
   type TaskProcessExecutor,
 } from './executor.ts';
 import type { DynamoDBTaskStore } from './task-store.ts';
@@ -52,10 +52,10 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
         `not an AgentForge start: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    const sessionHeader = headerOf(context, runtimeSessionHeader);
+    const sessionHeader = headerOf(context, RUNTIME_SESSION_HEADER);
     if (sessionHeader === undefined) {
       throw new RequestMalformedError(
-        `the ${runtimeSessionHeader} header is required`,
+        `the ${RUNTIME_SESSION_HEADER} header is required`,
       );
     }
     const runtimeSessionId: string = sessionHeader;
@@ -133,7 +133,7 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
             contextId,
             metadata: {
               ...message.metadata,
-              [admissionMetadataKey]: admission,
+              [ADMISSION_METADATA_KEY]: admission,
             },
           },
           configuration: {

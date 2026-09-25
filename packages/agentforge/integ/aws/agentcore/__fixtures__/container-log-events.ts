@@ -11,7 +11,7 @@
 import { z } from 'zod';
 
 /** Every invocation — a POST — so what reached the container is observed (§I). */
-const requestEventSchema = z.object({
+const RequestEventSchema = z.object({
   event: z.literal('request'),
   containerId: z.string(),
   a2aVersion: z.string().nullable(),
@@ -19,7 +19,7 @@ const requestEventSchema = z.object({
   jsonRpcMethod: z.string().nullable(),
 });
 
-const sigtermEventSchema = z.object({
+const SigtermEventSchema = z.object({
   event: z.literal('sigterm'),
   containerId: z.string(),
   at: z.number(),
@@ -27,7 +27,7 @@ const sigtermEventSchema = z.object({
 });
 
 /** The outcome row written from inside the SIGTERM handler (§C). */
-const shutdownOutcomeEventSchema = z.object({
+const ShutdownOutcomeEventSchema = z.object({
   event: z.literal('shutdown-outcome'),
   containerId: z.string(),
   written: z.boolean(),
@@ -37,21 +37,21 @@ const shutdownOutcomeEventSchema = z.object({
 });
 
 /** A heartbeat every 500 ms after SIGTERM; the last one is when the process died. */
-const postSigtermEventSchema = z.object({
+const PostSigtermEventSchema = z.object({
   event: z.literal('post-sigterm'),
   containerId: z.string(),
   millisecondsSinceSigterm: z.number(),
   liveTasks: z.number(),
 });
 
-export const containerLogEventSchema = z.discriminatedUnion('event', [
-  requestEventSchema,
-  sigtermEventSchema,
-  shutdownOutcomeEventSchema,
-  postSigtermEventSchema,
+export const ContainerLogEventSchema = z.discriminatedUnion('event', [
+  RequestEventSchema,
+  SigtermEventSchema,
+  ShutdownOutcomeEventSchema,
+  PostSigtermEventSchema,
 ]);
 
-export type ContainerLogEvent = z.infer<typeof containerLogEventSchema>;
+export type ContainerLogEvent = z.infer<typeof ContainerLogEventSchema>;
 export type ContainerLogEventName = ContainerLogEvent['event'];
 export type ContainerLogEventNamed<Name extends ContainerLogEventName> =
   Extract<ContainerLogEvent, { event: Name }>;

@@ -28,11 +28,11 @@ import {
   sendMessageParams,
 } from './__fixtures__/invocation.ts';
 import {
-  a2aOneZeroOnlyProfile,
+  A2A_ONE_ZERO_ONLY_PROFILE,
   type FixtureRuntime,
+  PROVISIONING_TIMEOUT_MILLISECONDS,
   provisionFixtureRuntime,
-  provisioningTimeoutMilliseconds,
-  teardownTimeoutMilliseconds,
+  TEARDOWN_TIMEOUT_MILLISECONDS,
 } from './__fixtures__/provisioning.ts';
 import {
   createResourceStack,
@@ -40,7 +40,7 @@ import {
 } from './__fixtures__/resources.ts';
 import { waitForContainerLogEvents } from './__fixtures__/runtime-logs.ts';
 
-const logClockMarginMilliseconds = 60_000;
+const LOG_CLOCK_MARGIN_MILLISECONDS = 60_000;
 
 describe('A2A 1.0 only, through AgentCore (ADR 0014)', () => {
   const resources = createResourceStack();
@@ -51,7 +51,7 @@ describe('A2A 1.0 only, through AgentCore (ADR 0014)', () => {
   beforeAll(async () => {
     fixture = await provisionFixtureRuntime(resources, {
       purpose: 'a2a_1_0_only',
-      profile: a2aOneZeroOnlyProfile,
+      profile: A2A_ONE_ZERO_ONLY_PROFILE,
       outcomeTable: false,
     });
     a2a = new A2aOverAgentCore(
@@ -59,11 +59,11 @@ describe('A2A 1.0 only, through AgentCore (ADR 0014)', () => {
       fixture.runtime.agentRuntimeArn,
     );
     startedAt = Date.now();
-  }, provisioningTimeoutMilliseconds);
+  }, PROVISIONING_TIMEOUT_MILLISECONDS);
 
   afterAll(
     () => releaseResources(resources, 'a2a-1-0-only-through-agentcore'),
-    teardownTimeoutMilliseconds,
+    TEARDOWN_TIMEOUT_MILLISECONDS,
   );
 
   async function requestSeenBy(
@@ -74,7 +74,7 @@ describe('A2A 1.0 only, through AgentCore (ADR 0014)', () => {
       {
         agentRuntimeId: fixture.runtime.agentRuntimeId,
         eventName: 'request',
-        startTime: startedAt - logClockMarginMilliseconds,
+        startTime: startedAt - LOG_CLOCK_MARGIN_MILLISECONDS,
       },
       (read) =>
         read.some((event) => event.runtimeSessionId === runtimeSessionId),

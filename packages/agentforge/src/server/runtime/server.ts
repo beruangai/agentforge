@@ -71,7 +71,7 @@ export interface RunningServer {
 }
 
 /** Grace for a stopping task: inside the ~10 s AgentCore gives a stopped container. */
-const graceMilliseconds = 5_000;
+const GRACE_MILLISECONDS = 5_000;
 
 /**
  * The container's one server, on AgentCore's contract: A2A 1.0 JSON-RPC on
@@ -94,7 +94,7 @@ export async function startServer(
   const executor = new TaskProcessExecutor({
     taskCommand: config.taskCommand,
     defaultTimeBudgetSeconds: config.defaultTimeBudgetSeconds,
-    graceMilliseconds,
+    graceMilliseconds: GRACE_MILLISECONDS,
     store,
   });
 

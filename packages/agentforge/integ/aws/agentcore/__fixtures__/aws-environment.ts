@@ -5,7 +5,7 @@ import { resolveCallerIdentity } from '../../__fixtures__/aws-account.ts';
  * The execution role AgentCore assumes. It needs an ADMIN identity to create,
  * which the tests do not have — see integ/aws/agentcore/README.md.
  */
-export const executionRoleName = 'agentforge-integ-agentcore-execution';
+export const EXECUTION_ROLE_NAME = 'agentforge-integ-agentcore-execution';
 
 export interface AwsEnvironment {
   readonly accountId: string;
@@ -34,7 +34,7 @@ export async function resolveAwsEnvironment(): Promise<AwsEnvironment> {
     accountId,
     region,
     callerArn,
-    executionRoleArn: `arn:aws:iam::${accountId}:role/${executionRoleName}`,
+    executionRoleArn: `arn:aws:iam::${accountId}:role/${EXECUTION_ROLE_NAME}`,
     registry: `${accountId}.dkr.ecr.${region}.amazonaws.com`,
   };
 }

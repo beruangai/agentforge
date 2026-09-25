@@ -47,6 +47,10 @@
     },
     "./package.json": "./package.json"
   },
+  "dependencies": {
+    "ohash": "^2.0.12",
+    "ts-deepmerge": "^8.0.0"
+  },
   "peerDependencies": {
     "@orpc/contract": "2.0.0-beta.39",
     "@orpc/server": "2.0.0-beta.39",
@@ -57,7 +61,8 @@
     "@aws-sdk/client-dynamodb": "^3.1138.0",
     "@aws-sdk/client-bedrock-agentcore": "^3.1138.0",
     "@temporalio/activity": "^1.24.0",
-    "@temporalio/common": "^1.24.0"
+    "@temporalio/common": "^1.24.0",
+    "@anthropic-ai/sdk": "0.128.0"
   },
   "peerDependenciesMeta": {
     "@orpc/server": {
@@ -83,11 +88,15 @@
     },
     "@temporalio/common": {
       "optional": true
+    },
+    "@anthropic-ai/sdk": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@a2a-js/sdk": "catalog:",
     "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@anthropic-ai/sdk": "catalog:",
     "@aws-sdk/client-bedrock-agentcore": "catalog:",
     "@aws-sdk/client-bedrock-agentcore-control": "catalog:",
     "@aws-sdk/client-cloudwatch-logs": "catalog:",

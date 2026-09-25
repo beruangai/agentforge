@@ -29,6 +29,7 @@
       "dependencies": {
         "@a2a-js/sdk": "catalog:",
         "@anthropic-ai/claude-agent-sdk": "catalog:",
+        "@anthropic-ai/sdk": "catalog:",
         "@aws-sdk/client-dynamodb": "catalog:",
         "@beruangai/agentforge": "workspace:*",
         "@orpc/contract": "catalog:",
@@ -46,9 +47,14 @@
     "packages/agentforge": {
       "name": "@beruangai/agentforge",
       "version": "0.0.0",
+      "dependencies": {
+        "ohash": "^2.0.12",
+        "ts-deepmerge": "^8.0.0",
+      },
       "devDependencies": {
         "@a2a-js/sdk": "catalog:",
         "@anthropic-ai/claude-agent-sdk": "catalog:",
+        "@anthropic-ai/sdk": "catalog:",
         "@aws-sdk/client-bedrock-agentcore": "catalog:",
         "@aws-sdk/client-bedrock-agentcore-control": "catalog:",
         "@aws-sdk/client-cloudwatch-logs": "catalog:",
@@ -79,6 +85,7 @@
       "peerDependencies": {
         "@a2a-js/sdk": "^1.2.0",
         "@anthropic-ai/claude-agent-sdk": "0.3.280",
+        "@anthropic-ai/sdk": "0.128.0",
         "@aws-sdk/client-bedrock-agentcore": "^3.1138.0",
         "@aws-sdk/client-dynamodb": "^3.1138.0",
         "@orpc/contract": "2.0.0-beta.39",
@@ -91,6 +98,7 @@
       "optionalPeers": [
         "@a2a-js/sdk",
         "@anthropic-ai/claude-agent-sdk",
+        "@anthropic-ai/sdk",
         "@aws-sdk/client-bedrock-agentcore",
         "@aws-sdk/client-dynamodb",
         "@orpc/server",
@@ -103,6 +111,7 @@
   "catalog": {
     "@a2a-js/sdk": "1.2.0",
     "@anthropic-ai/claude-agent-sdk": "0.3.280",
+    "@anthropic-ai/sdk": "0.128.0",
     "@aws-sdk/client-bedrock-agentcore": "3.1138.0",
     "@aws-sdk/client-bedrock-agentcore-control": "3.1138.0",
     "@aws-sdk/client-cloudwatch-logs": "3.1138.0",
@@ -132,7 +141,9 @@
     "@vitest/coverage-v8": "4.1.11",
     "express": "5.2.1",
     "nx": "23.2.1",
+    "ohash": "2.0.12",
     "publint": "0.3.24",
+    "ts-deepmerge": "8.0.0",
     "tsdown": "0.23.0",
     "typescript": "~6.0.3",
     "vite": "8.3.0",
@@ -1668,6 +1679,8 @@
 
     "obug": ["obug@2.2.1", "", {}, "sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q=="],
 
+    "ohash": ["ohash@2.0.12", "", {}, "sha512-65S/5gk9YSsaRjcyf7Nfa6h/d3E8/1gslpXfI4W7Dxn/oap8IKRuNT5VXkLQ1YFKIEg4apRY4Pj6aiwFzrDdmw=="],
+
     "ohm-js": ["ohm-js@17.5.0", "", {}, "sha512-l4Sa7026+6jsvYbt0PXKmL+f+ML32fD++IznLgxDhx2t9Cx6NC7zwRqblCujPHGGmkQerHoeBzRutdxaw/S72g=="],
 
     "on-finished": ["on-finished@2.4.1", "", { "dependencies": { "ee-first": "1.1.1" } }, "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg=="],
@@ -1951,6 +1964,8 @@
     "trough": ["trough@2.2.0", "", {}, "sha512-tmMpK00BjZiUyVyvrBK7knerNgmgvcV/KLVyuma/SC+TQN167GrMRciANTz09+k3zW8L8t60jWO1GpfkZdjTaw=="],
 
     "ts-algebra": ["ts-algebra@2.0.0", "", {}, "sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw=="],
+
+    "ts-deepmerge": ["ts-deepmerge@8.0.0", "", {}, "sha512-133O+10nJmVI8w5xeVZPEv5PIrv7iaUae07wv1aH8XJH95Ur6YIhWAPhPyP1YPlbPS9fCVcNIZTu7m8urRVF0A=="],
 
     "tsconfig-paths": ["tsconfig-paths@4.2.0", "", { "dependencies": { "json5": "^2.2.2", "minimist": "^1.2.6", "strip-bom": "^3.0.0" } }, "sha512-NoZ4roiN7LnbKn9QqE1amc9DJfzvZXxF4xDavcOWt1BPkdx+m+0gJuPM+S0vCe7zTJMYUP0R8pO2XMr+Y8oLIg=="],
 

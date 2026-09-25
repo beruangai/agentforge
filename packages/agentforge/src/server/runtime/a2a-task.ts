@@ -6,15 +6,15 @@ import {
   taskStateFromJSON,
   taskStateToJSON,
 } from '@a2a-js/sdk';
-import { type Envelope, envelopeSchema } from '#core/contract/envelope.ts';
+import { type Envelope, EnvelopeSchema } from '#core/contract/envelope.ts';
 import {
   type Outcome,
-  outcomeSchema,
+  OutcomeSchema,
   type TaskState as TaskStateName,
 } from '#core/contract/task.ts';
 
 /** The artifact every finished task carries its outcome in. */
-export const outcomeArtifactId = 'outcome';
+export const OUTCOME_ARTIFACT_ID = 'outcome';
 
 export function stateOf(task: Task): TaskStateName {
   const state = task.status?.state;
@@ -49,7 +49,7 @@ export function finishedTask(
   metadata: Record<string, unknown> = {},
 ): Task {
   const artifact: Artifact = {
-    artifactId: outcomeArtifactId,
+    artifactId: OUTCOME_ARTIFACT_ID,
     name: 'outcome',
     description: '',
     parts: [
@@ -77,10 +77,10 @@ export function finishedTask(
 
 export function outcomeOf(task: Task): Outcome | undefined {
   const part = task.artifacts
-    .find((artifact) => artifact.artifactId === outcomeArtifactId)
+    .find((artifact) => artifact.artifactId === OUTCOME_ARTIFACT_ID)
     ?.parts.find((candidate) => candidate.content?.$case === 'data');
   if (part?.content?.$case !== 'data') return undefined;
-  return outcomeSchema.parse(part.content.value);
+  return OutcomeSchema.parse(part.content.value);
 }
 
 /**
@@ -99,7 +99,7 @@ export function readEnvelope(message: Message | undefined): Envelope {
       `expected exactly one data part carrying the envelope, got ${dataParts.length} of ${message.parts.length} parts`,
     );
   }
-  return envelopeSchema.parse(part.content.value);
+  return EnvelopeSchema.parse(part.content.value);
 }
 
 export { TaskState };

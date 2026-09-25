@@ -1,9 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUIDv7 } from 'node:crypto';
 
-const dynamoDBLocalImage =
+const DYNAMODB_LOCAL_IMAGE =
   'amazon/dynamodb-local:3.1.0@sha256:7ef4a2c45b58c2901e70a4f28e0953a422c2c631baaaf5e2c15e0805740c7752';
-const agentImage = 'agentforge-examples/hello-agent:local';
+const AGENT_IMAGE = 'agentforge-examples/hello-agent:local';
 
 export interface LocalAgent {
   readonly url: string;
@@ -75,7 +75,7 @@ export async function startLocalAgent(): Promise<LocalAgent> {
       network,
       '-p',
       '127.0.0.1::8000',
-      dynamoDBLocalImage,
+      DYNAMODB_LOCAL_IMAGE,
       '-jar',
       'DynamoDBLocal.jar',
       '-inMemory',
@@ -111,7 +111,7 @@ export async function startLocalAgent(): Promise<LocalAgent> {
       'AWS_SECRET_ACCESS_KEY=local',
       '-e',
       'AWS_REGION=us-east-2',
-      agentImage,
+      AGENT_IMAGE,
     );
     const url = `http://${publishedAddress(agent, 9000)}/`;
     await until('the agent to answer /ping', 60_000, () =>

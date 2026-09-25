@@ -9,7 +9,7 @@ import {
   TaskFailure,
 } from './kernel.ts';
 
-const output = z.object({ answer: z.string() });
+const OutputSchema = z.object({ answer: z.string() });
 
 function run(
   scripted: ReturnType<typeof scriptedQuery>,
@@ -19,7 +19,7 @@ function run(
   return {
     records,
     promise: runAgent(
-      { prompt: 'q', output, options: { maxTurns: 3 } },
+      { prompt: 'q', output: OutputSchema, options: { maxTurns: 3 } },
       { signal, onRecord: (record) => records.push(record) },
       scripted.query,
     ),
@@ -177,7 +177,7 @@ describe('hook matchers', () => {
     const promise = runAgent(
       {
         prompt: 'q',
-        output,
+        output: OutputSchema,
         options: {
           hooks: {
             PreToolUse: [{ matcher: 'Bash', hooks: [async () => ({})] }],

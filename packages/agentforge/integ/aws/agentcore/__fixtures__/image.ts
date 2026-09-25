@@ -2,11 +2,11 @@ import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pinnedBunBaseImageReference } from '../../../__fixtures__/pinned-base-image.ts';
+import { PINNED_BUN_BASE_IMAGE_REFERENCE } from '../../../__fixtures__/pinned-base-image.ts';
 import { runCommand } from '../../../__fixtures__/run-command.ts';
 import type { AwsEnvironment } from './aws-environment.ts';
 
-const fixturesDirectory = import.meta.dirname;
+const FIXTURES_DIRECTORY = import.meta.dirname;
 
 export interface PushedImage {
   /** `<registry>/<repository>:<tag>`, what `CreateAgentRuntime` is given. */
@@ -39,14 +39,14 @@ export async function buildAndPushFixtureImage(
     const contextDirectory = join(scratchDirectory, 'context');
     await mkdir(contextDirectory);
     await cp(
-      join(fixturesDirectory, 'Dockerfile'),
+      join(FIXTURES_DIRECTORY, 'Dockerfile'),
       join(contextDirectory, 'Dockerfile'),
     );
     await runCommand(
       'bun',
       [
         'build',
-        join(fixturesDirectory, 'server.ts'),
+        join(FIXTURES_DIRECTORY, 'server.ts'),
         '--target=bun',
         '--outfile',
         join(contextDirectory, 'server.js'),
@@ -76,7 +76,7 @@ export async function buildAndPushFixtureImage(
         '--platform',
         'linux/arm64',
         '--build-arg',
-        `BUN_IMAGE=${pinnedBunBaseImageReference}`,
+        `BUN_IMAGE=${PINNED_BUN_BASE_IMAGE_REFERENCE}`,
         '--tag',
         imageUri,
         '--metadata-file',

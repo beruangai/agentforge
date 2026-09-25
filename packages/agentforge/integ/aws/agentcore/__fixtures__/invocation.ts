@@ -4,23 +4,23 @@ import {
   InvokeAgentRuntimeCommand,
 } from '@aws-sdk/client-bedrock-agentcore';
 import { z } from 'zod';
-import { type FixtureEnvelope, fixtureTaskMetadataSchema } from './envelope.ts';
+import { type FixtureEnvelope, FixtureTaskMetadataSchema } from './envelope.ts';
 
-const jsonRpcErrorSchema = z.object({
+const JsonRpcErrorSchema = z.object({
   code: z.number(),
   message: z.string(),
   data: z.unknown().optional(),
 });
 
-const jsonRpcResponseSchema = z.object({
+const JsonRpcResponseSchema = z.object({
   jsonrpc: z.literal('2.0'),
   id: z.union([z.string(), z.number(), z.null()]),
   result: z.unknown().optional(),
-  error: jsonRpcErrorSchema.optional(),
+  error: JsonRpcErrorSchema.optional(),
 });
 
-export type JsonRpcError = z.infer<typeof jsonRpcErrorSchema>;
-export type JsonRpcResponse = z.infer<typeof jsonRpcResponseSchema>;
+export type JsonRpcError = z.infer<typeof JsonRpcErrorSchema>;
+export type JsonRpcResponse = z.infer<typeof JsonRpcResponseSchema>;
 
 /** The container answered, with a JSON-RPC result or a JSON-RPC error. */
 export interface DeliveredInvocation {
@@ -112,7 +112,7 @@ export async function invokeJsonRpc(
     }
     const text = await response.response.transformToString();
     const latencyMilliseconds = Date.now() - startedAt;
-    const parsed = jsonRpcResponseSchema.safeParse(JSON.parse(text));
+    const parsed = JsonRpcResponseSchema.safeParse(JSON.parse(text));
     if (!parsed.success) {
       throw new Error(
         `${request.method}: the container's answer is not JSON-RPC: ${text.slice(0, 500)}`,
@@ -134,7 +134,7 @@ export async function invokeJsonRpc(
       typeof metadata.httpStatusCode === 'number'
         ? metadata.httpStatusCode
         : undefined;
-    const attached = jsonRpcErrorSchema.safeParse(
+    const attached = JsonRpcErrorSchema.safeParse(
       'error' in error ? error.error : undefined,
     );
     return {
@@ -161,14 +161,14 @@ function hasHeaders(
   );
 }
 
-const fixtureTaskSchema = z.object({
+const FixtureTaskSchema = z.object({
   id: z.string(),
   contextId: z.string(),
   status: z.object({ state: z.string() }),
-  metadata: fixtureTaskMetadataSchema,
+  metadata: FixtureTaskMetadataSchema,
 });
 
-export type FixtureTask = z.infer<typeof fixtureTaskSchema>;
+export type FixtureTask = z.infer<typeof FixtureTaskSchema>;
 
 /** The 1.0 wire shape of a message carrying the envelope as one data part. */
 export function sendMessageParams(envelope: FixtureEnvelope): unknown {
@@ -258,7 +258,7 @@ export function taskFrom(invocation: Invocation, method: string): FixtureTask {
     'task' in body.result
       ? body.result.task
       : body.result;
-  return fixtureTaskSchema.parse(result);
+  return FixtureTaskSchema.parse(result);
 }
 
 export function delivered(

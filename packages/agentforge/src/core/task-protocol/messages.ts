@@ -25,4 +25,4 @@ export type TaskProcessMessage =
   | { readonly type: 'outcome'; readonly outcome: Outcome };
 
 /** Set on a spawned task process so it knows to wait for a `run`. */
-export const taskProcessEnvironmentVariable = 'AGENTFORGE_TASK_PROCESS';
+export const TASK_PROCESS_ENVIRONMENT_VARIABLE = 'AGENTFORGE_TASK_PROCESS';

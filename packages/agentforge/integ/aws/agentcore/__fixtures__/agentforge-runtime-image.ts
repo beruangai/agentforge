@@ -8,8 +8,8 @@ import {
   writeDockerConfigWithEcrCredentialHelper,
 } from './image.ts';
 
-const packageRoot = join(import.meta.dirname, '..', '..', '..', '..');
-const workspaceRoot = join(packageRoot, '..', '..');
+const PACKAGE_ROOT = join(import.meta.dirname, '..', '..', '..', '..');
+const WORKSPACE_ROOT = join(PACKAGE_ROOT, '..', '..');
 
 /**
  * AgentForge's base image, from the package's own `Dockerfile`, and over it an
@@ -29,13 +29,13 @@ export async function buildAndPushAgentForgeRuntimeImage(
     const workspace = join(context, 'workspace');
     const source = join(context, 'source');
     for (const file of ['package.json', 'bun.lock']) {
-      await cp(join(workspaceRoot, file), join(workspace, file));
+      await cp(join(WORKSPACE_ROOT, file), join(workspace, file));
     }
     // A frozen install checks every workspace's manifest against the lockfile.
     for (const parent of ['packages', 'examples']) {
-      for (const project of await readdir(join(workspaceRoot, parent))) {
+      for (const project of await readdir(join(WORKSPACE_ROOT, parent))) {
         await cp(
-          join(workspaceRoot, parent, project, 'package.json'),
+          join(WORKSPACE_ROOT, parent, project, 'package.json'),
           join(workspace, parent, project, 'package.json'),
         );
       }
@@ -45,11 +45,14 @@ export async function buildAndPushAgentForgeRuntimeImage(
       'integ/local/runtime/__fixtures__',
       'integ/aws/agentcore/__fixtures__/agentforge-server.ts',
     ]) {
-      await cp(join(packageRoot, part), join(source, part), {
+      await cp(join(PACKAGE_ROOT, part), join(source, part), {
         recursive: true,
       });
     }
-    await cp(join(packageRoot, 'Dockerfile'), join(context, 'base.Dockerfile'));
+    await cp(
+      join(PACKAGE_ROOT, 'Dockerfile'),
+      join(context, 'base.Dockerfile'),
+    );
     await cp(
       join(import.meta.dirname, 'agentforge-runtime.Dockerfile'),
       join(context, 'Dockerfile'),

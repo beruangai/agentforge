@@ -17,7 +17,7 @@ import {
 
 let agent: LocalAgent;
 let client: ReturnType<typeof createClient<typeof helloAgent>>;
-const runtimeSessionId = `e2e-${randomUUIDv7()}`;
+const RUNTIME_SESSION_ID = `e2e-${randomUUIDv7()}`;
 
 beforeAll(async () => {
   agent = await startLocalAgent();
@@ -39,7 +39,7 @@ function environment() {
 describe('the Temporal activity, locally', () => {
   it('returns the typed output, heartbeating the task as it runs', async () => {
     const activity = procedureActivity(client.summarise, {
-      runtimeSessionId: () => runtimeSessionId,
+      runtimeSessionId: () => RUNTIME_SESSION_ID,
       cancelTask: client.CancelTask,
       pollIntervalMilliseconds: 1_000,
     });
@@ -61,7 +61,7 @@ describe('the Temporal activity, locally', () => {
 
   it('cancels its task when the activity is cancelled', async () => {
     const activity = procedureActivity(client.sleepThenAnswer, {
-      runtimeSessionId: () => runtimeSessionId,
+      runtimeSessionId: () => RUNTIME_SESSION_ID,
       cancelTask: client.CancelTask,
       pollIntervalMilliseconds: 1_000,
     });
@@ -77,7 +77,7 @@ describe('the Temporal activity, locally', () => {
     if (taskId === undefined)
       throw new Error('the activity never heartbeat its task');
     const task = await client.sleepThenAnswer.GetTask(taskId, {
-      runtimeSessionId,
+      runtimeSessionId: RUNTIME_SESSION_ID,
     });
     expect(task.state).toBe('TASK_STATE_CANCELED');
   });

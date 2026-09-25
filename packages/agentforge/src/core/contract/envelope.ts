@@ -5,7 +5,7 @@ import { z } from 'zod';
  * message. The runtime session id is not here: it is the transport's, and
  * reaches the container as AgentCore's session header.
  */
-export const envelopeSchema = z.object({
+export const EnvelopeSchema = z.object({
   /** The procedure's path in the contract, dotted: `reviewStrategy` or `research.summarise`. */
   procedure: z.string().min(1),
   /** The hash of the contract the caller compiled against (§REQ104). */
@@ -21,8 +21,8 @@ export const envelopeSchema = z.object({
   metadata: z.record(z.string(), z.string()).optional(),
   tags: z.record(z.string(), z.string()).optional(),
 });
-export type Envelope = z.infer<typeof envelopeSchema>;
+export type Envelope = z.infer<typeof EnvelopeSchema>;
 
 /** The header AgentCore routes a session by; the local transport sends it too. */
-export const runtimeSessionHeader =
+export const RUNTIME_SESSION_HEADER =
   'x-amzn-bedrock-agentcore-runtime-session-id';

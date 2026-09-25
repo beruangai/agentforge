@@ -48,8 +48,8 @@ import { buildFixtureAgentCard } from '../../../__fixtures__/agent-card.ts';
 import type { ContainerLogEvent } from './container-log-events.ts';
 import {
   type FixtureEnvelope,
+  FixtureEnvelopeSchema,
   type FixtureTaskMetadata,
-  fixtureEnvelopeSchema,
   type OutcomeTarget,
 } from './envelope.ts';
 
@@ -113,7 +113,7 @@ function readEnvelope(message: Message | undefined): FixtureEnvelope {
         'A part the parser did not recognise is delivered with its content stripped.',
     );
   }
-  return fixtureEnvelopeSchema.parse(dataPart.content.value);
+  return FixtureEnvelopeSchema.parse(dataPart.content.value);
 }
 
 class TimerExecutor implements AgentExecutor {

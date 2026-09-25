@@ -92,14 +92,14 @@ export function createSandbox(name: string): Sandbox {
  * `outputFormat: { type: 'json_schema' }` — its emitted name, advertised in
  * `system/init.tools` (docs/research/kernel-settlement.md).
  */
-export const carrierToolName = 'StructuredOutput';
+export const CARRIER_TOOL_NAME = 'StructuredOutput';
 
 /**
  * What the kernel passes through `env` on every query: removes
  * `run_in_background` from Bash and the subagent tool, and turns off
  * auto-backgrounding (docs/ARCHITECTURE.md §7).
  */
-export const backgroundWorkDisabled: Record<string, string> = {
+export const BACKGROUND_WORK_DISABLED: Record<string, string> = {
   CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
 };
 
@@ -116,7 +116,7 @@ export function createSubscriptionEnvironment(
   };
 }
 
-const credentialVariablePattern = /^(ANTHROPIC_|CLAUDE_|TEMP_CLAUDE_)/;
+const CREDENTIAL_VARIABLE_PATTERN = /^(ANTHROPIC_|CLAUDE_|TEMP_CLAUDE_)/;
 
 /**
  * The environment for a run that must never reach a model: every
@@ -129,7 +129,7 @@ export function createEnvironmentWithoutCredentials(
 ): Record<string, string | undefined> {
   const environment: Record<string, string | undefined> = {};
   for (const [name, value] of Object.entries(process.env)) {
-    if (!credentialVariablePattern.test(name)) environment[name] = value;
+    if (!CREDENTIAL_VARIABLE_PATTERN.test(name)) environment[name] = value;
   }
   environment.CLAUDE_CONFIG_DIR = configDirectory;
   return environment;
@@ -444,9 +444,9 @@ export const endInputOnFirstResult: EndInputPolicy = (message, endInput) => {
 };
 
 /** How long the process may take to exit once its input has ended. */
-const exitBoundMilliseconds = 60_000;
+const EXIT_BOUND_MILLISECONDS = 60_000;
 
-/** The process was still running `exitBoundMilliseconds` after its input ended. */
+/** The process was still running `EXIT_BOUND_MILLISECONDS` after its input ended. */
 export class ProcessOutlivedItsInputError extends Error {}
 
 /**
@@ -491,7 +491,7 @@ export async function runWithStreamingInput(
   async function failWhenTheProcessOutlivesItsInput(): Promise<void> {
     await inputEnded;
     try {
-      await delay(exitBoundMilliseconds, undefined, {
+      await delay(EXIT_BOUND_MILLISECONDS, undefined, {
         signal: exitBoundTimer.signal,
       });
     } catch (error) {
@@ -500,7 +500,7 @@ export async function runWithStreamingInput(
     }
     session.close();
     throw new ProcessOutlivedItsInputError(
-      `the process did not exit within ${exitBoundMilliseconds} ms of its input ending; see ${recording.logPath}`,
+      `the process did not exit within ${EXIT_BOUND_MILLISECONDS} ms of its input ending; see ${recording.logPath}`,
       { cause: await drainFailure },
     );
   }

@@ -5,7 +5,7 @@ import { helloAgent } from './contract.ts';
 const os = implementAgent(helloAgent);
 
 /** Where the agent works; a fixed directory, so a session resumes against the same project. */
-const cwd = '/home/bun/work';
+const CWD = '/home/bun/work';
 
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
@@ -15,7 +15,7 @@ export const router = os.router({
         summary: z.string().describe('One sentence summarising the text'),
       }),
       options: {
-        cwd,
+        cwd: CWD,
         maxTurns: 3,
         tools: [],
         ...(input.resumeSessionId === undefined
@@ -33,7 +33,12 @@ export const router = os.router({
     const run = await context.runAgent({
       prompt: `Run the shell command \`sleep ${input.seconds}\` with the Bash tool, then answer "done".`,
       output: z.object({ answer: z.string() }),
-      options: { cwd, maxTurns: 4, tools: ['Bash'], allowedTools: ['Bash'] },
+      options: {
+        cwd: CWD,
+        maxTurns: 4,
+        tools: ['Bash'],
+        allowedTools: ['Bash'],
+      },
     });
     return { answer: run.output.answer };
   }),
