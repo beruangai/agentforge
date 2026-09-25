@@ -3,7 +3,6 @@ import { randomUUIDv7 } from 'node:crypto';
 
 const DYNAMODB_LOCAL_IMAGE =
   'amazon/dynamodb-local:3.1.0@sha256:7ef4a2c45b58c2901e70a4f28e0953a422c2c631baaaf5e2c15e0805740c7752';
-const AGENT_IMAGE = 'agentforge-examples/hello-agent:local';
 
 export interface LocalAgent {
   readonly url: string;
@@ -44,11 +43,12 @@ async function until(
 }
 
 /**
- * The agent's image running as it would locally: DynamoDB Local beside it on
+ * An agent's image running as it would locally: DynamoDB Local beside it on
  * a private network, the subscription token passed by name from this
- * process's environment, never written into a command line.
+ * process's environment, never written into a command line. Shared by the
+ * examples' e2e suites.
  */
-export async function startLocalAgent(): Promise<LocalAgent> {
+export async function startLocalAgent(image: string): Promise<LocalAgent> {
   if (!process.env.CLAUDE_CODE_OAUTH_TOKEN) {
     throw new Error(
       'CLAUDE_CODE_OAUTH_TOKEN is not set; the e2e target loads it from .env.integ.local',
@@ -111,7 +111,7 @@ export async function startLocalAgent(): Promise<LocalAgent> {
       'AWS_SECRET_ACCESS_KEY=local',
       '-e',
       'AWS_REGION=us-east-2',
-      AGENT_IMAGE,
+      image,
     );
     const url = `http://${publishedAddress(agent, 9000)}/`;
     await until('the agent to answer /ping', 60_000, () =>

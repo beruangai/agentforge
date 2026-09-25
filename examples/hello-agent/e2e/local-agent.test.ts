@@ -10,11 +10,13 @@ import {
   localTransport,
 } from '@beruangai/agentforge/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { helloAgent } from '../src/contract.ts';
 import {
   type LocalAgent,
   startLocalAgent,
-} from './__fixtures__/local-agent.ts';
+} from '../../__fixtures__/local-agent.ts';
+import { helloAgent } from '../src/contract.ts';
+
+const AGENT_IMAGE = 'agentforge-examples/hello-agent:local';
 
 let agent: LocalAgent;
 let client: ReturnType<typeof createClient<typeof helloAgent>>;
@@ -25,7 +27,7 @@ const POLL_OPTIONS = {
 };
 
 beforeAll(async () => {
-  agent = await startLocalAgent();
+  agent = await startLocalAgent(AGENT_IMAGE);
   client = createClient(helloAgent, localTransport(agent.url));
 });
 

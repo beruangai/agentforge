@@ -76,7 +76,11 @@
 
 ## Delivery
 
-**Base image** — `agentforge/a2a-claude`, built from the package's `Dockerfile`: Bun, what the Claude CLI needs, a non-root user.
+**Base image** — `agentforge/a2a-claude`, built from the package's `Dockerfile` over the **tarball**: Bun, what the Claude CLI needs, a non-root user, and AgentForge with its runtime peers installed globally, at `/node_modules`.
+
+**Agentic project** — One project holding an **agentic layer** and the agents nested in it; its **agentic base image** is `FROM` the base image and puts the layer at `/agentic` — dependencies, shared modules, MCP servers, skills, `CLAUDE.md`. Each agent's image adds its source at `/agentic/agent`.
+
+**Workspace** — `/mnt/workspace`: what an agent edits, and each run's `cwd` by default. Where it is configured is open (DESIGN_OPTIONS §W).
 
 **Agent** (deployed) — One AgentCore runtime serving one image. Where "the agent" means the Claude agent inside a run, the context says so.
 

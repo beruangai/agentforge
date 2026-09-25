@@ -1,0 +1,96 @@
+{
+  "name": "@beruangai/example-agentic-project",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "examples/agentic-project",
+  "tags": ["example"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tsconfig.base.json"
+      ],
+      "outputs": ["{workspaceRoot}/dist/examples/agentic-project/typecheck"],
+      "options": {
+        "command": "tsc -p tsconfig.json",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["biome"],
+      "options": {
+        "command": "biome check {projectRoot}"
+      }
+    },
+    "manifest": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": [
+        {
+          "projects": ["@beruangai/agentforge"],
+          "target": "tarball"
+        }
+      ],
+      "inputs": [
+        "{projectRoot}/package.json",
+        "{projectRoot}/image-manifest.ts",
+        "{workspaceRoot}/package.json",
+        { "dependentTasksOutputFiles": "**/package.json" },
+        { "runtime": "bun --version" }
+      ],
+      "outputs": ["{workspaceRoot}/dist/examples/agentic-project/manifest"],
+      "options": {
+        "command": "bun image-manifest.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "image": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        "manifest",
+        {
+          "projects": ["@beruangai/agentforge"],
+          "target": "image"
+        }
+      ],
+      "options": {
+        "command": "docker build --platform linux/arm64 --build-context manifest=../../dist/examples/agentic-project/manifest -t agentforge-examples/agentic-project:local .",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "image-reviewer": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["image"],
+      "options": {
+        "command": "docker build --platform linux/arm64 -t agentforge-examples/agentic-project-reviewer:local agents/reviewer",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "image-fixer": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["image"],
+      "options": {
+        "command": "docker build --platform linux/arm64 -t agentforge-examples/agentic-project-fixer:local agents/fixer",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["image-reviewer", "image-fixer"],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts",
+        "cwd": "{projectRoot}",
+        "envFile": "{workspaceRoot}/.env.integ.local"
+      }
+    }
+  }
+}

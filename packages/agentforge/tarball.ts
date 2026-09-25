@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -30,15 +31,8 @@ const RUNTIME_PEERS = [
   'zod',
 ] as const;
 
-async function run(command: string[], cwd: string): Promise<void> {
-  const child = Bun.spawn(command, {
-    cwd,
-    stdout: 'inherit',
-    stderr: 'inherit',
-  });
-  if ((await child.exited) !== 0) {
-    throw new Error(`${command.join(' ')} failed in ${cwd}`);
-  }
+function run(command: string, args: string[], cwd: string): void {
+  execFileSync(command, args, { cwd, stdio: 'inherit' });
 }
 
 const workspaceManifest = JSON.parse(
@@ -63,8 +57,9 @@ const peers = Object.fromEntries(
 
 await rm(TARBALL_DIRECTORY, { recursive: true, force: true });
 await mkdir(TARBALL_DIRECTORY, { recursive: true });
-await run(
-  ['bun', 'pm', 'pack', '--destination', TARBALL_DIRECTORY],
+run(
+  'bun',
+  ['pm', 'pack', '--destination', TARBALL_DIRECTORY],
   BUNDLE_DIRECTORY,
 );
 const [tarball, ...others] = (await readdir(TARBALL_DIRECTORY)).filter((file) =>
@@ -85,4 +80,4 @@ await writeFile(
     2,
   )}\n`,
 );
-await run(['bun', 'install', '--lockfile-only'], TARBALL_DIRECTORY);
+run('bun', ['install', '--lockfile-only'], TARBALL_DIRECTORY);

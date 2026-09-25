@@ -14,7 +14,7 @@ Section letters are stable ids; a closed section's letter is not reused.
 | **§W** | The working directory: `/mnt/workspace` in the base image today, set as each procedure's `cwd`. Where it is configured — the image, the server, the procedure — and how it relates to §F's sync | The operator, with the agentic-project example | Nothing; `hello-agent` uses the default |
 | **§P** | The local S3-compatible server for §F | Chosen with §F | §F locally |
 | **§T** | Telemetry and metrics (§REQ602, §REQ604): the SDK's OpenTelemetry export flushed before the outcome, and counts of lost tasks and unrecordable outcomes per agent | Design at A2, with the dashboard | A2 |
-| **§K** | The Nx plugin: generators for an agent and a procedure, and the sync generator that keeps a consumer's wiring current | Extracted from what `hello-agent` needed by hand, once a second agent exists | Consumer adoption |
+| **§K** | The Nx plugin: generators for an agent and a procedure, and the sync generator that keeps a consumer's wiring current | Designed from [`examples/agentic-project`](../examples/agentic-project), built by hand — its `manifest` task and per-agent image targets are the first executors to extract | Consumer adoption |
 | **§O** | A credential broker, so a provider key never sits in the task's environment; token rotation | When a procedure needs a key beyond the subscription | Nothing yet |
 | **§E** | Whether background work can be allowed with a deterministic final answer | A spike, when a procedure asks for background work | Nothing — it is off |
 | **§M** | Pausing a task for a human (`TASK_STATE_INPUT_REQUIRED`) | When a consumer asks | Nothing — no consumer asks |

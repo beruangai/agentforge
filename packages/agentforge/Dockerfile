@@ -10,19 +10,20 @@ FROM ${BUN_IMAGE}
 # The Claude CLI's Bash tool refuses busybox sh; it needs bash, named by SHELL.
 RUN apk add --no-cache bash git ca-certificates ripgrep \
  && mkdir -p /agentic/agent /mnt/workspace /home/bun/.bun/install/global \
- && chown -R bun:bun /agentic /mnt/workspace /home/bun/.bun
+ && chown -R bun:bun /agentic /mnt/workspace /home/bun/.bun \
+ && ln -s /home/bun/.bun/install/global/node_modules /node_modules
 # The CLI refuses to run tools unattended as root; the image never runs as root.
 USER bun
 WORKDIR /home/bun/.bun/install/global
 COPY --chown=bun package.json bun.lock *.tgz ./
-# A global install is not on the resolution path. Linked in as the
-# node_modules above the agent at /agentic/agent, it resolves as any
-# package does — ESM conditions, one copy shared with AgentForge — and its
-# presence keeps Bun from auto-installing an import from npm at run time.
-# NODE_PATH does neither: Bun resolves it with CommonJS conditions. An agent's
-# own node_modules still resolves first.
-RUN bun install --frozen-lockfile --production \
- && ln -s /home/bun/.bun/install/global/node_modules /agentic/node_modules
+# A global install is not on the resolution path. Linked in above it as
+# /node_modules, it resolves as any package does — ESM conditions, one copy
+# shared with AgentForge — and its presence keeps Bun from auto-installing an
+# import from npm at run time. NODE_PATH does neither: Bun resolves it with
+# CommonJS conditions. /agentic is the consumer's: an agentic project's
+# /agentic/node_modules and an agent's /agentic/agent/node_modules resolve
+# first.
+RUN bun install --frozen-lockfile --production
 ENV SHELL=/bin/bash AGENTFORGE_PORT=9000
 # The agent's code is /agentic/agent, read-only in intent; what the agent
 # edits is /mnt/workspace, its `cwd`.
