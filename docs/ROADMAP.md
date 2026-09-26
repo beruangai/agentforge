@@ -24,10 +24,10 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 **Started 2026-09-25**: AgentForge's server runs on a V2 runtime in `us-east-2`, reached through `agentCoreTransport`, with task state in DynamoDB — a typed output and an attach, a cancel, and a `StopRuntimeSession` ending the task `LOST` with the retry running as attempt 2 (`integ/aws/agentcore/agentforge-runtime.test.ts`, no model).
 
 - The construct and deploy path: runtime on V2, its role, the task table, the leaf image in ECR, a deploy that waits until the runtime serves. **Built 2026-09-25** as `AgentRuntime`, verified by `agentforge-runtime.test.ts` deploying through it
-- Ids minted after a V2 restore are distinct. **Settled 2026-09-25**, re-checked by the same test
-- The admission default measured (§G)
+- Ids minted after a V2 restore are distinct. **Settled 2026-09-26**: Bun's generator replays across restores once drawn from before the snapshot, so the server draws nothing before it; the same test, deployed with a secret and telemetry, re-checks it
+- The admission default measured (§G). **Settled 2026-09-26**: 4 kept, ~165 MB per running task measured
 - `hello-agent`'s e2e against the deployed runtime through `agentCoreTransport`, including a container stop mid-task ending `LOST` and a retry attaching
-- Telemetry and per-agent metrics (§T)
+- Telemetry and per-agent metrics (§T). **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels); open: `gen_ai.*` mapping, per-agent counts
 - Cross-container resume (§F), if a consumer needs it before A4
 
 **Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop.

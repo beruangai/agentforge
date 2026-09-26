@@ -43,7 +43,7 @@ The consumer decides how identifiers relate; AgentForge carries and records them
 | idempotency key | The caller | One logical execution across its attempts | Required on `SendMessage` only ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)) |
 | continuity key | The caller, optional | Whatever must not run twice at once — usually a Claude session | At most one live task per key in a container |
 
-Mechanical invariants only: one live task per continuity key; an idempotency key belongs to one runtime session, and reusing it in another is refused; one process per task; **no queueing** — a start beyond the container's admission limit is `TASK_STATE_REJECTED`, never held (§REQ306).
+Mechanical invariants only: one live task per continuity key; an idempotency key belongs to one runtime session, and reusing it in another is refused; one process per task; **no queueing** — a start beyond the container's admission limit is `TASK_STATE_REJECTED`, never held (§REQ306). The limit defaults to 4 (`AGENTFORGE_ADMISSION_LIMIT`): measured on AgentCore's 2 vCPU / 8 GB container, the container idles at about 0.4 GB and each running task's CLI adds about 165 MB, so memory is not what bounds a light procedure — twelve ran at once with 5.7 GB free — and 4 leaves each task about 1.8 GB for what its tools do. An agent whose procedures are light raises it.
 
 ## 3. Procedures
 

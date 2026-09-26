@@ -304,3 +304,17 @@ A throwaway V2 runtime running Bun 1.4.0 drew once from each source at startup, 
 
 **Bun's random generator is not snapshot-safe: every restored instance replays one stream**, and TLS draws from the same generator. It is fresh only in a process that drew nothing before the snapshot — as the server was on 2026-09-25, and was not once it read its declared secrets at startup (an AWS SDK call: TLS and request ids), when every restored container's first task took the same id and the second session's was refused as already ended. A task process starts after the restore, so it is unaffected.
 
+## Memory per running task — 2026-09-26
+
+hello-agent on V2, with a temporary model-free procedure reading `/proc/meminfo` and the cgroup, and the admission limit raised to 16. Each level in a fresh session: K `sleepThenAnswer` tasks (Haiku, a CLI kept alive by a Bash `sleep`), read once all K CLIs were running.
+
+| Running tasks | `memory.current` | `MemAvailable` | Ended |
+|---|---|---|---|
+| 0 (idle) | ~0.38 GB | 7.7 GB of 7.8 GiB | — |
+| 2 | 0.71 GB | 7.37 GB | none |
+| 4 | 1.06 GB | 7.03 GB | none |
+| 8 | 1.72 GB | 6.39 GB | none |
+| 12 | 2.38 GB | 5.75 GB | none |
+
+About 165 MB per task, two processes each whose names include `claude`; `memory.max` is `max` — the microVM's memory is the bound. These CLIs held almost no context and ran no heavy tools, so the figure is a floor. A session's calls must not overlap while AgentCore creates it: concurrent first calls were refused with JSON-RPC `-32054`, "Session operation in progress, please retry".
+
