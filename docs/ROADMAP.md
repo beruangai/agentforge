@@ -28,9 +28,9 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - The admission default measured (§G). **Settled 2026-09-26**: 4 kept, ~165 MB per running task measured
 - `hello-agent`'s e2e against the deployed runtime through `agentCoreTransport`, including a container stop mid-task ending `LOST` and a retry attaching. **Built 2026-09-26** as `e2e-agentcore`
 - Telemetry and per-agent metrics (§T). **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels), **its `gen_ai.*` mapping 2026-09-27**; open: per-agent counts
-- Cross-container resume (§F), if a consumer needs it before A4
+- Sessions persist beyond their container (§F): every transcript in S3 through the SDK's `SessionStore`, so a session outlives the container and a later task resumes it in another
 
-**Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop.
+**Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop, and its session persists beyond the container and resumes in another.
 
 ## A3 — Built-in capabilities
 
