@@ -13,6 +13,7 @@ import {
   type PriorAttempt,
   type RunRecord,
 } from '#core/contract/task.ts';
+import { OPERATIONAL_METRICS } from '#core/metrics.ts';
 import {
   type ExecutorMessage,
   TASK_PROCESS_ENVIRONMENT_VARIABLE,
@@ -20,6 +21,7 @@ import {
   type TaskProcessMessage,
 } from '#core/task-protocol/messages.ts';
 import { finishedTask, newTask, readEnvelope, TaskState } from './a2a-task.ts';
+import type { OperationalMetrics } from './metrics.ts';
 import type { DynamoDBTaskStore } from './task-store.ts';
 
 /** What the gateway decided about a start, handed to the executor on the message. */
@@ -37,6 +39,7 @@ export interface ExecutorConfig {
   /** How long a stopping task process gets before its process group is killed. */
   readonly graceMilliseconds: number;
   readonly store: DynamoDBTaskStore;
+  readonly metrics: OperationalMetrics;
 }
 
 type StopReason = 'cancel' | 'timeout' | 'shutdown';
@@ -183,7 +186,15 @@ export class TaskProcessExecutor implements AgentExecutor {
       const finished = finishedTask(submitted, outcome, { runs: records });
       // Stored before it is published, so a caller reading the store after a
       // cancel or a poll sees the end, not the SDK's write still in flight.
-      await this.#config.store.save(finished);
+      try {
+        await this.#config.store.save(finished);
+      } catch (error) {
+        this.#config.metrics.count(
+          OPERATIONAL_METRICS.OUTCOME_UNRECORDED,
+          taskId,
+        );
+        throw error;
+      }
       eventBus.publish(AgentEvent.task(finished));
     } finally {
       clearInterval(lease);
@@ -207,13 +218,19 @@ export class TaskProcessExecutor implements AgentExecutor {
     const live = this.#live.get(taskId);
     if (live === undefined) return;
     live.stopReason ??= reason;
+    if (reason === 'shutdown') {
+      this.#config.metrics.count(OPERATIONAL_METRICS.STOPPED_MID_TURN, taskId);
+    }
     if (live.child.connected) {
       live.child.send({ type: 'cancel' } satisfies ExecutorMessage);
     }
-    const kill = setTimeout(
-      () => killGroup(live.child),
-      this.#config.graceMilliseconds,
-    );
+    const kill = setTimeout(() => {
+      this.#config.metrics.count(
+        OPERATIONAL_METRICS.KILLED_AFTER_GRACE,
+        taskId,
+      );
+      killGroup(live.child);
+    }, this.#config.graceMilliseconds);
     await live.finished;
     clearTimeout(kill);
   }

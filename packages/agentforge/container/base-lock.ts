@@ -24,6 +24,7 @@ const RUNTIME_PEERS = [
   '@anthropic-ai/claude-agent-sdk',
   '@anthropic-ai/sdk',
   '@a2a-js/sdk',
+  '@aws-sdk/client-cloudwatch',
   '@aws-sdk/client-dynamodb',
   '@aws-sdk/client-secrets-manager',
   '@aws-sdk/client-s3',

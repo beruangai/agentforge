@@ -277,8 +277,12 @@ describe('the runtime', () => {
 });
 
 describe('the task store', () => {
-  it('derives a task lost once its lease lapses, and refuses a later write over it', async () => {
-    const store = new DynamoDBTaskStore(dynamoDB.client, tableName);
+  it('derives a task lost once its lease lapses, counts it once, and refuses a later write over it', async () => {
+    const counted: string[] = [];
+    const store = new DynamoDBTaskStore(dynamoDB.client, tableName, {
+      count: (metric) => counted.push(metric),
+      flush: async () => {},
+    });
     const task = newTask({
       id: randomUUIDv7(),
       contextId: randomUUIDv7(),
@@ -300,6 +304,9 @@ describe('the task store', () => {
     expect(lost?.artifacts[0]?.parts[0]?.content).toMatchObject({
       value: { state: 'TASK_STATE_FAILED', cause: { code: 'LOST' } },
     });
+    // Read again: already ended, so not counted again.
+    await store.load(task.id);
+    expect(counted).toEqual(['TasksLost']);
     await expect(
       store.save(
         finishedTask(task, { state: 'TASK_STATE_COMPLETED', output: {} }),

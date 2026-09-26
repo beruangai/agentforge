@@ -13,6 +13,12 @@ import {
   Runtime,
   type RuntimeProps,
 } from 'aws-cdk-lib/aws-bedrockagentcore';
+import {
+  Dashboard,
+  GraphWidget,
+  Metric,
+  TextWidget,
+} from 'aws-cdk-lib/aws-cloudwatch';
 import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
 import {
   type Grant,
@@ -32,6 +38,12 @@ import {
 } from 'aws-cdk-lib/aws-s3';
 import type { ISecret } from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
+import {
+  METRICS_DIMENSION,
+  METRICS_NAMESPACE,
+  METRICS_VARIABLE,
+  OPERATIONAL_METRICS,
+} from '#core/metrics.ts';
 import { SECRETS_VARIABLE } from '#core/secrets.ts';
 import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
 import {
@@ -39,6 +51,11 @@ import {
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
 } from '#core/task-table.ts';
 import { TELEMETRY_VARIABLE, type TelemetryLevel } from '#core/telemetry.ts';
+import {
+  WORKING_DIRECTORIES_VARIABLE,
+  WORKING_DIRECTORY_NAME_PATTERN,
+} from '#core/working-directory.ts';
+import type { WorkingDirectory } from './working-directory.ts';
 
 /** The one request header AgentForge relies on AgentCore forwarding (ADR 0014). */
 const A2A_VERSION_HEADER = 'A2A-Version';
@@ -89,6 +106,11 @@ export interface AgentRuntimeProps
    * @default 'INFO'
    */
   readonly telemetry?: TelemetryLevel;
+  /**
+   * The working directories the agent's procedures may open, by the name
+   * they open each by. A working directory may be given to several agents.
+   */
+  readonly workingDirectories?: Readonly<Record<string, WorkingDirectory>>;
 }
 
 /**
@@ -109,6 +131,8 @@ export class AgentRuntime extends Construct {
   readonly runtime: Runtime;
   readonly taskTable: Table;
   readonly sessionBucket: Bucket;
+  /** The agent's operational metrics beside what AgentCore reports of it (§REQ604). */
+  readonly dashboard: Dashboard;
 
   constructor(scope: Construct, id: string, props: AgentRuntimeProps) {
     super(scope, id);
@@ -118,6 +142,7 @@ export class AgentRuntime extends Construct {
       tracingEnabled = true,
       secrets = {},
       telemetry = 'INFO',
+      workingDirectories = {},
       environmentVariables = {},
       requestHeaderConfiguration,
       ...runtimeProps
@@ -125,12 +150,21 @@ export class AgentRuntime extends Construct {
     for (const owned of [
       TABLE_NAME_VARIABLE,
       SESSION_BUCKET_VARIABLE,
+      METRICS_VARIABLE,
       SECRETS_VARIABLE,
       TELEMETRY_VARIABLE,
+      WORKING_DIRECTORIES_VARIABLE,
     ]) {
       if (owned in environmentVariables) {
         throw new Error(
           `${owned} is set by AgentRuntime; remove it from environmentVariables`,
+        );
+      }
+    }
+    for (const name of Object.keys(workingDirectories)) {
+      if (!WORKING_DIRECTORY_NAME_PATTERN.test(name)) {
+        throw new Error(
+          `working directory name "${name}" must match ${WORKING_DIRECTORY_NAME_PATTERN}`,
         );
       }
     }
@@ -188,12 +222,28 @@ export class AgentRuntime extends Construct {
                 ),
               ),
             }),
+        ...(Object.keys(workingDirectories).length === 0
+          ? {}
+          : {
+              [WORKING_DIRECTORIES_VARIABLE]: Stack.of(this).toJsonString(
+                Object.fromEntries(
+                  Object.entries(workingDirectories).map(
+                    ([name, directory]) => [name, directory.bucket.bucketName],
+                  ),
+                ),
+              ),
+            }),
       },
     });
     // CloudFormation takes PlatformVersion; the CDK does not type it yet
     // (docs/research/agentcore-runtime.md §Platform version V2).
     const cfnRuntime = this.runtime.node.defaultChild as CfnRuntime;
     cfnRuntime.addPropertyOverride('PlatformVersion', 'V2');
+    // The runtime's own name, known only once the L2 has named it.
+    cfnRuntime.addPropertyOverride(
+      `EnvironmentVariables.${METRICS_VARIABLE}`,
+      this.runtime.agentRuntimeName,
+    );
     Validations.of(cfnRuntime).acknowledge({
       id: 'CloudFormation-Validate::F3002',
       reason:
@@ -201,6 +251,9 @@ export class AgentRuntime extends Construct {
     });
     this.taskTable.grantReadWriteData(this.runtime);
     this.sessionBucket.grantReadWrite(this.runtime);
+    for (const directory of Object.values(workingDirectories)) {
+      directory.bucket.grantReadWrite(this.runtime);
+    }
     // The collector's OTLP metrics are PutMetricData on CloudWatch's default
     // dataset, which the L2 role's namespace-scoped grant does not cover.
     this.runtime.role.addToPrincipalPolicy(
@@ -214,6 +267,22 @@ export class AgentRuntime extends Construct {
           }),
         ],
       }),
+    );
+    // What AgentForge counts per agent (§REQ604); PutMetricData takes no
+    // resource, so the namespace is the bound.
+    this.runtime.role.addToPrincipalPolicy(
+      new PolicyStatement({
+        actions: ['cloudwatch:PutMetricData'],
+        resources: ['*'],
+        conditions: {
+          StringEquals: { 'cloudwatch:namespace': METRICS_NAMESPACE },
+        },
+      }),
+    );
+    this.dashboard = operationalDashboard(
+      this,
+      this.runtime.agentRuntimeName,
+      this.runtime.agentRuntimeArn,
     );
     for (const secret of Object.values(secrets)) {
       secret.grantRead(this.runtime);
@@ -273,4 +342,93 @@ export class AgentRuntime extends Construct {
   grantInvoke(grantee: IGrantable): Grant {
     return this.runtime.grantInvokeRuntime(grantee);
   }
+}
+
+/**
+ * One dashboard per agent (§REQ604): what AgentForge counts, beside the
+ * invocations, errors, latency, sessions and resources AgentCore reports of
+ * the runtime's default endpoint.
+ */
+function operationalDashboard(
+  scope: Construct,
+  runtimeName: string,
+  runtimeArn: string,
+): Dashboard {
+  const counted = (metricName: string): Metric =>
+    new Metric({
+      namespace: METRICS_NAMESPACE,
+      metricName,
+      dimensionsMap: { [METRICS_DIMENSION]: runtimeName },
+      statistic: 'Sum',
+      period: Duration.minutes(5),
+    });
+  const endpoint = `${runtimeName}::DEFAULT`;
+  const invocation = (metricName: string, statistic = 'Sum'): Metric =>
+    new Metric({
+      namespace: 'AWS/Bedrock-AgentCore',
+      metricName,
+      dimensionsMap: {
+        Resource: runtimeArn,
+        Operation: 'InvokeAgentRuntime',
+        Name: endpoint,
+      },
+      statistic,
+      period: Duration.minutes(5),
+    });
+  const usage = (metricName: string): Metric =>
+    new Metric({
+      namespace: 'AWS/Bedrock-AgentCore',
+      metricName,
+      dimensionsMap: {
+        Resource: runtimeArn,
+        Service: 'AgentCore.Runtime',
+        Name: endpoint,
+      },
+      statistic: 'Sum',
+      period: Duration.hours(1),
+    });
+  const dashboard = new Dashboard(scope, 'Dashboard');
+  dashboard.addWidgets(
+    new TextWidget({
+      markdown: `# ${runtimeName}\nWhat AgentForge cannot rule out, beside what AgentCore reports.`,
+      width: 24,
+      height: 2,
+    }),
+  );
+  dashboard.addWidgets(
+    new GraphWidget({
+      title: 'Tasks AgentForge could not settle',
+      left: Object.values(OPERATIONAL_METRICS).map(counted),
+      width: 12,
+    }),
+    new GraphWidget({
+      title: 'Invocations and errors',
+      left: [
+        invocation('Invocations'),
+        invocation('SystemErrors'),
+        invocation('UserErrors'),
+        invocation('Throttles'),
+      ],
+      width: 12,
+    }),
+  );
+  dashboard.addWidgets(
+    new GraphWidget({
+      title: 'Latency',
+      left: [invocation('Latency', 'Average'), invocation('Latency', 'p99')],
+      width: 8,
+    }),
+    new GraphWidget({
+      title: 'Sessions',
+      left: [invocation('Sessions')],
+      width: 8,
+    }),
+    new GraphWidget({
+      title: 'Resources',
+      left: [usage('MemoryUsed-GBHours')],
+      right: [usage('CPUUsed-vCPUHours')],
+      width: 8,
+    }),
+  );
+  return dashboard;
 }

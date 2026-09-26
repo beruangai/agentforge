@@ -50,7 +50,7 @@
 
 **Outcome** — How a task ended: the output, a **cause**, cancelled, or rejected with a reason. Carried as the artifact `outcome`.
 
-**Cause** — `{ code, message, suggestedAction, retryable, retryAfter?, payload?, stackTrace? }` on a failed task. Codes are `SCREAMING_SNAKE_CASE`: `OUTPUT_INVALID`, `OUTPUT_TOO_LARGE`, `BUDGET_EXHAUSTED`, `TIMED_OUT`, `LOST`, `USAGE_LIMITED`, `CREDENTIAL_EXPIRED`, `PROVIDER_TRANSIENT`, `EXECUTION_ERROR`.
+**Cause** — `{ code, message, suggestedAction, retryable, retryAfter?, payload?, stackTrace? }` on a failed task. Codes are `SCREAMING_SNAKE_CASE`: `OUTPUT_INVALID`, `OUTPUT_TOO_LARGE`, `BUDGET_EXHAUSTED`, `TIMED_OUT`, `LOST`, `USAGE_LIMITED`, `CREDENTIAL_EXPIRED`, `PROVIDER_TRANSIENT`, `WORKING_DIRECTORY_UNSYNCED`, `EXECUTION_ERROR`.
 
 **Idempotency key** — The caller's name for one logical execution; a start with it attaches to its live or completed task ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
 
@@ -72,7 +72,7 @@
 
 **`cwd`** — The SDK's working directory, and the capability root: which `.claude/` layers apply.
 
-**Working directory** — Where a run's files live: chosen by the procedure, with no default, and added to the run with `additionalDirectories`. Persisting it across containers is open (DESIGN_OPTIONS §F).
+**Working directory** — An optional filesystem a consumer declares so its agents persist and share artifacts: a `WorkingDirectory` construct's bucket, given to agents by name. A procedure opens a prefix of it with `context.openWorkingDirectory`, under a **sync** it declares whole — `pull`, `push`, `continuous`, `deletes`, `exclude` — and the outcome waits for the push ([ADR 0015](../adr/0015-working-directories-sync-a-prefix-per-task.md)).
 
 ## Delivery
 
@@ -92,4 +92,4 @@
 
 **Consumer** — StrategyFoundry or TrendBot.
 
-**Requirement** — A numbered behavior in [REQUIREMENTS.md](REQUIREMENTS.md), cited as `§REQ304`. Distinct from an ADR, which records why, and a DESIGN_OPTIONS section (`§F`), which is still open.
+**Requirement** — A numbered behavior in [REQUIREMENTS.md](REQUIREMENTS.md), cited as `§REQ304`. Distinct from an ADR, which records why, and a DESIGN_OPTIONS section (`§K`), which is still open.

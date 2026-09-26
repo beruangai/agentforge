@@ -26,3 +26,4 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0012](0012-the-server-is-assembled-not-inherited.md) | The A2A server is assembled from `@a2a-js/sdk`, not inherited from the AgentCore SDK | accepted |
 | [0013](0013-a-procedure-is-an-orpc-contract.md) | A procedure is an oRPC contract, split into A2A's own task calls | accepted |
 | [0014](0014-agentforge-speaks-a2a-1-0-only.md) | AgentForge speaks A2A 1.0 only | accepted |
+| [0015](0015-working-directories-sync-a-prefix-per-task.md) | Working directories sync a prefix per task, verified by ETag | proposed |

@@ -2,6 +2,9 @@ import { timeBudget } from '@beruangai/agentforge/contract';
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
 
+/** A topic names the notebook's prefix its note is kept under. */
+const TopicField = z.string().regex(/^[a-z0-9-]{1,64}$/);
+
 /**
  * What callers import. Each procedure is an oRPC contract; AgentForge derives
  * `SendMessage` and `GetTask` for it, and checks its hash in the container.
@@ -28,4 +31,17 @@ export const helloAgent = {
     .meta(timeBudget(300))
     .input(z.object({ seconds: z.number().int().positive().max(600) }))
     .output(z.object({ answer: z.string() })),
+  /** Keeps a note in the notebook, a working directory, under a topic. */
+  keepNote: oc
+    .input(z.object({ topic: TopicField, note: z.string().min(1) }))
+    .output(
+      z.object({
+        /** Whether the file holds the note: read back, never asked of the model. */
+        kept: z.boolean(),
+      }),
+    ),
+  /** Reads back the note kept under a topic, whichever container kept it. */
+  recallNote: oc
+    .input(z.object({ topic: TopicField }))
+    .output(z.object({ note: z.string() })),
 };

@@ -27,6 +27,13 @@ import {
   TaskFailure,
 } from './kernel.ts';
 import { sessionStoreFromEnvironment } from './session-store.ts';
+import {
+  declaredWorkingDirectories,
+  type OpenWorkingDirectory,
+  TaskWorkingDirectories,
+  type WorkingDirectoriesOptions,
+  type WorkingDirectorySpec,
+} from './working-directory.ts';
 
 /** What every procedure handler receives as its oRPC context. */
 export interface TaskContext {
@@ -43,6 +50,14 @@ export interface TaskContext {
   readonly signal: AbortSignal;
   /** Runs the agent to a settled, typed answer. Throws to fail or cancel the task. */
   runAgent<Output>(spec: AgentRunSpec<Output>): Promise<AgentRun<Output>>;
+  /**
+   * Pulls a prefix of a working directory the deployment declared into a
+   * directory of this task's own, and pushes it back as `spec.sync` says
+   * before the outcome is published (ADR 0015).
+   */
+  openWorkingDirectory(
+    spec: WorkingDirectorySpec,
+  ): Promise<OpenWorkingDirectory>;
 }
 
 /** The oRPC implementer for a contract, with AgentForge's task context. */
@@ -63,16 +78,74 @@ export interface ExecuteOptions {
   readonly onRecord: (record: RunRecord) => void;
   /** Where every run's transcript is mirrored, when the deployment declares it. */
   readonly sessionStore?: SessionStore;
+  /** The working directories the deployment declared; none when absent. */
+  readonly workingDirectories?: WorkingDirectoriesOptions;
   /** A test seam: replaces the SDK call inside the kernel. */
   readonly query?: QueryFunction;
 }
 
 /**
- * Runs one invocation of one procedure to its outcome. Never throws: every
- * way it can end is an outcome.
+ * Runs one invocation of one procedure to its outcome, its working
+ * directories synced as their strategies say. Never throws: every way it can
+ * end is an outcome.
  */
 export async function executeProcedure(
   options: ExecuteOptions,
+): Promise<Outcome> {
+  const workingDirectories = new TaskWorkingDirectories({
+    buckets: {},
+    ...options.workingDirectories,
+    taskId: options.invocation.taskId,
+  });
+  try {
+    const outcome = await runProcedure(options, workingDirectories);
+    return await synced(outcome, workingDirectories);
+  } finally {
+    await workingDirectories.dispose();
+  }
+}
+
+/**
+ * Pushes the working directories as the outcome requires. A completed task
+ * whose files did not all arrive fails; a failed one keeps its own cause,
+ * the sync's failure added to its message.
+ */
+async function synced(
+  outcome: Outcome,
+  workingDirectories: TaskWorkingDirectories,
+): Promise<Outcome> {
+  if (outcome.state === 'TASK_STATE_REJECTED') return outcome;
+  const ending =
+    outcome.state === 'TASK_STATE_COMPLETED'
+      ? 'COMPLETED'
+      : outcome.state === 'TASK_STATE_FAILED'
+        ? 'FAILED'
+        : 'CANCELED';
+  try {
+    await workingDirectories.close(ending);
+    return outcome;
+  } catch (error) {
+    const unsynced =
+      error instanceof TaskFailure
+        ? error.taskCause
+        : cause('WORKING_DIRECTORY_UNSYNCED', String(error));
+    console.error(unsynced.message, error);
+    if (outcome.state !== 'TASK_STATE_FAILED') {
+      return { state: 'TASK_STATE_FAILED', cause: unsynced };
+    }
+    return {
+      state: 'TASK_STATE_FAILED',
+      cause: {
+        ...outcome.cause,
+        message: `${outcome.cause.message}; and ${unsynced.message}`,
+      },
+    };
+  }
+}
+
+async function runProcedure(
+  options: ExecuteOptions,
+  workingDirectories: TaskWorkingDirectories,
 ): Promise<Outcome> {
   const { envelope } = options.invocation;
   const procedureContract = procedureAt(options.contract, envelope.procedure);
@@ -119,6 +192,7 @@ export async function executeProcedure(
         },
         options.query,
       ),
+    openWorkingDirectory: (spec) => workingDirectories.open(spec),
   };
   try {
     const output: unknown = await call(procedure, input.data, {
@@ -214,6 +288,7 @@ export function runTaskProcess(options: {
     );
   const controller = new AbortController();
   const sessionStore = sessionStoreFromEnvironment();
+  const buckets = declaredWorkingDirectories();
   let started = false;
   process.on('message', (message: ExecutorMessage) => {
     if (message.type === 'cancel') {
@@ -229,6 +304,7 @@ export function runTaskProcess(options: {
       signal: controller.signal,
       onRecord: (record) => void emit({ type: 'record', record }),
       ...(sessionStore === undefined ? {} : { sessionStore }),
+      workingDirectories: { buckets },
     })
       .then((outcome) => emit({ type: 'outcome', outcome }))
       .then(

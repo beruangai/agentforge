@@ -73,7 +73,9 @@ export const summarise = procedureActivity(client.summarise, {
 Built to what the platforms document, with tests only where AgentForge relies on something they leave unsaid. Report what hits, and it is triaged in the layer that owns it.
 
 - **Resume uses the session's working directory.** A transcript is keyed by the directory its session began in — the agent's own unless a procedure sets `cwd` — and a resume must run from the same one.
-- **Files do not follow a session.** A resumed session remembers what earlier runs wrote, but a new container does not have those files. Working directories that persist are planned (§F).
+- **Files do not follow a session.** A resumed session remembers what earlier runs wrote, but a new container does not have those files — only what a working directory pushed.
+- **A working directory's prefix is last-writer-wins.** Two tasks pushing one prefix at once overwrite each other file by file; serialise them with a continuity key, or give each its own prefix. `deletes` without `pull` empties the prefix of what the task did not write.
+- **Working directories are verified by ETag**, so their buckets are S3-encrypted, and a file over 5 GB fails its push.
 - **Transcripts are kept 30 days by default** (`sessionRetention`), and hold everything the agent was sent and read.
 - **Locally, sessions live in the container** and end with it; only a deployed agent persists them.
 

@@ -4,7 +4,7 @@
  * harness, the Agent SDK and a real model — and back as a typed outcome; and
  * a task whose container the platform stops ends `LOST`, its retry running as
  * the next attempt; and a session outlives its container, resuming in
- * another from its transcript in S3.
+ * another from its transcript in S3; and so do a working directory's files.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -158,6 +158,40 @@ describe('hello-agent, on AgentCore', () => {
       throw new Error(`expected completion, got ${JSON.stringify(resumed)}`);
     }
     expect(resumed.output.sessionId).toBe(sessionId);
+  });
+
+  it('keeps a note in a working directory, and reads it back in another container', async () => {
+    const topic = `e2e-${randomUUIDv7()}`;
+    const note = `The notebook outlives the container that wrote ${topic}.`;
+    const first = {
+      runtimeSessionId: newRuntimeSessionId(),
+      idempotencyKey: randomUUIDv7(),
+    };
+    const kept = await awaitTask(
+      client.keepNote,
+      await client.keepNote.SendMessage({ topic, note }, first),
+      { ...first, pollIntervalMilliseconds: 2_000 },
+    );
+    if (kept.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(`expected completion, got ${JSON.stringify(kept)}`);
+    }
+    expect(kept.output.kept).toBe(true);
+
+    // Another runtime session is another container: the note can only come
+    // from the bucket.
+    const second = {
+      runtimeSessionId: newRuntimeSessionId(),
+      idempotencyKey: randomUUIDv7(),
+    };
+    const recalled = await awaitTask(
+      client.recallNote,
+      await client.recallNote.SendMessage({ topic }, second),
+      { ...second, pollIntervalMilliseconds: 2_000 },
+    );
+    if (recalled.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(`expected completion, got ${JSON.stringify(recalled)}`);
+    }
+    expect(recalled.output.note.trim()).toBe(note);
   });
 
   it('ends a task LOST when the platform stops its container mid-Bash, and runs the retry as the next attempt', async () => {

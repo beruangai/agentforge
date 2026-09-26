@@ -17,11 +17,13 @@ import {
   type TaskState as TaskStateName,
   TERMINAL_TASK_STATES,
 } from '#core/contract/task.ts';
+import { OPERATIONAL_METRICS } from '#core/metrics.ts';
 import {
   TASK_TABLE_PARTITION_KEY,
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
 } from '#core/task-table.ts';
 import { finishedTask, stateOf } from './a2a-task.ts';
+import type { OperationalMetrics } from './metrics.ts';
 
 /** A task whose lease has not been renewed for this long is lost (§REQ303). */
 export const LEASE_MILLISECONDS = 60_000;
@@ -42,9 +44,15 @@ export class DynamoDBTaskStore implements TaskStore {
   readonly #client: DynamoDBClient;
   readonly #tableName: string;
 
-  constructor(client: DynamoDBClient, tableName: string) {
+  readonly #metrics: OperationalMetrics;
+  constructor(
+    client: DynamoDBClient,
+    tableName: string,
+    metrics: OperationalMetrics,
+  ) {
     this.#client = client;
     this.#tableName = tableName;
+    this.#metrics = metrics;
   }
 
   async save(task: Task, _context?: ServerCallContext): Promise<void> {
@@ -122,6 +130,7 @@ export class DynamoDBTaskStore implements TaskStore {
           },
         }),
       );
+      this.#metrics.count(OPERATIONAL_METRICS.LOST, taskId);
       return lost;
     } catch (error) {
       // Someone wrote first — a renewal or the real outcome. Read what they wrote.

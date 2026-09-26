@@ -1,8 +1,22 @@
-import { implementAgent } from '@beruangai/agentforge/agent';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import {
+  implementAgent,
+  type WorkingDirectorySync,
+} from '@beruangai/agentforge/agent';
 import { z } from 'zod';
 import { helloAgent } from './contract.ts';
 
 const os = implementAgent(helloAgent);
+
+/** How this agent syncs its notebook; each procedure overrides what it must. */
+const NOTEBOOK_SYNC: WorkingDirectorySync = {
+  pull: true,
+  push: 'WHEN_COMPLETED',
+  continuous: false,
+  deletes: false,
+  exclude: [],
+};
 
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
@@ -41,5 +55,49 @@ export const router = os.router({
       },
     });
     return { answer: run.output.answer };
+  }),
+  keepNote: os.keepNote.handler(async ({ input, context }) => {
+    const notebook = await context.openWorkingDirectory({
+      name: 'notebook',
+      prefix: `topics/${input.topic}`,
+      sync: NOTEBOOK_SYNC,
+    });
+    const file = join(notebook.path, 'note.md');
+    await context.runAgent({
+      prompt: [
+        `Write the note below, exactly, to the file \`${file}\` with the Write tool, then answer that you did.`,
+        { tag: 'note', context: input.note },
+      ],
+      output: z.object({ written: z.boolean() }),
+      options: {
+        model: 'claude-haiku-4-5',
+        maxTurns: 4,
+        tools: ['Write'],
+        allowedTools: ['Write'],
+        additionalDirectories: [notebook.path],
+      },
+    });
+    return {
+      kept: (await readFile(file, 'utf8')).trim() === input.note.trim(),
+    };
+  }),
+  recallNote: os.recallNote.handler(async ({ input, context }) => {
+    const notebook = await context.openWorkingDirectory({
+      name: 'notebook',
+      prefix: `topics/${input.topic}`,
+      sync: { ...NOTEBOOK_SYNC, push: 'NEVER' },
+    });
+    const run = await context.runAgent({
+      prompt: `Read the file \`${join(notebook.path, 'note.md')}\` with the Read tool, and answer with its content, exactly.`,
+      output: z.object({ note: z.string().describe("The file's content") }),
+      options: {
+        model: 'claude-haiku-4-5',
+        maxTurns: 4,
+        tools: ['Read'],
+        allowedTools: ['Read'],
+        additionalDirectories: [notebook.path],
+      },
+    });
+    return { note: run.output.note };
   }),
 });

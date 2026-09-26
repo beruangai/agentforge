@@ -39,6 +39,7 @@
     "@anthropic-ai/sdk": "0.128.0",
     "@aws-sdk/client-bedrock-agentcore": "3.1138.0",
     "@aws-sdk/client-bedrock-agentcore-control": "3.1138.0",
+    "@aws-sdk/client-cloudwatch": "3.1138.0",
     "@aws-sdk/client-cloudwatch-logs": "3.1138.0",
     "@aws-sdk/client-dynamodb": "3.1138.0",
     "@aws-sdk/client-secrets-manager": "3.1138.0",

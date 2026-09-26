@@ -9,6 +9,7 @@ import express from 'express';
 import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
 import { TaskProcessExecutor } from './executor.ts';
 import { createGateway } from './gateway.ts';
+import { createOperationalMetrics } from './metrics.ts';
 import { resolveDeclaredSecrets } from './secrets.ts';
 import { createTaskTable, DynamoDBTaskStore } from './task-store.ts';
 import { startTelemetry, type Telemetry } from './telemetry.ts';
@@ -109,7 +110,8 @@ export async function startServer(
   if (config.dynamoDBEndpoint !== undefined) {
     await createTaskTable(dynamoDB, config.tableName);
   }
-  const store = new DynamoDBTaskStore(dynamoDB, config.tableName);
+  const metrics = createOperationalMetrics();
+  const store = new DynamoDBTaskStore(dynamoDB, config.tableName, metrics);
   const executor = new TaskProcessExecutor({
     taskCommand: [
       process.execPath,
@@ -121,6 +123,7 @@ export async function startServer(
     defaultTimeBudgetSeconds: config.defaultTimeBudgetSeconds,
     graceMilliseconds: GRACE_MILLISECONDS,
     store,
+    metrics,
   });
 
   const app = express();
@@ -197,6 +200,7 @@ export async function startServer(
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
+    await metrics.flush();
     // Last, so it flushes what the stopped tasks' CLIs exported.
     await prepared?.catch(() => undefined);
     await telemetry?.stop();

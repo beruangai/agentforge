@@ -8,6 +8,7 @@ import {
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
 } from '#core/task-table.ts';
 import { AgentRuntime, type AgentRuntimeProps } from './agent-runtime.ts';
+import { WorkingDirectory } from './working-directory.ts';
 
 const IMAGE = AgentRuntimeArtifact.fromImageUri(
   '123456789012.dkr.ecr.us-east-2.amazonaws.com/agent:latest',
@@ -95,6 +96,34 @@ describe('AgentRuntime', () => {
         ]),
       },
     });
+  });
+
+  it('counts per agent under its runtime name, may publish only to its namespace, and charts it beside AgentCore', () => {
+    const template = synthesize({ runtimeName: 'agent_runtime' });
+    template.hasResourceProperties('AWS::BedrockAgentCore::Runtime', {
+      EnvironmentVariables: Match.objectLike({
+        AGENTFORGE_METRICS_RUNTIME_NAME: 'agent_runtime',
+      }),
+    });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          {
+            Action: 'cloudwatch:PutMetricData',
+            Condition: {
+              StringEquals: { 'cloudwatch:namespace': 'AgentForge' },
+            },
+            Effect: 'Allow',
+            Resource: '*',
+          },
+        ]),
+      },
+    });
+    const body = JSON.stringify(
+      template.findResources('AWS::CloudWatch::Dashboard'),
+    );
+    expect(body).toContain('TasksLost');
+    expect(body).toContain('agent_runtime::DEFAULT');
   });
 
   it('keeps transcripts as long as the consumer chooses', () => {
@@ -223,5 +252,39 @@ describe('AgentRuntime', () => {
     expect(() =>
       synthesize({ environmentVariables: { AGENTFORGE_TABLE_NAME: 'mine' } }),
     ).toThrow(/AGENTFORGE_TABLE_NAME/);
+  });
+
+  it('names its working directories to the harness, and may read and write each', () => {
+    const template = synthesize((stack) => ({
+      workingDirectories: { vault: new WorkingDirectory(stack, 'Vault') },
+    }));
+    const [runtime] = Object.values(
+      template.findResources('AWS::BedrockAgentCore::Runtime'),
+    );
+    const declared = JSON.stringify(
+      runtime?.Properties.EnvironmentVariables.AGENTFORGE_WORKING_DIRECTORIES,
+    );
+    expect(declared).toContain('\\"vault\\":');
+    expect(declared).toContain('VaultBucket');
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(['s3:DeleteObject*', 's3:PutObject']),
+            Resource: Match.arrayWith([
+              { 'Fn::GetAtt': [Match.stringLikeRegexp('^VaultBucket'), 'Arn'] },
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  it('refuses a working directory name a procedure could not open', () => {
+    expect(() =>
+      synthesize((stack) => ({
+        workingDirectories: { Vault: new WorkingDirectory(stack, 'Vault') },
+      })),
+    ).toThrow(/working directory name "Vault"/);
   });
 });

@@ -29,3 +29,8 @@ export {
   runTaskProcess,
   type TaskContext,
 } from './task-process.ts';
+export type {
+  OpenWorkingDirectory,
+  WorkingDirectorySpec,
+  WorkingDirectorySync,
+} from './working-directory.ts';
