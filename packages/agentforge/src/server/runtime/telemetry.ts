@@ -81,9 +81,16 @@ export interface Telemetry {
  * At the level the construct sets, starts the collector and points the CLI
  * of every task at it, through the environment tasks inherit. Nothing set,
  * nothing started — locally there is no role to sign with. A collector that
- * does not come up fails the request that prepared the container.
+ * does not come up fails the request that prepared the container. The
+ * container serves one runtime session, which the collector stamps on every
+ * span as `session.id`, so the CLI's spans join AgentCore's session; the
+ * agent's name becomes `gen_ai.agent.name`.
  */
 export async function startTelemetry(
+  {
+    agentName,
+    runtimeSessionId,
+  }: { readonly agentName: string; readonly runtimeSessionId?: string },
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<Telemetry | undefined> {
   const declared = environment[TELEMETRY_VARIABLE];
@@ -91,6 +98,9 @@ export async function startTelemetry(
   const level = TelemetryLevelSchema.parse(declared);
   const region = environment.AWS_REGION;
   if (!region) throw new Error('AWS_REGION must be set for telemetry');
+  if (!runtimeSessionId) {
+    throw new Error('telemetry needs the runtime session the container serves');
+  }
   const { logGroup, logStream } = agentCoreLogDestination(environment);
 
   const configs = [
@@ -105,6 +115,8 @@ export async function startTelemetry(
       ...environment,
       AGENTFORGE_OTEL_LOG_GROUP: logGroup,
       AGENTFORGE_OTEL_LOG_STREAM: logStream,
+      AGENTFORGE_RUNTIME_SESSION_ID: runtimeSessionId,
+      AGENTFORGE_AGENT_NAME: agentName,
       // ADOT logs to stderr, not to a file under /opt/aws it cannot create.
       RUN_IN_CONTAINER: 'True',
     },

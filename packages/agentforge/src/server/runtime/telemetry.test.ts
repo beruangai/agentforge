@@ -61,12 +61,29 @@ describe('agentCoreLogDestination', () => {
 
 describe('startTelemetry', () => {
   it('starts nothing when no level is set', async () => {
-    await expect(startTelemetry({})).resolves.toBeUndefined();
+    await expect(
+      startTelemetry({ agentName: 'agent' }, {}),
+    ).resolves.toBeUndefined();
   });
 
   it('refuses a level it does not know', async () => {
     await expect(
-      startTelemetry({ AGENTFORGE_TELEMETRY: 'VERBOSE' }),
+      startTelemetry(
+        { agentName: 'agent', runtimeSessionId: 'session' },
+        { AGENTFORGE_TELEMETRY: 'VERBOSE' },
+      ),
     ).rejects.toThrow();
+  });
+
+  it('refuses to start without the runtime session to stamp on its spans', async () => {
+    await expect(
+      startTelemetry(
+        { agentName: 'agent' },
+        {
+          AGENTFORGE_TELEMETRY: 'INFO',
+          AWS_REGION: 'us-east-2',
+        },
+      ),
+    ).rejects.toThrow(/runtime session/);
   });
 });

@@ -27,7 +27,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - Ids minted after a V2 restore are distinct. **Settled 2026-09-26**: Bun's generator replays across restores once drawn from before the snapshot, so the server draws nothing before it; the same test, deployed with a secret and telemetry, re-checks it
 - The admission default measured (§G). **Settled 2026-09-26**: 4 kept, ~165 MB per running task measured
 - `hello-agent`'s e2e against the deployed runtime through `agentCoreTransport`, including a container stop mid-task ending `LOST` and a retry attaching. **Built 2026-09-26** as `e2e-agentcore`
-- Telemetry and per-agent metrics (§T). **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels); open: `gen_ai.*` mapping, per-agent counts
+- Telemetry and per-agent metrics (§T). **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels), **its `gen_ai.*` mapping 2026-09-27**; open: per-agent counts
 - Cross-container resume (§F), if a consumer needs it before A4
 
 **Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop.

@@ -1,6 +1,17 @@
 # The container's OpenTelemetry collector (ADOT): receives the Claude CLI's
 # OTLP on localhost and signs it on to CloudWatch's OTLP endpoints with the
 # runtime's role. The server starts it and sets the variables below.
+#
+# The CLI names its spans `claude_code.*` and sets some GenAI semantic
+# conventions (`gen_ai.request.model`, `gen_ai.provider.name`,
+# `gen_ai.tool.call.id`) but not the operation, the token usage, the tool's
+# or the agent's name, which GenAI Observability reads. The `attributes/gen_ai_*`
+# processors copy them from the CLI's own attributes, never overwriting one
+# the CLI sets; the `span/gen_ai_*` processors then name each span
+# `{operation} {target}`, as the conventions do. The CLI's own span type stays
+# in `span.type`. Its `input_tokens` is Anthropic's, which excludes cached
+# tokens: the cache counts are copied beside it rather than summed, as these
+# processors cannot.
 extensions:
   health_check:
     endpoint: 127.0.0.1:13133
@@ -22,6 +33,55 @@ processors:
   # Short, so little is buffered when AgentCore stops the container.
   batch:
     timeout: 1s
+  # A container serves one runtime session: every span joins it.
+  attributes/session:
+    actions:
+      - { key: session.id, value: '${env:AGENTFORGE_RUNTIME_SESSION_ID}', action: insert }
+  attributes/gen_ai_chat:
+    include:
+      match_type: strict
+      span_names: [claude_code.llm_request]
+    actions:
+      - { key: gen_ai.operation.name, value: chat, action: insert }
+      - { key: gen_ai.usage.input_tokens, from_attribute: input_tokens, action: insert }
+      - { key: gen_ai.usage.output_tokens, from_attribute: output_tokens, action: insert }
+      - { key: gen_ai.usage.cache_read.input_tokens, from_attribute: cache_read_tokens, action: insert }
+      - { key: gen_ai.usage.cache_creation.input_tokens, from_attribute: cache_creation_tokens, action: insert }
+  attributes/gen_ai_tool:
+    include:
+      match_type: strict
+      span_names: [claude_code.tool]
+    actions:
+      - { key: gen_ai.operation.name, value: execute_tool, action: insert }
+      - { key: gen_ai.tool.name, from_attribute: tool_name, action: insert }
+  attributes/gen_ai_agent:
+    include:
+      match_type: strict
+      span_names: [claude_code.interaction]
+    actions:
+      - { key: gen_ai.operation.name, value: invoke_agent, action: insert }
+      - { key: gen_ai.agent.name, value: '${env:AGENTFORGE_AGENT_NAME}', action: insert }
+  span/gen_ai_chat:
+    include:
+      match_type: strict
+      span_names: [claude_code.llm_request]
+    name:
+      from_attributes: [gen_ai.operation.name, gen_ai.request.model]
+      separator: ' '
+  span/gen_ai_tool:
+    include:
+      match_type: strict
+      span_names: [claude_code.tool]
+    name:
+      from_attributes: [gen_ai.operation.name, gen_ai.tool.name]
+      separator: ' '
+  span/gen_ai_agent:
+    include:
+      match_type: strict
+      span_names: [claude_code.interaction]
+    name:
+      from_attributes: [gen_ai.operation.name, gen_ai.agent.name]
+      separator: ' '
 exporters:
   otlp_http/traces:
     traces_endpoint: https://xray.${env:AWS_REGION}.amazonaws.com/v1/traces
@@ -46,7 +106,15 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors:
+        - attributes/session
+        - attributes/gen_ai_chat
+        - attributes/gen_ai_tool
+        - attributes/gen_ai_agent
+        - span/gen_ai_chat
+        - span/gen_ai_tool
+        - span/gen_ai_agent
+        - batch
       exporters: [otlp_http/traces]
     logs:
       receivers: [otlp]

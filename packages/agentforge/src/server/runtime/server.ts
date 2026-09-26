@@ -6,6 +6,7 @@ import { DefaultRequestHandler } from '@a2a-js/sdk/server';
 import { jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import express from 'express';
+import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
 import { TaskProcessExecutor } from './executor.ts';
 import { createGateway } from './gateway.ts';
 import { resolveDeclaredSecrets } from './secrets.ts';
@@ -154,16 +155,19 @@ export async function startServer(
   // prepared on the first request after the restore, before any task.
   let telemetry: Telemetry | undefined;
   let prepared: Promise<void> | undefined;
-  const prepare = (): Promise<void> => {
+  const prepare = (runtimeSessionId: string | undefined): Promise<void> => {
     prepared ??= (async () => {
       // Before the secrets, so the collector's environment holds none.
-      telemetry = await startTelemetry();
+      telemetry = await startTelemetry({
+        agentName: config.agentName,
+        ...(runtimeSessionId === undefined ? {} : { runtimeSessionId }),
+      });
       await resolveDeclaredSecrets();
     })();
     return prepared;
   };
   app.post('/', (request, response, next) => {
-    prepare().then(
+    prepare(request.get(RUNTIME_SESSION_HEADER)).then(
       () => next(),
       (error: unknown) => {
         console.error('the container could not be prepared', error);
