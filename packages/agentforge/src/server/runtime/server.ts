@@ -10,6 +10,7 @@ import { TaskProcessExecutor } from './executor.ts';
 import { createGateway } from './gateway.ts';
 import { resolveDeclaredSecrets } from './secrets.ts';
 import { createTaskTable, DynamoDBTaskStore } from './task-store.ts';
+import { startTelemetry } from './telemetry.ts';
 
 export interface ServerConfig {
   /** The agent's name, on its card and in its records. */
@@ -96,6 +97,8 @@ const GRACE_MILLISECONDS = 5_000;
 export async function startServer(
   options: ServerOptions,
 ): Promise<RunningServer> {
+  // Before the secrets, so the collector's environment holds none.
+  const telemetry = await startTelemetry();
   await resolveDeclaredSecrets();
   const config = serverConfig(options);
   const dynamoDB = new DynamoDBClient(
@@ -162,6 +165,8 @@ export async function startServer(
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
+    // Last, so it flushes what the stopped tasks' CLIs exported.
+    await telemetry?.stop();
   };
   process.once('SIGTERM', () => {
     close().then(

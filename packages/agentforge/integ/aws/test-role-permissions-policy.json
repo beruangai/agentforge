@@ -86,6 +86,20 @@
       "Resource": "arn:aws:logs:us-east-2:913756569129:log-group:/aws/bedrock-agentcore/runtimes/agentforge_integ_*"
     },
     {
+      "Sid": "ReadTheExamplesLogsAndSpans",
+      "Effect": "Allow",
+      "Action": [
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents",
+        "logs:DescribeLogStreams",
+        "logs:StartLiveTail"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-2:913756569129:log-group:/aws/bedrock-agentcore/runtimes/agentforgeexample*",
+        "arn:aws:logs:us-east-2:913756569129:log-group:aws/spans"
+      ]
+    },
+    {
       "Sid": "S3BucketsTheTestsCreate",
       "Effect": "Allow",
       "Action": [

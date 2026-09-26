@@ -1,5 +1,6 @@
 # The AgentForge base image, `agentforge/a2a-claude`: Bun, what the Claude
-# Code CLI needs at run time, and the container's `/workspace` — a Bun
+# Code CLI needs at run time, the ADOT collector that carries the CLI's
+# telemetry to CloudWatch, and the container's `/workspace` — a Bun
 # workspace whose root depends on the peers AgentForge's server and harness
 # import, with AgentForge itself as the member at `/workspace/agentforge`.
 #
@@ -11,7 +12,11 @@
 # Build context: the published bundle, which becomes the `agentforge` member.
 # The `container` context holds the root manifest and its lock.
 ARG BUN_IMAGE=docker.io/oven/bun:1.4.0-alpine@sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb
+ARG COLLECTOR_IMAGE=public.ecr.aws/aws-observability/aws-otel-collector:v0.50.0@sha256:7968fb60db6a2390a47ba6a2df029745638486e285c9b2487da1b722d0855a3e
+FROM ${COLLECTOR_IMAGE} AS collector
 FROM ${BUN_IMAGE}
+# A static binary; the server starts it when the construct sets a telemetry level.
+COPY --from=collector /awscollector /usr/local/bin/aws-otel-collector
 # The Claude CLI's Bash tool refuses busybox sh; it needs bash, named by SHELL.
 RUN apk add --no-cache bash git ca-certificates ripgrep \
  && mkdir -p /workspace/agentforge /workspace/agentic/agent \

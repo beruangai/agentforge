@@ -32,6 +32,7 @@ import {
   TASK_TABLE_PARTITION_KEY,
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
 } from '#core/task-table.ts';
+import { TELEMETRY_VARIABLE, type TelemetryLevel } from '#core/telemetry.ts';
 
 /** The one request header AgentForge relies on AgentCore forwarding (ADR 0014). */
 const A2A_VERSION_HEADER = 'A2A-Version';
@@ -63,6 +64,14 @@ export interface AgentRuntimeProps
    * stopgap until AgentCore Identity holds them.
    */
   readonly secrets?: Readonly<Record<string, ISecret>>;
+  /**
+   * How much of the Claude CLI's telemetry the agent exports to CloudWatch,
+   * as a log level: `WARN`, metrics and error events; `INFO`, every event
+   * and trace, no content; `DEBUG`, prompts and tool content too; `ALL`, the
+   * raw API bodies too.
+   * @default 'INFO'
+   */
+  readonly telemetry?: TelemetryLevel;
 }
 
 /**
@@ -87,11 +96,16 @@ export class AgentRuntime extends Construct {
       taskTableRemovalPolicy = RemovalPolicy.RETAIN,
       tracingEnabled = true,
       secrets = {},
+      telemetry = 'INFO',
       environmentVariables = {},
       requestHeaderConfiguration,
       ...runtimeProps
     } = props;
-    for (const owned of [TABLE_NAME_VARIABLE, SECRETS_VARIABLE]) {
+    for (const owned of [
+      TABLE_NAME_VARIABLE,
+      SECRETS_VARIABLE,
+      TELEMETRY_VARIABLE,
+    ]) {
       if (owned in environmentVariables) {
         throw new Error(
           `${owned} is set by AgentRuntime; remove it from environmentVariables`,
@@ -131,6 +145,7 @@ export class AgentRuntime extends Construct {
       environmentVariables: {
         ...environmentVariables,
         [TABLE_NAME_VARIABLE]: this.taskTable.tableName,
+        [TELEMETRY_VARIABLE]: telemetry,
         ...(Object.keys(secrets).length === 0
           ? {}
           : {
@@ -155,6 +170,20 @@ export class AgentRuntime extends Construct {
         "PlatformVersion is in CloudFormation's resource reference but not yet in the CDK's bundled schema",
     });
     this.taskTable.grantReadWriteData(this.runtime);
+    // The collector's OTLP metrics are PutMetricData on CloudWatch's default
+    // dataset, which the L2 role's namespace-scoped grant does not cover.
+    this.runtime.role.addToPrincipalPolicy(
+      new PolicyStatement({
+        actions: ['cloudwatch:PutMetricData'],
+        resources: [
+          Stack.of(this).formatArn({
+            service: 'cloudwatch',
+            resource: 'dataset',
+            resourceName: 'default',
+          }),
+        ],
+      }),
+    );
     for (const secret of Object.values(secrets)) {
       secret.grantRead(this.runtime);
     }

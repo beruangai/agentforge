@@ -120,6 +120,13 @@ export async function runAgent<Output>(
     },
     outputFormat: { type: 'json_schema', schema: wire.schema },
     abortController,
+    // The SDK drops the CLI's stderr unless asked for it, and with it the
+    // CLI's telemetry export errors; into the task's log instead.
+    stderr:
+      spec.options?.stderr ??
+      ((data: string) => {
+        process.stderr.write(data);
+      }),
   };
   const session = query({
     prompt: createStreamingInput(message, inputEnded),

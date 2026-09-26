@@ -175,8 +175,8 @@ describe("AgentForge's server on AgentCore", () => {
   }, 300_000);
 
   // Held: on 2026-09-26 no span reached the runtime's own log group within
-  // ten minutes. Enabled once spans are confirmed by hand and where they land
-  // is known, so a regression in delivery is caught.
+  // ten minutes; they land in the shared `aws/spans` group instead. Rewritten
+  // to read there, and enabled, once it is decided the check earns its place.
   it.skip(
     "delivers the runtime's service spans to its own log group",
     async () => {

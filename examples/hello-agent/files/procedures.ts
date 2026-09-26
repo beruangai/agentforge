@@ -15,6 +15,7 @@ export const router = os.router({
         summary: z.string().describe('One sentence summarising the text'),
       }),
       options: {
+        model: 'claude-haiku-4-5',
         maxTurns: 3,
         tools: [],
         ...(input.resumeSessionId === undefined
@@ -33,6 +34,7 @@ export const router = os.router({
       prompt: `Run the shell command \`sleep ${input.seconds}\` with the Bash tool, then answer "done".`,
       output: z.object({ answer: z.string() }),
       options: {
+        model: 'claude-haiku-4-5',
         maxTurns: 4,
         tools: ['Bash'],
         allowedTools: ['Bash'],

@@ -1,0 +1,17 @@
+# Laid over collector.yaml at WARN: of the CLI's events, only errors — a
+# failed API call or refusal, a failed tool.
+processors:
+  filter/errors:
+    error_mode: propagate
+    logs:
+      log_record:
+        - >-
+          not (IsMatch(attributes["event.name"], "^(claude_code\\.)?(api_error|api_refusal)$")
+          or (IsMatch(attributes["event.name"], "^(claude_code\\.)?tool_result$")
+          and (attributes["success"] == false or attributes["success"] == "false")))
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [filter/errors, batch]
+      exporters: [otlp_http/logs]

@@ -43,6 +43,7 @@ describe('AgentRuntime', () => {
       EnvironmentVariables: {
         AGENTFORGE_ADMISSION_LIMIT: '2',
         AGENTFORGE_TABLE_NAME: { Ref: Match.stringLikeRegexp('TaskTable') },
+        AGENTFORGE_TELEMETRY: 'INFO',
       },
     });
   });
@@ -90,6 +91,21 @@ describe('AgentRuntime', () => {
         ]),
       },
     });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'cloudwatch:PutMetricData',
+            Resource: {
+              'Fn::Join': [
+                '',
+                Match.arrayWith([Match.stringLikeRegexp(':dataset/default$')]),
+              ],
+            },
+          }),
+        ]),
+      },
+    });
   });
 
   it('delivers no spans when the consumer turns tracing off', () => {
@@ -130,6 +146,17 @@ describe('AgentRuntime', () => {
         ]),
       },
     });
+  });
+
+  it('exports the telemetry level the consumer chooses', () => {
+    synthesize({ telemetry: 'DEBUG' }).hasResourceProperties(
+      'AWS::BedrockAgentCore::Runtime',
+      {
+        EnvironmentVariables: Match.objectLike({
+          AGENTFORGE_TELEMETRY: 'DEBUG',
+        }),
+      },
+    );
   });
 
   it('refuses a secret also set as a plain variable', () => {

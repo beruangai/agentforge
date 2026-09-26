@@ -45,6 +45,11 @@ export default defineConfig({
       from: 'src/infra/readiness-probe/index.mjs',
       to: `${bundleDirectory}/readiness-probe`,
     },
+    // The container's collector configuration, beside `server.js`.
+    {
+      from: 'src/server/runtime/collector/*.yaml',
+      to: `${bundleDirectory}/collector`,
+    },
   ],
   hooks: {
     'build:done': writePublishedManifest,
