@@ -7,7 +7,9 @@
  * CloudFormation honours `PlatformVersion`, which its reference lists without
  * describing; the deploy returns only once the runtime serves, so the first
  * call succeeds; ids minted in containers restored from one snapshot differ
- * (DESIGN_OPTIONS §H); a start and its retry attach through the platform; a
+ * — deployed with a declared secret and telemetry on, whose preparation on
+ * the first request must draw no randomness before the snapshot, as Bun's
+ * generator replays it in every restored instance; a start and its retry attach through the platform; a
  * cancel reaches the container running the task; and a platform stop ends the
  * task `LOST` — read by a fresh container from the store — after which a
  * retry runs as the next attempt.
@@ -92,9 +94,10 @@ describe("AgentForge's server on AgentCore", () => {
         ),
       ),
     );
-    // Each task id is a uuid7 minted by that container's first request. Its
-    // leading 48 bits are the time, so compare the random tail: a random
-    // source not reseeded after the restore repeats it across containers.
+    // Each task id is the A2A SDK's crypto.randomUUID(), the first a restored
+    // container mints. Bun's generator replays across restores once drawn
+    // from before the snapshot, so a draw at startup — here or in a
+    // dependency — repeats it in every container.
     const randomTails = started.map(({ taskId }) =>
       taskId.replaceAll('-', '').slice(16),
     );

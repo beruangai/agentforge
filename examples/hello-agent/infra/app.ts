@@ -25,7 +25,12 @@ const stack = new Stack(app, 'agentforge-example-hello-agent', {
 const agent = new AgentRuntime(stack, 'HelloAgent', {
   agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(
     new URL('..', import.meta.url).pathname,
-    { platform: Platform.LINUX_ARM64 },
+    {
+      platform: Platform.LINUX_ARM64,
+      // The asset hash covers this directory only; the base image it builds
+      // FROM changes without it, and a deploy would not rebuild.
+      extraHash: required('AGENTFORGE_BASE_IMAGE_ID'),
+    },
   ),
   // The operator creates this secret and sets its value (README).
   secrets: {

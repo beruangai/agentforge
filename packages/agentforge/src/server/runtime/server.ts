@@ -10,7 +10,7 @@ import { TaskProcessExecutor } from './executor.ts';
 import { createGateway } from './gateway.ts';
 import { resolveDeclaredSecrets } from './secrets.ts';
 import { createTaskTable, DynamoDBTaskStore } from './task-store.ts';
-import { startTelemetry } from './telemetry.ts';
+import { startTelemetry, type Telemetry } from './telemetry.ts';
 
 export interface ServerConfig {
   /** The agent's name, on its card and in its records. */
@@ -97,9 +97,6 @@ const GRACE_MILLISECONDS = 5_000;
 export async function startServer(
   options: ServerOptions,
 ): Promise<RunningServer> {
-  // Before the secrets, so the collector's environment holds none.
-  const telemetry = await startTelemetry();
-  await resolveDeclaredSecrets();
   const config = serverConfig(options);
   const dynamoDB = new DynamoDBClient(
     config.dynamoDBEndpoint === undefined
@@ -150,6 +147,37 @@ export async function startServer(
   app.get('/.well-known/agent-card.json', (_request, response) => {
     response.json(card);
   });
+  // AgentCore snapshots the container at its first healthy /ping, and every
+  // instance restored from it replays any randomness drawn before it — Bun's
+  // generator is not snapshot-safe, and TLS draws from it too. So startup
+  // draws none: the secrets and the collector, which need the network, are
+  // prepared on the first request after the restore, before any task.
+  let telemetry: Telemetry | undefined;
+  let prepared: Promise<void> | undefined;
+  const prepare = (): Promise<void> => {
+    prepared ??= (async () => {
+      // Before the secrets, so the collector's environment holds none.
+      telemetry = await startTelemetry();
+      await resolveDeclaredSecrets();
+    })();
+    return prepared;
+  };
+  app.post('/', (request, response, next) => {
+    prepare().then(
+      () => next(),
+      (error: unknown) => {
+        console.error('the container could not be prepared', error);
+        response.status(500).json({
+          jsonrpc: '2.0',
+          id: (request.body as { id?: unknown } | undefined)?.id ?? null,
+          error: {
+            code: -32603,
+            message: `the container could not be prepared: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        });
+      },
+    );
+  });
   app.use(
     jsonRpcHandler({
       requestHandler: gateway,
@@ -166,6 +194,7 @@ export async function startServer(
       server.close((error) => (error ? reject(error) : resolve())),
     );
     // Last, so it flushes what the stopped tasks' CLIs exported.
+    await prepared?.catch(() => undefined);
     await telemetry?.stop();
   };
   process.once('SIGTERM', () => {

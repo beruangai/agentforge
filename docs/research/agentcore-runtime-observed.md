@@ -276,7 +276,7 @@ The measurement above uses **one clock and one network**: the container writes a
 
 ## Deployed through the construct — 2026-09-25
 
-`agentforge-runtime.test.ts` now deploys through `AgentRuntime` with the CDK CLI. **CloudFormation honours `PlatformVersion: V2`** — `GetAgentRuntime` reports `V2` — though its reference lists the property without a description and the CDK's bundled schema does not know it. The readiness probe held the deploy until the runtime answered, and the first call after it was served. **Ids minted in containers restored from one V2 snapshot differ:** eight fresh sessions at once, each a restored container, minted task ids (Bun's `randomUUIDv7`) whose random tails were all distinct, so Bun's random source is reseeded after a restore (DESIGN_OPTIONS §H, closed). The deploy, the five tests and the destroy took about eleven minutes.
+`agentforge-runtime.test.ts` now deploys through `AgentRuntime` with the CDK CLI. **CloudFormation honours `PlatformVersion: V2`** — `GetAgentRuntime` reports `V2` — though its reference lists the property without a description and the CDK's bundled schema does not know it. The readiness probe held the deploy until the runtime answered, and the first call after it was served. **Ids minted in containers restored from one V2 snapshot differ:** eight fresh sessions at once, each a restored container, minted task ids (Bun's `randomUUIDv7`) whose random tails were all distinct, — **wrong conclusion, corrected below**: the ids were the A2A SDK's `crypto.randomUUID()`, and they differed only because that server drew no randomness before the snapshot, so each instance seeded after its restore. The deploy, the five tests and the destroy took about eleven minutes.
 
 ## Observability — 2026-09-26
 
@@ -289,4 +289,18 @@ The measurement above uses **one clock and one network**: the container writes a
 **The first model run on AgentCore**, hello-agent's `summarise` through the public client and `agentCoreTransport`, with the subscription token read from its declared secret at server start: completed with a typed output in about 22 s end to end, $0.0036.
 
 **The CLI's telemetry through the ADOT collector — 2026-09-26.** The CLI's `claude_code.*` spans reach `aws/spans` and show in GenAI Observability under the agent (their resource carries the `OTEL_RESOURCE_ATTRIBUTES` AgentCore sets, which the CLI inherits); its events reach the runtime's `otel-rt-logs` stream, which AgentCore creates. Token counts show as 0 there: the CLI's attributes are not the `gen_ai.*` ones the panels read. OTLP metrics were refused until the role could `cloudwatch:PutMetricData` on `arn:aws:cloudwatch:<region>:<account>:dataset/default` — the L2 role's grant is limited to the `bedrock-agentcore` namespace. ADOT's wrapper writes its log to a file under `/opt/aws` unless `RUN_IN_CONTAINER=True`. The collector's AWS session is named `snapstart-build-DEFAULT`: its credentials come from the snapshot build.
+
+## Randomness after a restore — 2026-09-26
+
+A throwaway V2 runtime running Bun 1.4.0 drew once from each source at startup, before the snapshot, and made one HTTPS request; each invocation then drew twice more. Four fresh sessions at once, each a restored instance:
+
+| Source | Distinct first draws | Distinct second draws |
+|---|---|---|
+| `crypto.randomUUID()` | 1 / 4 | 1 / 4 |
+| `crypto.getRandomValues()` | 1 / 4 | 1 / 4 |
+| `node:crypto` `randomBytes()` | 1 / 4 | 1 / 4 |
+| `node:crypto` `randomUUIDv7()` | 4 / 4 — the timestamp only; the random part was identical | 4 / 4, likewise |
+| `Math.random()` | 1 / 4 | 1 / 4 |
+
+**Bun's random generator is not snapshot-safe: every restored instance replays one stream**, and TLS draws from the same generator. It is fresh only in a process that drew nothing before the snapshot — as the server was on 2026-09-25, and was not once it read its declared secrets at startup (an AWS SDK call: TLS and request ids), when every restored container's first task took the same id and the second session's was refused as already ended. A task process starts after the restore, so it is unaffected.
 

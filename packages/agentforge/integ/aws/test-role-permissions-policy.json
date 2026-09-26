@@ -100,6 +100,30 @@
       ]
     },
     {
+      "Sid": "ReadTelemetryThatCannotBeScopedToAResource",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:GetMetricData",
+        "cloudwatch:ListMetrics",
+        "xray:GetTraceSegmentDestination",
+        "xray:GetTraceSummaries",
+        "xray:BatchGetTraces",
+        "xray:GetIndexingRules"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadTheExamplesTaskTables",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:DescribeTable"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-2:913756569129:table/agentforge-example-*"
+    },
+    {
       "Sid": "S3BucketsTheTestsCreate",
       "Effect": "Allow",
       "Action": [

@@ -63,7 +63,9 @@ export interface AgentRuntimeProps
    * these and no others (§REQ705); the server reads them at startup. A
    * stopgap until AgentCore Identity holds them.
    */
-  readonly secrets?: Readonly<Record<string, ISecret>>;
+  readonly secrets?: Readonly<
+    Record<string, Pick<ISecret, 'secretArn' | 'grantRead'>>
+  >;
   /**
    * How much of the Claude CLI's telemetry the agent exports to CloudWatch,
    * as a log level: `WARN`, metrics and error events; `INFO`, every event

@@ -81,7 +81,7 @@ export interface Telemetry {
  * At the level the construct sets, starts the collector and points the CLI
  * of every task at it, through the environment tasks inherit. Nothing set,
  * nothing started — locally there is no role to sign with. A collector that
- * does not come up stops the server.
+ * does not come up fails the request that prepared the container.
  */
 export async function startTelemetry(
   environment: NodeJS.ProcessEnv = process.env,

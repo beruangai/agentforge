@@ -15,7 +15,8 @@ type SecretReader = Pick<SecretsManagerClient, 'send'>;
 /**
  * Reads each declared secret into the environment, before any task starts,
  * so task processes inherit it. Nothing declared, nothing read; a secret that
- * cannot be read, or would replace a variable already set, stops the server.
+ * cannot be read, or would replace a variable already set, fails the request
+ * that prepared the container.
  */
 export async function resolveDeclaredSecrets(
   environment: NodeJS.ProcessEnv = process.env,
