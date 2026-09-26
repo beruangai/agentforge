@@ -91,6 +91,28 @@ export function localTransport(url: string): Transport {
 }
 
 /**
+ * AgentCore's refusals while it creates a session's container: calls that
+ * overlap the first are refused before they reach it — `-32054`, "Session
+ * operation in progress, please retry", and `-32055` — and a warm session
+ * never refuses them (research/agentcore-runtime-observed.md). Any call is
+ * safe to repeat: none reached the server, and a start attaches by its key.
+ */
+const AGENTCORE_SESSION_CREATION_CODES = new Set([-32054, -32055]);
+/** Backoff between repeats; about six seconds in all, then the refusal is thrown. */
+const AGENTCORE_RETRY_DELAYS_MILLISECONDS = [250, 500, 1_000, 2_000, 2_000];
+
+/** AgentCore's own JSON-RPC error, which the AWS SDK throws unmodelled, with the body spread onto it. */
+function agentCoreErrorOf(
+  error: unknown,
+): { code: number; message: string } | undefined {
+  const body = (error as { error?: { code?: unknown; message?: unknown } })
+    ?.error;
+  return typeof body?.code === 'number'
+    ? { code: body.code, message: String(body.message ?? 'no message') }
+    : undefined;
+}
+
+/**
  * An agent deployed on AgentCore, reached through `InvokeAgentRuntime`,
  * signed with the caller's own AWS credentials (§REQ708). The AgentCore SDK
  * is an optional peer, loaded on first use.
@@ -101,18 +123,15 @@ export function agentCoreTransport(options: {
   readonly qualifier?: string;
 }): Transport {
   let client:
-    | Promise<
-        import('@aws-sdk/client-bedrock-agentcore').BedrockAgentCoreClient
-      >
+    | import('@aws-sdk/client-bedrock-agentcore').BedrockAgentCoreClient
     | undefined;
   return {
     async call(method, params, runtimeSessionId) {
       const sdk = await import('@aws-sdk/client-bedrock-agentcore');
-      client ??= Promise.resolve(
-        new sdk.BedrockAgentCoreClient(
-          options.region === undefined ? {} : { region: options.region },
-        ),
+      client ??= new sdk.BedrockAgentCoreClient(
+        options.region === undefined ? {} : { region: options.region },
       );
+      const connected = client;
       const command = new sdk.InvokeAgentRuntimeCommand({
         agentRuntimeArn: options.agentRuntimeArn,
         runtimeSessionId,
@@ -138,7 +157,9 @@ export function agentCoreTransport(options: {
         },
         { step: 'build', name: 'agentforgeA2aVersionHeader' },
       );
-      const response = await (await client).send(command);
+      const response = await sendRetryingSessionCreation(method, async () =>
+        connected.send(command),
+      );
       if (response.response === undefined) {
         throw new AgentForgeRequestError(
           method,
@@ -149,4 +170,36 @@ export function agentCoreTransport(options: {
       return resultOf(method, await response.response.transformToString());
     },
   };
+}
+
+/**
+ * Sends, repeating AgentCore's session-creation refusals within the budget.
+ * Any JSON-RPC error AgentCore answers with is thrown as an
+ * `AgentForgeRequestError` carrying its code; anything else as it came.
+ */
+async function sendRetryingSessionCreation<Response>(
+  method: TaskMethod,
+  send: () => Promise<Response>,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await send();
+    } catch (error) {
+      const refusal = agentCoreErrorOf(error);
+      if (refusal === undefined) throw error;
+      const wait = AGENTCORE_RETRY_DELAYS_MILLISECONDS[attempt];
+      if (
+        !AGENTCORE_SESSION_CREATION_CODES.has(refusal.code) ||
+        wait === undefined
+      ) {
+        throw new AgentForgeRequestError(
+          method,
+          refusal.code,
+          refusal.message,
+          { cause: error },
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
 }

@@ -9,7 +9,9 @@
  * call succeeds; ids minted in containers restored from one snapshot differ
  * — deployed with a declared secret and telemetry on, whose preparation on
  * the first request must draw no randomness before the snapshot, as Bun's
- * generator replays it in every restored instance; a start and its retry attach through the platform; a
+ * generator replays it in every restored instance; calls overlapping a new
+ * session's first, which AgentCore refuses while it creates the container,
+ * are repeated by the transport until they reach it; a start and its retry attach through the platform; a
  * cancel reaches the container running the task; and a platform stop ends the
  * task `LOST` — read by a fresh container from the store — after which a
  * retry runs as the next attempt.
@@ -102,6 +104,24 @@ describe("AgentForge's server on AgentCore", () => {
       taskId.replaceAll('-', '').slice(16),
     );
     expect(new Set(randomTails).size).toBe(RESTORED_CONTAINERS);
+  });
+
+  it('answers calls that overlap the first to a new session, which AgentCore refuses while it creates the container', async () => {
+    const runtimeSessionId = newRuntimeSessionId('overlap');
+    const answered = await Promise.allSettled(
+      Array.from({ length: 6 }, () =>
+        client.echo.GetTask(newRuntimeSessionId('unknown'), {
+          runtimeSessionId,
+        }),
+      ),
+    );
+    // Each reached the server, which knows no such task: none was left refused.
+    for (const outcome of answered) {
+      expect(outcome).toMatchObject({
+        status: 'rejected',
+        reason: { name: 'AgentForgeRequestError', code: -32001 },
+      });
+    }
   });
 
   it('runs a procedure to its typed output, and attaches a retry to it', async () => {
