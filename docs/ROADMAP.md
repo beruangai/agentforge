@@ -21,7 +21,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 ## A2 — The same agent on AgentCore
 
-**Started 2026-09-25**: AgentForge's server runs on a V2 runtime in `us-east-2`, reached through `agentCoreTransport`, with task state in DynamoDB — a typed output and an attach, a cancel, and a `StopRuntimeSession` ending the task `LOST` with the retry running as attempt 2 (`integ/aws/agentcore/agentforge-runtime.test.ts`, no model).
+**Delivered 2026-09-27**, on `hello-agent`, against a real model. Started 2026-09-25: AgentForge's server runs on a V2 runtime in `us-east-2`, reached through `agentCoreTransport`, with task state in DynamoDB — a typed output and an attach, a cancel, and a `StopRuntimeSession` ending the task `LOST` with the retry running as attempt 2 (`integ/aws/agentcore/agentforge-runtime.test.ts`, no model).
 
 - The construct and deploy path: runtime on V2, its role, the task table, the leaf image in ECR, a deploy that waits until the runtime serves. **Built 2026-09-25** as `AgentRuntime`, verified by `agentforge-runtime.test.ts` deploying through it
 - Ids minted after a V2 restore are distinct. **Settled 2026-09-26**: Bun's generator replays across restores once drawn from before the snapshot, so the server draws nothing before it; the same test, deployed with a secret and telemetry, re-checks it
