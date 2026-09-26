@@ -43,10 +43,11 @@ export async function deployAgentForgeRuntime(
   resources.defer(() => rm(scratchDirectory, { recursive: true, force: true }));
   const contextDirectory = join(scratchDirectory, 'context');
   await stageAgentForgeRuntimeImage(contextDirectory);
-  // The asset publish runs `docker login`, which a credential helper refuses
-  // to store ("not implemented"). An empty configuration keeps that
-  // short-lived ECR login out of the developer's own Docker configuration and
-  // keychain; it goes with the scratch directory.
+  // The asset publish always runs `docker login`, which the ECR credential
+  // helper refuses to store ("not implemented") and Docker Desktop's own
+  // helper holds on a keychain prompt no one sees. With an empty
+  // configuration Docker falls back to `docker-credential-osxkeychain`, so the
+  // 12-hour ECR login lands in the keychain, as it does for any CDK user.
   const dockerConfigDirectory = join(scratchDirectory, 'docker-config');
   await mkdir(dockerConfigDirectory);
   await writeFile(join(dockerConfigDirectory, 'config.json'), '{}\n');
