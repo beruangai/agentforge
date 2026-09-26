@@ -82,7 +82,7 @@ bunx nx run @beruangai/agentforge:integ --configuration=local
 bunx nx run @beruangai/example-hello-agent:e2e
 ```
 
-The e2e builds both images and runs the agent in Docker against a real model; it reads `CLAUDE_CODE_OAUTH_TOKEN` from `.env.integ.local`.
+The e2e builds both images and runs the agent in Docker against a real model; it reads `CLAUDE_CODE_OAUTH_TOKEN` from `.env.integ.local`. `e2e-agentcore` deploys it and runs the same path on AgentCore.
 
 ## Read
 

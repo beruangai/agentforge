@@ -15,7 +15,8 @@ AgentForge's own agent: the smallest thing a consumer would ship, built and veri
 | `server.ts` | The container's entry: starts the server and names `task.ts` as its task entry |
 | `Dockerfile` | `FROM agentforge/a2a-claude`, plus the member and its lock, installed frozen |
 | `infra/app.ts` | The deployment: one `AgentRuntime` serving this directory's image |
-| `e2e/` | The whole path against a real model: the client, and the Temporal activity |
+| `e2e/local/` | The whole path against a real model, in Docker: the client, and the Temporal activity |
+| `e2e/agentcore/` | The same path against the deployed runtime, through `agentCoreTransport`, and a platform stop ending a task `LOST` |
 
 ```bash
 bunx nx run @beruangai/example-hello-agent:e2e
@@ -32,3 +33,9 @@ Deploys the stack `agentforge-example-hello-agent` to `us-east-2` as the test ro
 ```bash
 aws secretsmanager create-secret --region us-east-2 --name agentforge/claude-code-oauth-token --secret-string "$CLAUDE_CODE_OAUTH_TOKEN"
 ```
+
+```bash
+bunx nx run @beruangai/example-hello-agent:e2e-agentcore
+```
+
+Deploys first (a no-op when nothing changed), then drives the deployed runtime through `agentCoreTransport` as the test role, reading its ARN from the deploy's outputs.

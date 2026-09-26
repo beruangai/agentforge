@@ -3,9 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "examples/hello-agent/files",
-  "tags": [
-    "example"
-  ],
+  "tags": ["example"],
   "targets": {
     "typecheck": {
       "executor": "nx:run-commands",
@@ -15,9 +13,7 @@
         "^production",
         "{workspaceRoot}/tsconfig.base.json"
       ],
-      "outputs": [
-        "{workspaceRoot}/dist/examples/hello-agent/typecheck"
-      ],
+      "outputs": ["{workspaceRoot}/dist/examples/hello-agent/typecheck"],
       "options": {
         "command": "tsc -p tsconfig.json",
         "cwd": "{projectRoot}"
@@ -26,9 +22,7 @@
     "lint": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "biome"
-      ],
+      "inputs": ["biome"],
       "options": {
         "command": "biome check {projectRoot}"
       }
@@ -38,9 +32,7 @@
       "cache": true,
       "dependsOn": [
         {
-          "projects": [
-            "@beruangai/agentforge"
-          ],
+          "projects": ["@beruangai/agentforge"],
           "target": "container-lock"
         }
       ],
@@ -54,9 +46,7 @@
           "runtime": "bun --version"
         }
       ],
-      "outputs": [
-        "{projectRoot}/files/bun.lock"
-      ],
+      "outputs": ["{projectRoot}/files/bun.lock"],
       "options": {
         "command": "bun ../../packages/agentforge/container/workspace-lock.ts --root ../../packages/agentforge/container/workspace/package.json --member agentforge=../../dist/packages/agentforge/bundle --member agentic/agent=files --seed ../../packages/agentforge/container/workspace/bun.lock --out files/bun.lock",
         "cwd": "{projectRoot}"
@@ -68,9 +58,7 @@
       "dependsOn": [
         "lock",
         {
-          "projects": [
-            "@beruangai/agentforge"
-          ],
+          "projects": ["@beruangai/agentforge"],
           "target": "image"
         }
       ],
@@ -82,13 +70,21 @@
     "e2e": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": [
-        "image"
-      ],
+      "dependsOn": ["image"],
       "options": {
-        "command": "vitest run --config vitest.e2e.mts",
+        "command": "vitest run --config vitest.e2e.mts --project=@beruangai/example-hello-agent:e2e:local",
         "cwd": "{projectRoot}",
         "envFile": "{workspaceRoot}/.env.integ.local"
+      }
+    },
+    "e2e-agentcore": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["deploy"],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project=@beruangai/example-hello-agent:e2e:agentcore",
+        "cwd": "{projectRoot}",
+        "envFile": "{workspaceRoot}/.env.integ"
       }
     },
     "deploy": {
@@ -97,15 +93,11 @@
       "dependsOn": [
         "lock",
         {
-          "projects": [
-            "@beruangai/agentforge"
-          ],
+          "projects": ["@beruangai/agentforge"],
           "target": "image"
         }
       ],
-      "outputs": [
-        "{workspaceRoot}/dist/examples/hello-agent/deploy"
-      ],
+      "outputs": ["{workspaceRoot}/dist/examples/hello-agent/deploy"],
       "options": {
         "command": "export AGENTFORGE_BASE_IMAGE_ID=\"$(docker image inspect --format '{{.Id}}' agentforge/a2a-claude:local)\" && export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk --app \"bun --conditions=@beruangai/source infra/app.ts\" --output ../../dist/examples/hello-agent/cdk.out --no-notices deploy --require-approval never --outputs-file ../../dist/examples/hello-agent/deploy/outputs.json",
         "cwd": "{projectRoot}",
@@ -120,9 +112,7 @@
       "cache": false,
       "dependsOn": [
         {
-          "projects": [
-            "@beruangai/agentforge"
-          ],
+          "projects": ["@beruangai/agentforge"],
           "target": "image"
         }
       ],

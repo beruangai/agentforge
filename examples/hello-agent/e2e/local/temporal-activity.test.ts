@@ -12,8 +12,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   type LocalAgent,
   startLocalAgent,
-} from '../../__fixtures__/local-agent.ts';
-import { helloAgent } from '../files/contract.ts';
+} from '../../../__fixtures__/local-agent.ts';
+import { helloAgent } from '../../files/contract.ts';
 
 const AGENT_IMAGE = 'agentforge-examples/hello-agent:local';
 

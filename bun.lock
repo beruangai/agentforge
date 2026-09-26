@@ -46,6 +46,7 @@
         "zod": "catalog:",
       },
       "devDependencies": {
+        "@aws-sdk/client-bedrock-agentcore": "catalog:",
         "@temporalio/activity": "catalog:",
         "@temporalio/common": "catalog:",
         "@temporalio/testing": "catalog:",

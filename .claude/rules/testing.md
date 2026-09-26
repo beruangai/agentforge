@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | `test` | Colocated `src/**/*.test.ts` | Units against nothing external; the kernel against a scripted `query()` | Every build | None |
 | `integ` | `packages/agentforge/integ/<dimension>/<concept>/` | One live slice: something AgentForge relies on, against the real thing | Before publishing, never on every commit | Per dimension, below |
-| `e2e` | `examples/<agent>/e2e/` | The whole path: a caller, the client or the Temporal activity, the agent's image, a real model, back as a typed outcome | Before publishing | The subscription token; AWS from A2 |
+| `e2e` | `examples/<agent>/e2e/<place>/` | The whole path: a caller, the client or the Temporal activity, the agent's image, a real model, back as a typed outcome | Before publishing | The subscription token; AWS from A2 |
 
 A live slice is integration however expensive it is; e2e means the whole path.
 
@@ -18,7 +18,7 @@ A live slice is integration however expensive it is; e2e means the whole path.
 
 `nx run @beruangai/agentforge:integ --configuration=local` runs one dimension; a subset by path after `--`. A concept goes in the folder of the most expensive thing it needs. A new dimension is a folder, a vitest project and a configuration — never a conditional inside a test.
 
-**e2e lives with the examples** because they are AgentForge's own consumers: the image is built from the published bundle exactly as a consumer's would be, and the test drives it through the public client. `nx run @beruangai/example-hello-agent:e2e` builds both images first.
+**e2e lives with the examples** because they are AgentForge's own consumers: the image is built from the published bundle exactly as a consumer's would be, and the test drives it through the public client. `nx run @beruangai/example-hello-agent:e2e` builds both images first and runs the `local` project; `e2e-agentcore` deploys first and runs the `agentcore` project, as the test role. One vitest project per place the image runs; a separate target, because each depends on a different build.
 
 ## What earns a test
 

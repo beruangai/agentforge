@@ -198,7 +198,7 @@ Imports inside the package use `.ts` extensions, and `#core/*` for a module in `
 |---|---|---|---|
 | `test` | Colocated `*.test.ts` | Nothing external; the kernel against a scripted `query()` | Every build |
 | `integ` | `packages/agentforge/integ/` | One live slice: the runtime with real processes and DynamoDB Local (`local`), AgentCore (`aws`), the Agent SDK against a model (`model`) | Before publishing |
-| `e2e` | `examples/*/e2e/` | The whole path: a caller, the client or the Temporal activity, the agent's image, a real model | Before publishing |
+| `e2e` | `examples/*/e2e/` | The whole path: a caller, the client or the Temporal activity, the agent's image, a real model — in Docker (`local`) or deployed on AgentCore (`agentcore`) | Before publishing |
 
 The examples are the dogfood: AgentForge's own agents, built and verified exactly as a consumer's would be — the image from the published bundle, the procedures through the client — before any consumer adopts a change. Rules are in `.claude/rules/testing.md`.
 
