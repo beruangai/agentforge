@@ -1,6 +1,7 @@
 import { App, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
+import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import { describe, expect, it } from 'vitest';
 import {
   TASK_TABLE_PARTITION_KEY,
@@ -12,11 +13,18 @@ const IMAGE = AgentRuntimeArtifact.fromImageUri(
   '123456789012.dkr.ecr.us-east-2.amazonaws.com/agent:latest',
 );
 
-function synthesize(props: Partial<AgentRuntimeProps> = {}): Template {
+function synthesize(
+  props:
+    | Partial<AgentRuntimeProps>
+    | ((stack: Stack) => Partial<AgentRuntimeProps>) = {},
+): Template {
   const stack = new Stack(new App(), 'Agent', {
     env: { account: '123456789012', region: 'us-east-2' },
   });
-  new AgentRuntime(stack, 'Agent', { agentRuntimeArtifact: IMAGE, ...props });
+  new AgentRuntime(stack, 'Agent', {
+    agentRuntimeArtifact: IMAGE,
+    ...(typeof props === 'function' ? props(stack) : props),
+  });
   return Template.fromStack(stack);
 }
 
@@ -65,6 +73,78 @@ describe('AgentRuntime', () => {
     });
     // The probe is the only function: no provider outlives the stack.
     template.resourceCountIs('AWS::Lambda::Function', 1);
+  });
+
+  it('delivers service spans to AgentCore Observability, with leave to write them to its log group', () => {
+    const template = synthesize();
+    template.hasResourceProperties('AWS::Logs::DeliverySource', {
+      LogType: 'TRACES',
+    });
+    template.hasResourceProperties('AWS::Logs::DeliveryDestination', {
+      DeliveryDestinationType: 'XRAY',
+    });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: 'logs:PutResourcePolicy' }),
+        ]),
+      },
+    });
+  });
+
+  it('delivers no spans when the consumer turns tracing off', () => {
+    synthesize({ tracingEnabled: false }).resourceCountIs(
+      'AWS::Logs::DeliverySource',
+      0,
+    );
+  });
+
+  it('names its declared secrets to the server, and may read those alone', () => {
+    const template = synthesize((stack) => ({
+      secrets: {
+        CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
+          stack,
+          'Token',
+          'agentforge/claude-code-oauth-token',
+        ),
+      },
+    }));
+    // The ARN joins in the partition, so the JSON is an Fn::Join.
+    const [runtime] = Object.values(
+      template.findResources('AWS::BedrockAgentCore::Runtime'),
+    );
+    const declared = JSON.stringify(
+      runtime?.Properties.EnvironmentVariables.AGENTFORGE_SECRETS,
+    );
+    expect(declared).toContain('CLAUDE_CODE_OAUTH_TOKEN');
+    expect(declared).toContain('secret:agentforge/claude-code-oauth-token');
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: [
+              'secretsmanager:GetSecretValue',
+              'secretsmanager:DescribeSecret',
+            ],
+          }),
+        ]),
+      },
+    });
+  });
+
+  it('refuses a secret also set as a plain variable', () => {
+    expect(() =>
+      synthesize((stack) => ({
+        environmentVariables: { CLAUDE_CODE_OAUTH_TOKEN: 'plain' },
+        secrets: {
+          CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
+            stack,
+            'Token',
+            'token',
+          ),
+        },
+      })),
+    ).toThrow(/both as a secret/);
   });
 
   it('refuses a table name the consumer set, which the construct owns', () => {

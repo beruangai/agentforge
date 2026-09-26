@@ -82,6 +82,8 @@ aws iam put-role-policy --role-name agentforge-integ-agentcore-execution \
 bunx cdk bootstrap aws://913756569129/us-east-2
 ```
 
+**4. CloudWatch Transaction Search**, which `AgentRuntime` needs for its tracing on by default: CloudFormation refuses the runtime's trace delivery until X-Ray sends segments to CloudWatch Logs. Enabled in the console (CloudWatch → Application Signals → Transaction search) on 2026-09-26; the [AgentCore guide](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/observability-configure.html#observability-configure-builtin-cw) gives the CLI equivalent.
+
 ### Replaced
 
 - **The tests no longer run as the `agentforge` profile.** It is only the source the test role is assumed from. Drop the `PassTheIntegExecutionRoleToAgentCoreOnly` statement from its permission set, if it was added there.

@@ -8,6 +8,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import express from 'express';
 import { TaskProcessExecutor } from './executor.ts';
 import { createGateway } from './gateway.ts';
+import { resolveDeclaredSecrets } from './secrets.ts';
 import { createTaskTable, DynamoDBTaskStore } from './task-store.ts';
 
 export interface ServerConfig {
@@ -95,6 +96,7 @@ const GRACE_MILLISECONDS = 5_000;
 export async function startServer(
   options: ServerOptions,
 ): Promise<RunningServer> {
+  await resolveDeclaredSecrets();
   const config = serverConfig(options);
   const dynamoDB = new DynamoDBClient(
     config.dynamoDBEndpoint === undefined

@@ -1,8 +1,10 @@
 import { fileURLToPath } from 'node:url';
 import {
+  ArnFormat,
   CustomResource,
   Duration,
   RemovalPolicy,
+  Stack,
   Validations,
 } from 'aws-cdk-lib';
 import {
@@ -12,14 +14,20 @@ import {
   type RuntimeProps,
 } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
-import type { Grant, IGrantable } from 'aws-cdk-lib/aws-iam';
+import {
+  type Grant,
+  type IGrantable,
+  PolicyStatement,
+} from 'aws-cdk-lib/aws-iam';
 import {
   Code,
   Function as LambdaFunction,
   Runtime as LambdaRuntime,
 } from 'aws-cdk-lib/aws-lambda';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
+import type { ISecret } from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
+import { SECRETS_VARIABLE } from '#core/secrets.ts';
 import {
   TASK_TABLE_PARTITION_KEY,
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
@@ -43,6 +51,18 @@ export interface AgentRuntimeProps
    * @default RemovalPolicy.RETAIN
    */
   readonly taskTableRemovalPolicy?: RemovalPolicy;
+  /**
+   * Whether the runtime delivers its service spans to AgentCore Observability.
+   * @default true
+   */
+  readonly tracingEnabled?: boolean;
+  /**
+   * Secrets the agent reads, by the environment variable each becomes — the
+   * subscription token as `CLAUDE_CODE_OAUTH_TOKEN`. The runtime may read
+   * these and no others (§REQ705); the server reads them at startup. A
+   * stopgap until AgentCore Identity holds them.
+   */
+  readonly secrets?: Readonly<Record<string, ISecret>>;
 }
 
 /**
@@ -53,6 +73,9 @@ export interface AgentRuntimeProps
  * server answers. Everything else a runtime takes — its image, role, network,
  * lifecycle, environment — is the consumer's, as the L2 `Runtime` takes it;
  * the A2A-Version header and the table's name are added to what it declares.
+ * AgentCore Observability is on unless the consumer turns it off: the runtime
+ * delivers its service spans, which needs CloudWatch Transaction Search in the
+ * account (a one-time setup).
  */
 export class AgentRuntime extends Construct {
   readonly runtime: Runtime;
@@ -62,14 +85,25 @@ export class AgentRuntime extends Construct {
     super(scope, id);
     const {
       taskTableRemovalPolicy = RemovalPolicy.RETAIN,
+      tracingEnabled = true,
+      secrets = {},
       environmentVariables = {},
       requestHeaderConfiguration,
       ...runtimeProps
     } = props;
-    if (TABLE_NAME_VARIABLE in environmentVariables) {
-      throw new Error(
-        `${TABLE_NAME_VARIABLE} is set by AgentRuntime to its own task table; remove it from environmentVariables`,
-      );
+    for (const owned of [TABLE_NAME_VARIABLE, SECRETS_VARIABLE]) {
+      if (owned in environmentVariables) {
+        throw new Error(
+          `${owned} is set by AgentRuntime; remove it from environmentVariables`,
+        );
+      }
+    }
+    for (const name of Object.keys(secrets)) {
+      if (name in environmentVariables) {
+        throw new Error(
+          `${name} is declared both as a secret and in environmentVariables`,
+        );
+      }
     }
 
     this.taskTable = new Table(this, 'TaskTable', {
@@ -86,6 +120,7 @@ export class AgentRuntime extends Construct {
       requestHeaderConfiguration?.allowlistedHeaders ?? [];
     this.runtime = new Runtime(this, 'Runtime', {
       ...runtimeProps,
+      tracingEnabled,
       protocolConfiguration: ProtocolType.A2A,
       requestHeaderConfiguration: {
         ...requestHeaderConfiguration,
@@ -96,6 +131,18 @@ export class AgentRuntime extends Construct {
       environmentVariables: {
         ...environmentVariables,
         [TABLE_NAME_VARIABLE]: this.taskTable.tableName,
+        ...(Object.keys(secrets).length === 0
+          ? {}
+          : {
+              [SECRETS_VARIABLE]: Stack.of(this).toJsonString(
+                Object.fromEntries(
+                  Object.entries(secrets).map(([name, secret]) => [
+                    name,
+                    secret.secretArn,
+                  ]),
+                ),
+              ),
+            }),
       },
     });
     // CloudFormation takes PlatformVersion; the CDK does not type it yet
@@ -108,6 +155,24 @@ export class AgentRuntime extends Construct {
         "PlatformVersion is in CloudFormation's resource reference but not yet in the CDK's bundled schema",
     });
     this.taskTable.grantReadWriteData(this.runtime);
+    for (const secret of Object.values(secrets)) {
+      secret.grantRead(this.runtime);
+    }
+    // AgentCore delivers a new agent's spans to the agent's own log group,
+    // and needs its role to let X-Ray write there; the L2 role does not.
+    this.runtime.role.addToPrincipalPolicy(
+      new PolicyStatement({
+        actions: ['logs:PutResourcePolicy'],
+        resources: [
+          Stack.of(this).formatArn({
+            service: 'logs',
+            resource: 'log-group',
+            resourceName: `/aws/bedrock-agentcore/runtimes/${this.runtime.agentRuntimeName}-*`,
+            arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+          }),
+        ],
+      }),
+    );
 
     const agentRuntimeVersion = this.runtime.agentRuntimeVersion;
     if (agentRuntimeVersion === undefined) {

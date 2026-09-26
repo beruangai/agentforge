@@ -60,6 +60,7 @@
     "express": "^5.2.1",
     "@aws-sdk/client-dynamodb": "^3.1138.0",
     "@aws-sdk/client-bedrock-agentcore": "^3.1138.0",
+    "@aws-sdk/client-secrets-manager": "^3.1138.0",
     "@temporalio/activity": "^1.24.0",
     "@temporalio/common": "^1.24.0",
     "@anthropic-ai/sdk": "0.128.0",
@@ -83,6 +84,9 @@
       "optional": true
     },
     "@aws-sdk/client-bedrock-agentcore": {
+      "optional": true
+    },
+    "@aws-sdk/client-secrets-manager": {
       "optional": true
     },
     "@temporalio/activity": {
@@ -112,6 +116,7 @@
     "@aws-sdk/client-ecr": "catalog:",
     "@aws-sdk/client-iam": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/client-secrets-manager": "catalog:",
     "@aws-sdk/client-sts": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/contract": "catalog:",

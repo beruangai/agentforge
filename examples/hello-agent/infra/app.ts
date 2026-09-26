@@ -6,6 +6,7 @@ import { AgentRuntime } from '@beruangai/agentforge/infra';
 import { App, CfnOutput, Stack } from 'aws-cdk-lib';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
+import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -26,5 +27,13 @@ const agent = new AgentRuntime(stack, 'HelloAgent', {
     new URL('..', import.meta.url).pathname,
     { platform: Platform.LINUX_ARM64 },
   ),
+  // The operator creates this secret and sets its value (README).
+  secrets: {
+    CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
+      stack,
+      'SubscriptionToken',
+      'agentforge/claude-code-oauth-token',
+    ),
+  },
 });
 new CfnOutput(stack, 'AgentRuntimeArn', { value: agent.agentRuntimeArn });

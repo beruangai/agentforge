@@ -27,4 +27,8 @@ That builds AgentForge's bundle, the base image's lock and image, this agent's l
 bunx nx run @beruangai/example-hello-agent:deploy
 ```
 
-Deploys the stack `agentforge-example-hello-agent` to `us-east-2` as the test role (`.env.integ`), through the CDK bootstrap roles; it returns once the runtime serves, and writes the runtime's ARN to `dist/examples/hello-agent/deploy/outputs.json`. `destroy` removes it. The target runs `cdk` with an empty throwaway Docker configuration: the asset publish always runs `docker login`, and Docker Desktop's own credential helper would wait on a keychain prompt no one sees. The 12-hour ECR login still lands in the keychain, through `docker-credential-osxkeychain`. Its procedures need the subscription token in the runtime, which is not deployed yet, so a deployed hello-agent serves the protocol but cannot yet run an agent.
+Deploys the stack `agentforge-example-hello-agent` to `us-east-2` as the test role (`.env.integ`), through the CDK bootstrap roles; it returns once the runtime serves, and writes the runtime's ARN to `dist/examples/hello-agent/deploy/outputs.json`. `destroy` removes it. The account needs CloudWatch Transaction Search enabled once, for the runtime's tracing. The target runs `cdk` with an empty throwaway Docker configuration: the asset publish always runs `docker login`, and Docker Desktop's own credential helper would wait on a keychain prompt no one sees. The 12-hour ECR login still lands in the keychain, through `docker-credential-osxkeychain`. The runtime reads the subscription token from the Secrets Manager secret `agentforge/claude-code-oauth-token`, which the operator creates once in `us-east-2` with their own credentials, from their own shell:
+
+```bash
+aws secretsmanager create-secret --region us-east-2 --name agentforge/claude-code-oauth-token --secret-string "$CLAUDE_CODE_OAUTH_TOKEN"
+```

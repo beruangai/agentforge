@@ -11,6 +11,7 @@
     "@anthropic-ai/sdk": "0.128.0",
     "@a2a-js/sdk": "1.2.0",
     "@aws-sdk/client-dynamodb": "3.1138.0",
+    "@aws-sdk/client-secrets-manager": "3.1138.0",
     "@orpc/contract": "2.0.0-beta.39",
     "@orpc/server": "2.0.0-beta.39",
     "express": "5.2.1",

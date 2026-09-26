@@ -9,6 +9,7 @@
         "@anthropic-ai/claude-agent-sdk": "0.3.280",
         "@anthropic-ai/sdk": "0.128.0",
         "@aws-sdk/client-dynamodb": "3.1138.0",
+        "@aws-sdk/client-secrets-manager": "3.1138.0",
         "@orpc/contract": "2.0.0-beta.39",
         "@orpc/server": "2.0.0-beta.39",
         "express": "5.2.1",
@@ -28,6 +29,7 @@
         "@anthropic-ai/sdk": "0.128.0",
         "@aws-sdk/client-bedrock-agentcore": "^3.1138.0",
         "@aws-sdk/client-dynamodb": "^3.1138.0",
+        "@aws-sdk/client-secrets-manager": "^3.1138.0",
         "@orpc/contract": "2.0.0-beta.39",
         "@orpc/server": "2.0.0-beta.39",
         "@temporalio/activity": "^1.24.0",
@@ -43,6 +45,7 @@
         "@anthropic-ai/sdk",
         "@aws-sdk/client-bedrock-agentcore",
         "@aws-sdk/client-dynamodb",
+        "@aws-sdk/client-secrets-manager",
         "@orpc/server",
         "@temporalio/activity",
         "@temporalio/common",
@@ -76,6 +79,8 @@
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.128.0", "", { "dependencies": { "json-schema-to-ts": "^3.1.1", "standardwebhooks": "^1.0.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-tl5cBFZC1jVFrTuQyvQObA4WmuNgcYVeXfriqOumgtLAHUm4gPUj18YnszBW60v0PrjDB8nBDOC6wd9CmHQFlA=="],
 
     "@aws-sdk/client-dynamodb": ["@aws-sdk/client-dynamodb@3.1138.0", "", { "dependencies": { "@aws-sdk/core": "^3.978.1", "@aws-sdk/credential-provider-node": "^3.972.84", "@aws-sdk/dynamodb-codec": "^3.973.46", "@aws-sdk/middleware-endpoint-discovery": "^3.972.31", "@aws-sdk/types": "^3.974.6", "@smithy/core": "^3.35.0", "@smithy/fetch-http-handler": "^5.8.0", "@smithy/node-http-handler": "^4.12.1", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-qzrDRzbf4Zdney1oaolFmrpc8xIZFOrqjUOdmrz8ZpJkd/5qC4p3n4jsZenn19biMToRm0XIjKdkD0fXhwS0Bw=="],
+
+    "@aws-sdk/client-secrets-manager": ["@aws-sdk/client-secrets-manager@3.1138.0", "", { "dependencies": { "@aws-sdk/core": "^3.978.1", "@aws-sdk/credential-provider-node": "^3.972.84", "@aws-sdk/types": "^3.974.6", "@smithy/core": "^3.35.0", "@smithy/fetch-http-handler": "^5.8.0", "@smithy/node-http-handler": "^4.12.1", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-r9/hBI1B7RnDndlmJvvPXB8wVIKZoR9hBMcKbGPE74xhCaE5uE76TQN4AHf3vt1eXWwEEUsNa+XM7BPUmwxNNw=="],
 
     "@aws-sdk/core": ["@aws-sdk/core@3.978.1", "", { "dependencies": { "@aws-sdk/types": "^3.974.6", "@aws-sdk/xml-builder": "^3.972.41", "@aws/lambda-invoke-store": "^0.3.0", "@smithy/core": "^3.35.0", "@smithy/signature-v4": "^5.7.3", "@smithy/types": "^4.19.0", "bowser": "^2.11.0", "tslib": "^2.6.2" } }, "sha512-LbY9aGsEiznDWmUc30Nwv3aIX/+dbwTx8KfS0yOC3NPYMO+O91e6jkT1azf34FwjOndq8/Q+RcVVZz5xnerwdg=="],
 

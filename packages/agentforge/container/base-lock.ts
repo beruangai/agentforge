@@ -25,6 +25,7 @@ const RUNTIME_PEERS = [
   '@anthropic-ai/sdk',
   '@a2a-js/sdk',
   '@aws-sdk/client-dynamodb',
+  '@aws-sdk/client-secrets-manager',
   '@orpc/contract',
   '@orpc/server',
   'express',
