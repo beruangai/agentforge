@@ -39,7 +39,7 @@ const agent = new AgentRuntime(stack, 'Agent', {
       buildArgs: { BASE_IMAGE: required('AGENTFORGE_INTEG_BASE_IMAGE') },
     },
   ),
-  taskTableRemovalPolicy: RemovalPolicy.DESTROY,
+  removalPolicy: RemovalPolicy.DESTROY,
   secrets: { AGENTFORGE_INTEG_SECRET: secret },
 });
 new CfnOutput(stack, 'AgentRuntimeArn', { value: agent.agentRuntimeArn });

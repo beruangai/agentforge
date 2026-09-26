@@ -42,3 +42,6 @@ const agent = new AgentRuntime(stack, 'HelloAgent', {
   },
 });
 new CfnOutput(stack, 'AgentRuntimeArn', { value: agent.agentRuntimeArn });
+new CfnOutput(stack, 'SessionBucketName', {
+  value: agent.sessionBucket.bucketName,
+});

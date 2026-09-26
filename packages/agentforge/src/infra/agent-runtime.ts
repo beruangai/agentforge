@@ -25,9 +25,15 @@ import {
   Runtime as LambdaRuntime,
 } from 'aws-cdk-lib/aws-lambda';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
+import {
+  BlockPublicAccess,
+  Bucket,
+  BucketEncryption,
+} from 'aws-cdk-lib/aws-s3';
 import type { ISecret } from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { SECRETS_VARIABLE } from '#core/secrets.ts';
+import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
 import {
   TASK_TABLE_PARTITION_KEY,
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
@@ -48,10 +54,19 @@ const READINESS_TIMEOUT = Duration.minutes(14);
 export interface AgentRuntimeProps
   extends Omit<RuntimeProps, 'protocolConfiguration'> {
   /**
-   * What happens to the task table when the stack deletes it.
+   * What happens to the task table and the session bucket when the stack
+   * deletes them. `DESTROY` deletes the bucket only when it is empty, and
+   * fails the stack's deletion otherwise: emptying it would take a Lambda
+   * whose log group outlives the stack.
    * @default RemovalPolicy.RETAIN
    */
-  readonly taskTableRemovalPolicy?: RemovalPolicy;
+  readonly removalPolicy?: RemovalPolicy;
+  /**
+   * How long a session's transcript is kept after it is written (§REQ402).
+   * Transcripts hold everything the agent was sent and read.
+   * @default Duration.days(30)
+   */
+  readonly sessionRetention?: Duration;
   /**
    * Whether the runtime delivers its service spans to AgentCore Observability.
    * @default true
@@ -78,7 +93,9 @@ export interface AgentRuntimeProps
 
 /**
  * One deployed agent: an AgentCore runtime on platform version V2 serving the
- * agent's image over A2A, and the DynamoDB table its tasks live in. A deploy
+ * agent's image over A2A, the DynamoDB table its tasks live in, and the S3
+ * bucket its session transcripts persist in, so a session outlives its
+ * container — encrypted, private, expired after `sessionRetention`. A deploy
  * completes only once the runtime serves: a readiness probe runs after every
  * change to the runtime, asking it for an unknown task until AgentForge's
  * server answers. Everything else a runtime takes — its image, role, network,
@@ -91,11 +108,13 @@ export interface AgentRuntimeProps
 export class AgentRuntime extends Construct {
   readonly runtime: Runtime;
   readonly taskTable: Table;
+  readonly sessionBucket: Bucket;
 
   constructor(scope: Construct, id: string, props: AgentRuntimeProps) {
     super(scope, id);
     const {
-      taskTableRemovalPolicy = RemovalPolicy.RETAIN,
+      removalPolicy = RemovalPolicy.RETAIN,
+      sessionRetention = Duration.days(30),
       tracingEnabled = true,
       secrets = {},
       telemetry = 'INFO',
@@ -105,6 +124,7 @@ export class AgentRuntime extends Construct {
     } = props;
     for (const owned of [
       TABLE_NAME_VARIABLE,
+      SESSION_BUCKET_VARIABLE,
       SECRETS_VARIABLE,
       TELEMETRY_VARIABLE,
     ]) {
@@ -129,7 +149,14 @@ export class AgentRuntime extends Construct {
       },
       timeToLiveAttribute: TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
       billingMode: BillingMode.PAY_PER_REQUEST,
-      removalPolicy: taskTableRemovalPolicy,
+      removalPolicy,
+    });
+    this.sessionBucket = new Bucket(this, 'SessionBucket', {
+      encryption: BucketEncryption.S3_MANAGED,
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      lifecycleRules: [{ expiration: sessionRetention }],
+      removalPolicy,
     });
 
     const allowlistedHeaders =
@@ -147,6 +174,7 @@ export class AgentRuntime extends Construct {
       environmentVariables: {
         ...environmentVariables,
         [TABLE_NAME_VARIABLE]: this.taskTable.tableName,
+        [SESSION_BUCKET_VARIABLE]: this.sessionBucket.bucketName,
         [TELEMETRY_VARIABLE]: telemetry,
         ...(Object.keys(secrets).length === 0
           ? {}
@@ -172,6 +200,7 @@ export class AgentRuntime extends Construct {
         "PlatformVersion is in CloudFormation's resource reference but not yet in the CDK's bundled schema",
     });
     this.taskTable.grantReadWriteData(this.runtime);
+    this.sessionBucket.grantReadWrite(this.runtime);
     // The collector's OTLP metrics are PutMetricData on CloudWatch's default
     // dataset, which the L2 role's namespace-scoped grant does not cover.
     this.runtime.role.addToPrincipalPolicy(

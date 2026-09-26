@@ -3,7 +3,8 @@
  * `agentCoreTransport`, to this agent as `deploy` left it — the runtime, the
  * harness, the Agent SDK and a real model — and back as a typed outcome; and
  * a task whose container the platform stops ends `LOST`, its retry running as
- * the next attempt.
+ * the next attempt; and a session outlives its container, resuming in
+ * another from its transcript in S3.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -12,6 +13,7 @@ import {
   BedrockAgentCoreClient,
   StopRuntimeSessionCommand,
 } from '@aws-sdk/client-bedrock-agentcore';
+import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import {
   agentCoreTransport,
   awaitTask,
@@ -26,16 +28,16 @@ const DEPLOY_OUTPUTS = new URL(
   import.meta.url,
 );
 
-function deployedAgentRuntimeArn(): string {
+function deployOutput(name: string): string {
   const outputs = JSON.parse(readFileSync(DEPLOY_OUTPUTS, 'utf8')) as Record<
     string,
     Record<string, string> | undefined
   >;
-  const arn = outputs['agentforge-example-hello-agent']?.AgentRuntimeArn;
-  if (arn === undefined) {
-    throw new Error(`no AgentRuntimeArn in ${DEPLOY_OUTPUTS.pathname}`);
+  const value = outputs['agentforge-example-hello-agent']?.[name];
+  if (value === undefined) {
+    throw new Error(`no ${name} in ${DEPLOY_OUTPUTS.pathname}`);
   }
-  return arn;
+  return value;
 }
 
 function required(name: string): string {
@@ -57,7 +59,7 @@ let client: ReturnType<typeof createClient<typeof helloAgent>>;
 
 beforeAll(() => {
   region = required('AWS_REGION');
-  agentRuntimeArn = deployedAgentRuntimeArn();
+  agentRuntimeArn = deployOutput('AgentRuntimeArn');
   client = createClient(
     helloAgent,
     agentCoreTransport({ agentRuntimeArn, region }),
@@ -97,6 +99,65 @@ describe('hello-agent, on AgentCore', () => {
       state: 'TASK_STATE_COMPLETED',
       output: ended.output,
     });
+  });
+
+  it('resumes a session in another container, from its transcript in S3', async () => {
+    const first = {
+      runtimeSessionId: newRuntimeSessionId(),
+      idempotencyKey: randomUUIDv7(),
+    };
+    const started = await client.summarise.SendMessage(
+      {
+        text: 'AgentForge persists each session transcript in S3, so a session outlives its container.',
+      },
+      first,
+    );
+    const ended = await awaitTask(client.summarise, started, {
+      ...first,
+      pollIntervalMilliseconds: 2_000,
+    });
+    if (ended.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(`expected completion, got ${JSON.stringify(ended)}`);
+    }
+    const { sessionId } = ended.output;
+    await new BedrockAgentCoreClient({ region }).send(
+      new StopRuntimeSessionCommand({
+        agentRuntimeArn,
+        runtimeSessionId: first.runtimeSessionId,
+      }),
+    );
+
+    // The container is gone; the transcript is not.
+    const listed = await new S3Client({ region }).send(
+      new ListObjectsV2Command({ Bucket: deployOutput('SessionBucketName') }),
+    );
+    expect(
+      (listed.Contents ?? []).some(({ Key }) =>
+        Key?.includes(`/${sessionId}/part-`),
+      ),
+    ).toBe(true);
+
+    // Another runtime session is another container: the resume can only
+    // come from the store. An unknown session would fail the run.
+    const second = {
+      runtimeSessionId: newRuntimeSessionId(),
+      idempotencyKey: randomUUIDv7(),
+    };
+    const resumed = await awaitTask(
+      client.summarise,
+      await client.summarise.SendMessage(
+        {
+          text: 'Now summarise the same text again, more briefly.',
+          resumeSessionId: sessionId,
+        },
+        second,
+      ),
+      { ...second, pollIntervalMilliseconds: 2_000 },
+    );
+    if (resumed.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(`expected completion, got ${JSON.stringify(resumed)}`);
+    }
+    expect(resumed.output.sessionId).toBe(sessionId);
   });
 
   it('ends a task LOST when the platform stops its container mid-Bash, and runs the retry as the next attempt', async () => {

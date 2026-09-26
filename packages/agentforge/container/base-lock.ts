@@ -26,6 +26,7 @@ const RUNTIME_PEERS = [
   '@a2a-js/sdk',
   '@aws-sdk/client-dynamodb',
   '@aws-sdk/client-secrets-manager',
+  '@aws-sdk/client-s3',
   '@orpc/contract',
   '@orpc/server',
   'express',

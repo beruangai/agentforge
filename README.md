@@ -68,6 +68,15 @@ export const summarise = procedureActivity(client.summarise, {
 
 [`examples/hello-agent`](examples/hello-agent) is all of this, complete, with its e2e.
 
+## Known limits
+
+Built to what the platforms document, with tests only where AgentForge relies on something they leave unsaid. Report what hits, and it is triaged in the layer that owns it.
+
+- **Resume uses the session's working directory.** A transcript is keyed by the directory its session began in — the agent's own unless a procedure sets `cwd` — and a resume must run from the same one.
+- **Files do not follow a session.** A resumed session remembers what earlier runs wrote, but a new container does not have those files. Working directories that persist are planned (§F).
+- **Transcripts are kept 30 days by default** (`sessionRetention`), and hold everything the agent was sent and read.
+- **Locally, sessions live in the container** and end with it; only a deployed agent persists them.
+
 ## Work in this repository
 
 ```bash

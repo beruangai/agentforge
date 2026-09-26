@@ -47,6 +47,7 @@
       },
       "devDependencies": {
         "@aws-sdk/client-bedrock-agentcore": "catalog:",
+        "@aws-sdk/client-s3": "catalog:",
         "@temporalio/activity": "catalog:",
         "@temporalio/common": "catalog:",
         "@temporalio/testing": "catalog:",
@@ -104,6 +105,7 @@
         "@anthropic-ai/sdk": "0.128.0",
         "@aws-sdk/client-bedrock-agentcore": "^3.1138.0",
         "@aws-sdk/client-dynamodb": "^3.1138.0",
+        "@aws-sdk/client-s3": "^3.1138.0",
         "@aws-sdk/client-secrets-manager": "^3.1138.0",
         "@orpc/contract": "2.0.0-beta.39",
         "@orpc/server": "2.0.0-beta.39",
@@ -120,6 +122,7 @@
         "@anthropic-ai/sdk",
         "@aws-sdk/client-bedrock-agentcore",
         "@aws-sdk/client-dynamodb",
+        "@aws-sdk/client-s3",
         "@aws-sdk/client-secrets-manager",
         "@orpc/server",
         "@temporalio/activity",

@@ -1,4 +1,5 @@
 import { inspect } from 'node:util';
+import type { SessionStore } from '@anthropic-ai/claude-agent-sdk';
 import type { RouterContract } from '@orpc/contract';
 import { call, implement, type Router } from '@orpc/server';
 import {
@@ -25,6 +26,7 @@ import {
   TaskCanceled,
   TaskFailure,
 } from './kernel.ts';
+import { sessionStoreFromEnvironment } from './session-store.ts';
 
 /** What every procedure handler receives as its oRPC context. */
 export interface TaskContext {
@@ -59,6 +61,8 @@ export interface ExecuteOptions {
   readonly invocation: TaskInvocation;
   readonly signal: AbortSignal;
   readonly onRecord: (record: RunRecord) => void;
+  /** Where every run's transcript is mirrored, when the deployment declares it. */
+  readonly sessionStore?: SessionStore;
   /** A test seam: replaces the SDK call inside the kernel. */
   readonly query?: QueryFunction;
 }
@@ -106,7 +110,13 @@ export async function executeProcedure(
     runAgent: (spec) =>
       runAgent(
         spec,
-        { signal: options.signal, onRecord: options.onRecord },
+        {
+          signal: options.signal,
+          onRecord: options.onRecord,
+          ...(options.sessionStore === undefined
+            ? {}
+            : { sessionStore: options.sessionStore }),
+        },
         options.query,
       ),
   };
@@ -203,6 +213,7 @@ export function runTaskProcess(options: {
       ),
     );
   const controller = new AbortController();
+  const sessionStore = sessionStoreFromEnvironment();
   let started = false;
   process.on('message', (message: ExecutorMessage) => {
     if (message.type === 'cancel') {
@@ -217,6 +228,7 @@ export function runTaskProcess(options: {
       invocation: message.invocation,
       signal: controller.signal,
       onRecord: (record) => void emit({ type: 'record', record }),
+      ...(sessionStore === undefined ? {} : { sessionStore }),
     })
       .then((outcome) => emit({ type: 'outcome', outcome }))
       .then(

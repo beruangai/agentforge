@@ -4,6 +4,7 @@ import {
   type Options,
   type SDKMessage,
   type SDKResultMessage,
+  type SessionStore,
   query as sdkQuery,
 } from '@anthropic-ai/claude-agent-sdk';
 import { hash as ohash } from 'ohash';
@@ -64,6 +65,8 @@ export class TaskCanceled extends Error {
 export interface KernelContext {
   readonly signal: AbortSignal;
   readonly onRecord: (record: RunRecord) => void;
+  /** The store the deployment declares; a procedure's own `sessionStore` wins. */
+  readonly sessionStore?: SessionStore;
 }
 
 export type QueryFunction = typeof sdkQuery;
@@ -111,8 +114,12 @@ export async function runAgent<Output>(
   const { promise: inputEnded, resolve: endInput } =
     Promise.withResolvers<void>();
 
+  const declaredStore = spec.options?.sessionStore ?? context.sessionStore;
+  const mirror =
+    declaredStore === undefined ? undefined : recordingStore(declaredStore);
   const options: Options = {
     ...spec.options,
+    ...(mirror === undefined ? {} : { sessionStore: mirror.store }),
     env: {
       ...process.env,
       ...spec.options?.env,
@@ -149,6 +156,7 @@ export async function runAgent<Output>(
     rateLimitResetsAt: undefined,
     assistantError: undefined,
     mirrorError: undefined,
+    assistantMessages: [],
     deadMatchers: [],
   };
   let result: SDKResultMessage | undefined;
@@ -233,6 +241,19 @@ export async function runAgent<Output>(
       ),
     );
   }
+  if (mirror !== undefined) {
+    const unmirrored = observed.assistantMessages.filter(
+      (uuid) => !mirror.mirrored.has(uuid),
+    );
+    if (unmirrored.length > 0) {
+      throw new TaskFailure(
+        cause(
+          'EXECUTION_ERROR',
+          `the session store holds no entry for ${unmirrored.length} of the run's ${observed.assistantMessages.length} assistant messages: the transcript would not resume whole`,
+        ),
+      );
+    }
+  }
   if (result === undefined) {
     throw new TaskFailure(
       cause(
@@ -254,6 +275,8 @@ interface Observed {
   rateLimitResetsAt: number | undefined;
   assistantError: string | undefined;
   mirrorError: string | undefined;
+  /** Every assistant message's uuid, which the transcript entry for it shares. */
+  assistantMessages: string[];
   deadMatchers: string[];
 }
 
@@ -314,12 +337,46 @@ function observe(message: SDKMessage, observed: Observed): void {
       observed.rateLimitResetsAt = resetsAt;
     }
   }
-  if (message.type === 'assistant' && message.error !== undefined) {
-    observed.assistantError = message.error;
+  if (message.type === 'assistant') {
+    observed.assistantMessages.push(message.uuid);
+    if (message.error !== undefined) observed.assistantError = message.error;
   }
   if (message.type === 'system' && message.subtype === 'mirror_error') {
     observed.mirrorError = JSON.stringify(message);
   }
+}
+
+/**
+ * The store as the SDK sees it, noting each entry it accepted. The SDK's
+ * mirror is best-effort, so the kernel checks what landed rather than
+ * trusting it (ADR 0011).
+ */
+function recordingStore(store: SessionStore): {
+  store: SessionStore;
+  mirrored: Set<string>;
+} {
+  const mirrored = new Set<string>();
+  return {
+    mirrored,
+    store: {
+      append: async (key, entries) => {
+        await store.append(key, entries);
+        for (const entry of entries) {
+          const uuid = (entry as { uuid?: unknown }).uuid;
+          if (typeof uuid === 'string') mirrored.add(uuid);
+        }
+      },
+      load: (key) => store.load(key),
+      ...(store.listSessions && {
+        listSessions: store.listSessions.bind(store),
+      }),
+      ...(store.listSessionSummaries && {
+        listSessionSummaries: store.listSessionSummaries.bind(store),
+      }),
+      ...(store.delete && { delete: store.delete.bind(store) }),
+      ...(store.listSubkeys && { listSubkeys: store.listSubkeys.bind(store) }),
+    },
+  };
 }
 
 /** The next message, or `'timed-out'` once a deadline has passed. */

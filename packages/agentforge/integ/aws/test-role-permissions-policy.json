@@ -176,6 +176,12 @@
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
       "Resource": "arn:aws:iam::913756569129:role/cdk-hnb659fds-*-913756569129-us-east-2"
+    },
+    {
+      "Sid": "ListTheExamplesSessionTranscripts",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::agentforge-example-*"]
     }
   ]
 }

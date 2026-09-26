@@ -1,4 +1,4 @@
-import { App, Stack } from 'aws-cdk-lib';
+import { App, Duration, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
@@ -43,6 +43,9 @@ describe('AgentRuntime', () => {
       EnvironmentVariables: {
         AGENTFORGE_ADMISSION_LIMIT: '2',
         AGENTFORGE_TABLE_NAME: { Ref: Match.stringLikeRegexp('TaskTable') },
+        AGENTFORGE_SESSION_BUCKET: {
+          Ref: Match.stringLikeRegexp('SessionBucket'),
+        },
         AGENTFORGE_TELEMETRY: 'INFO',
       },
     });
@@ -57,6 +60,48 @@ describe('AgentRuntime', () => {
       },
       BillingMode: 'PAY_PER_REQUEST',
     });
+  });
+
+  it('persists session transcripts in a private, encrypted bucket it may read and write, expired after 30 days', () => {
+    const template = synthesize();
+    template.hasResourceProperties('AWS::S3::Bucket', {
+      BucketEncryption: {
+        ServerSideEncryptionConfiguration: [
+          { ServerSideEncryptionByDefault: { SSEAlgorithm: 'AES256' } },
+        ],
+      },
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        BlockPublicPolicy: true,
+        IgnorePublicAcls: true,
+        RestrictPublicBuckets: true,
+      },
+      LifecycleConfiguration: {
+        Rules: [{ ExpirationInDays: 30, Status: 'Enabled' }],
+      },
+    });
+    template.hasResource('AWS::S3::Bucket', { DeletionPolicy: 'Retain' });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(['s3:PutObject']),
+            Resource: Match.arrayWith([
+              {
+                'Fn::GetAtt': [Match.stringLikeRegexp('SessionBucket'), 'Arn'],
+              },
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  it('keeps transcripts as long as the consumer chooses', () => {
+    synthesize({ sessionRetention: Duration.days(365) }).hasResourceProperties(
+      'AWS::S3::Bucket',
+      { LifecycleConfiguration: { Rules: [{ ExpirationInDays: 365 }] } },
+    );
   });
 
   it('probes the runtime at every new version, with leave to invoke it', () => {

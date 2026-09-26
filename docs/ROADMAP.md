@@ -28,7 +28,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - The admission default measured (§G). **Settled 2026-09-26**: 4 kept, ~165 MB per running task measured
 - `hello-agent`'s e2e against the deployed runtime through `agentCoreTransport`, including a container stop mid-task ending `LOST` and a retry attaching. **Built 2026-09-26** as `e2e-agentcore`
 - Telemetry and per-agent metrics (§T). **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels), **its `gen_ai.*` mapping 2026-09-27**; open: per-agent counts
-- Sessions persist beyond their container (§F): every transcript in S3 through the SDK's `SessionStore`, so a session outlives the container and a later task resumes it in another
+- Sessions persist beyond their container (§REQ402): every transcript in the agent's session bucket through the SDK's `SessionStore`, so a session outlives the container and a later task resumes it in another. **Built 2026-09-27**: `hello-agent`'s AgentCore e2e resumes a session in another container after its own is stopped
 
 **Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop, and its session persists beyond the container and resumes in another.
 
@@ -42,6 +42,7 @@ Common guardrails a procedure opts into rather than writes, each acting **within
 ## A4 — Consumers
 
 - StrategyFoundry adopts; TrendBot migrates off its predecessor harness
+- Working directories (§F), the optional filesystem AgentForge manages for a consumer's artifacts, designed with TrendBot's vault
 - What either lacks enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator, and lands on an example first
 - A second example in the plugin's shape — an agentic project with nested agents, each layer its own image — built by hand first; `hello-agent` stays flat, the minimal consumer. **Built 2026-09-25** as [`examples/agentic-project`](../examples/agentic-project): `reviewer` and `fixer` over a shared skill, `CLAUDE.md`, MCP server and house options, each layer a member of the container workspace, verified end to end
 - The plugin's generators and sync generator (§K), designed from that example, which the plugin then manages in this repository so its sync and updates are dogfooded here

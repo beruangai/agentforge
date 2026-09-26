@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-09-21
+date: 2026-09-27
 decision-makers: Jeremy Jonas
 ---
 
@@ -18,18 +18,18 @@ A container is ephemeral, but a session must resume in another one (§REQ402) an
 
 ## Decision Outcome
 
-Chosen option: **state persists through APIs**. No mount is required, so an agent runs in public network mode unless its consumer chooses otherwise.
+Chosen option: **state persists through APIs**. No mount is required, so an agent runs in public network mode unless its consumer chooses otherwise. **AgentForge owns the lifecycle of every filesystem it provides**: the session store always, as part of what the base image requires, and any working directory a consumer declares.
 
-* **Transcripts** persist through the SDK's `SessionStore` adapter, which is the documented pattern for ephemeral containers that hydrate on start. `CLAUDE_CODE_PROJECT_DIR_NAME` pins the project key, so resume does not depend on reproducing an identical working-directory path — and the key is namespaced by AgentForge, because one store serves many agents.
+* **Transcripts** persist through the SDK's `SessionStore` adapter, which is the documented pattern for ephemeral containers that hydrate on start, into a bucket each agent's construct owns. The project key is the SDK's own, from the working directory: one bucket per agent needs no namespace, and a resume uses the working directory its session began in — the agent's directory unless a procedure sets another. Pinning it with `CLAUDE_CODE_PROJECT_DIR_NAME` would also mean setting `CLAUDE_CONFIG_DIR`, for no need yet.
 * **The rest of the config directory is baked into the image**: settings, skills, plugins and user-tier memory are capabilities, not state.
-* **Working directories persist by syncing to an object store**, under a strategy the consumer declares per agent and may override per procedure — direction, delete propagation, continuous or at the close, cadence, exclusions. AgentForge runs it and guarantees the parts that are not a matter of taste: the sync is flushed and verified *before* the outcome is published, so a task never reports `TASK_STATE_COMPLETED` over unsynced files; it lives in the task's process group, so cancellation takes it; and its failure is an outcome, not a log line.
+* **Working directories are an optional capability**: a filesystem a consumer declares so its agents can persist and share artifacts — TrendBot's vault is the first. They persist by syncing to an object store, under a strategy the consumer declares per agent and may override per procedure — direction, delete propagation, continuous or at the close, cadence, exclusions. AgentForge runs it and guarantees the parts that are not a matter of taste: the sync is flushed and verified *before* the outcome is published, so a task never reports `TASK_STATE_COMPLETED` over unsynced files; it lives in the task's process group, so cancellation takes it; and its failure is an outcome, not a log line.
 * **No mount is supported.** Neither consumer needs live shared POSIX — nothing reads another procedure's files mid-run, subtrees are megabytes, and nothing outside the agent writes to them — so mounts and the VPC they require are tabled rather than built. A consumer that wants one configures it in its own CDK.
-* The mirror is best-effort by design, so AgentForge verifies rather than trusts: dedupe by entry id, check the transcript's last entry after the run, and fail the task on a dropped batch rather than logging it.
+* The mirror is best-effort by design, so AgentForge verifies rather than trusts: dedupe by entry id, check that every assistant message the run streamed reached the store, and fail the task on a dropped batch rather than logging it.
 
 ### Consequences
 
 * Good, because no consumer pays for a VPC to run an agent, and the whole class of mount failures — AZ misalignment, 424s indistinguishable from container kills, ENI lifecycle — disappears from the default path
-* Good, because local development uses the same mechanism: an object store is reachable from Docker, an S3 Files mount is not
+* Good, because local development can use the same mechanism when a test needs it: an object store is reachable from Docker, an S3 Files mount is not
 * Good, because continuous sync makes a lost container lose seconds of work rather than a run's worth
 * Bad, because a continuous strategy makes artifacts visible progressively rather than atomically, which is safe only while nothing reads another task's files mid-run — the reason the choice is the consumer's rather than ours
 * Bad, because the declaration is real surface a mount would not need, and a wrong delete policy can empty a working directory the way a mount never would

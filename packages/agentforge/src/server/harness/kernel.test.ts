@@ -1,9 +1,15 @@
+import type {
+  SDKMessage,
+  SessionStore,
+  SessionStoreEntry,
+} from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { init, result, scriptedQuery } from './__fixtures__/scripted-query.ts';
 import {
   deadToolMatchers,
   matcherSelects,
+  type QueryFunction,
   runAgent,
   TaskCanceled,
   TaskFailure,
@@ -90,6 +96,87 @@ describe('runAgent', () => {
     };
     expect(options.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBe('1');
     expect(options.outputFormat.type).toBe('json_schema');
+  });
+
+  describe('with a session store', () => {
+    const ASSISTANT = {
+      type: 'assistant',
+      uuid: 'assistant-1',
+      session_id: 'session-1',
+      message: { role: 'assistant', content: [] },
+    } as unknown as SDKMessage;
+    const KEY = { projectKey: 'project', sessionId: 'session-1' };
+
+    /** The SDK's mirror, reduced to appending these entries as the run starts. */
+    function mirroring(
+      scripted: ReturnType<typeof scriptedQuery>,
+      entries: SessionStoreEntry[],
+    ): QueryFunction {
+      return ((parameters: Parameters<QueryFunction>[0]) => {
+        void parameters.options?.sessionStore?.append(KEY, entries);
+        return scripted.query(parameters);
+      }) as QueryFunction;
+    }
+
+    function storeOf(appended: SessionStoreEntry[][]): SessionStore {
+      return {
+        append: async (_key, entries) => {
+          appended.push(entries);
+        },
+        load: async () => null,
+      };
+    }
+
+    const answered = () =>
+      scriptedQuery([
+        ASSISTANT,
+        result({ structured_output: { answer: 'x' } }),
+      ]);
+    const ENTRIES = [{ type: 'assistant', uuid: 'assistant-1' }];
+
+    it("mirrors to the deployment's store, unless the procedure names its own", async () => {
+      const deployed: SessionStoreEntry[][] = [];
+      const own: SessionStoreEntry[][] = [];
+      const context = {
+        signal: new AbortController().signal,
+        onRecord: () => {},
+        sessionStore: storeOf(deployed),
+      };
+      await runAgent(
+        { prompt: 'q', output: OutputSchema },
+        context,
+        mirroring(answered(), ENTRIES),
+      );
+      expect(deployed).toEqual([ENTRIES]);
+      await runAgent(
+        {
+          prompt: 'q',
+          output: OutputSchema,
+          options: { sessionStore: storeOf(own) },
+        },
+        context,
+        mirroring(answered(), ENTRIES),
+      );
+      expect(own).toEqual([ENTRIES]);
+      expect(deployed).toHaveLength(1);
+    });
+
+    it('fails the run when an assistant message never reached the store', async () => {
+      const context = {
+        signal: new AbortController().signal,
+        onRecord: () => {},
+        sessionStore: storeOf([]),
+      };
+      expect(
+        await causeOf(
+          runAgent(
+            { prompt: 'q', output: OutputSchema },
+            context,
+            mirroring(answered(), []),
+          ),
+        ),
+      ).toBe('EXECUTION_ERROR');
+    });
   });
 
   it('takes the first result and ignores a later one', async () => {
