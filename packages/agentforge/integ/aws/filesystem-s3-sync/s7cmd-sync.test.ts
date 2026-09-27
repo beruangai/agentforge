@@ -1,5 +1,5 @@
 /**
- * Working directories on `s7cmd`, pinned in the base image, against a real
+ * `S3Filesystem` on `s7cmd`, pinned in the base image, against a real
  * bucket — the harness's own sync, its arguments unchanged, with only where
  * `s7cmd` runs swapped for a container of the base image as built.
  *
@@ -31,11 +31,12 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { MountedHandle } from '../../../src/server/harness/filesystem/filesystem.ts';
 import {
+  S3Filesystem,
+  type S3FilesystemOptions,
   type S7cmdRunner,
-  TaskWorkingDirectories,
-  type WorkingDirectorySync,
-} from '../../../src/server/harness/working-directory.ts';
+} from '../../../src/server/harness/filesystem/s3-filesystem.ts';
 import { buildAgentForgeBaseImage } from '../__fixtures__/agentforge-base-image.ts';
 import { s7cmdInBaseImage } from './__fixtures__/s7cmd-in-base-image.ts';
 import {
@@ -44,10 +45,14 @@ import {
   listRelativeKeys,
 } from './__fixtures__/scratch-bucket.ts';
 
-const SYNC: WorkingDirectorySync = {
+/** Everything but where it mounts, which is per task. */
+const OPTIONS: Omit<S3FilesystemOptions, 'path'> = {
+  bucket: 'vault',
+  access: 'READ_WRITE',
+  scope: () => ({ root: 'p' }),
   pull: true,
   push: 'WHEN_COMPLETED',
-  continuous: false,
+  checkpoints: false,
   deletes: true,
   // Anchored at the start: it holds only if patterns see paths relative to the prefix.
   exclude: ['^cache/', '\\.tmp$'],
@@ -71,12 +76,25 @@ async function body(key: string): Promise<string> {
   return (await object.Body?.transformToString()) ?? '';
 }
 
-function task(taskId: string): TaskWorkingDirectories {
-  return new TaskWorkingDirectories({
+/** Mounts an S3 filesystem for one task, in the directory `s7cmd`'s container shares. */
+function mount(
+  taskId: string,
+  options: Partial<S3FilesystemOptions> = {},
+): Promise<MountedHandle> {
+  const filesystem = new S3Filesystem(
+    { ...OPTIONS, path: join(root, taskId), ...options },
+    {
+      s7cmd,
+      environment: {
+        AGENTFORGE_FILESYSTEM_BUCKETS: JSON.stringify({ vault: bucket }),
+      },
+    },
+  );
+  // No scope here reads the request.
+  return filesystem.mount({
+    name: 'vault',
     taskId,
-    buckets: { vault: bucket },
-    s7cmd,
-    root,
+    request: { input: undefined, context: {} as never },
   });
 }
 
@@ -99,7 +117,7 @@ afterAll(async () => {
   }
 });
 
-describe('working directories on s7cmd, against a real bucket', () => {
+describe('S3 filesystems on s7cmd, against a real bucket', () => {
   it('pulls a prefix, and pushes back only what changed, deleting what the task removed and never what it excludes', async () => {
     await put('p/notes.md', 'old');
     await put('p/keep.md', 'keep');
@@ -111,12 +129,8 @@ describe('working directories on s7cmd, against a real bucket', () => {
       await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: 'p/keep.md' }))
     ).LastModified;
 
-    const directories = task('round-trip');
-    const { path } = await directories.open({
-      name: 'vault',
-      prefix: 'p',
-      sync: SYNC,
-    });
+    const vault = await mount('round-trip');
+    const { path } = vault.mounted;
     expect(await readFile(join(path, 'keep.md'), 'utf8')).toBe('keep');
     expect(existsSync(join(path, 'cache'))).toBe(false);
     expect(existsSync(join(path, '..', 'escape.md'))).toBe(false);
@@ -127,8 +141,7 @@ describe('working directories on s7cmd, against a real bucket', () => {
     await writeFile(join(path, 'deep', 'added.md'), 'added');
     await writeFile(join(path, 'scratch.tmp'), 'excluded locally');
     await delay(1_100); // so a re-upload would move LastModified
-    await directories.close('COMPLETED');
-    await directories.dispose();
+    await vault.unmount('COMPLETED');
 
     expect(await listRelativeKeys(s3, bucket, 'p/')).toEqual([
       '../escape.md',
@@ -151,41 +164,62 @@ describe('working directories on s7cmd, against a real bucket', () => {
     ).toEqual(keptModified);
   });
 
-  it('pushes continuously, leaving a file changed in the quiet period; a cancel pushes nothing more', async () => {
-    const directories = task('continuous');
-    const { path } = await directories.open({
-      name: 'vault',
-      prefix: 'c',
-      sync: {
-        ...SYNC,
-        pull: false,
-        deletes: false,
-        push: 'WHEN_ENDED',
-        continuous: { everySeconds: 5, quietSeconds: 3_600 },
-      },
+  it('pushes only within its write scope, and deletes nothing outside it', async () => {
+    await put('w/outside.md', 'remote');
+    const vault = await mount('write-scope', {
+      scope: () => ({ root: 'w', write: ['notes/today.md'] }),
     });
+    const { path } = vault.mounted;
+    await mkdir(join(path, 'notes'));
+    await writeFile(join(path, 'notes', 'today.md'), 'today');
+    await writeFile(join(path, 'notes', 'tomorrow.md'), 'kept local');
+    await rm(join(path, 'outside.md'));
+    await vault.unmount('COMPLETED');
+    expect(await listRelativeKeys(s3, bucket, 'w/')).toEqual([
+      'notes/today.md',
+      'outside.md',
+    ]);
+  });
+
+  it('pushes checkpoints, leaving a file changed in the quiet period; a cancel pushes nothing more', async () => {
+    const vault = await mount('checkpoints', {
+      scope: () => ({ root: 'c' }),
+      pull: false,
+      deletes: false,
+      push: 'WHEN_ENDED',
+      checkpoints: { everySeconds: 5, quietSeconds: 3_600 },
+    });
+    const { path } = vault.mounted;
     await writeFile(join(path, 'settled.md'), 'settled');
     const longAgo = new Date('2026-01-01T00:00:00Z');
     await utimes(join(path, 'settled.md'), longAgo, longAgo);
     await writeFile(join(path, 'fresh.md'), 'fresh');
     await delay(12_000);
-    await directories.close('CANCELED');
-    await directories.dispose();
+    await vault.unmount('CANCELED');
     expect(await listRelativeKeys(s3, bucket, 'c/')).toEqual(['settled.md']);
   });
 
   it('fails unsynced when the object store refuses', async () => {
-    const directories = new TaskWorkingDirectories({
-      taskId: 'refused',
-      buckets: { vault: `${bucket}-absent` },
-      s7cmd,
-      root,
-    });
+    const refused = new S3Filesystem(
+      { ...OPTIONS, path: join(root, 'refused') },
+      {
+        s7cmd,
+        environment: {
+          AGENTFORGE_FILESYSTEM_BUCKETS: JSON.stringify({
+            vault: `${bucket}-absent`,
+          }),
+        },
+      },
+    );
     await expect(
-      directories.open({ name: 'vault', prefix: 'p', sync: SYNC }),
+      refused.mount({
+        name: 'vault',
+        taskId: 'refused',
+        request: { input: undefined, context: {} as never },
+      }),
     ).rejects.toMatchObject({
       taskCause: {
-        code: 'WORKING_DIRECTORY_UNSYNCED',
+        code: 'FILESYSTEM_UNSYNCED',
         message: expect.stringMatching(
           /could not be pulled: s7cmd exited [13]/,
         ),
@@ -194,12 +228,8 @@ describe('working directories on s7cmd, against a real bucket', () => {
   });
 
   it('fails a pattern s7cmd cannot parse as the procedure’s error', async () => {
-    const opened = task('bad-pattern').open({
-      name: 'vault',
-      prefix: 'p',
-      sync: { ...SYNC, exclude: ['('] },
-    });
-    await expect(opened).rejects.toThrow(/check its `exclude` patterns/);
-    await expect(opened).rejects.not.toHaveProperty('taskCause');
+    const mounted = mount('bad-pattern', { exclude: ['('] });
+    await expect(mounted).rejects.toThrow(/check `exclude`/);
+    await expect(mounted).rejects.not.toHaveProperty('taskCause');
   });
 });

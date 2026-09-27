@@ -4,6 +4,23 @@
  * `context.runAgent`, and the task process entry. Resolvable only under the
  * `agentforge-agent` export condition, so a worker's build cannot import it.
  */
+
+export {
+  type Ending,
+  Filesystem,
+  type FilesystemOptions,
+  type FilesystemRequest,
+  type FilesystemScope,
+  FilesystemUnsynced,
+  type Mount,
+  type MountedFilesystem,
+} from './filesystem/filesystem.ts';
+export { filesystems } from './filesystem/registry.ts';
+export {
+  S3Filesystem,
+  type S3FilesystemOptions,
+} from './filesystem/s3-filesystem.ts';
+export { ScratchFilesystem } from './filesystem/scratch-filesystem.ts';
 export {
   type AgentOptions,
   type AgentRun,
@@ -29,8 +46,3 @@ export {
   runTaskProcess,
   type TaskContext,
 } from './task-process.ts';
-export type {
-  OpenWorkingDirectory,
-  WorkingDirectorySpec,
-  WorkingDirectorySync,
-} from './working-directory.ts';

@@ -31,7 +31,7 @@ export const helloAgent = {
     .meta(timeBudget(300))
     .input(z.object({ seconds: z.number().int().positive().max(600) }))
     .output(z.object({ answer: z.string() })),
-  /** Keeps a note in the notebook, a working directory, under a topic. */
+  /** Keeps a note in the notebook, an S3 filesystem, under a topic. */
   keepNote: oc
     .input(z.object({ topic: TopicField, note: z.string().min(1) }))
     .output(

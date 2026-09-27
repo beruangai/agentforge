@@ -50,7 +50,7 @@
 
 **Outcome** — How a task ended: the output, a **cause**, cancelled, or rejected with a reason. Carried as the artifact `outcome`.
 
-**Cause** — `{ code, message, suggestedAction, retryable, retryAfter?, payload?, stackTrace? }` on a failed task. Codes are `SCREAMING_SNAKE_CASE`: `OUTPUT_INVALID`, `OUTPUT_TOO_LARGE`, `BUDGET_EXHAUSTED`, `TIMED_OUT`, `LOST`, `USAGE_LIMITED`, `CREDENTIAL_EXPIRED`, `PROVIDER_TRANSIENT`, `WORKING_DIRECTORY_UNSYNCED`, `EXECUTION_ERROR`.
+**Cause** — `{ code, message, suggestedAction, retryable, retryAfter?, payload?, stackTrace? }` on a failed task. Codes are `SCREAMING_SNAKE_CASE`: `OUTPUT_INVALID`, `OUTPUT_TOO_LARGE`, `BUDGET_EXHAUSTED`, `TIMED_OUT`, `LOST`, `USAGE_LIMITED`, `CREDENTIAL_EXPIRED`, `PROVIDER_TRANSIENT`, `FILESYSTEM_UNSYNCED`, `EXECUTION_ERROR`.
 
 **Idempotency key** — The caller's name for one logical execution; a start with it attaches to its live or completed task ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
 
@@ -72,7 +72,7 @@
 
 **`cwd`** — The SDK's working directory, and the capability root: which `.claude/` layers apply.
 
-**Working directory** — An optional filesystem a consumer declares so its agents persist and share artifacts: a `WorkingDirectory` construct's bucket, given to agents by name. A procedure opens a prefix of it with `context.openWorkingDirectory`, under a **sync** it declares whole — `pull`, `push`, `continuous`, `deletes`, `exclude` — run by `s7cmd`, and the outcome waits for the push ([ADR 0015](../adr/0015-working-directories-sync-a-prefix-per-task.md)).
+**Filesystem** — Files AgentForge manages for a procedure, persistent or scratch: a kind (`S3Filesystem`, `ScratchFilesystem`, or a consumer's subclass) registered by name with the `filesystems()` middleware, mounted before the handler and unmounted once the outcome is known. Its operations are **pull** and **push**; a **checkpoint** is a push, while the task runs, of what has settled. Its **scope** — the `root` mounted and the `read` and `write` globs within it — is resolved per request; the handler receives its path and **baseline permissions** and decides what an agent gets ([ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)).
 
 ## Delivery
 

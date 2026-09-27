@@ -3,7 +3,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import type {
   S7cmdResult,
   S7cmdRunner,
-} from '../../../../src/server/harness/working-directory.ts';
+} from '../../../../src/server/harness/filesystem/s3-filesystem.ts';
 import { AGENTFORGE_BASE_IMAGE } from '../../__fixtures__/agentforge-base-image.ts';
 
 /** The credentials `s7cmd` reads first, handed to the container by name. */

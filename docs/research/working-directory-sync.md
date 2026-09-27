@@ -1,6 +1,6 @@
 # Working-directory sync — does `s7cmd` hold up?
 
-**Measured on 2026-09-22** with `s7cmd` **1.8.3**; **re-checked on 2026-09-27** with **1.8.5**, the release the base image pins, through `packages/agentforge/integ/aws/filesystem-s3-sync/`, which drives the harness's own sync with `s7cmd` in the base image as built. Decided in [ADR 0015](../../adr/0015-working-directories-sync-a-prefix-per-task.md).
+**Measured on 2026-09-22** with `s7cmd` **1.8.3**; **re-checked on 2026-09-27** with **1.8.5**, the release the base image pins, through `packages/agentforge/integ/aws/filesystem-s3-sync/`, which drives `S3Filesystem`'s own sync with `s7cmd` in the base image as built. Decided in [ADR 0015](../../adr/0015-filesystems-mount-around-a-procedure.md).
 
 §F rests three design choices on this tool: that `LastModifiedDate` filtering is a usable **quiescence heuristic**, that exclusions work, and that **delete propagation is an explicit choice rather than a default**. All three were assumptions. All three hold.
 

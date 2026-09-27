@@ -30,7 +30,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - Telemetry and per-agent metrics (§T). **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels), **its `gen_ai.*` mapping 2026-09-27**, and **the per-agent counts and dashboard 2026-09-27** (§REQ604); a transcript view waits on the CLI (§T)
 - Sessions persist beyond their container (§REQ402): every transcript in the agent's session bucket through the SDK's `SessionStore`, so a session outlives the container and a later task resumes it in another. **Built 2026-09-27**: `hello-agent`'s AgentCore e2e resumes a session in another container after its own is stopped
 
-- Retroactive OpenSpec specs for what A1 and A2 built — succinct, significant behaviour only — written with the operator once working directories land
+- Retroactive OpenSpec specs for what A1 and A2 built — succinct, significant behaviour only — written with the operator once filesystems land
 
 **Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop, and its session persists beyond the container and resumes in another.
 
@@ -38,13 +38,13 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 Each lands on an example agent first; what it needs enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator.
 
-- Working directories (§REQ401, [ADR 0015](../adr/0015-working-directories-sync-a-prefix-per-task.md)), the optional filesystem AgentForge manages for a consumer's artifacts: a `WorkingDirectory` construct several agents share, a prefix per task pulled and pushed by `s7cmd` under a sync the consumer declares, the outcome waiting for a verified push. Specified by the OpenSpec change `filesystem-working-directories`; `hello-agent` keeps a note in one container and reads it back in another
+- Filesystems (§REQ401, [ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)): an abstract kind AgentForge mounts around a procedure, registered by middleware, scoped per request, the outcome waiting for a verified push. `S3Filesystem` on `s7cmd` over an `S3FilesystemBucket` several agents share, and `ScratchFilesystem`; git later. Specified by the OpenSpec change `filesystem-lifecycle`; `hello-agent` keeps a note in one container and reads it back in another
 - Guardrails a procedure opts into rather than writes, each acting **within the agent's turn** so the agent can fix what it finds before it answers — never a check after the run that can only fail it. First, a stop guard for predefined cases: the files the procedure expects exist before the agent may stop. To be designed with the operator
 
 ## A4 — Consumers
 
-- StrategyFoundry adopts first: a fresh codebase whose working directory is S3, so it vets working directories and ADR 0015
-- TrendBot migrates off its predecessor harness only after StrategyFoundry has vetted AgentForge. Its vault is a git-backed filesystem: before it can adopt, either AgentForge adds a git-backed working directory or TrendBot owns that filesystem itself
+- StrategyFoundry adopts first: a fresh codebase whose workspace is S3, so it vets filesystems and ADR 0015
+- TrendBot migrates off its predecessor harness only after StrategyFoundry has vetted AgentForge. Its vault is a git-backed filesystem: before it can adopt, either AgentForge adds a git filesystem kind or TrendBot subclasses `Filesystem` itself
 - What either lacks enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator, and lands on an example first
 - A second example in the plugin's shape — an agentic project with nested agents, each layer its own image — built by hand first; `hello-agent` stays flat, the minimal consumer. **Built 2026-09-25** as [`examples/agentic-project`](../examples/agentic-project): `reviewer` and `fixer` over a shared skill, `CLAUDE.md`, MCP server and house options, each layer a member of the container workspace, verified end to end
 - The plugin's generators and sync generator (§K), designed from that example, which the plugin then manages in this repository so its sync and updates are dogfooded here

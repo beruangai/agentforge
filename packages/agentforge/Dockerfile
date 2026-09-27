@@ -1,6 +1,6 @@
 # The AgentForge base image, `agentforge/a2a-claude`: Bun, what the Claude
 # Code CLI needs at run time, the ADOT collector that carries the CLI's
-# telemetry to CloudWatch, `s7cmd` for working directories, and the container's `/workspace` — a Bun
+# telemetry to CloudWatch, `s7cmd` for S3 filesystems, and the container's `/workspace` — a Bun
 # workspace whose root depends on the peers AgentForge's server and harness
 # import, with AgentForge itself as the member at `/workspace/agentforge`.
 #

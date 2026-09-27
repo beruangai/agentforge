@@ -39,6 +39,10 @@ import {
 import type { ISecret } from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import {
+  FILESYSTEM_BUCKETS_VARIABLE,
+  FILESYSTEM_NAME_PATTERN,
+} from '#core/filesystem.ts';
+import {
   METRICS_DIMENSION,
   METRICS_NAMESPACE,
   METRICS_VARIABLE,
@@ -51,12 +55,8 @@ import {
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
 } from '#core/task-table.ts';
 import { TELEMETRY_VARIABLE, type TelemetryLevel } from '#core/telemetry.ts';
-import {
-  WORKING_DIRECTORIES_VARIABLE,
-  WORKING_DIRECTORY_NAME_PATTERN,
-} from '#core/working-directory.ts';
 import { suppressRules } from './checkov.ts';
-import type { WorkingDirectory } from './working-directory.ts';
+import type { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
 
 /** The one request header AgentForge relies on AgentCore forwarding (ADR 0014). */
 const A2A_VERSION_HEADER = 'A2A-Version';
@@ -108,10 +108,10 @@ export interface AgentRuntimeProps
    */
   readonly telemetry?: TelemetryLevel;
   /**
-   * The working directories the agent's procedures may open, by the name
-   * they open each by. A working directory may be given to several agents.
+   * The buckets the agent's `S3Filesystem`s may mount, by the name each
+   * declares as its `bucket`. A bucket may be given to several agents.
    */
-  readonly workingDirectories?: Readonly<Record<string, WorkingDirectory>>;
+  readonly filesystems?: Readonly<Record<string, S3FilesystemBucket>>;
 }
 
 /**
@@ -143,7 +143,7 @@ export class AgentRuntime extends Construct {
       tracingEnabled = true,
       secrets = {},
       telemetry = 'INFO',
-      workingDirectories = {},
+      filesystems = {},
       environmentVariables = {},
       requestHeaderConfiguration,
       ...runtimeProps
@@ -154,7 +154,7 @@ export class AgentRuntime extends Construct {
       METRICS_VARIABLE,
       SECRETS_VARIABLE,
       TELEMETRY_VARIABLE,
-      WORKING_DIRECTORIES_VARIABLE,
+      FILESYSTEM_BUCKETS_VARIABLE,
     ]) {
       if (owned in environmentVariables) {
         throw new Error(
@@ -162,10 +162,10 @@ export class AgentRuntime extends Construct {
         );
       }
     }
-    for (const name of Object.keys(workingDirectories)) {
-      if (!WORKING_DIRECTORY_NAME_PATTERN.test(name)) {
+    for (const name of Object.keys(filesystems)) {
+      if (!FILESYSTEM_NAME_PATTERN.test(name)) {
         throw new Error(
-          `working directory name "${name}" must match ${WORKING_DIRECTORY_NAME_PATTERN}`,
+          `filesystem bucket name "${name}" must match ${FILESYSTEM_NAME_PATTERN}`,
         );
       }
     }
@@ -239,14 +239,15 @@ export class AgentRuntime extends Construct {
                 ),
               ),
             }),
-        ...(Object.keys(workingDirectories).length === 0
+        ...(Object.keys(filesystems).length === 0
           ? {}
           : {
-              [WORKING_DIRECTORIES_VARIABLE]: Stack.of(this).toJsonString(
+              [FILESYSTEM_BUCKETS_VARIABLE]: Stack.of(this).toJsonString(
                 Object.fromEntries(
-                  Object.entries(workingDirectories).map(
-                    ([name, directory]) => [name, directory.bucket.bucketName],
-                  ),
+                  Object.entries(filesystems).map(([name, filesystem]) => [
+                    name,
+                    filesystem.bucket.bucketName,
+                  ]),
                 ),
               ),
             }),
@@ -268,8 +269,8 @@ export class AgentRuntime extends Construct {
     });
     this.taskTable.grantReadWriteData(this.runtime);
     this.sessionBucket.grantReadWrite(this.runtime);
-    for (const directory of Object.values(workingDirectories)) {
-      directory.bucket.grantReadWrite(this.runtime);
+    for (const filesystem of Object.values(filesystems)) {
+      filesystem.bucket.grantReadWrite(this.runtime);
     }
     // The collector's OTLP metrics are PutMetricData on CloudWatch's default
     // dataset, which the L2 role's namespace-scoped grant does not cover.

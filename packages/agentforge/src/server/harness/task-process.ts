@@ -1,7 +1,13 @@
 import { inspect } from 'node:util';
 import type { SessionStore } from '@anthropic-ai/claude-agent-sdk';
 import type { RouterContract } from '@orpc/contract';
-import { call, implement, type Router } from '@orpc/server';
+import {
+  call,
+  DecoratedProcedure,
+  implement,
+  type Router,
+  unlazy,
+} from '@orpc/server';
 import {
   contractHash,
   inputSchemaOf,
@@ -18,6 +24,12 @@ import type {
   TaskInvocation,
   TaskProcessMessage,
 } from '#core/task-protocol/messages.ts';
+import type {
+  Ending,
+  MountedFilesystem,
+  MountedHandle,
+} from './filesystem/filesystem.ts';
+import { mountRegistered } from './filesystem/registry.ts';
 import {
   type AgentRun,
   type AgentRunSpec,
@@ -27,13 +39,6 @@ import {
   TaskFailure,
 } from './kernel.ts';
 import { sessionStoreFromEnvironment } from './session-store.ts';
-import {
-  declaredWorkingDirectories,
-  type OpenWorkingDirectory,
-  TaskWorkingDirectories,
-  type WorkingDirectoriesOptions,
-  type WorkingDirectorySpec,
-} from './working-directory.ts';
 
 /** What every procedure handler receives as its oRPC context. */
 export interface TaskContext {
@@ -50,14 +55,10 @@ export interface TaskContext {
   readonly signal: AbortSignal;
   /** Runs the agent to a settled, typed answer. Throws to fail or cancel the task. */
   runAgent<Output>(spec: AgentRunSpec<Output>): Promise<AgentRun<Output>>;
-  /**
-   * Pulls a prefix of a working directory the deployment declared into a
-   * directory of this task's own, and pushes it back as `spec.sync` says
-   * before the outcome is published (ADR 0015).
-   */
-  openWorkingDirectory(
-    spec: WorkingDirectorySpec,
-  ): Promise<OpenWorkingDirectory>;
+  /** The filesystems mounted for this procedure, by the name it registered each under (ADR 0015). */
+  readonly filesystems: Readonly<Record<string, MountedFilesystem>>;
+  /** Every mounted filesystem's baseline permissions, merged; no agent gets them unless the handler gives them. */
+  readonly filesystemPermissions: { readonly allow: readonly string[] };
 }
 
 /** The oRPC implementer for a contract, with AgentForge's task context. */
@@ -78,79 +79,73 @@ export interface ExecuteOptions {
   readonly onRecord: (record: RunRecord) => void;
   /** Where every run's transcript is mirrored, when the deployment declares it. */
   readonly sessionStore?: SessionStore;
-  /** The working directories the deployment declared; none when absent. */
-  readonly workingDirectories?: WorkingDirectoriesOptions;
   /** A test seam: replaces the SDK call inside the kernel. */
   readonly query?: QueryFunction;
 }
 
 /**
- * Runs one invocation of one procedure to its outcome, its working
- * directories synced as their strategies say. Never throws: every way it can
- * end is an outcome.
+ * Runs one invocation of one procedure to its outcome, its filesystems
+ * mounted before the handler and unmounted once the outcome is known. Never
+ * throws: every way it can end is an outcome.
  */
 export async function executeProcedure(
   options: ExecuteOptions,
 ): Promise<Outcome> {
-  const workingDirectories = new TaskWorkingDirectories({
-    buckets: {},
-    ...options.workingDirectories,
-    taskId: options.invocation.taskId,
-  });
-  try {
-    const outcome = await runProcedure(options, workingDirectories);
-    return await synced(outcome, workingDirectories);
-  } finally {
-    await workingDirectories.dispose();
-  }
+  const mounted: MountedHandle[] = [];
+  const outcome = await runProcedure(options, mounted);
+  return unmounted(outcome, mounted);
 }
 
 /**
- * Pushes the working directories as the outcome requires. A completed task
- * whose files did not all arrive fails; a failed one keeps its own cause,
- * the sync's failure added to its message.
+ * Unmounts every filesystem, each pushing as its ending requires. A task
+ * that did not fail, whose filesystems did not all unmount, fails; a failed
+ * one keeps its own cause, the unmount's failure added to its message.
  */
-async function synced(
+async function unmounted(
   outcome: Outcome,
-  workingDirectories: TaskWorkingDirectories,
+  mounted: readonly MountedHandle[],
 ): Promise<Outcome> {
   if (outcome.state === 'TASK_STATE_REJECTED') return outcome;
-  const ending =
+  const ending: Ending =
     outcome.state === 'TASK_STATE_COMPLETED'
       ? 'COMPLETED'
       : outcome.state === 'TASK_STATE_FAILED'
         ? 'FAILED'
         : 'CANCELED';
-  try {
-    await workingDirectories.close(ending);
-    return outcome;
-  } catch (error) {
-    const unsynced =
-      error instanceof TaskFailure
-        ? error.taskCause
-        : cause('WORKING_DIRECTORY_UNSYNCED', String(error));
-    console.error(unsynced.message, error);
-    if (outcome.state !== 'TASK_STATE_FAILED') {
-      return { state: 'TASK_STATE_FAILED', cause: unsynced };
-    }
+  const failures = (
+    await Promise.allSettled(mounted.map((handle) => handle.unmount(ending)))
+  ).flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
+  if (failures.length === 0) return outcome;
+  const causes = failures.map((error: unknown) => {
+    console.error('a filesystem did not unmount', error);
+    return error instanceof TaskFailure
+      ? error.taskCause
+      : cause('EXECUTION_ERROR', String(error));
+  });
+  const message = causes.map((unmount) => unmount.message).join('; ');
+  if (outcome.state !== 'TASK_STATE_FAILED') {
     return {
       state: 'TASK_STATE_FAILED',
-      cause: {
-        ...outcome.cause,
-        message: `${outcome.cause.message}; and ${unsynced.message}`,
-      },
+      cause: { ...(causes[0] as (typeof causes)[number]), message },
     };
   }
+  return {
+    state: 'TASK_STATE_FAILED',
+    cause: {
+      ...outcome.cause,
+      message: `${outcome.cause.message}; and ${message}`,
+    },
+  };
 }
 
 async function runProcedure(
   options: ExecuteOptions,
-  workingDirectories: TaskWorkingDirectories,
+  mounted: MountedHandle[],
 ): Promise<Outcome> {
   const { envelope } = options.invocation;
   const procedureContract = procedureAt(options.contract, envelope.procedure);
-  const procedure = lookup(options.router, envelope.procedure);
-  if (procedureContract === undefined || procedure === undefined) {
+  const registered = lookup(options.router, envelope.procedure);
+  if (procedureContract === undefined || registered === undefined) {
     return {
       state: 'TASK_STATE_REJECTED',
       reason: `this agent does not serve procedure "${envelope.procedure}"`,
@@ -192,9 +187,16 @@ async function runProcedure(
         },
         options.query,
       ),
-    openWorkingDirectory: (spec) => workingDirectories.open(spec),
+    // Set by the lifecycle middleware, which runs just before the handler.
+    filesystems: {},
+    filesystemPermissions: { allow: [] },
   };
+  // Appended last, so it runs innermost: after every registration.
   try {
+    const { default: leaf } = await unlazy(registered);
+    const procedure = new DecoratedProcedure(leaf['~orpc']).use(
+      mountRegistered(mounted),
+    );
     const output: unknown = await call(procedure, input.data, {
       context,
       signal: options.signal,
@@ -288,7 +290,6 @@ export function runTaskProcess(options: {
     );
   const controller = new AbortController();
   const sessionStore = sessionStoreFromEnvironment();
-  const buckets = declaredWorkingDirectories();
   let started = false;
   process.on('message', (message: ExecutorMessage) => {
     if (message.type === 'cancel') {
@@ -304,7 +305,6 @@ export function runTaskProcess(options: {
       signal: controller.signal,
       onRecord: (record) => void emit({ type: 'record', record }),
       ...(sessionStore === undefined ? {} : { sessionStore }),
-      workingDirectories: { buckets },
     })
       .then((outcome) => emit({ type: 'outcome', outcome }))
       .then(

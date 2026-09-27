@@ -2,7 +2,7 @@
 // image, through AgentForge's construct. `nx run @beruangai/example-hello-agent:deploy`
 // runs it with the test role in us-east-2, after the base image it builds FROM.
 
-import { AgentRuntime, WorkingDirectory } from '@beruangai/agentforge/infra';
+import { AgentRuntime, S3FilesystemBucket } from '@beruangai/agentforge/infra';
 import { App, CfnOutput, Stack } from 'aws-cdk-lib';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
@@ -22,9 +22,9 @@ const stack = new Stack(app, 'agentforge-example-hello-agent', {
     region: required('CDK_DEFAULT_REGION'),
   },
 });
-// The notebook the note procedures keep their notes in; any other agent
+// The bucket the note procedures' notebook mounts from; any other agent
 // could be given it too.
-const notebook = new WorkingDirectory(stack, 'Notebook');
+const notebook = new S3FilesystemBucket(stack, 'Notebook');
 const agent = new AgentRuntime(stack, 'HelloAgent', {
   agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(
     new URL('..', import.meta.url).pathname,
@@ -35,7 +35,7 @@ const agent = new AgentRuntime(stack, 'HelloAgent', {
       extraHash: required('AGENTFORGE_BASE_IMAGE_ID'),
     },
   ),
-  workingDirectories: { notebook },
+  filesystems: { notebook },
   // The operator creates this secret and sets its value (README).
   secrets: {
     CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(

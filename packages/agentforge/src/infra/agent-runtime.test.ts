@@ -8,7 +8,7 @@ import {
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
 } from '#core/task-table.ts';
 import { AgentRuntime, type AgentRuntimeProps } from './agent-runtime.ts';
-import { WorkingDirectory } from './working-directory.ts';
+import { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
 
 const IMAGE = AgentRuntimeArtifact.fromImageUri(
   '123456789012.dkr.ecr.us-east-2.amazonaws.com/agent:latest',
@@ -276,15 +276,15 @@ describe('AgentRuntime', () => {
     ).toThrow(/AGENTFORGE_TABLE_NAME/);
   });
 
-  it('names its working directories to the harness, and may read and write each', () => {
+  it('names its filesystem buckets to the harness, and may read and write each', () => {
     const template = synthesize((stack) => ({
-      workingDirectories: { vault: new WorkingDirectory(stack, 'Vault') },
+      filesystems: { vault: new S3FilesystemBucket(stack, 'Vault') },
     }));
     const [runtime] = Object.values(
       template.findResources('AWS::BedrockAgentCore::Runtime'),
     );
     const declared = JSON.stringify(
-      runtime?.Properties.EnvironmentVariables.AGENTFORGE_WORKING_DIRECTORIES,
+      runtime?.Properties.EnvironmentVariables.AGENTFORGE_FILESYSTEM_BUCKETS,
     );
     expect(declared).toContain('\\"vault\\":');
     expect(declared).toContain('VaultBucket');
@@ -302,11 +302,11 @@ describe('AgentRuntime', () => {
     });
   });
 
-  it('refuses a working directory name a procedure could not open', () => {
+  it('refuses a bucket name a filesystem could not declare', () => {
     expect(() =>
       synthesize((stack) => ({
-        workingDirectories: { Vault: new WorkingDirectory(stack, 'Vault') },
+        filesystems: { Vault: new S3FilesystemBucket(stack, 'Vault') },
       })),
-    ).toThrow(/working directory name "Vault"/);
+    ).toThrow(/filesystem bucket name "Vault"/);
   });
 });

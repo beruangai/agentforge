@@ -4,20 +4,20 @@ import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { BucketEncryption } from 'aws-cdk-lib/aws-s3';
 import { describe, expect, it } from 'vitest';
 import { AgentRuntime } from './agent-runtime.ts';
-import { WorkingDirectory } from './working-directory.ts';
+import { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
 
-describe('WorkingDirectory', () => {
+describe('S3FilesystemBucket', () => {
   it('is a private, S3-encrypted, versioned, retained bucket that several agents share', () => {
     const stack = new Stack(new App(), 'Agents', {
       env: { account: '123456789012', region: 'us-east-2' },
     });
-    const vault = new WorkingDirectory(stack, 'Vault');
+    const vault = new S3FilesystemBucket(stack, 'Vault');
     for (const name of ['One', 'Two']) {
       new AgentRuntime(stack, name, {
         agentRuntimeArtifact: AgentRuntimeArtifact.fromImageUri(
           '123456789012.dkr.ecr.us-east-2.amazonaws.com/agent:latest',
         ),
-        workingDirectories: { vault },
+        filesystems: { vault },
       });
     }
     const template = Template.fromStack(stack);
@@ -27,7 +27,6 @@ describe('WorkingDirectory', () => {
     ) ?? [undefined, undefined];
     expect(bucket).toMatchObject({
       DeletionPolicy: 'Retain',
-      Metadata: { checkov: { skip: [{ id: 'CKV_AWS_18' }] } },
       Properties: {
         VersioningConfiguration: { Status: 'Enabled' },
         BucketEncryption: {
@@ -43,6 +42,8 @@ describe('WorkingDirectory', () => {
         },
       },
     });
+    // Access logging is the consumer's decision, in its checkov config.
+    expect(bucket?.Metadata).toBeUndefined();
     // One bucket, and both agents' policies grant on it.
     expect(
       Object.values(template.findResources('AWS::IAM::Policy')).filter(
@@ -55,7 +56,7 @@ describe('WorkingDirectory', () => {
     const stack = new Stack(new App(), 'Agents');
     expect(
       () =>
-        new WorkingDirectory(stack, 'Vault', {
+        new S3FilesystemBucket(stack, 'Vault', {
           encryption: BucketEncryption.KMS,
         } as never),
     ).toThrow(/no KMS, for now; remove encryption/);

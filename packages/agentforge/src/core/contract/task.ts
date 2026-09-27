@@ -43,8 +43,8 @@ export const CAUSE_CODES = [
   'CREDENTIAL_EXPIRED',
   /** The model provider failed transiently. */
   'PROVIDER_TRANSIENT',
-  /** A working directory could not be pulled, or its push not verified: the run's files are not all where they belong. */
-  'WORKING_DIRECTORY_UNSYNCED',
+  /** A filesystem could not be mounted, or its push not verified: the task's files are not all where they belong. */
+  'FILESYSTEM_UNSYNCED',
   /** Anything else: the procedure, the harness or the SDK threw. */
   'EXECUTION_ERROR',
 ] as const;
@@ -78,7 +78,7 @@ const RETRYABLE_BY_CODE: Record<CauseCode, boolean> = {
   USAGE_LIMITED: true,
   CREDENTIAL_EXPIRED: false,
   PROVIDER_TRANSIENT: true,
-  WORKING_DIRECTORY_UNSYNCED: true,
+  FILESYSTEM_UNSYNCED: true,
   EXECUTION_ERROR: false,
 };
 
@@ -97,8 +97,8 @@ const SUGGESTED_ACTION_BY_CODE: Record<CauseCode, string> = {
   CREDENTIAL_EXPIRED:
     "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ705).",
   PROVIDER_TRANSIENT: 'Retry with backoff.',
-  WORKING_DIRECTORY_UNSYNCED:
-    "Retry: the working directory's object store failed or disagreed. A pushed prefix may hold part of this attempt's files; the next attempt receives this one as `priorAttempt` (ADR 0015).",
+  FILESYSTEM_UNSYNCED:
+    "Retry: the filesystem's store failed or disagreed. A push may have landed part of this attempt's files; the next attempt receives this one as `priorAttempt` (ADR 0015).",
   EXECUTION_ERROR:
     'Read `stackTrace`, and the container log for the whole error; fix the procedure, its options, or the layer that threw.',
 };
