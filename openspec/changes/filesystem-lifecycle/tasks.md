@@ -20,4 +20,4 @@ The e2e tests are not rebuilt or run until the operator confirms the implementat
 
 ## 4. Integration (after the operator confirms)
 
-- [ ] 4.1 `integ/aws/filesystem-s3-sync` and `hello-agent`'s AgentCore e2e pass
+- [x] 4.1 `integ/aws/filesystem-s3-sync` and `hello-agent`'s AgentCore e2e pass

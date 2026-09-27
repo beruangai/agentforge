@@ -4,7 +4,7 @@
  * harness, the Agent SDK and a real model — and back as a typed outcome; and
  * a task whose container the platform stops ends `LOST`, its retry running as
  * the next attempt; and a session outlives its container, resuming in
- * another from its transcript in S3; and so do a working directory's files.
+ * another from its transcript in S3; and so do an S3 filesystem's files.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -160,7 +160,7 @@ describe('hello-agent, on AgentCore', () => {
     expect(resumed.output.sessionId).toBe(sessionId);
   });
 
-  it('keeps a note in a working directory, and reads it back in another container', async () => {
+  it('keeps a note in an S3 filesystem, and reads it back in another container', async () => {
     const topic = `e2e-${randomUUIDv7()}`;
     const note = `The notebook outlives the container that wrote ${topic}.`;
     const first = {
