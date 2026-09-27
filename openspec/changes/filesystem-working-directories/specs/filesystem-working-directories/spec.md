@@ -7,7 +7,7 @@ Lets a consumer's agents persist and share files beyond one container: a bucket 
 ## ADDED Requirements
 
 ### Requirement: A working directory is declared once and shared by name
-A consumer SHALL declare a working directory as a bucket that is private, TLS-only and S3-encrypted, and SHALL give it to any number of agents under a name. An agent SHALL be able to open only the working directories declared to it.
+A consumer SHALL declare a working directory as a bucket that is private, TLS-only, S3-encrypted and versioned, and SHALL give it to any number of agents under a name. An agent SHALL be able to open only the working directories declared to it.
 
 #### Scenario: Two agents share one working directory
 - **WHEN** one working directory is given to two agents under the name `notebook`

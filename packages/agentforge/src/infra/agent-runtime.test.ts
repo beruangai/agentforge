@@ -60,10 +60,11 @@ describe('AgentRuntime', () => {
         Enabled: true,
       },
       BillingMode: 'PAY_PER_REQUEST',
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true },
     });
   });
 
-  it('persists session transcripts in a private, encrypted bucket it may read and write, expired after 30 days', () => {
+  it('persists session transcripts in a private, encrypted, versioned bucket it may read and write, expired after 30 days', () => {
     const template = synthesize();
     template.hasResourceProperties('AWS::S3::Bucket', {
       BucketEncryption: {
@@ -77,11 +78,28 @@ describe('AgentRuntime', () => {
         IgnorePublicAcls: true,
         RestrictPublicBuckets: true,
       },
+      VersioningConfiguration: { Status: 'Enabled' },
       LifecycleConfiguration: {
-        Rules: [{ ExpirationInDays: 30, Status: 'Enabled' }],
+        Rules: [
+          {
+            ExpirationInDays: 30,
+            NoncurrentVersionExpiration: { NoncurrentDays: 1 },
+            Status: 'Enabled',
+          },
+          { ExpiredObjectDeleteMarker: true, Status: 'Enabled' },
+        ],
       },
     });
-    template.hasResource('AWS::S3::Bucket', { DeletionPolicy: 'Retain' });
+    template.hasResource('AWS::S3::Bucket', {
+      DeletionPolicy: 'Retain',
+      Metadata: {
+        checkov: {
+          skip: [
+            { id: 'CKV_AWS_18', comment: Match.stringLikeRegexp('audit') },
+          ],
+        },
+      },
+    });
     template.hasResourceProperties('AWS::IAM::Policy', {
       PolicyDocument: {
         Statement: Match.arrayWith([
@@ -129,7 +147,11 @@ describe('AgentRuntime', () => {
   it('keeps transcripts as long as the consumer chooses', () => {
     synthesize({ sessionRetention: Duration.days(365) }).hasResourceProperties(
       'AWS::S3::Bucket',
-      { LifecycleConfiguration: { Rules: [{ ExpirationInDays: 365 }] } },
+      {
+        LifecycleConfiguration: {
+          Rules: Match.arrayWith([Match.objectLike({ ExpirationInDays: 365 })]),
+        },
+      },
     );
   });
 

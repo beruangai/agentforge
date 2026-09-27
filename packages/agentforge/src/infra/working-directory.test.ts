@@ -7,7 +7,7 @@ import { AgentRuntime } from './agent-runtime.ts';
 import { WorkingDirectory } from './working-directory.ts';
 
 describe('WorkingDirectory', () => {
-  it('is a private, S3-encrypted, retained bucket that several agents share', () => {
+  it('is a private, S3-encrypted, versioned, retained bucket that several agents share', () => {
     const stack = new Stack(new App(), 'Agents', {
       env: { account: '123456789012', region: 'us-east-2' },
     });
@@ -27,7 +27,9 @@ describe('WorkingDirectory', () => {
     ) ?? [undefined, undefined];
     expect(bucket).toMatchObject({
       DeletionPolicy: 'Retain',
+      Metadata: { checkov: { skip: [{ id: 'CKV_AWS_18' }] } },
       Properties: {
+        VersioningConfiguration: { Status: 'Enabled' },
         BucketEncryption: {
           ServerSideEncryptionConfiguration: [
             { ServerSideEncryptionByDefault: { SSEAlgorithm: 'AES256' } },
@@ -56,6 +58,6 @@ describe('WorkingDirectory', () => {
         new WorkingDirectory(stack, 'Vault', {
           encryption: BucketEncryption.KMS,
         } as never),
-    ).toThrow(/remove encryption/);
+    ).toThrow(/no KMS, for now; remove encryption/);
   });
 });

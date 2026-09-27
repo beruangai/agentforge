@@ -57,4 +57,5 @@ AgentRuntimeProps.workingDirectories?: Record<string, WorkingDirectory>
 
 - [`s7cmd` is a personal project; the engines are pinned but maintained best-effort] → pin by sha256, and admit each release through the integ test.
 - [Whether exclusion regexes match the object key or the relative path on a pull] → the integ test pins the behaviour; the spec promises only relative-path matching.
-- [A KMS-encrypted bucket breaks ETag verification] → the construct fixes encryption to S3-managed, and checkov's KMS rule is skipped in config.
+- [A push or a delete the consumer regrets] → the bucket is versioned by default; how long an overwritten version is kept is the consumer's `lifecycleRules`.
+- [A KMS-encrypted bucket breaks ETag verification] → no KMS anywhere for now: encryption is fixed to S3-managed, and the KMS rules are skipped in `checkov.yml`.

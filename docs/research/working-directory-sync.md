@@ -1,6 +1,6 @@
 # Working-directory sync — does `s7cmd` hold up?
 
-**Measured on 2026-09-22.** `s7cmd` **1.8.3**, released 2026-09-19. Answers the mechanical half of [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §F — whether the leading implementation candidate does what the design note assumes. Source: `spikes/sync/f1-s7cmd-semantics.sh`, carried at A0 into `packages/agentforge/integ/aws/filesystem-s3-sync/`.
+**Measured on 2026-09-22** with `s7cmd` **1.8.3**; **re-checked on 2026-09-27** with **1.8.5**, the release the base image pins, through `packages/agentforge/integ/aws/filesystem-s3-sync/`, which drives the harness's own sync with `s7cmd` in the base image as built. Decided in [ADR 0015](../../adr/0015-working-directories-sync-a-prefix-per-task.md).
 
 §F rests three design choices on this tool: that `LastModifiedDate` filtering is a usable **quiescence heuristic**, that exclusions work, and that **delete propagation is an explicit choice rather than a default**. All three were assumptions. All three hold.
 
@@ -37,8 +37,15 @@ Eight checks against a real bucket, over a working directory shaped like an agen
 
 > One caveat on the method. On the first run the exclusions check **passed falsely**: `aws … --output text` prints the literal `None` for an empty result, and the catch-all arm accepted it, so "nothing was uploaded" read as "the right things were uploaded". The harness now filters `None`, and the re-run shows the real result. Recorded because the same shape of bug — a permissive default arm swallowing an empty result — would pass a green test suite just as easily.
 
-## What this does not settle
+## What 1.8.5 showed on 2026-09-27
 
-**The tool does not constrain the declaration**, so every open question in §F stays open and stays a design decision: direction and what wins a conflict, whether delete propagation is offered at all, cadence and the quiescence threshold, whether AgentForge ships a starting exclusion list, and how a partial override reads. `s7cmd` can express all of them; which ones AgentForge *offers* is not a question a spike answers.
+Through the harness's own arguments, against a scratch bucket in `us-east-2`:
+
+- **Exclusions match paths relative to the prefix, in both directions**: an anchored `^cache/` kept `p/cache/…` out of a pull, and `--delete` left it in place.
+- **`--check-etag` does not send an unchanged file again**: a pulled file the task left alone kept its `LastModified` across the push.
+- **A key with a `..` segment stays out**: `p/../escape.md`, stored literally, was not written outside the directory — the harness excludes such paths itself, so this does not rest on the tool.
+- **The quiet period holds** as `--filter-mtime-before`: a continuous push took the settled file and left the fresh one.
+- **Exit codes**: a missing bucket exits non-zero (unsynced); an unparsable pattern exits 2.
+- **Credentials**: the AWS SDK for Rust's default chain; inside AgentCore, proven by `hello-agent`'s e2e.
 
 The standing reservation also stands: this is a personal project whose dependencies are updated best-effort, shipped in our base image and running with credentials. Pinning by the published sha256 is verified to work, and the AWS-SDK walk remains the fallback if that risk stops being acceptable.

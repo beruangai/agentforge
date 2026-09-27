@@ -113,21 +113,16 @@
       "dependsOn": ["synth"],
       "options": {
         "command": "uvx checkov --config-file {projectRoot}/checkov.yml --directory dist/examples/hello-agent/cdk.out --framework cloudformation --compact"
-      }
+      },
+      "outputs": ["{workspaceRoot}/dist/examples/hello-agent/checkov"]
     },
     "deploy": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": [
-        "lock",
-        {
-          "projects": ["@beruangai/agentforge"],
-          "target": "image"
-        }
-      ],
+      "dependsOn": ["checkov"],
       "outputs": ["{workspaceRoot}/dist/examples/hello-agent/deploy"],
       "options": {
-        "command": "export AGENTFORGE_BASE_IMAGE_ID=\"$(docker image inspect --format '{{.Id}}' agentforge/a2a-claude:local)\" && export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk --app \"bun --conditions=@beruangai/source infra/app.ts\" --output ../../dist/examples/hello-agent/cdk.out --no-notices deploy --require-approval never --outputs-file ../../dist/examples/hello-agent/deploy/outputs.json",
+        "command": "export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk --app ../../dist/examples/hello-agent/cdk.out --no-notices deploy --require-approval never --outputs-file ../../dist/examples/hello-agent/deploy/outputs.json",
         "cwd": "{projectRoot}",
         "envFile": "{workspaceRoot}/.env.integ",
         "env": {

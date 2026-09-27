@@ -55,6 +55,7 @@ import {
   WORKING_DIRECTORIES_VARIABLE,
   WORKING_DIRECTORY_NAME_PATTERN,
 } from '#core/working-directory.ts';
+import { suppressRules } from './checkov.ts';
 import type { WorkingDirectory } from './working-directory.ts';
 
 /** The one request header AgentForge relies on AgentCore forwarding (ADR 0014). */
@@ -183,15 +184,31 @@ export class AgentRuntime extends Construct {
       },
       timeToLiveAttribute: TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
       billingMode: BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy,
     });
     this.sessionBucket = new Bucket(this, 'SessionBucket', {
       encryption: BucketEncryption.S3_MANAGED,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
-      lifecycleRules: [{ expiration: sessionRetention }],
+      versioned: true,
+      // A transcript is gone a day after it expires: versioning is an undo
+      // window, not a second retention.
+      lifecycleRules: [
+        {
+          expiration: sessionRetention,
+          noncurrentVersionExpiration: Duration.days(1),
+        },
+        // S3 refuses this beside an expiration, so it is a rule of its own.
+        { expiredObjectDeleteMarker: true },
+      ],
       removalPolicy,
     });
+    suppressRules(
+      this.sessionBucket,
+      ['CKV_AWS_18'],
+      "Only the agent's own role reads and writes transcripts; the run record and the task store are the audit, not S3 access logs.",
+    );
 
     const allowlistedHeaders =
       requestHeaderConfiguration?.allowlistedHeaders ?? [];
