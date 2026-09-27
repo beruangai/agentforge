@@ -15,16 +15,14 @@ const os = implementAgent(helloAgent);
 const NOTEBOOK_PATH = '/workspace/notebook';
 const NOTE_FILE = join(NOTEBOOK_PATH, 'note.md');
 
-/** The notebook, scoped to the request's topic; each procedure declares its access. */
-const NOTEBOOK: Omit<S3FilesystemOptions, 'access' | 'push'> = {
-  path: NOTEBOOK_PATH,
+/** The notebook, scoped to the request's topic; a procedure that writes declares its push. */
+const NOTEBOOK: S3FilesystemOptions = {
+  localPath: NOTEBOOK_PATH,
   bucket: 'notebook',
   // The contract has validated the input.
   scope: ({ input }) => ({
-    root: `topics/${(input as { readonly topic: string }).topic}`,
+    remotePath: `topics/${(input as { readonly topic: string }).topic}`,
   }),
-  checkpoints: false,
-  exclude: [],
 };
 
 export const router = os.router({
@@ -70,8 +68,7 @@ export const router = os.router({
       filesystems({
         notebook: new S3Filesystem({
           ...NOTEBOOK,
-          access: 'READ_WRITE',
-          push: 'WHEN_COMPLETED',
+          push: 'FULFILLED',
         }),
       }),
     )
@@ -97,11 +94,7 @@ export const router = os.router({
   recallNote: os.recallNote
     .use(
       filesystems({
-        notebook: new S3Filesystem({
-          ...NOTEBOOK,
-          access: 'READ_ONLY',
-          push: 'NEVER',
-        }),
+        notebook: new S3Filesystem(NOTEBOOK),
       }),
     )
     .handler(async ({ context }) => {

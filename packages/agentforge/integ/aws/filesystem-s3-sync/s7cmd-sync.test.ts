@@ -46,15 +46,13 @@ import {
 } from './__fixtures__/scratch-bucket.ts';
 
 /** Everything but where it mounts, which is per task. */
-const OPTIONS: Omit<S3FilesystemOptions, 'path'> = {
+const OPTIONS: Omit<S3FilesystemOptions, 'localPath'> = {
   bucket: 'vault',
-  access: 'READ_WRITE',
-  scope: () => ({ root: 'p' }),
-  push: 'WHEN_COMPLETED',
-  checkpoints: false,
+  scope: () => ({ remotePath: 'p' }),
+  push: 'FULFILLED',
   dangerouslyEnableDeletes: true,
-  // Anchored at the start: it holds only if patterns see paths relative to the prefix.
-  exclude: ['^cache/', '\\.tmp$'],
+  // `cache/**` holds only if s7cmd matches paths relative to the remote path.
+  exclude: ['cache/**', '**/*.tmp'],
 };
 
 const s3 = new S3Client({});
@@ -81,7 +79,7 @@ function mount(
   options: Partial<S3FilesystemOptions> = {},
 ): Promise<MountLifecycle> {
   const filesystem = new S3Filesystem(
-    { ...OPTIONS, path: join(root, taskId), ...options },
+    { ...OPTIONS, localPath: join(root, taskId), ...options },
     {
       s7cmd,
       environment: {
@@ -129,18 +127,18 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
     ).LastModified;
 
     const vault = await mount('round-trip');
-    const { path } = vault.mounted;
-    expect(await readFile(join(path, 'keep.md'), 'utf8')).toBe('keep');
-    expect(existsSync(join(path, 'cache'))).toBe(false);
-    expect(existsSync(join(path, '..', 'escape.md'))).toBe(false);
+    const { localPath } = vault.mounted;
+    expect(await readFile(join(localPath, 'keep.md'), 'utf8')).toBe('keep');
+    expect(existsSync(join(localPath, 'cache'))).toBe(false);
+    expect(existsSync(join(localPath, '..', 'escape.md'))).toBe(false);
 
-    await writeFile(join(path, 'notes.md'), 'new');
-    await rm(join(path, 'gone.md'));
-    await mkdir(join(path, 'deep'));
-    await writeFile(join(path, 'deep', 'added.md'), 'added');
-    await writeFile(join(path, 'scratch.tmp'), 'excluded locally');
+    await writeFile(join(localPath, 'notes.md'), 'new');
+    await rm(join(localPath, 'gone.md'));
+    await mkdir(join(localPath, 'deep'));
+    await writeFile(join(localPath, 'deep', 'added.md'), 'added');
+    await writeFile(join(localPath, 'scratch.tmp'), 'excluded locally');
     await delay(1_100); // so a re-upload would move LastModified
-    await vault.unmount('COMPLETED');
+    await vault.unmount('FULFILLED');
 
     expect(await listRelativeKeys(s3, bucket, 'p/')).toEqual([
       '../escape.md',
@@ -166,14 +164,14 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
   it('pushes only within its write scope, and deletes nothing outside it', async () => {
     await put('w/outside.md', 'remote');
     const vault = await mount('write-scope', {
-      scope: () => ({ root: 'w', write: ['notes/today.md'] }),
+      scope: () => ({ remotePath: 'w', write: ['notes/today.md'] }),
     });
-    const { path } = vault.mounted;
-    await mkdir(join(path, 'notes'));
-    await writeFile(join(path, 'notes', 'today.md'), 'today');
-    await writeFile(join(path, 'notes', 'tomorrow.md'), 'kept local');
-    await rm(join(path, 'outside.md'));
-    await vault.unmount('COMPLETED');
+    const { localPath } = vault.mounted;
+    await mkdir(join(localPath, 'notes'));
+    await writeFile(join(localPath, 'notes', 'today.md'), 'today');
+    await writeFile(join(localPath, 'notes', 'tomorrow.md'), 'kept local');
+    await rm(join(localPath, 'outside.md'));
+    await vault.unmount('FULFILLED');
     expect(await listRelativeKeys(s3, bucket, 'w/')).toEqual([
       'notes/today.md',
       'outside.md',
@@ -182,16 +180,16 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
 
   it('pushes checkpoints, leaving a file that has not settled; a cancel pushes nothing more', async () => {
     const vault = await mount('checkpoints', {
-      scope: () => ({ root: 'c' }),
+      scope: () => ({ remotePath: 'c' }),
       dangerouslyEnableDeletes: false,
-      push: 'WHEN_ENDED',
+      push: 'SETTLED',
       checkpoints: { intervalSeconds: 5, settleSeconds: 3_600 },
     });
-    const { path } = vault.mounted;
-    await writeFile(join(path, 'settled.md'), 'settled');
+    const { localPath } = vault.mounted;
+    await writeFile(join(localPath, 'settled.md'), 'settled');
     const longAgo = new Date('2026-01-01T00:00:00Z');
-    await utimes(join(path, 'settled.md'), longAgo, longAgo);
-    await writeFile(join(path, 'fresh.md'), 'fresh');
+    await utimes(join(localPath, 'settled.md'), longAgo, longAgo);
+    await writeFile(join(localPath, 'fresh.md'), 'fresh');
     await delay(12_000);
     await vault.unmount('CANCELED');
     expect(await listRelativeKeys(s3, bucket, 'c/')).toEqual(['settled.md']);
@@ -199,7 +197,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
 
   it('fails unsynced when the object store refuses', async () => {
     const refused = new S3Filesystem(
-      { ...OPTIONS, path: join(root, 'refused') },
+      { ...OPTIONS, localPath: join(root, 'refused') },
       {
         s7cmd,
         environment: {
@@ -223,11 +221,5 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
         ),
       },
     });
-  });
-
-  it('fails a pattern s7cmd cannot parse as the procedure’s error', async () => {
-    const mounted = mount('bad-pattern', { exclude: ['('] });
-    await expect(mounted).rejects.toThrow(/check `exclude`/);
-    await expect(mounted).rejects.not.toHaveProperty('taskCause');
   });
 });

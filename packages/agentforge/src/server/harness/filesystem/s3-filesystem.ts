@@ -13,19 +13,19 @@ import {
 } from './filesystem.ts';
 
 export interface S3FilesystemOptions extends FilesystemOptions {
-  /** Where it mounts: an S3 filesystem has no default, so prompts can name it. */
-  readonly path: string;
+  /** The local directory it mounts at: an S3 filesystem has no default, so prompts can name it. */
+  readonly localPath: string;
   /** The bucket's name as the deployment declared it (`AgentRuntime.filesystems`). */
   readonly bucket: string;
   /**
    * Off by default. When on, the push at the end deletes every object in the
    * write scope that has no local file — not only what the task removed, but
    * anything written to the prefix by someone else since the pull. Never on
-   * a checkpoint, and only on a non-empty root.
+   * a checkpoint, and only on a non-empty `remotePath`.
    */
   readonly dangerouslyEnableDeletes?: boolean;
-  /** Regular expressions (`s7cmd`'s syntax) over paths relative to the root: never pulled, pushed or deleted. */
-  readonly exclude: readonly string[];
+  /** Globs relative to the mount, like `read` and `write`: never pulled, pushed or deleted. */
+  readonly exclude?: readonly string[];
 }
 
 /** How one `s7cmd` run ended. */
@@ -41,7 +41,7 @@ export type S7cmdRunner = (args: readonly string[]) => Promise<S7cmdResult>;
 const S7CMD = 's7cmd';
 /** How much of `s7cmd`'s stderr a failure carries. */
 const STDERR_TAIL_CHARACTERS = 2_000;
-/** `s7cmd` refused its arguments: a bad `exclude` pattern, or AgentForge's bug. */
+/** `s7cmd` refused its arguments: AgentForge's bug. */
 const S7CMD_EXIT_INVALID_ARGUMENTS = 2;
 /** Excluded always: a key with a `..` segment would be written outside the mount. */
 const CLIMBING_PATH_PATTERN = '(^|/)\\.\\.(/|$)';
@@ -97,7 +97,7 @@ export class S3Filesystem extends Filesystem {
     const {
       bucket,
       dangerouslyEnableDeletes = false,
-      exclude,
+      exclude = [],
       ...filesystemOptions
     } = options;
     super(filesystemOptions);
@@ -113,15 +113,15 @@ export class S3Filesystem extends Filesystem {
 
   protected override validate(mount: Mount): void {
     this.#remoteUrl(mount);
-    if (this.#s3Options.dangerouslyEnableDeletes && mount.root === '') {
+    if (this.#s3Options.dangerouslyEnableDeletes && mount.remotePath === '') {
       throw new Error(
-        `filesystem "${mount.name}": dangerouslyEnableDeletes needs a root, since on the whole bucket it could empty it`,
+        `filesystem "${mount.name}": dangerouslyEnableDeletes needs a remotePath, since on the whole bucket it could empty it`,
       );
     }
   }
 
   protected pull(mount: Mount): Promise<void> {
-    return this.#sync([this.#remoteUrl(mount), `${mount.path}/`], []);
+    return this.#sync([this.#remoteUrl(mount), `${mount.localPath}/`], []);
   }
 
   protected push(
@@ -138,7 +138,7 @@ export class S3Filesystem extends Filesystem {
             ? ['--delete']
             : []
           : ['--filter-mtime-before', options.modifiedBefore.toISOString()]),
-        `${mount.path}/`,
+        `${mount.localPath}/`,
         this.#remoteUrl(mount),
       ],
       outsideWriteScope(mount.write),
@@ -157,7 +157,7 @@ export class S3Filesystem extends Filesystem {
         `no bucket "${this.#s3Options.bucket}" is declared to this agent; declared: ${Object.keys(declaredBuckets).join(', ') || 'none'}`,
       );
     }
-    return `s3://${bucket}/${mount.root === '' ? '' : `${mount.root}/`}`;
+    return `s3://${bucket}/${mount.remotePath === '' ? '' : `${mount.remotePath}/`}`;
   }
 
   /** One `s7cmd sync`; any exit but 0 — an error, or a warning such as an ETag mismatch — is unsynced. */
@@ -167,7 +167,7 @@ export class S3Filesystem extends Filesystem {
   ): Promise<void> {
     const exclude = [
       CLIMBING_PATH_PATTERN,
-      ...this.#s3Options.exclude,
+      ...this.#s3Options.exclude.map(globPattern),
       ...additionalExclusions,
     ]
       .map((pattern) => `(?:${pattern})`)
@@ -180,9 +180,7 @@ export class S3Filesystem extends Filesystem {
     ]);
     if (exitCode === 0) return;
     if (exitCode === S7CMD_EXIT_INVALID_ARGUMENTS) {
-      throw new Error(
-        `s7cmd refused its arguments; check \`exclude\`: ${stderr.trim()}`,
-      );
+      throw new Error(`s7cmd refused its arguments: ${stderr.trim()}`);
     }
     throw new FilesystemUnsynced(`s7cmd exited ${exitCode}: ${stderr.trim()}`);
   }
@@ -191,8 +189,11 @@ export class S3Filesystem extends Filesystem {
 /** A pattern matching every path outside the write scope; none when the scope is everything. */
 function outsideWriteScope(write: readonly string[]): readonly string[] {
   if (write.includes('**')) return [];
-  const writeScope = write
-    .map((glob) => `(?:${picomatch.makeRe(glob, { dot: true }).source})`)
-    .join('|');
+  const writeScope = write.map((glob) => `(?:${globPattern(glob)})`).join('|');
   return [`^(?!${writeScope})`];
+}
+
+/** A glob as the regular expression `s7cmd` matches paths relative to the mount with. */
+function globPattern(glob: string): string {
+  return picomatch.makeRe(glob, { dot: true }).source;
 }

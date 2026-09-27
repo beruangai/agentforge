@@ -6,7 +6,7 @@ The e2e tests are not rebuilt or run until the operator confirms the implementat
 
 - [x] 1.1 `Filesystem` base class: options, scope, baseline permissions, the mount and unmount lifecycle over `pull` and `push`, checkpoints — verified by unit tests against a scripted kind
 - [x] 1.2 `ScratchFilesystem` and `S3Filesystem` (the `s7cmd` engine moved over, write scope as a push filter) — verified by unit tests against a scripted `s7cmd`
-- [x] 1.3 `filesystems()` registration middleware and the innermost lifecycle middleware; `executeProcedure` unmounts after the outcome; `FILESYSTEM_UNSYNCED` — verified by unit tests of append, replace and `inherit: false`, mount before the handler, and the outcome per ending
+- [x] 1.3 `filesystems()` registration middleware and the innermost lifecycle middleware; `executeProcedure` unmounts after the outcome; `FILESYSTEM_UNSYNCED` — verified by unit tests of append, replace and `replaceUpstream: true`, mount before the handler, and the outcome per ending
 - [x] 1.4 Remove the working-directory API, and move `integ/aws/filesystem-s3-sync` onto `S3Filesystem` — verified by typecheck
 
 ## 2. Infra

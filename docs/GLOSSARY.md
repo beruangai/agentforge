@@ -72,7 +72,7 @@
 
 **`cwd`** — The SDK's working directory, and the capability root: which `.claude/` layers apply.
 
-**Filesystem** — Files AgentForge manages for a procedure, persistent or scratch: a kind (`S3Filesystem`, `ScratchFilesystem`, or a consumer's subclass) registered by name with the `filesystems()` middleware, mounted before the handler and unmounted once the outcome is known. Its operations are **pull** and **push**; a **checkpoint** is a push, while the task runs, of what has settled. Its **scope** — the `root` mounted and the `read` and `write` globs within it — is resolved per request; the handler receives its path and **baseline permissions** and decides what an agent gets ([ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)).
+**Filesystem** — Files AgentForge manages for a procedure, persistent or scratch: a kind (`S3Filesystem`, `ScratchFilesystem`, or a consumer's subclass) registered by name with the `filesystems()` middleware, mounted before the handler and unmounted once the outcome is known. To **mount** one is to pull its store into a local directory — not a runtime or container mount. Its operations are **pull** and **push**; `push` is `FULFILLED` (only when the task succeeds: its handler returned an output the contract accepts) or `SETTLED` (success or failure; never a cancel), and absent it never pushes. A **checkpoint** is a push, while the task runs, of what has settled. Its **scope** — the `remotePath` mounted and the `read` and `write` globs within it — is resolved per request; the handler receives its `localPath` and **baseline permissions** and decides what an agent gets ([ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)).
 
 ## Delivery
 

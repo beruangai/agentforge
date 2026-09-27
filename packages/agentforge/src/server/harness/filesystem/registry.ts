@@ -19,12 +19,12 @@ interface RegistryContext {
 /**
  * Registers filesystems for the procedures under it, by name: added to what
  * is registered upstream, a name already there replaced. With
- * `inherit: false`, everything upstream is dropped. Nothing is mounted here;
+ * `replaceUpstream: true`, everything registered upstream is dropped. Nothing is mounted here;
  * AgentForge mounts what is registered just before the handler (ADR 0015).
  */
 export function filesystems(
   entries: Readonly<Record<string, Filesystem>>,
-  options: { readonly inherit?: boolean } = {},
+  options: { readonly replaceUpstream?: boolean } = {},
 ) {
   for (const name of Object.keys(entries)) {
     if (!FILESYSTEM_NAME_PATTERN.test(name)) {
@@ -37,7 +37,9 @@ export function filesystems(
     next({
       context: {
         [FILESYSTEM_REGISTRY]: {
-          ...(options.inherit === false ? {} : context[FILESYSTEM_REGISTRY]),
+          ...(options.replaceUpstream === true
+            ? {}
+            : context[FILESYSTEM_REGISTRY]),
           ...entries,
         },
       },

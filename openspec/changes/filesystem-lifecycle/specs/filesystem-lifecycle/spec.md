@@ -7,18 +7,18 @@ Gives procedures file I/O that AgentForge manages: filesystems a procedure regis
 ## ADDED Requirements
 
 ### Requirement: Filesystems are registered by middleware, appending by default
-A procedure's filesystems SHALL be registered by middleware, by name. Registering a name already registered upstream SHALL replace that entry; other entries SHALL be kept. A registration that declares it does not inherit SHALL drop everything registered upstream.
+A procedure's filesystems SHALL be registered by middleware, by name. Registering a name already registered upstream SHALL replace that entry; other entries SHALL be kept. A registration that declares it replaces upstream SHALL drop everything registered upstream.
 
 #### Scenario: A procedure adds to its house's filesystems
 - **WHEN** an agentic project registers `workspace` and `scratch`, and a procedure registers `workspace` again and `notes`
 - **THEN** the procedure mounts `scratch`, `notes`, and the procedure's `workspace`
 
 #### Scenario: A procedure drops its house's filesystems
-- **WHEN** a procedure registers `notes` without inheriting
+- **WHEN** a procedure registers `notes`, replacing upstream
 - **THEN** the procedure mounts only `notes`
 
 ### Requirement: Filesystems mount before the handler and unmount after the outcome
-Every registered filesystem SHALL be mounted, pulling its scope from its store, before the procedure's handler runs, and SHALL be unmounted once the task's outcome is known. Unmounting SHALL push as the filesystem declares — `WHEN_COMPLETED` on completion, `WHEN_ENDED` on completion or failure, never on cancellation — and the outcome SHALL be published only after those pushes are verified. A task SHALL never report `TASK_STATE_COMPLETED` over a push that was not verified.
+Every registered filesystem SHALL be mounted, pulling its scope from its store, before the procedure's handler runs, and SHALL be unmounted once the task's outcome is known. Unmounting SHALL push as the filesystem declares — `FULFILLED` when the task succeeds, `SETTLED` when it succeeds or fails, never on cancellation, and never when it declares no push — and the outcome SHALL be published only after those pushes are verified. A task SHALL never report `TASK_STATE_COMPLETED` over a push that was not verified.
 
 #### Scenario: The handler reads a pulled filesystem before any agent runs
 - **WHEN** a procedure registers a filesystem
@@ -29,7 +29,7 @@ Every registered filesystem SHALL be mounted, pulling its scope from its store, 
 - **THEN** the task ends `TASK_STATE_FAILED` with cause `FILESYSTEM_UNSYNCED`, retryable
 
 #### Scenario: A push that fails keeps a failed task's cause
-- **WHEN** a failed task's `WHEN_ENDED` push fails
+- **WHEN** a failed task's `SETTLED` push fails
 - **THEN** the task keeps its own cause, and the push's failure is added to the cause's message
 
 #### Scenario: A mount that fails fails the task
@@ -37,7 +37,7 @@ Every registered filesystem SHALL be mounted, pulling its scope from its store, 
 - **THEN** the handler does not run, and the task ends `TASK_STATE_FAILED` with cause `FILESYSTEM_UNSYNCED`
 
 ### Requirement: Scope is resolved per request and bounds every push
-A filesystem SHALL resolve, from the request's input and context, the subtree it mounts and the read and write scopes within it; both default to the whole mount, and a read-only filesystem has no write scope. A push SHALL upload and delete only within the write scope.
+A filesystem SHALL resolve, from the request's input and context, the subtree it mounts and the read and write scopes within it; the read scope defaults to the whole mount, and the write scope does too when the filesystem pushes and is empty when it does not. A push SHALL upload and delete only within the write scope.
 
 #### Scenario: A file written outside the write scope stays local
 - **WHEN** a filesystem that may write only `notes/today.md` finds another changed file at push

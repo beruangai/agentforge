@@ -22,18 +22,15 @@ export class ScriptedFilesystem extends Filesystem {
 
   constructor(options: Partial<FilesystemOptions>, script: Script = {}) {
     super({
-      access: 'READ_WRITE',
-      scope: () => ({ root: '' }),
-      push: 'WHEN_COMPLETED',
-      checkpoints: false,
+      scope: () => ({ remotePath: '' }),
       ...options,
     });
     this.#script = script;
   }
 
   protected async pull(mount: Mount): Promise<void> {
-    this.calls.push(`pull ${mount.root}`);
-    await writeFile(join(mount.path, 'pulled.md'), 'pulled');
+    this.calls.push(`pull ${mount.remotePath}`);
+    await writeFile(join(mount.localPath, 'pulled.md'), 'pulled');
     await this.#script.pull?.();
   }
 
@@ -43,7 +40,7 @@ export class ScriptedFilesystem extends Filesystem {
   ): Promise<void> {
     this.calls.push(
       options.modifiedBefore === undefined
-        ? `push ${mount.root}`
+        ? `push ${mount.remotePath}`
         : `checkpoint ${options.modifiedBefore.toISOString()}`,
     );
     await this.#script.push?.();

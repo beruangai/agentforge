@@ -25,85 +25,87 @@ function mount(filesystem: ScriptedFilesystem, name = 'vault') {
 
 describe('Filesystem', () => {
   it('pulls the scope the request resolves, and gives baseline permissions for its scopes', async () => {
-    const path = join(root, 'vault');
+    const localPath = join(root, 'vault');
     const filesystem = new ScriptedFilesystem({
-      path,
+      localPath,
+      push: 'FULFILLED',
       scope: ({ input }) => ({
-        root: `topics/${(input as { topic: string }).topic}/`,
+        remotePath: `topics/${(input as { topic: string }).topic}/`,
         write: ['notes/today.md'],
       }),
     });
     const vault = await mount(filesystem);
     expect(filesystem.calls).toEqual(['pull topics/today']);
-    expect(existsSync(join(path, 'pulled.md'))).toBe(true);
+    expect(existsSync(join(localPath, 'pulled.md'))).toBe(true);
     expect(vault.mounted).toEqual({
-      path,
+      localPath,
       permissions: {
-        allow: [`Read(/${path}/**)`, `Edit(/${path}/notes/today.md)`],
+        allow: [`Read(/${localPath}/**)`, `Edit(/${localPath}/notes/today.md)`],
       },
     });
   });
 
-  it('gives a read-only filesystem no write scope', async () => {
-    const path = join(root, 'vault');
-    const vault = await mount(
-      new ScriptedFilesystem({ path, access: 'READ_ONLY', push: 'NEVER' }),
-    );
-    expect(vault.mounted.permissions.allow).toEqual([`Read(/${path}/**)`]);
+  it('writes nothing by default when it never pushes', async () => {
+    const localPath = join(root, 'vault');
+    const vault = await mount(new ScriptedFilesystem({ localPath }));
+    expect(vault.mounted.permissions.allow).toEqual([`Read(/${localPath}/**)`]);
   });
 
-  it.each<[string, TaskEnding, boolean]>([
-    ['WHEN_COMPLETED', 'COMPLETED', true],
-    ['WHEN_COMPLETED', 'FAILED', false],
-    ['WHEN_ENDED', 'FAILED', true],
-    ['WHEN_ENDED', 'CANCELED', false],
-    ['NEVER', 'COMPLETED', false],
+  it.each<[string, 'FULFILLED' | 'SETTLED' | undefined, TaskEnding, boolean]>([
+    ['FULFILLED', 'FULFILLED', 'FULFILLED', true],
+    ['FULFILLED', 'FULFILLED', 'REJECTED', false],
+    ['SETTLED', 'SETTLED', 'REJECTED', true],
+    ['SETTLED', 'SETTLED', 'CANCELED', false],
+    ['absent', undefined, 'FULFILLED', false],
   ])(
-    'pushes %s when the task ends %s: %s; and removes the mount',
-    async (push, ending, pushes) => {
-      const path = join(root, 'vault');
+    'push %s, the task %s: pushes %s; and removes the mount',
+    async (_label, push, ending, pushes) => {
+      const localPath = join(root, 'vault');
       const filesystem = new ScriptedFilesystem({
-        path,
-        push: push as 'NEVER',
+        localPath,
+        ...(push === undefined ? {} : { push }),
       });
       await (await mount(filesystem)).unmount(ending);
       expect(filesystem.calls).toEqual(pushes ? ['pull ', 'push '] : ['pull ']);
-      expect(existsSync(path)).toBe(false);
+      expect(existsSync(localPath)).toBe(false);
     },
   );
 
   it('fails unsynced when its store fails, and removes what it mounted', async () => {
-    const path = join(root, 'vault');
+    const localPath = join(root, 'vault');
     const unsynced = () => Promise.reject(new FilesystemUnsynced('refused'));
     await expect(
-      mount(new ScriptedFilesystem({ path }, { pull: unsynced })),
+      mount(new ScriptedFilesystem({ localPath }, { pull: unsynced })),
     ).rejects.toMatchObject({
       taskCause: {
         code: 'FILESYSTEM_UNSYNCED',
         message: 'filesystem "vault" could not be pulled: refused',
       },
     });
-    expect(existsSync(path)).toBe(false);
+    expect(existsSync(localPath)).toBe(false);
     const vault = await mount(
-      new ScriptedFilesystem({ path }, { push: unsynced }),
+      new ScriptedFilesystem(
+        { localPath, push: 'FULFILLED' },
+        { push: unsynced },
+      ),
     );
-    await expect(vault.unmount('COMPLETED')).rejects.toMatchObject({
+    await expect(vault.unmount('FULFILLED')).rejects.toMatchObject({
       taskCause: { code: 'FILESYSTEM_UNSYNCED' },
     });
-    expect(existsSync(path)).toBe(false);
+    expect(existsSync(localPath)).toBe(false);
   });
 
   it('pushes checkpoints of what has settled while mounted, and stops at unmount', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     vi.setSystemTime(new Date('2026-09-27T00:00:00Z'));
     const filesystem = new ScriptedFilesystem({
-      path: join(root, 'vault'),
-      push: 'WHEN_ENDED',
+      localPath: join(root, 'vault'),
+      push: 'SETTLED',
       checkpoints: { intervalSeconds: 5, settleSeconds: 60 },
     });
     const vault = await mount(filesystem);
     await vi.advanceTimersByTimeAsync(5_000);
-    await vault.unmount('COMPLETED');
+    await vault.unmount('FULFILLED');
     await vi.advanceTimersByTimeAsync(5_000);
     expect(filesystem.calls).toEqual([
       'pull ',
@@ -116,37 +118,33 @@ describe('Filesystem', () => {
     expect(
       () =>
         new ScriptedFilesystem({
-          path: join(root, 'x'),
+          localPath: join(root, 'x'),
+          push: 'FULFILLED',
           checkpoints: { intervalSeconds: 5, settleSeconds: 0 },
         }),
-    ).toThrow(/need `push: "WHEN_ENDED"`/);
-    expect(
-      () =>
-        new ScriptedFilesystem({ path: join(root, 'x'), access: 'READ_ONLY' }),
-    ).toThrow(/a read-only filesystem never pushes/);
-    expect(() => new ScriptedFilesystem({ path: 'relative' })).toThrow(
-      /absolute path/,
+    ).toThrow(/need `push: "SETTLED"`/);
+    expect(() => new ScriptedFilesystem({ localPath: 'relative' })).toThrow(
+      /absolute local path/,
     );
     expect(() => new ScriptedFilesystem({})).toThrow(
-      /ScriptedFilesystem needs a path/,
+      /ScriptedFilesystem needs a localPath/,
     );
     await expect(
       mount(
         new ScriptedFilesystem({
-          path: join(root, 'x'),
-          scope: () => ({ root: 'a/../b' }),
+          localPath: join(root, 'x'),
+          scope: () => ({ remotePath: 'a/../b' }),
         }),
       ),
     ).rejects.toThrow(/never climbs/);
     await expect(
       mount(
         new ScriptedFilesystem({
-          path: join(root, 'x'),
-          access: 'READ_ONLY',
-          push: 'NEVER',
-          scope: () => ({ root: '', write: ['**'] }),
+          localPath: join(root, 'x'),
+          push: 'FULFILLED',
+          scope: () => ({ remotePath: '', write: [] }),
         }),
       ),
-    ).rejects.toThrow(/is read-only/);
+    ).rejects.toThrow(/pushes, but its scope writes nothing/);
   });
 });

@@ -5,20 +5,19 @@ import { Filesystem } from './filesystem.ts';
 /**
  * An empty directory of the task's own, removed when the task ends: nothing
  * is pulled or pushed. Mounts under the system's temporary directory unless
- * the consumer names a path.
+ * the consumer names a `localPath`.
  */
 export class ScratchFilesystem extends Filesystem {
-  constructor(options: { readonly path?: string } = {}) {
+  constructor(options: { readonly localPath?: string } = {}) {
     super(
       {
-        ...(options.path === undefined ? {} : { path: options.path }),
-        access: 'READ_WRITE',
-        scope: () => ({ root: '' }),
-        push: 'NEVER',
-        checkpoints: false,
+        ...(options.localPath === undefined
+          ? {}
+          : { localPath: options.localPath }),
+        scope: () => ({ remotePath: '', write: ['**'] }),
       },
       {
-        defaultPath: ({ taskId, name }) =>
+        defaultLocalPath: ({ taskId, name }) =>
           join(tmpdir(), 'agentforge-scratch', taskId, name),
       },
     );

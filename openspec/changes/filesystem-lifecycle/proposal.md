@@ -13,9 +13,9 @@ Procedures need file I/O that AgentForge manages (§REQ401, §REQ403). Some of i
   - Git later. A consumer can subclass for its own kind.
 - **Registered by an oRPC middleware into `context.filesystems`.**
   - An agentic project registers its defaults for every procedure; a procedure's own middleware adds to them.
-  - Registering the same name downstream replaces that entry. Registering with `inherit: false` drops everything registered upstream.
+  - Registering the same name downstream replaces that entry. Registering with `replaceUpstream: true` drops everything registered upstream.
 - **Mounted around the leaf procedure.** AgentForge mounts every registered filesystem before the handler runs, and unmounts them once the outcome is known. The outcome is published only after the pushes it requires are verified.
-- **Scope per request.** A callback on the request's input and context gives the subtree that is mounted, and the read and write scopes inside it (both default to the whole mount). Access is read-only or read-write. A push never leaves the write scope.
+- **Scope per request.** A callback on the request's input and context gives the subtree that is mounted, and the read and write scopes inside it. Read defaults to the whole mount; write does too when the filesystem pushes, and is empty when it does not, so read-only needs no declaration. A push never leaves the write scope.
 - **The handler owns the agent's permissions.** Each mounted filesystem gives the handler its path and a baseline of permission rules for its scopes. The handler applies, extends or replaces them in its `runAgent` options. Nothing is wired into a run automatically.
 - **Where it mounts:** each kind either sets a default path, which the consumer may override, or requires the consumer to give one.
 - **BREAKING, for code not yet shipped:**

@@ -108,9 +108,9 @@ async function unmountAll(
   if (outcome.state === 'TASK_STATE_REJECTED') return outcome;
   const ending: TaskEnding =
     outcome.state === 'TASK_STATE_COMPLETED'
-      ? 'COMPLETED'
+      ? 'FULFILLED'
       : outcome.state === 'TASK_STATE_FAILED'
-        ? 'FAILED'
+        ? 'REJECTED'
         : 'CANCELED';
   const failures = (
     await Promise.allSettled(

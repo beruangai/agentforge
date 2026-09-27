@@ -45,13 +45,13 @@ function build() {
         return {
           names: Object.keys(context.filesystems).sort(),
           pulled: existsSync(
-            join(context.filesystems.workspace?.path ?? '', 'pulled.md'),
+            join(context.filesystems.workspace?.localPath ?? '', 'pulled.md'),
           ),
           allow: [...context.filesystemPermissions.allow],
         };
       }),
     alone: os.alone
-      .use(filesystems({ notes }, { inherit: false }))
+      .use(filesystems({ notes }, { replaceUpstream: true }))
       .handler(async ({ context }) => ({
         names: Object.keys(context.filesystems),
         pulled: false,
@@ -82,9 +82,12 @@ function execute(procedure: keyof typeof contract, fail = false) {
   });
 }
 
+/** A filesystem that pushes on success, mounted at `name` under the test's root. */
+const at = (name: string) =>
+  ({ localPath: join(root, name), push: 'FULFILLED' }) as const;
+
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'agentforge-registry-'));
-  const at = (name: string) => ({ path: join(root, name) });
   house = new ScriptedFilesystem(at('house'));
   scratch = new ScriptedFilesystem(at('scratch'));
   workspace = new ScriptedFilesystem(at('workspace'));
@@ -117,7 +120,7 @@ describe('filesystems registered on a procedure', () => {
     }
   });
 
-  it('drop those upstream when they do not inherit', async () => {
+  it('drop those upstream when they replace them', async () => {
     expect(await execute('alone')).toMatchObject({
       output: { names: ['notes'] },
     });
@@ -126,10 +129,9 @@ describe('filesystems registered on a procedure', () => {
   });
 
   it('fail a completed task whose push fails, unsynced', async () => {
-    workspace = new ScriptedFilesystem(
-      { path: join(root, 'workspace') },
-      { push: () => Promise.reject(new FilesystemUnsynced('refused')) },
-    );
+    workspace = new ScriptedFilesystem(at('workspace'), {
+      push: () => Promise.reject(new FilesystemUnsynced('refused')),
+    });
     expect(await execute('added')).toMatchObject({
       state: 'TASK_STATE_FAILED',
       cause: {
@@ -142,7 +144,7 @@ describe('filesystems registered on a procedure', () => {
 
   it('keep a failed task’s cause, the push’s failure added to it', async () => {
     workspace = new ScriptedFilesystem(
-      { path: join(root, 'workspace'), push: 'WHEN_ENDED' },
+      { ...at('workspace'), push: 'SETTLED' },
       { push: () => Promise.reject(new FilesystemUnsynced('refused')) },
     );
     expect(await execute('added', true)).toMatchObject({
@@ -156,10 +158,9 @@ describe('filesystems registered on a procedure', () => {
   });
 
   it('fail the task before the handler when one cannot mount, unmounting those that did', async () => {
-    workspace = new ScriptedFilesystem(
-      { path: join(root, 'workspace') },
-      { pull: () => Promise.reject(new FilesystemUnsynced('refused')) },
-    );
+    workspace = new ScriptedFilesystem(at('workspace'), {
+      pull: () => Promise.reject(new FilesystemUnsynced('refused')),
+    });
     expect(await execute('added')).toMatchObject({
       state: 'TASK_STATE_FAILED',
       cause: { code: 'FILESYSTEM_UNSYNCED' },
