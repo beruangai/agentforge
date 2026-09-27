@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskContext } from '../task-process.ts';
 import { ScriptedFilesystem } from './__fixtures__/scripted-filesystem.ts';
-import { type Ending, FilesystemUnsynced } from './filesystem.ts';
+import { FilesystemUnsynced, type TaskEnding } from './filesystem.ts';
 
 let root: string;
 beforeEach(async () => {
@@ -52,7 +52,7 @@ describe('Filesystem', () => {
     expect(vault.mounted.permissions.allow).toEqual([`Read(/${path}/**)`]);
   });
 
-  it.each<[string, Ending, boolean]>([
+  it.each<[string, TaskEnding, boolean]>([
     ['WHEN_COMPLETED', 'COMPLETED', true],
     ['WHEN_COMPLETED', 'FAILED', false],
     ['WHEN_ENDED', 'FAILED', true],
@@ -99,7 +99,7 @@ describe('Filesystem', () => {
     const filesystem = new ScriptedFilesystem({
       path: join(root, 'vault'),
       push: 'WHEN_ENDED',
-      checkpoints: { everySeconds: 5, settleSeconds: 60 },
+      checkpoints: { intervalSeconds: 5, settleSeconds: 60 },
     });
     const vault = await mount(filesystem);
     await vi.advanceTimersByTimeAsync(5_000);
@@ -117,7 +117,7 @@ describe('Filesystem', () => {
       () =>
         new ScriptedFilesystem({
           path: join(root, 'x'),
-          checkpoints: { everySeconds: 5, settleSeconds: 0 },
+          checkpoints: { intervalSeconds: 5, settleSeconds: 0 },
         }),
     ).toThrow(/need `push: "WHEN_ENDED"`/);
     expect(

@@ -31,7 +31,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { MountedHandle } from '../../../src/server/harness/filesystem/filesystem.ts';
+import type { MountLifecycle } from '../../../src/server/harness/filesystem/filesystem.ts';
 import {
   S3Filesystem,
   type S3FilesystemOptions,
@@ -79,7 +79,7 @@ async function body(key: string): Promise<string> {
 function mount(
   taskId: string,
   options: Partial<S3FilesystemOptions> = {},
-): Promise<MountedHandle> {
+): Promise<MountLifecycle> {
   const filesystem = new S3Filesystem(
     { ...OPTIONS, path: join(root, taskId), ...options },
     {
@@ -185,7 +185,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
       scope: () => ({ root: 'c' }),
       deletes: false,
       push: 'WHEN_ENDED',
-      checkpoints: { everySeconds: 5, settleSeconds: 3_600 },
+      checkpoints: { intervalSeconds: 5, settleSeconds: 3_600 },
     });
     const { path } = vault.mounted;
     await writeFile(join(path, 'settled.md'), 'settled');

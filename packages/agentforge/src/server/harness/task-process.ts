@@ -25,11 +25,11 @@ import type {
   TaskProcessMessage,
 } from '#core/task-protocol/messages.ts';
 import type {
-  Ending,
   MountedFilesystem,
-  MountedHandle,
+  MountLifecycle,
+  TaskEnding,
 } from './filesystem/filesystem.ts';
-import { mountRegistered } from './filesystem/registry.ts';
+import { mountRegisteredFilesystems } from './filesystem/registry.ts';
 import {
   type AgentRun,
   type AgentRunSpec,
@@ -91,9 +91,9 @@ export interface ExecuteOptions {
 export async function executeProcedure(
   options: ExecuteOptions,
 ): Promise<Outcome> {
-  const mounted: MountedHandle[] = [];
-  const outcome = await runProcedure(options, mounted);
-  return unmounted(outcome, mounted);
+  const lifecycles: MountLifecycle[] = [];
+  const outcome = await runProcedure(options, lifecycles);
+  return unmountAll(outcome, lifecycles);
 }
 
 /**
@@ -101,19 +101,21 @@ export async function executeProcedure(
  * that did not fail, whose filesystems did not all unmount, fails; a failed
  * one keeps its own cause, the unmount's failure added to its message.
  */
-async function unmounted(
+async function unmountAll(
   outcome: Outcome,
-  mounted: readonly MountedHandle[],
+  lifecycles: readonly MountLifecycle[],
 ): Promise<Outcome> {
   if (outcome.state === 'TASK_STATE_REJECTED') return outcome;
-  const ending: Ending =
+  const ending: TaskEnding =
     outcome.state === 'TASK_STATE_COMPLETED'
       ? 'COMPLETED'
       : outcome.state === 'TASK_STATE_FAILED'
         ? 'FAILED'
         : 'CANCELED';
   const failures = (
-    await Promise.allSettled(mounted.map((handle) => handle.unmount(ending)))
+    await Promise.allSettled(
+      lifecycles.map((lifecycle) => lifecycle.unmount(ending)),
+    )
   ).flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
   if (failures.length === 0) return outcome;
   const causes = failures.map((error: unknown) => {
@@ -140,7 +142,7 @@ async function unmounted(
 
 async function runProcedure(
   options: ExecuteOptions,
-  mounted: MountedHandle[],
+  lifecycles: MountLifecycle[],
 ): Promise<Outcome> {
   const { envelope } = options.invocation;
   const procedureContract = procedureAt(options.contract, envelope.procedure);
@@ -195,7 +197,7 @@ async function runProcedure(
   try {
     const { default: leaf } = await unlazy(registered);
     const procedure = new DecoratedProcedure(leaf['~orpc']).use(
-      mountRegistered(mounted),
+      mountRegisteredFilesystems(lifecycles),
     );
     const output: unknown = await call(procedure, input.data, {
       context,

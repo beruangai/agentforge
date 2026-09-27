@@ -6,7 +6,7 @@ import { TaskFailure } from '../kernel.ts';
 import type { TaskContext } from '../task-process.ts';
 
 /** How a task ended, which decides what an unmount pushes. */
-export type Ending = 'COMPLETED' | 'FAILED' | 'CANCELED';
+export type TaskEnding = 'COMPLETED' | 'FAILED' | 'CANCELED';
 
 /** What a filesystem's scope is resolved from: the request the procedure serves. */
 export interface FilesystemRequest {
@@ -36,10 +36,10 @@ export interface FilesystemOptions {
   readonly scope: (request: FilesystemRequest) => FilesystemScope;
   /** When it goes back, verified before the outcome is published; never after a cancel. */
   readonly push: 'NEVER' | 'WHEN_COMPLETED' | 'WHEN_ENDED';
-  /** Also push every `everySeconds` while the task runs, only files unchanged for `settleSeconds` so writes in progress settle first; only with `WHEN_ENDED`. */
+  /** Also push every `intervalSeconds` while the task runs, only files unchanged for `settleSeconds` so writes in progress settle first; only with `WHEN_ENDED`. */
   readonly checkpoints:
     | false
-    | { readonly everySeconds: number; readonly settleSeconds: number };
+    | { readonly intervalSeconds: number; readonly settleSeconds: number };
 }
 
 const FilesystemOptionsSchema = z
@@ -57,7 +57,7 @@ const FilesystemOptionsSchema = z
     checkpoints: z.union([
       z.literal(false),
       z.strictObject({
-        everySeconds: z.number().int().min(5),
+        intervalSeconds: z.number().int().min(5),
         settleSeconds: z.number().int().min(0),
       }),
     ]),
@@ -91,13 +91,6 @@ export interface MountedFilesystem {
   readonly permissions: { readonly allow: readonly string[] };
 }
 
-/** A mounted filesystem, as the lifecycle holds it until the outcome is known. */
-export interface MountedHandle {
-  readonly name: string;
-  readonly mounted: MountedFilesystem;
-  unmount(ending: Ending): Promise<void>;
-}
-
 /** The store failed or disagreed; retrying may succeed. Kinds throw it from `pull` and `push`. */
 export class FilesystemUnsynced extends Error {}
 
@@ -110,7 +103,7 @@ export class FilesystemUnsynced extends Error {}
 export abstract class Filesystem {
   readonly options: FilesystemOptions;
   /** Where it mounts for a task: the consumer's path, or the kind's default. */
-  readonly #pathOf: (task: {
+  readonly #resolvePath: (task: {
     readonly taskId: string;
     readonly name: string;
   }) => string;
@@ -133,20 +126,20 @@ export abstract class Filesystem {
     }
     this.options = parsed.data as FilesystemOptions;
     const { path } = this.options;
-    const pathOf = path === undefined ? kind.defaultPath : () => path;
-    if (pathOf === undefined) {
+    const resolvePath = path === undefined ? kind.defaultPath : () => path;
+    if (resolvePath === undefined) {
       throw new Error(`${this.constructor.name} needs a path: where it mounts`);
     }
-    this.#pathOf = pathOf;
+    this.#resolvePath = resolvePath;
   }
 
   /** Fetches the scope's contents into the mount; every mount pulls, so a task starts from the store, never blind. */
   protected abstract pull(mount: Mount): Promise<void>;
 
-  /** Sends the write scope's changes back; `settledBefore` leaves what changed after it. */
+  /** Sends the write scope's changes back; with `modifiedBefore`, only files last modified before it. */
   protected abstract push(
     mount: Mount,
-    options: { readonly settledBefore?: Date },
+    options: { readonly modifiedBefore?: Date },
   ): Promise<void>;
 
   /** Refuses a mount the kind cannot honour, before anything is fetched. */
@@ -156,7 +149,7 @@ export abstract class Filesystem {
     readonly name: string;
     readonly taskId: string;
     readonly request: FilesystemRequest;
-  }): Promise<MountedHandle> {
+  }): Promise<MountLifecycle> {
     const mount = this.#resolve(task);
     this.validate(mount);
     await mkdir(mount.path, { recursive: true });
@@ -164,9 +157,14 @@ export abstract class Filesystem {
       await this.pull(mount);
     } catch (error) {
       await rm(mount.path, { recursive: true, force: true });
-      throw unsyncedOr(error, `filesystem "${mount.name}" could not be pulled`);
+      throw asTaskFailure(
+        error,
+        `filesystem "${mount.name}" could not be pulled`,
+      );
     }
-    return new Lifecycle(this, mount, (options) => this.push(mount, options));
+    return new MountLifecycle(this, mount, (options) =>
+      this.push(mount, options),
+    );
   }
 
   #resolve(task: {
@@ -194,7 +192,7 @@ export abstract class Filesystem {
     return {
       name: task.name,
       taskId: task.taskId,
-      path: this.#pathOf(task).replace(/\/+$/, ''),
+      path: this.#resolvePath(task).replace(/\/+$/, ''),
       root,
       read: scope.read ?? ['**'],
       write,
@@ -202,20 +200,23 @@ export abstract class Filesystem {
   }
 }
 
-class Lifecycle implements MountedHandle {
+/** A mounted filesystem, held until the outcome is known: runs its checkpoints, and unmounts it. */
+export class MountLifecycle {
   readonly name: string;
   readonly mounted: MountedFilesystem;
   readonly #filesystem: Filesystem;
   readonly #mount: Mount;
-  readonly #push: (options: { readonly settledBefore?: Date }) => Promise<void>;
-  #checkpoints: ReturnType<typeof setInterval> | undefined;
+  readonly #push: (options: {
+    readonly modifiedBefore?: Date;
+  }) => Promise<void>;
+  #checkpointTimer: ReturnType<typeof setInterval> | undefined;
   /** Pushes run one at a time: a checkpoint never overlaps the last. */
-  #pushing: Promise<void> = Promise.resolve();
+  #latestPush: Promise<void> = Promise.resolve();
 
   constructor(
     filesystem: Filesystem,
     mount: Mount,
-    push: (options: { readonly settledBefore?: Date }) => Promise<void>,
+    push: (options: { readonly modifiedBefore?: Date }) => Promise<void>,
   ) {
     this.#filesystem = filesystem;
     this.#mount = mount;
@@ -232,34 +233,34 @@ class Lifecycle implements MountedHandle {
     };
     const { checkpoints } = filesystem.options;
     if (checkpoints !== false) {
-      this.#checkpoints = setInterval(() => {
-        const settledBefore = new Date(
+      this.#checkpointTimer = setInterval(() => {
+        const modifiedBefore = new Date(
           Date.now() - checkpoints.settleSeconds * 1000,
         );
-        this.#serialized({ settledBefore }).catch((error: unknown) => {
+        this.#queuePush({ modifiedBefore }).catch((error: unknown) => {
           // The push at the end is the one the outcome waits on.
           console.error(
             `filesystem "${this.name}": a checkpoint failed`,
             error,
           );
         });
-      }, checkpoints.everySeconds * 1000);
+      }, checkpoints.intervalSeconds * 1000);
     }
   }
 
-  async unmount(ending: Ending): Promise<void> {
-    clearInterval(this.#checkpoints);
+  async unmount(ending: TaskEnding): Promise<void> {
+    clearInterval(this.#checkpointTimer);
     try {
-      await this.#pushing.catch(() => undefined);
+      await this.#latestPush.catch(() => undefined);
       const { push } = this.#filesystem.options;
-      const pushes =
+      const shouldPush =
         (push === 'WHEN_COMPLETED' && ending === 'COMPLETED') ||
         (push === 'WHEN_ENDED' && ending !== 'CANCELED');
-      if (pushes) {
+      if (shouldPush) {
         try {
-          await this.#serialized({});
+          await this.#queuePush({});
         } catch (error) {
-          throw unsyncedOr(
+          throw asTaskFailure(
             error,
             `filesystem "${this.name}" could not be pushed`,
           );
@@ -270,18 +271,18 @@ class Lifecycle implements MountedHandle {
     }
   }
 
-  #serialized(options: { readonly settledBefore?: Date }): Promise<void> {
-    this.#pushing = this.#pushing
+  #queuePush(options: { readonly modifiedBefore?: Date }): Promise<void> {
+    this.#latestPush = this.#latestPush
       .catch(() => undefined)
       .then(() => this.#push(options));
-    return this.#pushing;
+    return this.#latestPush;
   }
 }
 
 /** A store's failure becomes `FILESYSTEM_UNSYNCED`; anything else is the procedure's error, as it is. */
-function unsyncedOr(error: unknown, what: string): unknown {
+function asTaskFailure(error: unknown, failure: string): unknown {
   if (!(error instanceof FilesystemUnsynced)) return error;
   return new TaskFailure(
-    cause('FILESYSTEM_UNSYNCED', `${what}: ${error.message}`),
+    cause('FILESYSTEM_UNSYNCED', `${failure}: ${error.message}`),
   );
 }

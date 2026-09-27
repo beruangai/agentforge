@@ -6,7 +6,6 @@
  */
 
 export {
-  type Ending,
   Filesystem,
   type FilesystemOptions,
   type FilesystemRequest,
@@ -14,6 +13,7 @@ export {
   FilesystemUnsynced,
   type Mount,
   type MountedFilesystem,
+  type TaskEnding,
 } from './filesystem/filesystem.ts';
 export { filesystems } from './filesystem/registry.ts';
 export {

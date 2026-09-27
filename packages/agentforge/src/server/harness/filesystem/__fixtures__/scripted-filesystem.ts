@@ -39,12 +39,12 @@ export class ScriptedFilesystem extends Filesystem {
 
   protected async push(
     mount: Mount,
-    options: { readonly settledBefore?: Date },
+    options: { readonly modifiedBefore?: Date },
   ): Promise<void> {
     this.calls.push(
-      options.settledBefore === undefined
+      options.modifiedBefore === undefined
         ? `push ${mount.root}`
-        : `checkpoint ${options.settledBefore.toISOString()}`,
+        : `checkpoint ${options.modifiedBefore.toISOString()}`,
     );
     await this.#script.push?.();
   }

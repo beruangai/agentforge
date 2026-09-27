@@ -37,9 +37,9 @@ const S7CMD = 's7cmd';
 /** How much of `s7cmd`'s stderr a failure carries. */
 const STDERR_TAIL_CHARACTERS = 2_000;
 /** `s7cmd` refused its arguments: a bad `exclude` pattern, or AgentForge's bug. */
-const S7CMD_INVALID_ARGUMENTS = 2;
+const S7CMD_EXIT_INVALID_ARGUMENTS = 2;
 /** Excluded always: a key with a `..` segment would be written outside the mount. */
-const CLIMBING_PATH = '(^|/)\\.\\.(/|$)';
+const CLIMBING_PATH_PATTERN = '(^|/)\\.\\.(/|$)';
 
 /** Runs `s7cmd` as a child of the task process, so a cancel or a lost container takes it. */
 export const runS7cmd: S7cmdRunner = (args) =>
@@ -73,7 +73,10 @@ export const runS7cmd: S7cmdRunner = (args) =>
  * sent again, and never leaves the write scope.
  */
 export class S3Filesystem extends Filesystem {
-  readonly #s3: Pick<S3FilesystemOptions, 'bucket' | 'deletes' | 'exclude'>;
+  readonly #s3Options: Pick<
+    S3FilesystemOptions,
+    'bucket' | 'deletes' | 'exclude'
+  >;
   readonly #s7cmd: S7cmdRunner;
   readonly #environment: NodeJS.ProcessEnv;
 
@@ -85,21 +88,21 @@ export class S3Filesystem extends Filesystem {
       readonly environment?: NodeJS.ProcessEnv;
     } = {},
   ) {
-    const { bucket, deletes, exclude, ...common } = options;
-    super(common);
+    const { bucket, deletes, exclude, ...filesystemOptions } = options;
+    super(filesystemOptions);
     if (!FILESYSTEM_NAME_PATTERN.test(bucket)) {
       throw new Error(
         `bucket "${bucket}" must match ${FILESYSTEM_NAME_PATTERN}`,
       );
     }
-    this.#s3 = { bucket, deletes, exclude };
+    this.#s3Options = { bucket, deletes, exclude };
     this.#s7cmd = seams.s7cmd ?? runS7cmd;
     this.#environment = seams.environment ?? process.env;
   }
 
   protected override validate(mount: Mount): void {
-    this.#remote(mount);
-    if (this.#s3.deletes && mount.root === '') {
+    this.#remoteUrl(mount);
+    if (this.#s3Options.deletes && mount.root === '') {
       throw new Error(
         `filesystem "${mount.name}": deletes needs a root, since on the whole bucket it could empty it`,
       );
@@ -107,37 +110,37 @@ export class S3Filesystem extends Filesystem {
   }
 
   protected pull(mount: Mount): Promise<void> {
-    return this.#sync([this.#remote(mount), `${mount.path}/`], []);
+    return this.#sync([this.#remoteUrl(mount), `${mount.path}/`], []);
   }
 
   protected push(
     mount: Mount,
-    options: { readonly settledBefore?: Date },
+    options: { readonly modifiedBefore?: Date },
   ): Promise<void> {
     return this.#sync(
       [
         '--check-etag',
-        ...(this.#s3.deletes ? ['--delete'] : []),
-        ...(options.settledBefore === undefined
+        ...(this.#s3Options.deletes ? ['--delete'] : []),
+        ...(options.modifiedBefore === undefined
           ? []
-          : ['--filter-mtime-before', options.settledBefore.toISOString()]),
+          : ['--filter-mtime-before', options.modifiedBefore.toISOString()]),
         `${mount.path}/`,
-        this.#remote(mount),
+        this.#remoteUrl(mount),
       ],
-      outsideOf(mount.write),
+      outsideWriteScope(mount.write),
     );
   }
 
-  #remote(mount: Mount): string {
-    const declared = z
+  #remoteUrl(mount: Mount): string {
+    const declaredBuckets = z
       .record(z.string(), z.string().min(3))
       .parse(
         JSON.parse(this.#environment[FILESYSTEM_BUCKETS_VARIABLE] ?? '{}'),
       );
-    const bucket = declared[this.#s3.bucket];
+    const bucket = declaredBuckets[this.#s3Options.bucket];
     if (bucket === undefined) {
       throw new Error(
-        `no bucket "${this.#s3.bucket}" is declared to this agent; declared: ${Object.keys(declared).join(', ') || 'none'}`,
+        `no bucket "${this.#s3Options.bucket}" is declared to this agent; declared: ${Object.keys(declaredBuckets).join(', ') || 'none'}`,
       );
     }
     return `s3://${bucket}/${mount.root === '' ? '' : `${mount.root}/`}`;
@@ -146,9 +149,13 @@ export class S3Filesystem extends Filesystem {
   /** One `s7cmd sync`; any exit but 0 — an error, or a warning such as an ETag mismatch — is unsynced. */
   async #sync(
     args: readonly string[],
-    excluded: readonly string[],
+    additionalExclusions: readonly string[],
   ): Promise<void> {
-    const exclude = [CLIMBING_PATH, ...this.#s3.exclude, ...excluded]
+    const exclude = [
+      CLIMBING_PATH_PATTERN,
+      ...this.#s3Options.exclude,
+      ...additionalExclusions,
+    ]
       .map((pattern) => `(?:${pattern})`)
       .join('|');
     const { exitCode, stderr } = await this.#s7cmd([
@@ -158,7 +165,7 @@ export class S3Filesystem extends Filesystem {
       ...args,
     ]);
     if (exitCode === 0) return;
-    if (exitCode === S7CMD_INVALID_ARGUMENTS) {
+    if (exitCode === S7CMD_EXIT_INVALID_ARGUMENTS) {
       throw new Error(
         `s7cmd refused its arguments; check \`exclude\`: ${stderr.trim()}`,
       );
@@ -168,10 +175,10 @@ export class S3Filesystem extends Filesystem {
 }
 
 /** A pattern matching every path outside the write scope; none when the scope is everything. */
-function outsideOf(write: readonly string[]): readonly string[] {
+function outsideWriteScope(write: readonly string[]): readonly string[] {
   if (write.includes('**')) return [];
-  const inside = write
+  const writeScope = write
     .map((glob) => `(?:${picomatch.makeRe(glob, { dot: true }).source})`)
     .join('|');
-  return [`^(?!${inside})`];
+  return [`^(?!${writeScope})`];
 }

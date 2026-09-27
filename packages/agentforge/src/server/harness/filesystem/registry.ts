@@ -4,7 +4,7 @@ import type { TaskContext } from '../task-process.ts';
 import type {
   Filesystem,
   MountedFilesystem,
-  MountedHandle,
+  MountLifecycle,
 } from './filesystem.ts';
 
 /** Where registrations accumulate on the context, until the lifecycle mounts them. */
@@ -48,10 +48,10 @@ export function filesystems(
 /**
  * The innermost middleware, appended by the harness to the procedure it
  * calls: mounts every registered filesystem and hands the handler their
- * paths and baseline permissions. Each mount joins `mounted` as it
+ * paths and baseline permissions. Each mount joins `lifecycles` as it
  * succeeds, for the harness to unmount once the outcome is known.
  */
-export function mountRegistered(mounted: MountedHandle[]) {
+export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
   return os
     .$context<TaskContext & RegistryContext>()
     .middleware(async ({ context, next }, input) => {
@@ -59,13 +59,13 @@ export function mountRegistered(mounted: MountedHandle[]) {
       for (const [name, filesystem] of Object.entries(
         context[FILESYSTEM_REGISTRY] ?? {},
       )) {
-        const handle = await filesystem.mount({
+        const lifecycle = await filesystem.mount({
           name,
           taskId: context.taskId,
           request: { input, context },
         });
-        mounted.push(handle);
-        filesystems[name] = handle.mounted;
+        lifecycles.push(lifecycle);
+        filesystems[name] = lifecycle.mounted;
       }
       const allow = Object.values(filesystems).flatMap(
         (filesystem) => filesystem.permissions.allow,
