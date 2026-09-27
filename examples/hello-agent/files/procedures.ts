@@ -23,7 +23,6 @@ const NOTEBOOK: Omit<S3FilesystemOptions, 'access' | 'push'> = {
   scope: ({ input }) => ({
     root: `topics/${(input as { readonly topic: string }).topic}`,
   }),
-  pull: true,
   checkpoints: false,
   deletes: false,
   exclude: [],

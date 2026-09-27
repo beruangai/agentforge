@@ -17,7 +17,7 @@ export interface S3FilesystemOptions extends FilesystemOptions {
   readonly path: string;
   /** The bucket's name as the deployment declared it (`AgentRuntime.filesystems`). */
   readonly bucket: string;
-  /** Whether a push deletes the objects the task removed, within the write scope; only with `pull`, on a non-empty root. */
+  /** Whether a push deletes the objects the task removed, within the write scope; only on a non-empty root. */
   readonly deletes: boolean;
   /** Regular expressions (`s7cmd`'s syntax) over paths relative to the root: never pulled, pushed or deleted. */
   readonly exclude: readonly string[];
@@ -90,11 +90,6 @@ export class S3Filesystem extends Filesystem {
     if (!FILESYSTEM_NAME_PATTERN.test(bucket)) {
       throw new Error(
         `bucket "${bucket}" must match ${FILESYSTEM_NAME_PATTERN}`,
-      );
-    }
-    if (deletes && !options.pull) {
-      throw new Error(
-        'deletes needs `pull`: without it, a push deletes every object the task did not write',
       );
     }
     this.#s3 = { bucket, deletes, exclude };

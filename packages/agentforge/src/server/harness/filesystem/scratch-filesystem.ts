@@ -14,7 +14,6 @@ export class ScratchFilesystem extends Filesystem {
         ...(options.path === undefined ? {} : { path: options.path }),
         access: 'READ_WRITE',
         scope: () => ({ root: '' }),
-        pull: false,
         push: 'NEVER',
         checkpoints: false,
       },
@@ -25,9 +24,8 @@ export class ScratchFilesystem extends Filesystem {
     );
   }
 
-  protected pull(): Promise<void> {
-    throw new Error('a scratch filesystem never pulls');
-  }
+  /** Its store is empty: there is nothing to fetch. */
+  protected async pull(): Promise<void> {}
 
   protected push(): Promise<void> {
     throw new Error('a scratch filesystem never pushes');

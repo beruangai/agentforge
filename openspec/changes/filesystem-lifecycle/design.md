@@ -21,19 +21,18 @@ interface FilesystemOptions {
   path?: string;             // where it mounts; each kind sets a default or requires it
   access: 'READ_ONLY' | 'READ_WRITE';
   scope: (request: FilesystemRequest) => FilesystemScope;
-  pull: boolean;
   push: 'NEVER' | 'WHEN_COMPLETED' | 'WHEN_ENDED';
-  checkpoints: false | { everySeconds: number; quietSeconds: number }; // only with WHEN_ENDED
+  checkpoints: false | { everySeconds: number; settleSeconds: number }; // only with WHEN_ENDED; pushes only files unchanged for settleSeconds
 }
 abstract class Filesystem {
   protected abstract pull(mount: Mount): Promise<void>;
   protected abstract push(mount: Mount, options: { settledBefore?: Date }): Promise<void>;
   // run by the base class from its options:
-  //   mount:   resolve scope and path → create → pull → start checkpoints
+  //   mount:   resolve scope and path → create → pull (always) → start checkpoints
   //   unmount: stop checkpoints → push (per `push` and the ending) → remove the local copy
 }
 class S3Filesystem extends Filesystem {}      // + bucket (a name the construct declared), deletes, exclude; path required
-class ScratchFilesystem extends Filesystem {} // no pull or push; path defaults to a directory of the task's own
+class ScratchFilesystem extends Filesystem {} // pulls nothing, never pushes; path defaults to a directory of the task's own
 
 function filesystems(entries: Record<string, Filesystem>, options?: { inherit?: boolean }): Middleware;
 
@@ -56,6 +55,7 @@ AgentRuntimeProps.filesystems?: Record<string, S3FilesystemBucket>
   - The harness appends one lifecycle middleware to the procedure at call time. oRPC's `.use()` on a built procedure appends it last, so it runs innermost: after every registration and before the handler. It mounts the final registry.
   - `executeProcedure` unmounts once the outcome is known, so an output that fails validation counts as a failure.
   - Alternative rejected: mounting inside each registration middleware. A procedure's override would come after the house default had already been pulled.
+- **Every mount pulls.** A task works from what is in the store, never blind, and a delete is always relative to what was pulled. A procedure that only adds a file scopes its `root` to it, where a pull costs one listing. Pulling again mid-task is an operation for later, not an option.
 - **Operations, not options, are the abstraction.** A kind implements `pull` and `push`; checkpoints are `push({ settledBefore })` on a timer run by the base class. Kind-specific config such as `deletes` and `exclude` stays on the subclass.
 - **Scope.** `root` bounds what is mounted. `read` and `write` bound the baseline permissions. A push uploads and deletes only within `write`, so a file written elsewhere in the mount never leaves the container.
 - **Permissions are a baseline the handler owns.** The rules follow Claude Code's absolute-path syntax, `Read(//abs/glob)` and `Edit(//abs/glob)`. The context carries them per filesystem and merged. The handler passes them to `runAgent` or not, extending them through `composeOptions`. Procedures run in `dontAsk` mode, so a path with no allow rule is denied.
@@ -63,7 +63,7 @@ AgentRuntimeProps.filesystems?: Record<string, S3FilesystemBucket>
 - **S3 engine unchanged.**
   - `s7cmd sync`, with `--check-etag` on push, `--delete` when `deletes` is set, and one `--filter-exclude-regex` that always excludes `..` segments. A checkpoint adds `--filter-mtime-before`.
   - The write scope becomes a filter on the push.
-  - `deletes` requires `pull` and a non-empty `root`.
+  - `deletes` requires a non-empty `root`.
 - **Errors → outcomes:**
 
   | Failure | Outcome |

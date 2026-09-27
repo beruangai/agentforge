@@ -75,7 +75,7 @@ Built to what the platforms document, with tests only where AgentForge relies on
 - **Resume uses the session's working directory.** A transcript is keyed by the directory its session began in — the agent's own unless a procedure sets `cwd` — and a resume must run from the same one.
 - **Files do not follow a session.** A resumed session remembers what earlier runs wrote, but a new container does not have those files — only what a filesystem pushed.
 - **A filesystem's path and root are the consumer's to keep to one task at a time.** AgentForge syncs what a task declares; two tasks on one path or prefix at once overwrite each other file by file. A consumer's workflows prevent it — through `runtimeSessionId`, a continuity key, or a root per task.
-- **`deletes` removes what the task removed**, within its write scope, and needs `pull` and a non-empty root; what a delete should reach is the procedure's to scope.
+- **`deletes` removes what the task removed**, within its write scope, and needs a non-empty root; what a delete should reach is the procedure's to scope.
 - **AgentForge gives an agent no filesystem permission.** The handler passes `context.filesystemPermissions` (or its own rules) to `runAgent`; Bash is not bounded by them, so a procedure lists the commands it allows.
 - **Transcripts are kept 30 days by default** (`sessionRetention`), and hold everything the agent was sent and read.
 - **Locally, sessions live in the container** and end with it; only a deployed agent persists them.

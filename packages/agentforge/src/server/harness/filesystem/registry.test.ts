@@ -86,9 +86,9 @@ beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'agentforge-registry-'));
   const at = (name: string) => ({ path: join(root, name) });
   house = new ScriptedFilesystem(at('house'));
-  scratch = new ScriptedFilesystem({ ...at('scratch'), pull: false });
+  scratch = new ScriptedFilesystem(at('scratch'));
   workspace = new ScriptedFilesystem(at('workspace'));
-  notes = new ScriptedFilesystem({ ...at('notes'), pull: false });
+  notes = new ScriptedFilesystem(at('notes'));
   ran = false;
 });
 
@@ -122,6 +122,7 @@ describe('filesystems registered on a procedure', () => {
       output: { names: ['notes'] },
     });
     expect(scratch.calls).toEqual([]);
+    expect(notes.calls).toEqual(['pull ', 'push ']);
   });
 
   it('fail a completed task whose push fails, unsynced', async () => {

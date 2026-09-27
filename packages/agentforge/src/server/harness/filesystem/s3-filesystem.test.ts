@@ -30,7 +30,6 @@ function s3(
       bucket: 'vault',
       access: 'READ_WRITE',
       scope: () => ({ root: 'topics/a' }),
-      pull: true,
       push: 'WHEN_COMPLETED',
       checkpoints: false,
       deletes: false,
@@ -118,10 +117,7 @@ describe('S3Filesystem', () => {
     await expect(refused).rejects.not.toHaveProperty('taskCause');
   });
 
-  it('refuses an unsafe delete and an undeclared bucket before anything runs', async () => {
-    expect(() => s3({ deletes: true, pull: false })).toThrow(
-      /deletes needs `pull`/,
-    );
+  it('refuses a delete on the whole bucket and an undeclared bucket before anything runs', async () => {
     const whole = s3({ deletes: true, scope: () => ({ root: '' }) });
     await expect(whole.mount()).rejects.toThrow(/deletes needs a root/);
     const undeclared = s3({ bucket: 'other' });

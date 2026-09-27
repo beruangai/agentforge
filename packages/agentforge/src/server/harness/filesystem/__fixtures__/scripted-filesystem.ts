@@ -24,7 +24,6 @@ export class ScriptedFilesystem extends Filesystem {
     super({
       access: 'READ_WRITE',
       scope: () => ({ root: '' }),
-      pull: true,
       push: 'WHEN_COMPLETED',
       checkpoints: false,
       ...options,

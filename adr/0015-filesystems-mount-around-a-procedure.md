@@ -19,9 +19,9 @@ decision-makers: Jeremy Jonas
 ## Decision Outcome
 
 * **A `Filesystem` is an abstract kind with two operations, `pull` and `push`.** The base class runs the lifecycle from the options, which have no defaults of AgentForge's:
-  * mount: resolve the scope, create the path, `pull` if declared, start checkpoints
+  * mount: resolve the scope, create the path, `pull`, start checkpoints. Every mount pulls, so a task works from what is in the store, never blind; a procedure that only adds a file scopes its `root` to it, and pulling again mid-task is an operation, not an option
   * unmount: stop checkpoints, `push` as `push` (`NEVER`, `WHEN_COMPLETED`, `WHEN_ENDED`) and the ending say — never after a cancel — then remove the local copy
-  * checkpoints: a `push` every N seconds of the files unchanged for the last M; only with `WHEN_ENDED`
+  * checkpoints: a `push` every `everySeconds` of only the files unchanged for `settleSeconds`, so writes in progress settle first; only with `WHEN_ENDED`
 
   Built in: `S3Filesystem` and `ScratchFilesystem`. A consumer subclasses for its own kind; git comes later.
 * **Registration and lifecycle are separate.** `filesystems({ name: filesystem })` is oRPC middleware that only adds to a registry on the context: a name registered again replaces the entry upstream, and `inherit: false` drops everything upstream. The harness appends one middleware to the procedure it calls, which oRPC runs innermost — after every registration and before the handler — and mounts the registry. The harness unmounts once the outcome is known, so an output that fails validation counts as a failure.
@@ -32,7 +32,7 @@ decision-makers: Jeremy Jonas
 * **An `S3FilesystemBucket` construct owns its bucket**, so several agents can share one; `AgentRuntime` takes `filesystems: { name: bucket }`, grants read and write, and names the buckets to the harness. The bucket is private, TLS-only, versioned, S3-encrypted and retained by default. No KMS; checkov's KMS and access-logging rules are the consumer's, in its config.
 * **`s7cmd sync` runs S3**, as a child of the task process, so a cancel or a lost container takes it.
   * It verifies each transferred object's ETag, and any exit but 0 is unsynced. A push compares by ETag, so an unchanged file is not sent again; a checkpoint adds `--filter-mtime-before`.
-  * One `--filter-exclude-regex` carries the consumer's `exclude`, always a `..` segment, and everything outside the write scope; `--delete` never removes an excluded object. `deletes` needs `pull` and a non-empty root.
+  * One `--filter-exclude-regex` carries the consumer's `exclude`, always a `..` segment, and everything outside the write scope; `--delete` never removes an excluded object. `deletes` needs a non-empty root.
   * The binary is the static musl build, pinned by sha256 in the base image. A sync of our own was rejected: it would re-implement the verification `s7cmd` already does.
 * **Mechanics, not policy**: two tasks on one path or prefix, and what a delete should remove, are the consumer's to prevent (through `runtimeSessionId`) and to declare.
 

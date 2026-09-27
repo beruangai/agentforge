@@ -98,15 +98,15 @@ describe('Filesystem', () => {
     vi.setSystemTime(new Date('2026-09-27T00:00:00Z'));
     const filesystem = new ScriptedFilesystem({
       path: join(root, 'vault'),
-      pull: false,
       push: 'WHEN_ENDED',
-      checkpoints: { everySeconds: 5, quietSeconds: 60 },
+      checkpoints: { everySeconds: 5, settleSeconds: 60 },
     });
     const vault = await mount(filesystem);
     await vi.advanceTimersByTimeAsync(5_000);
     await vault.unmount('COMPLETED');
     await vi.advanceTimersByTimeAsync(5_000);
     expect(filesystem.calls).toEqual([
+      'pull ',
       'checkpoint 2026-09-26T23:59:05.000Z',
       'push ',
     ]);
@@ -117,7 +117,7 @@ describe('Filesystem', () => {
       () =>
         new ScriptedFilesystem({
           path: join(root, 'x'),
-          checkpoints: { everySeconds: 5, quietSeconds: 0 },
+          checkpoints: { everySeconds: 5, settleSeconds: 0 },
         }),
     ).toThrow(/need `push: "WHEN_ENDED"`/);
     expect(

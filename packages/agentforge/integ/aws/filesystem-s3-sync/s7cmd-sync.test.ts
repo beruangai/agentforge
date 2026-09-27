@@ -50,7 +50,6 @@ const OPTIONS: Omit<S3FilesystemOptions, 'path'> = {
   bucket: 'vault',
   access: 'READ_WRITE',
   scope: () => ({ root: 'p' }),
-  pull: true,
   push: 'WHEN_COMPLETED',
   checkpoints: false,
   deletes: true,
@@ -181,13 +180,12 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
     ]);
   });
 
-  it('pushes checkpoints, leaving a file changed in the quiet period; a cancel pushes nothing more', async () => {
+  it('pushes checkpoints, leaving a file that has not settled; a cancel pushes nothing more', async () => {
     const vault = await mount('checkpoints', {
       scope: () => ({ root: 'c' }),
-      pull: false,
       deletes: false,
       push: 'WHEN_ENDED',
-      checkpoints: { everySeconds: 5, quietSeconds: 3_600 },
+      checkpoints: { everySeconds: 5, settleSeconds: 3_600 },
     });
     const { path } = vault.mounted;
     await writeFile(join(path, 'settled.md'), 'settled');

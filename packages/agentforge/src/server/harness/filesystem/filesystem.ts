@@ -34,14 +34,12 @@ export interface FilesystemOptions {
   readonly path?: string;
   readonly access: 'READ_ONLY' | 'READ_WRITE';
   readonly scope: (request: FilesystemRequest) => FilesystemScope;
-  /** Fetch the scope's contents when it mounts. */
-  readonly pull: boolean;
   /** When it goes back, verified before the outcome is published; never after a cancel. */
   readonly push: 'NEVER' | 'WHEN_COMPLETED' | 'WHEN_ENDED';
-  /** Also push while the task runs, leaving files changed in the last `quietSeconds`; only with `WHEN_ENDED`. */
+  /** Also push every `everySeconds` while the task runs, only files unchanged for `settleSeconds` so writes in progress settle first; only with `WHEN_ENDED`. */
   readonly checkpoints:
     | false
-    | { readonly everySeconds: number; readonly quietSeconds: number };
+    | { readonly everySeconds: number; readonly settleSeconds: number };
 }
 
 const FilesystemOptionsSchema = z
@@ -55,13 +53,12 @@ const FilesystemOptionsSchema = z
       (value) => typeof value === 'function',
       'scope is a function of the request',
     ),
-    pull: z.boolean(),
     push: z.enum(['NEVER', 'WHEN_COMPLETED', 'WHEN_ENDED']),
     checkpoints: z.union([
       z.literal(false),
       z.strictObject({
         everySeconds: z.number().int().min(5),
-        quietSeconds: z.number().int().min(0),
+        settleSeconds: z.number().int().min(0),
       }),
     ]),
   })
@@ -143,7 +140,7 @@ export abstract class Filesystem {
     this.#pathOf = pathOf;
   }
 
-  /** Fetches the scope's contents into the mount. */
+  /** Fetches the scope's contents into the mount; every mount pulls, so a task starts from the store, never blind. */
   protected abstract pull(mount: Mount): Promise<void>;
 
   /** Sends the write scope's changes back; `settledBefore` leaves what changed after it. */
@@ -163,16 +160,11 @@ export abstract class Filesystem {
     const mount = this.#resolve(task);
     this.validate(mount);
     await mkdir(mount.path, { recursive: true });
-    if (this.options.pull) {
-      try {
-        await this.pull(mount);
-      } catch (error) {
-        await rm(mount.path, { recursive: true, force: true });
-        throw unsyncedOr(
-          error,
-          `filesystem "${mount.name}" could not be pulled`,
-        );
-      }
+    try {
+      await this.pull(mount);
+    } catch (error) {
+      await rm(mount.path, { recursive: true, force: true });
+      throw unsyncedOr(error, `filesystem "${mount.name}" could not be pulled`);
     }
     return new Lifecycle(this, mount, (options) => this.push(mount, options));
   }
@@ -242,7 +234,7 @@ class Lifecycle implements MountedHandle {
     if (checkpoints !== false) {
       this.#checkpoints = setInterval(() => {
         const settledBefore = new Date(
-          Date.now() - checkpoints.quietSeconds * 1000,
+          Date.now() - checkpoints.settleSeconds * 1000,
         );
         this.#serialized({ settledBefore }).catch((error: unknown) => {
           // The push at the end is the one the outcome waits on.

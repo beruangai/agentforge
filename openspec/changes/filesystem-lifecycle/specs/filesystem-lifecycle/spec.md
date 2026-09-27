@@ -18,10 +18,10 @@ A procedure's filesystems SHALL be registered by middleware, by name. Registerin
 - **THEN** the procedure mounts only `notes`
 
 ### Requirement: Filesystems mount before the handler and unmount after the outcome
-Every registered filesystem SHALL be mounted before the procedure's handler runs, and SHALL be unmounted once the task's outcome is known. Unmounting SHALL push as the filesystem declares — `WHEN_COMPLETED` on completion, `WHEN_ENDED` on completion or failure, never on cancellation — and the outcome SHALL be published only after those pushes are verified. A task SHALL never report `TASK_STATE_COMPLETED` over a push that was not verified.
+Every registered filesystem SHALL be mounted, pulling its scope from its store, before the procedure's handler runs, and SHALL be unmounted once the task's outcome is known. Unmounting SHALL push as the filesystem declares — `WHEN_COMPLETED` on completion, `WHEN_ENDED` on completion or failure, never on cancellation — and the outcome SHALL be published only after those pushes are verified. A task SHALL never report `TASK_STATE_COMPLETED` over a push that was not verified.
 
 #### Scenario: The handler reads a pulled filesystem before any agent runs
-- **WHEN** a procedure registers a filesystem that pulls
+- **WHEN** a procedure registers a filesystem
 - **THEN** its files are present at its path when the handler starts
 
 #### Scenario: A push that fails fails a completed task
@@ -58,5 +58,5 @@ Each filesystem kind SHALL either set a default path the consumer may override, 
 - **THEN** it mounts an empty directory of the task's own, removed when the task ends
 
 #### Scenario: An S3 filesystem refuses an unsafe delete
-- **WHEN** an S3 filesystem declares deletes without pulling, or on its whole bucket
+- **WHEN** an S3 filesystem declares deletes on its whole bucket
 - **THEN** the task fails `EXECUTION_ERROR` before anything is mounted
