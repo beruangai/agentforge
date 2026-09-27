@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskContext } from '../task-process.ts';
 import {
   S3Filesystem,
@@ -16,6 +16,9 @@ const CLIMBING = '(?:(^|/)\\.\\.(/|$))';
 let path: string;
 beforeEach(async () => {
   path = join(await mkdtemp(join(tmpdir(), 'agentforge-s3-')), 'vault');
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 /** An S3 filesystem over a scripted `s7cmd`, with the bucket `vault` declared. */
@@ -32,7 +35,6 @@ function s3(
       scope: () => ({ root: 'topics/a' }),
       push: 'WHEN_COMPLETED',
       checkpoints: false,
-      deletes: false,
       exclude: [],
       ...options,
     },
@@ -59,7 +61,10 @@ function s3(
 
 describe('S3Filesystem', () => {
   it('pulls its root, and pushes by ETag, deleting only when declared', async () => {
-    const { calls, mount } = s3({ deletes: true, exclude: ['^cache/'] });
+    const { calls, mount } = s3({
+      dangerouslyEnableDeletes: true,
+      exclude: ['^cache/'],
+    });
     await (await mount()).unmount('COMPLETED');
     const exclude = `${CLIMBING}|(?:^cache/)`;
     expect(calls).toEqual([
@@ -80,6 +85,26 @@ describe('S3Filesystem', () => {
         's3://vault-bucket/topics/a/',
       ],
     ]);
+  });
+
+  it('deletes only when dangerously enabled, and never on a checkpoint', async () => {
+    const off = s3();
+    await (await off.mount()).unmount('COMPLETED');
+    expect(off.calls[1]).not.toContain('--delete');
+
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    const on = s3({
+      dangerouslyEnableDeletes: true,
+      push: 'WHEN_ENDED',
+      checkpoints: { intervalSeconds: 5, settleSeconds: 60 },
+    });
+    const vault = await on.mount();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vault.unmount('COMPLETED');
+    const [, checkpoint, final] = on.calls;
+    expect(checkpoint).toContain('--filter-mtime-before');
+    expect(checkpoint).not.toContain('--delete');
+    expect(final).toContain('--delete');
   });
 
   it('pushes only within its write scope', async () => {
@@ -118,8 +143,13 @@ describe('S3Filesystem', () => {
   });
 
   it('refuses a delete on the whole bucket and an undeclared bucket before anything runs', async () => {
-    const whole = s3({ deletes: true, scope: () => ({ root: '' }) });
-    await expect(whole.mount()).rejects.toThrow(/deletes needs a root/);
+    const whole = s3({
+      dangerouslyEnableDeletes: true,
+      scope: () => ({ root: '' }),
+    });
+    await expect(whole.mount()).rejects.toThrow(
+      /dangerouslyEnableDeletes needs a root/,
+    );
     const undeclared = s3({ bucket: 'other' });
     await expect(undeclared.mount()).rejects.toThrow(
       /no bucket "other" is declared to this agent; declared: vault/,

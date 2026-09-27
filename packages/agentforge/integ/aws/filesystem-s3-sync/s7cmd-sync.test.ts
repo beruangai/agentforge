@@ -52,7 +52,7 @@ const OPTIONS: Omit<S3FilesystemOptions, 'path'> = {
   scope: () => ({ root: 'p' }),
   push: 'WHEN_COMPLETED',
   checkpoints: false,
-  deletes: true,
+  dangerouslyEnableDeletes: true,
   // Anchored at the start: it holds only if patterns see paths relative to the prefix.
   exclude: ['^cache/', '\\.tmp$'],
 };
@@ -183,7 +183,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
   it('pushes checkpoints, leaving a file that has not settled; a cancel pushes nothing more', async () => {
     const vault = await mount('checkpoints', {
       scope: () => ({ root: 'c' }),
-      deletes: false,
+      dangerouslyEnableDeletes: false,
       push: 'WHEN_ENDED',
       checkpoints: { intervalSeconds: 5, settleSeconds: 3_600 },
     });

@@ -58,5 +58,5 @@ Each filesystem kind SHALL either set a default path the consumer may override, 
 - **THEN** it mounts an empty directory of the task's own, removed when the task ends
 
 #### Scenario: An S3 filesystem refuses an unsafe delete
-- **WHEN** an S3 filesystem declares deletes on its whole bucket
+- **WHEN** an S3 filesystem enables deletes on its whole bucket
 - **THEN** the task fails `EXECUTION_ERROR` before anything is mounted

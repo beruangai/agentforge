@@ -17,8 +17,13 @@ export interface S3FilesystemOptions extends FilesystemOptions {
   readonly path: string;
   /** The bucket's name as the deployment declared it (`AgentRuntime.filesystems`). */
   readonly bucket: string;
-  /** Whether a push deletes the objects the task removed, within the write scope; only on a non-empty root. */
-  readonly deletes: boolean;
+  /**
+   * Off by default. When on, the push at the end deletes every object in the
+   * write scope that has no local file — not only what the task removed, but
+   * anything written to the prefix by someone else since the pull. Never on
+   * a checkpoint, and only on a non-empty root.
+   */
+  readonly dangerouslyEnableDeletes?: boolean;
   /** Regular expressions (`s7cmd`'s syntax) over paths relative to the root: never pulled, pushed or deleted. */
   readonly exclude: readonly string[];
 }
@@ -73,10 +78,11 @@ export const runS7cmd: S7cmdRunner = (args) =>
  * sent again, and never leaves the write scope.
  */
 export class S3Filesystem extends Filesystem {
-  readonly #s3Options: Pick<
-    S3FilesystemOptions,
-    'bucket' | 'deletes' | 'exclude'
-  >;
+  readonly #s3Options: {
+    readonly bucket: string;
+    readonly dangerouslyEnableDeletes: boolean;
+    readonly exclude: readonly string[];
+  };
   readonly #s7cmd: S7cmdRunner;
   readonly #environment: NodeJS.ProcessEnv;
 
@@ -88,23 +94,28 @@ export class S3Filesystem extends Filesystem {
       readonly environment?: NodeJS.ProcessEnv;
     } = {},
   ) {
-    const { bucket, deletes, exclude, ...filesystemOptions } = options;
+    const {
+      bucket,
+      dangerouslyEnableDeletes = false,
+      exclude,
+      ...filesystemOptions
+    } = options;
     super(filesystemOptions);
     if (!FILESYSTEM_NAME_PATTERN.test(bucket)) {
       throw new Error(
         `bucket "${bucket}" must match ${FILESYSTEM_NAME_PATTERN}`,
       );
     }
-    this.#s3Options = { bucket, deletes, exclude };
+    this.#s3Options = { bucket, dangerouslyEnableDeletes, exclude };
     this.#s7cmd = seams.s7cmd ?? runS7cmd;
     this.#environment = seams.environment ?? process.env;
   }
 
   protected override validate(mount: Mount): void {
     this.#remoteUrl(mount);
-    if (this.#s3Options.deletes && mount.root === '') {
+    if (this.#s3Options.dangerouslyEnableDeletes && mount.root === '') {
       throw new Error(
-        `filesystem "${mount.name}": deletes needs a root, since on the whole bucket it could empty it`,
+        `filesystem "${mount.name}": dangerouslyEnableDeletes needs a root, since on the whole bucket it could empty it`,
       );
     }
   }
@@ -120,9 +131,12 @@ export class S3Filesystem extends Filesystem {
     return this.#sync(
       [
         '--check-etag',
-        ...(this.#s3Options.deletes ? ['--delete'] : []),
+        // A checkpoint never deletes: whether s7cmd would delete the remote
+        // copy of a file its mtime filter skips is unverified.
         ...(options.modifiedBefore === undefined
-          ? []
+          ? this.#s3Options.dangerouslyEnableDeletes
+            ? ['--delete']
+            : []
           : ['--filter-mtime-before', options.modifiedBefore.toISOString()]),
         `${mount.path}/`,
         this.#remoteUrl(mount),

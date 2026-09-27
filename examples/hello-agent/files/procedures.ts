@@ -24,7 +24,6 @@ const NOTEBOOK: Omit<S3FilesystemOptions, 'access' | 'push'> = {
     root: `topics/${(input as { readonly topic: string }).topic}`,
   }),
   checkpoints: false,
-  deletes: false,
   exclude: [],
 };
 
