@@ -72,7 +72,7 @@
 
 **`cwd`** — The SDK's working directory, and the capability root: which `.claude/` layers apply.
 
-**Working directory** — An optional filesystem a consumer declares so its agents persist and share artifacts: a `WorkingDirectory` construct's bucket, given to agents by name. A procedure opens a prefix of it with `context.openWorkingDirectory`, under a **sync** it declares whole — `pull`, `push`, `continuous`, `deletes`, `exclude` — and the outcome waits for the push ([ADR 0015](../adr/0015-working-directories-sync-a-prefix-per-task.md)).
+**Working directory** — An optional filesystem a consumer declares so its agents persist and share artifacts: a `WorkingDirectory` construct's bucket, given to agents by name. A procedure opens a prefix of it with `context.openWorkingDirectory`, under a **sync** it declares whole — `pull`, `push`, `continuous`, `deletes`, `exclude` — run by `s7cmd`, and the outcome waits for the push ([ADR 0015](../adr/0015-working-directories-sync-a-prefix-per-task.md)).
 
 ## Delivery
 

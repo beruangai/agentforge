@@ -21,7 +21,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 ## A2 — The same agent on AgentCore
 
-**Delivered 2026-09-27**, on `hello-agent`, against a real model. Started 2026-09-25: AgentForge's server runs on a V2 runtime in `us-east-2`, reached through `agentCoreTransport`, with task state in DynamoDB — a typed output and an attach, a cancel, and a `StopRuntimeSession` ending the task `LOST` with the retry running as attempt 2 (`integ/aws/agentcore/agentforge-runtime.test.ts`, no model).
+**Built 2026-09-27**, on `hello-agent`, against a real model; open: retroactive OpenSpec specs (below). Started 2026-09-25: AgentForge's server runs on a V2 runtime in `us-east-2`, reached through `agentCoreTransport`, with task state in DynamoDB — a typed output and an attach, a cancel, and a `StopRuntimeSession` ending the task `LOST` with the retry running as attempt 2 (`integ/aws/agentcore/agentforge-runtime.test.ts`, no model).
 
 - The construct and deploy path: runtime on V2, its role, the task table, the leaf image in ECR, a deploy that waits until the runtime serves. **Built 2026-09-25** as `AgentRuntime`, verified by `agentforge-runtime.test.ts` deploying through it
 - Ids minted after a V2 restore are distinct. **Settled 2026-09-26**: Bun's generator replays across restores once drawn from before the snapshot, so the server draws nothing before it; the same test, deployed with a secret and telemetry, re-checks it
@@ -30,19 +30,21 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - Telemetry and per-agent metrics (§T). **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels), **its `gen_ai.*` mapping 2026-09-27**, and **the per-agent counts and dashboard 2026-09-27** (§REQ604); a transcript view waits on the CLI (§T)
 - Sessions persist beyond their container (§REQ402): every transcript in the agent's session bucket through the SDK's `SessionStore`, so a session outlives the container and a later task resumes it in another. **Built 2026-09-27**: `hello-agent`'s AgentCore e2e resumes a session in another container after its own is stopped
 
+- Retroactive OpenSpec specs for what A1 and A2 built — succinct, significant behaviour only — written with the operator once working directories land
+
 **Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop, and its session persists beyond the container and resumes in another.
 
 ## A3 — Built-in capabilities
 
 Each lands on an example agent first; what it needs enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator.
 
-- Working directories (§REQ401, [ADR 0015](../adr/0015-working-directories-sync-a-prefix-per-task.md)), the optional filesystem AgentForge manages for a consumer's artifacts: a `WorkingDirectory` construct several agents share, a prefix per task pulled and pushed under a strategy the consumer declares, the outcome waiting for a verified push. **Built 2026-09-27**: `hello-agent` keeps a note in one container and reads it back in another
+- Working directories (§REQ401, [ADR 0015](../adr/0015-working-directories-sync-a-prefix-per-task.md)), the optional filesystem AgentForge manages for a consumer's artifacts: a `WorkingDirectory` construct several agents share, a prefix per task pulled and pushed by `s7cmd` under a sync the consumer declares, the outcome waiting for a verified push. Specified by the OpenSpec change `filesystem-working-directories`; `hello-agent` keeps a note in one container and reads it back in another
 - Guardrails a procedure opts into rather than writes, each acting **within the agent's turn** so the agent can fix what it finds before it answers — never a check after the run that can only fail it. First, a stop guard for predefined cases: the files the procedure expects exist before the agent may stop. To be designed with the operator
 
 ## A4 — Consumers
 
-- StrategyFoundry adopts; TrendBot migrates off its predecessor harness
-- TrendBot's vault on working directories, which confirms or amends ADR 0015
+- StrategyFoundry adopts first: a fresh codebase whose working directory is S3, so it vets working directories and ADR 0015
+- TrendBot migrates off its predecessor harness only after StrategyFoundry has vetted AgentForge. Its vault is a git-backed filesystem: before it can adopt, either AgentForge adds a git-backed working directory or TrendBot owns that filesystem itself
 - What either lacks enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator, and lands on an example first
 - A second example in the plugin's shape — an agentic project with nested agents, each layer its own image — built by hand first; `hello-agent` stays flat, the minimal consumer. **Built 2026-09-25** as [`examples/agentic-project`](../examples/agentic-project): `reviewer` and `fixer` over a shared skill, `CLAUDE.md`, MCP server and house options, each layer a member of the container workspace, verified end to end
 - The plugin's generators and sync generator (§K), designed from that example, which the plugin then manages in this repository so its sync and updates are dogfooded here

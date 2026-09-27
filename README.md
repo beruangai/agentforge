@@ -74,8 +74,8 @@ Built to what the platforms document, with tests only where AgentForge relies on
 
 - **Resume uses the session's working directory.** A transcript is keyed by the directory its session began in — the agent's own unless a procedure sets `cwd` — and a resume must run from the same one.
 - **Files do not follow a session.** A resumed session remembers what earlier runs wrote, but a new container does not have those files — only what a working directory pushed.
-- **A working directory's prefix is last-writer-wins.** Two tasks pushing one prefix at once overwrite each other file by file; serialise them with a continuity key, or give each its own prefix. `deletes` without `pull` empties the prefix of what the task did not write.
-- **Working directories are verified by ETag**, so their buckets are S3-encrypted, and a file over 5 GB fails its push.
+- **A working directory's prefix is the consumer's to keep to one task at a time.** AgentForge syncs what a task declares; two tasks pushing one prefix at once overwrite each other file by file. A consumer's workflows prevent it — a continuity key, or a prefix per task.
+- **`deletes` removes what the task removed**, within its prefix, and needs `pull` and a non-empty prefix; what a delete should reach is the procedure's to scope.
 - **Transcripts are kept 30 days by default** (`sessionRetention`), and hold everything the agent was sent and read.
 - **Locally, sessions live in the container** and end with it; only a deployed agent persists them.
 

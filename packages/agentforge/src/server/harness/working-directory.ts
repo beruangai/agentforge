@@ -1,14 +1,7 @@
-import { createHash } from 'node:crypto';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, matchesGlob, relative, sep } from 'node:path';
-import {
-  DeleteObjectsCommand,
-  GetObjectCommand,
-  ListObjectsV2Command,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { cause } from '#core/contract/task.ts';
 import {
@@ -31,40 +24,63 @@ export const WorkingDirectorySyncSchema = z.strictObject({
    * failed. Never after a cancel.
    */
   push: z.enum(['NEVER', 'WHEN_COMPLETED', 'WHEN_ENDED']),
-  /** Also push while the task runs, so a lost container loses little; only with `WHEN_ENDED`. */
+  /**
+   * Also push while the task runs, so a lost container loses little, leaving
+   * any file changed in the last `quietSeconds` for the next pass; only with
+   * `WHEN_ENDED`.
+   */
   continuous: z.union([
     z.literal(false),
-    z.strictObject({ everySeconds: z.number().int().min(5) }),
+    z.strictObject({
+      everySeconds: z.number().int().min(5),
+      quietSeconds: z.number().int().min(0),
+    }),
   ]),
-  /** Whether a push deletes objects under the prefix that the task removed. */
+  /**
+   * Whether a push deletes the objects under the prefix that the task
+   * removed; only with `pull`, on a non-empty prefix.
+   */
   deletes: z.boolean(),
-  /** Globs, relative to the prefix, never pulled or pushed. */
+  /**
+   * Regular expressions (`s7cmd`'s syntax) over paths relative to the
+   * prefix: never pulled, pushed or deleted.
+   */
   exclude: z.array(z.string().min(1)),
 });
 export type WorkingDirectorySync = z.infer<typeof WorkingDirectorySyncSchema>;
 
-export const WorkingDirectorySpecSchema = z.strictObject({
-  /** The working directory the construct declared to this agent. */
-  name: z.string().regex(WORKING_DIRECTORY_NAME_PATTERN),
-  /**
-   * The part of it this task works in — `entities/acme`, or `''` for all of
-   * it. The procedure chooses it (§REQ401).
-   */
-  prefix: z
-    .string()
-    .refine(
-      (prefix) =>
-        !prefix.startsWith('/') &&
-        !prefix
-          .split('/')
-          .some((segment) => segment === '..' || segment === '.'),
-      'a prefix is relative, and never climbs',
-    ),
-  sync: WorkingDirectorySyncSchema.refine(
-    (sync) => sync.continuous === false || sync.push === 'WHEN_ENDED',
+export const WorkingDirectorySpecSchema = z
+  .strictObject({
+    /** The working directory the construct declared to this agent. */
+    name: z.string().regex(WORKING_DIRECTORY_NAME_PATTERN),
+    /**
+     * The part of it this task works in — `entities/acme`, or `''` for all of
+     * it. The procedure chooses it (§REQ401).
+     */
+    prefix: z
+      .string()
+      .refine(
+        (prefix) =>
+          !prefix.startsWith('/') &&
+          !prefix
+            .split('/')
+            .some((segment) => segment === '..' || segment === '.'),
+        'a prefix is relative, and never climbs',
+      ),
+    sync: WorkingDirectorySyncSchema,
+  })
+  .refine(
+    ({ sync }) => sync.continuous === false || sync.push === 'WHEN_ENDED',
     'a continuous push publishes files before the outcome is known: it needs `push: "WHEN_ENDED"`',
-  ),
-});
+  )
+  .refine(
+    ({ sync }) => !sync.deletes || sync.pull,
+    'deletes needs `pull`: without it, a push deletes every object the task did not write',
+  )
+  .refine(
+    ({ sync, prefix }) => !sync.deletes || normalizedPrefix(prefix) !== '',
+    'deletes needs a prefix: on the whole working directory it could empty it',
+  );
 export type WorkingDirectorySpec = z.infer<typeof WorkingDirectorySpecSchema>;
 
 export interface OpenWorkingDirectory {
@@ -74,14 +90,61 @@ export interface OpenWorkingDirectory {
 
 type Ending = 'COMPLETED' | 'FAILED' | 'CANCELED';
 
+/** How one `s7cmd` run ended. */
+export interface S7cmdResult {
+  readonly exitCode: number;
+  /** The end of what it wrote to stderr. */
+  readonly stderr: string;
+}
+
+export type S7cmdRunner = (args: readonly string[]) => Promise<S7cmdResult>;
+
 export interface WorkingDirectoriesOptions {
   /** The bucket behind each declared working directory, by name. */
   readonly buckets: Readonly<Record<string, string>>;
-  /** A test seam: the S3 client. */
-  readonly client?: () => S3Client;
+  /** A test seam: runs `s7cmd`. */
+  readonly s7cmd?: S7cmdRunner;
   /** Where tasks' local copies go, one directory per task; the system's temporary directory by default. */
   readonly root?: string;
 }
+
+/** The base image installs it on the `PATH` (packages/agentforge/Dockerfile). */
+const S7CMD = 's7cmd';
+/** How much of `s7cmd`'s stderr a failure carries. */
+const STDERR_TAIL_CHARACTERS = 2_000;
+/** `s7cmd` refused its arguments: a bad `exclude` pattern, or AgentForge's bug. */
+const S7CMD_INVALID_ARGUMENTS = 2;
+/**
+ * Excluded always, in both directions: a key with a `..` segment would write
+ * outside the directory on a pull.
+ */
+const CLIMBING_PATH = '(^|/)\\.\\.(/|$)';
+
+/** Runs `s7cmd` as a child of the task process, so a cancel or a lost container takes it. */
+export const runS7cmd: S7cmdRunner = (args) =>
+  new Promise((resolve, reject) => {
+    const child = spawn(S7CMD, args, { stdio: ['ignore', 'inherit', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', (chunk: Buffer) => {
+      process.stderr.write(chunk);
+      stderr = (stderr + chunk.toString()).slice(-STDERR_TAIL_CHARACTERS);
+    });
+    child.on('error', (error: NodeJS.ErrnoException) =>
+      reject(
+        error.code === 'ENOENT'
+          ? new Error(
+              `${S7CMD} is not on the PATH: working directories run in AgentForge's base image, which installs it`,
+            )
+          : error,
+      ),
+    );
+    child.on('close', (code, signal) =>
+      resolve({
+        exitCode: code ?? -1,
+        stderr: signal === null ? stderr : `${stderr}\nkilled by ${signal}`,
+      }),
+    );
+  });
 
 /** The buckets the construct declared, by name; none locally. */
 export function declaredWorkingDirectories(
@@ -96,13 +159,13 @@ export function declaredWorkingDirectories(
 
 /**
  * The working directories one task opened. Each is a prefix of a bucket,
- * pulled into a directory of the task's own and pushed back as its strategy
- * says; the sync runs in the task's process, so a cancel takes it (ADR 0011).
+ * pulled into a directory of the task's own and pushed back as its sync
+ * says, by `s7cmd`, which verifies each object it transfers (ADR 0015).
  */
 export class TaskWorkingDirectories {
   readonly #root: string;
   readonly #buckets: Readonly<Record<string, string>>;
-  readonly #client: () => S3Client;
+  readonly #s7cmd: S7cmdRunner;
   readonly #open = new Map<string, OpenDirectory>();
 
   constructor(
@@ -113,13 +176,7 @@ export class TaskWorkingDirectories {
       options.taskId,
     );
     this.#buckets = options.buckets;
-    let client: S3Client | undefined;
-    this.#client =
-      options.client ??
-      (() => {
-        client ??= new S3Client({});
-        return client;
-      });
+    this.#s7cmd = options.s7cmd ?? runS7cmd;
   }
 
   async open(declared: WorkingDirectorySpec): Promise<OpenWorkingDirectory> {
@@ -135,25 +192,21 @@ export class TaskWorkingDirectories {
         `working directory "${spec.name}" is already open in this task`,
       );
     }
-    const directory = new OpenDirectory(
-      new PrefixSync({
-        client: this.#client(),
-        bucket,
-        prefix: normalizedPrefix(spec.prefix),
-        path: join(this.#root, spec.name),
-        exclude: spec.sync.exclude,
-      }),
+    const directory = new OpenDirectory({
       spec,
-    );
+      path: join(this.#root, spec.name),
+      remote: `s3://${bucket}/${normalizedPrefix(spec.prefix)}`,
+      s7cmd: this.#s7cmd,
+    });
     this.#open.set(spec.name, directory);
     await directory.start();
     return { path: directory.path };
   }
 
   /**
-   * Stops continuous pushes, then pushes and verifies each directory whose
-   * strategy covers how the task ended. Throws a `WORKING_DIRECTORY_UNSYNCED`
-   * failure naming every directory that did not sync.
+   * Stops continuous pushes, then pushes each directory whose sync covers
+   * how the task ended. Throws a `WORKING_DIRECTORY_UNSYNCED` failure naming
+   * every directory that did not sync.
    */
   async close(ending: Ending): Promise<void> {
     const failures: string[] = [];
@@ -183,35 +236,45 @@ export class TaskWorkingDirectories {
 }
 
 class OpenDirectory {
-  readonly #sync: PrefixSync;
+  readonly path: string;
   readonly #spec: WorkingDirectorySpec;
+  readonly #remote: string;
+  readonly #s7cmd: S7cmdRunner;
+  readonly #exclude: string;
   #continuous: ReturnType<typeof setInterval> | undefined;
   /** Pushes run one at a time: a continuous push never overlaps the last. */
   #pushing: Promise<void> = Promise.resolve();
 
-  constructor(sync: PrefixSync, spec: WorkingDirectorySpec) {
-    this.#sync = sync;
-    this.#spec = spec;
+  constructor(options: {
+    readonly spec: WorkingDirectorySpec;
+    readonly path: string;
+    readonly remote: string;
+    readonly s7cmd: S7cmdRunner;
+  }) {
+    this.path = options.path;
+    this.#spec = options.spec;
+    this.#remote = options.remote;
+    this.#s7cmd = options.s7cmd;
+    this.#exclude = [CLIMBING_PATH, ...options.spec.sync.exclude]
+      .map((pattern) => `(?:${pattern})`)
+      .join('|');
   }
 
   get name(): string {
     return this.#spec.name;
   }
 
-  get path(): string {
-    return this.#sync.path;
-  }
-
   async start(): Promise<void> {
     await mkdir(this.path, { recursive: true });
     if (this.#spec.sync.pull) {
       try {
-        await this.#sync.pull();
+        await this.#sync([this.#remote, `${this.path}/`]);
       } catch (error) {
+        if (!(error instanceof Unsynced)) throw error;
         throw new TaskFailure(
           cause(
             'WORKING_DIRECTORY_UNSYNCED',
-            `working directory "${this.name}" could not be pulled: ${error instanceof Error ? error.message : String(error)}`,
+            `working directory "${this.name}" could not be pulled: ${error.message}`,
           ),
         );
       }
@@ -219,13 +282,16 @@ class OpenDirectory {
     const { continuous } = this.#spec.sync;
     if (continuous !== false) {
       this.#continuous = setInterval(() => {
-        this.#push().catch((error: unknown) => {
-          // The push at the end is the one the outcome waits on.
-          console.error(
-            `working directory "${this.name}": a continuous push failed`,
-            error,
-          );
-        });
+        const cutoff = new Date(Date.now() - continuous.quietSeconds * 1000);
+        this.#push(['--filter-mtime-before', cutoff.toISOString()]).catch(
+          (error: unknown) => {
+            // The push at the end is the one the outcome waits on.
+            console.error(
+              `working directory "${this.name}": a continuous push failed`,
+              error,
+            );
+          },
+        );
       }, continuous.everySeconds * 1000);
     }
   }
@@ -237,184 +303,44 @@ class OpenDirectory {
     const pushes =
       (push === 'WHEN_COMPLETED' && ending === 'COMPLETED') ||
       (push === 'WHEN_ENDED' && ending !== 'CANCELED');
-    if (pushes) await this.#push();
+    if (pushes) await this.#push([]);
   }
 
-  #push(): Promise<void> {
+  #push(extra: readonly string[]): Promise<void> {
     this.#pushing = this.#pushing
       .catch(() => undefined)
-      .then(() => this.#sync.push({ deletes: this.#spec.sync.deletes }));
+      .then(() =>
+        this.#sync([
+          '--check-etag',
+          ...(this.#spec.sync.deletes ? ['--delete'] : []),
+          ...extra,
+          `${this.path}/`,
+          this.#remote,
+        ]),
+      );
     return this.#pushing;
   }
-}
 
-/**
- * One bucket prefix against one local directory. An object's ETag is its
- * MD5 — true of every single-part upload to an S3-managed-encryption bucket,
- * which the `WorkingDirectory` construct makes — so a file whose MD5 matches
- * is already there, and a push is verified by listing again.
- */
-export class PrefixSync {
-  readonly path: string;
-  readonly #client: S3Client;
-  readonly #bucket: string;
-  readonly #prefix: string;
-  readonly #exclude: readonly string[];
-
-  constructor(options: {
-    readonly client: S3Client;
-    readonly bucket: string;
-    readonly prefix: string;
-    readonly path: string;
-    readonly exclude: readonly string[];
-  }) {
-    this.#client = options.client;
-    this.#bucket = options.bucket;
-    this.#prefix = options.prefix;
-    this.path = options.path;
-    this.#exclude = options.exclude;
-  }
-
-  async pull(): Promise<void> {
-    for (const name of (await this.#remote()).keys()) {
-      const object = await this.#client.send(
-        new GetObjectCommand({
-          Bucket: this.#bucket,
-          Key: this.#prefix + name,
-        }),
-      );
-      if (object.Body === undefined) {
-        throw new Error(
-          `s3://${this.#bucket}/${this.#prefix}${name} has no body`,
-        );
-      }
-      const file = join(this.path, ...name.split('/'));
-      if (relative(this.path, file).split(sep).includes('..')) {
-        throw new Error(
-          `s3://${this.#bucket}/${this.#prefix}${name} would be written outside the working directory`,
-        );
-      }
-      await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, await object.Body.transformToByteArray());
-    }
-  }
-
-  async push(options: { readonly deletes: boolean }): Promise<void> {
-    const local = await this.#local();
-    const remote = await this.#remote();
-    for (const [name, md5] of local) {
-      if (remote.get(name) === md5) continue;
-      await this.#client.send(
-        new PutObjectCommand({
-          Bucket: this.#bucket,
-          Key: this.#prefix + name,
-          Body: await readFile(join(this.path, ...name.split('/'))),
-          ContentMD5: Buffer.from(md5, 'hex').toString('base64'),
-        }),
-      );
-    }
-    if (options.deletes) {
-      const gone = [...remote.keys()].filter((name) => !local.has(name));
-      for (let index = 0; index < gone.length; index += 1000) {
-        const result = await this.#client.send(
-          new DeleteObjectsCommand({
-            Bucket: this.#bucket,
-            Delete: {
-              Objects: gone
-                .slice(index, index + 1000)
-                .map((name) => ({ Key: this.#prefix + name })),
-              Quiet: true,
-            },
-          }),
-        );
-        if (result.Errors?.length) {
-          throw new Error(
-            `${result.Errors.length} objects could not be deleted: ${result.Errors.map((error) => `${error.Key}: ${error.Code}`).join(', ')}`,
-          );
-        }
-      }
-    }
-    await this.#verify(local, options);
-  }
-
-  async #verify(
-    local: ReadonlyMap<string, string>,
-    options: { readonly deletes: boolean },
-  ): Promise<void> {
-    const remote = await this.#remote();
-    const differing = [...local]
-      .filter(([name, md5]) => remote.get(name) !== md5)
-      .map(([name]) => name);
-    const extra = options.deletes
-      ? [...remote.keys()].filter((name) => !local.has(name))
-      : [];
-    if (differing.length > 0 || extra.length > 0) {
+  /** One `s7cmd sync`; any exit but 0 — an error, or a warning such as an ETag mismatch — is unsynced. */
+  async #sync(args: readonly string[]): Promise<void> {
+    const { exitCode, stderr } = await this.#s7cmd([
+      'sync',
+      '--filter-exclude-regex',
+      this.#exclude,
+      ...args,
+    ]);
+    if (exitCode === 0) return;
+    if (exitCode === S7CMD_INVALID_ARGUMENTS) {
       throw new Error(
-        `after the push, s3://${this.#bucket}/${this.#prefix} ${[
-          differing.length > 0 ? `differs at ${differing.join(', ')}` : '',
-          extra.length > 0 ? `still holds ${extra.join(', ')}` : '',
-        ]
-          .filter(Boolean)
-          .join(' and ')}`,
+        `s7cmd refused the sync of working directory "${this.name}"; check its \`exclude\` patterns: ${stderr.trim()}`,
       );
     }
-  }
-
-  /** Every file under the directory, by its name relative to it, with its MD5. */
-  async #local(): Promise<Map<string, string>> {
-    const files = new Map<string, string>();
-    for (const entry of await readdir(this.path, {
-      recursive: true,
-      withFileTypes: true,
-    })) {
-      if (entry.isDirectory()) continue;
-      const file = join(entry.parentPath, entry.name);
-      const name = relative(this.path, file).split(sep).join('/');
-      if (this.#excluded(name)) continue;
-      if (!entry.isFile()) {
-        throw new Error(
-          `${name} is neither a file nor a directory, so it cannot be pushed; exclude it or remove it`,
-        );
-      }
-      files.set(
-        name,
-        createHash('md5')
-          .update(await readFile(file))
-          .digest('hex'),
-      );
-    }
-    return files;
-  }
-
-  /** Every object under the prefix, by its name relative to it, with its ETag. */
-  async #remote(): Promise<Map<string, string>> {
-    const objects = new Map<string, string>();
-    let continuationToken: string | undefined;
-    do {
-      const page = await this.#client.send(
-        new ListObjectsV2Command({
-          Bucket: this.#bucket,
-          Prefix: this.#prefix,
-          ...(continuationToken === undefined
-            ? {}
-            : { ContinuationToken: continuationToken }),
-        }),
-      );
-      for (const object of page.Contents ?? []) {
-        if (object.Key === undefined || object.Key.endsWith('/')) continue;
-        const name = object.Key.slice(this.#prefix.length);
-        if (this.#excluded(name)) continue;
-        objects.set(name, (object.ETag ?? '').replaceAll('"', ''));
-      }
-      continuationToken = page.NextContinuationToken;
-    } while (continuationToken !== undefined);
-    return objects;
-  }
-
-  #excluded(name: string): boolean {
-    return this.#exclude.some((pattern) => matchesGlob(name, pattern));
+    throw new Unsynced(`s7cmd exited ${exitCode}: ${stderr.trim()}`);
   }
 }
+
+/** The object store failed or disagreed; retrying may succeed. */
+class Unsynced extends Error {}
 
 function normalizedPrefix(prefix: string): string {
   const trimmed = prefix.replace(/\/+$/, '');

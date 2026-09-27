@@ -1,9 +1,7 @@
-import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { S3Client } from '@aws-sdk/client-s3';
 import { oc } from '@orpc/contract';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -11,57 +9,19 @@ import { contractHash } from '#core/contract/procedures.ts';
 import { executeProcedure, implementAgent } from './task-process.ts';
 import {
   declaredWorkingDirectories,
+  type S7cmdResult,
   TaskWorkingDirectories,
   type WorkingDirectorySync,
 } from './working-directory.ts';
 
-/** An in-memory bucket whose ETags are MD5s, as an S3-managed-encryption bucket's are. */
-function inMemoryS3(options: { dropPuts?: boolean } = {}) {
-  const objects = new Map<string, Buffer>();
-  const commands: string[] = [];
-  const client = {
-    async send(command: {
-      constructor: { name: string };
-      input: Record<string, unknown>;
-    }) {
-      const { input } = command;
-      commands.push(command.constructor.name);
-      switch (command.constructor.name) {
-        case 'ListObjectsV2Command':
-          return {
-            Contents: [...objects]
-              .filter(([key]) => key.startsWith(input.Prefix as string))
-              .map(([Key, body]) => ({
-                Key,
-                ETag: `"${createHash('md5').update(body).digest('hex')}"`,
-              })),
-          };
-        case 'GetObjectCommand': {
-          const body = objects.get(input.Key as string);
-          return {
-            Body: { transformToByteArray: async () => body },
-          };
-        }
-        case 'PutObjectCommand': {
-          const body = input.Body as Buffer;
-          expect(input.ContentMD5).toBe(
-            createHash('md5').update(body).digest('base64'),
-          );
-          if (!options.dropPuts) objects.set(input.Key as string, body);
-          return {};
-        }
-        case 'DeleteObjectsCommand':
-          for (const { Key } of (input.Delete as { Objects: { Key: string }[] })
-            .Objects) {
-            objects.delete(Key);
-          }
-          return {};
-        default:
-          throw new Error(`unexpected ${command.constructor.name}`);
-      }
-    },
-  } as unknown as S3Client;
-  return { client, objects, commands };
+/** A scripted `s7cmd`: records every call, and answers each with the next result, or success. */
+function scriptedS7cmd(...results: S7cmdResult[]) {
+  const calls: string[][] = [];
+  const run = async (args: readonly string[]): Promise<S7cmdResult> => {
+    calls.push([...args]);
+    return results.shift() ?? { exitCode: 0, stderr: '' };
+  };
+  return { run, calls };
 }
 
 const SYNC: WorkingDirectorySync = {
@@ -69,8 +29,9 @@ const SYNC: WorkingDirectorySync = {
   push: 'WHEN_COMPLETED',
   continuous: false,
   deletes: true,
-  exclude: ['**/*.tmp'],
+  exclude: ['\\.tmp$'],
 };
+const EXCLUDE = '(?:(^|/)\\.\\.(/|$))|(?:\\.tmp$)';
 
 let root: string;
 beforeEach(async () => {
@@ -81,144 +42,164 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-function directories(s3: ReturnType<typeof inMemoryS3>, taskId = 't-1') {
+function directories(s7cmd: ReturnType<typeof scriptedS7cmd>, taskId = 't-1') {
   return new TaskWorkingDirectories({
     taskId,
     buckets: { vault: 'vault-bucket' },
-    client: () => s3.client,
+    s7cmd: s7cmd.run,
     root,
   });
 }
 
 describe('TaskWorkingDirectories', () => {
-  it('pulls its prefix, and pushes back only what changed, deleting what the task removed', async () => {
-    const s3 = inMemoryS3();
-    s3.objects.set('entities/acme/notes.md', Buffer.from('old'));
-    s3.objects.set('entities/acme/deep/keep.md', Buffer.from('keep'));
-    s3.objects.set('entities/acme/gone.md', Buffer.from('gone'));
-    s3.objects.set('entities/other/untouched.md', Buffer.from('other'));
-    const task = directories(s3);
+  it('pulls its prefix, and pushes it back by ETag, deleting what the task removed, never what it excludes', async () => {
+    const s7cmd = scriptedS7cmd();
+    const task = directories(s7cmd);
     const { path } = await task.open({
       name: 'vault',
       prefix: 'entities/acme/',
       sync: SYNC,
     });
-    expect(await readFile(join(path, 'deep', 'keep.md'), 'utf8')).toBe('keep');
-    expect(existsSync(join(path, '..', 'other'))).toBe(false);
-
-    await writeFile(join(path, 'notes.md'), 'new');
-    await rm(join(path, 'gone.md'));
-    await writeFile(join(path, 'scratch.tmp'), 'excluded');
-    s3.commands.length = 0;
+    expect(path).toBe(join(root, 't-1', 'vault'));
     await task.close('COMPLETED');
-
-    expect(
-      Object.fromEntries([...s3.objects].map(([k, v]) => [k, `${v}`])),
-    ).toEqual({
-      'entities/acme/notes.md': 'new',
-      'entities/acme/deep/keep.md': 'keep',
-      'entities/other/untouched.md': 'other',
-    });
-    expect(
-      s3.commands.filter((name) => name === 'PutObjectCommand'),
-    ).toHaveLength(1);
+    expect(s7cmd.calls).toEqual([
+      [
+        'sync',
+        '--filter-exclude-regex',
+        EXCLUDE,
+        's3://vault-bucket/entities/acme/',
+        `${path}/`,
+      ],
+      [
+        'sync',
+        '--filter-exclude-regex',
+        EXCLUDE,
+        '--check-etag',
+        '--delete',
+        `${path}/`,
+        's3://vault-bucket/entities/acme/',
+      ],
+    ]);
   });
 
-  it('pushes as its strategy says, and never after a cancel', async () => {
+  it('pushes as its sync says, and never after a cancel', async () => {
     const cases = [
+      ['WHEN_COMPLETED', 'COMPLETED', true],
       ['WHEN_COMPLETED', 'FAILED', false],
       ['WHEN_ENDED', 'FAILED', true],
       ['WHEN_ENDED', 'CANCELED', false],
       ['NEVER', 'COMPLETED', false],
     ] as const;
     for (const [push, ending, pushed] of cases) {
-      const s3 = inMemoryS3();
-      const task = directories(s3, `${push}-${ending}`);
-      const { path } = await task.open({
+      const s7cmd = scriptedS7cmd();
+      const task = directories(s7cmd, `${push}-${ending}`);
+      await task.open({
         name: 'vault',
-        prefix: '',
-        sync: { ...SYNC, push },
+        prefix: 'p',
+        sync: { ...SYNC, pull: false, deletes: false, push },
       });
-      await writeFile(join(path, 'out.md'), 'x');
       await task.close(ending);
-      expect([push, ending, s3.objects.has('out.md')]).toEqual([
+      expect([push, ending, s7cmd.calls.length]).toEqual([
         push,
         ending,
-        pushed,
+        pushed ? 1 : 0,
       ]);
     }
   });
 
-  it('pushes continuously while the task runs', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    const s3 = inMemoryS3();
-    const task = directories(s3);
-    const { path } = await task.open({
+  it('pushes continuously, leaving what changed in the quiet period', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    vi.setSystemTime(new Date('2026-09-27T00:00:00Z'));
+    const s7cmd = scriptedS7cmd();
+    const task = directories(s7cmd);
+    await task.open({
       name: 'vault',
       prefix: 'p',
-      sync: { ...SYNC, push: 'WHEN_ENDED', continuous: { everySeconds: 5 } },
+      sync: {
+        ...SYNC,
+        pull: false,
+        deletes: false,
+        push: 'WHEN_ENDED',
+        continuous: { everySeconds: 5, quietSeconds: 30 },
+      },
     });
-    await writeFile(join(path, 'progress.md'), 'half');
     await vi.advanceTimersByTimeAsync(5_000);
-    // A cancel pushes nothing, but waits for the push under way.
+    // A cancel pushes nothing more, but waits for the push under way.
     await task.close('CANCELED');
-    expect(`${s3.objects.get('p/progress.md')}`).toBe('half');
+    expect(s7cmd.calls).toHaveLength(1);
+    expect(s7cmd.calls[0]).toEqual(
+      expect.arrayContaining([
+        '--filter-mtime-before',
+        '2026-09-26T23:59:35.000Z',
+      ]),
+    );
   });
 
-  it('fails unsynced when the bucket does not hold what was pushed', async () => {
-    const task = directories(inMemoryS3({ dropPuts: true }));
-    const { path } = await task.open({ name: 'vault', prefix: '', sync: SYNC });
-    await writeFile(join(path, 'out.md'), 'x');
+  it('fails unsynced on any exit but 0, carrying what s7cmd said', async () => {
+    const task = directories(
+      scriptedS7cmd(
+        { exitCode: 0, stderr: '' },
+        { exitCode: 3, stderr: 'ETag mismatch: out.md' },
+      ),
+    );
+    await task.open({ name: 'vault', prefix: 'p', sync: SYNC });
     await expect(task.close('COMPLETED')).rejects.toMatchObject({
       taskCause: {
         code: 'WORKING_DIRECTORY_UNSYNCED',
         retryable: true,
-        message: expect.stringContaining('differs at out.md'),
-      },
-    });
-  });
-
-  it('fails unsynced over what it cannot push, and over a key that would escape', async () => {
-    const s3 = inMemoryS3();
-    const task = directories(s3);
-    const { path } = await task.open({ name: 'vault', prefix: '', sync: SYNC });
-    await symlink('/etc/hosts', join(path, 'link'));
-    await expect(task.close('COMPLETED')).rejects.toMatchObject({
-      taskCause: {
-        code: 'WORKING_DIRECTORY_UNSYNCED',
-        message: expect.stringContaining('link is neither a file'),
+        message: expect.stringContaining('s7cmd exited 3: ETag mismatch'),
       },
     });
 
-    s3.objects.set('p/../../escape.md', Buffer.from('x'));
     await expect(
-      directories(s3, 't-2').open({ name: 'vault', prefix: 'p', sync: SYNC }),
+      directories(
+        scriptedS7cmd({ exitCode: 1, stderr: 'AccessDenied' }),
+        't-2',
+      ).open({ name: 'vault', prefix: 'p', sync: SYNC }),
     ).rejects.toMatchObject({
       taskCause: {
         code: 'WORKING_DIRECTORY_UNSYNCED',
-        message: expect.stringContaining('outside the working directory'),
+        message: expect.stringContaining('could not be pulled'),
       },
     });
   });
 
-  it('refuses what it cannot honour', async () => {
-    const task = directories(inMemoryS3());
+  it('fails a pattern s7cmd refuses as the procedure’s error, not the store’s', async () => {
+    const pulled = directories(
+      scriptedS7cmd({ exitCode: 2, stderr: 'invalid regex' }),
+    ).open({ name: 'vault', prefix: 'p', sync: { ...SYNC, exclude: ['('] } });
+    await expect(pulled).rejects.toThrow(/check its `exclude` patterns/);
+    await expect(pulled).rejects.not.toHaveProperty('taskCause');
+  });
+
+  it('refuses what it cannot honour, before anything is pulled', async () => {
+    const s7cmd = scriptedS7cmd();
+    const task = directories(s7cmd);
+    const refused = [
+      [{ name: 'nope', prefix: 'p', sync: SYNC }, /"nope".*declared: vault/],
+      [{ name: 'vault', prefix: 'a/../b', sync: SYNC }, /never climbs/],
+      [
+        {
+          name: 'vault',
+          prefix: 'p',
+          sync: { ...SYNC, continuous: { everySeconds: 30, quietSeconds: 5 } },
+        },
+        /WHEN_ENDED/,
+      ],
+      [
+        { name: 'vault', prefix: 'p', sync: { ...SYNC, pull: false } },
+        /deletes needs `pull`/,
+      ],
+      [{ name: 'vault', prefix: '/', sync: SYNC }, /never climbs/],
+      [{ name: 'vault', prefix: '', sync: SYNC }, /deletes needs a prefix/],
+    ] as const;
+    for (const [spec, message] of refused) {
+      await expect(task.open(spec)).rejects.toThrow(message);
+    }
+    expect(s7cmd.calls).toEqual([]);
+    await task.open({ name: 'vault', prefix: 'p', sync: SYNC });
     await expect(
-      task.open({ name: 'nope', prefix: '', sync: SYNC }),
-    ).rejects.toThrow(/no working directory "nope".*declared: vault/);
-    await expect(
-      task.open({ name: 'vault', prefix: 'a/../b', sync: SYNC }),
-    ).rejects.toThrow(/never climbs/);
-    await expect(
-      task.open({
-        name: 'vault',
-        prefix: '',
-        sync: { ...SYNC, continuous: { everySeconds: 30 } },
-      }),
-    ).rejects.toThrow(/WHEN_ENDED/);
-    await task.open({ name: 'vault', prefix: '', sync: SYNC });
-    await expect(
-      task.open({ name: 'vault', prefix: 'x', sync: SYNC }),
+      task.open({ name: 'vault', prefix: 'q', sync: SYNC }),
     ).rejects.toThrow(/already open/);
   });
 });
@@ -251,7 +232,7 @@ describe('executeProcedure, with a working directory', () => {
     }),
   });
 
-  function execute(s3: ReturnType<typeof inMemoryS3>) {
+  function execute(s7cmd: ReturnType<typeof scriptedS7cmd>) {
     return executeProcedure({
       contract,
       router,
@@ -272,25 +253,35 @@ describe('executeProcedure, with a working directory', () => {
       onRecord: () => undefined,
       workingDirectories: {
         buckets: { vault: 'vault-bucket' },
-        client: () => s3.client,
+        s7cmd: s7cmd.run,
         root,
       },
     });
   }
 
   it('publishes the outcome after the push, and removes its local copy', async () => {
-    const s3 = inMemoryS3();
-    expect(await execute(s3)).toEqual({
+    const s7cmd = scriptedS7cmd();
+    expect(await execute(s7cmd)).toEqual({
       state: 'TASK_STATE_COMPLETED',
       output: { ok: true },
     });
-    expect(`${s3.objects.get('out/result.md')}`).toBe('done');
+    expect(s7cmd.calls.map((call) => call.at(-1))).toEqual([
+      `${join(root, 't-1', 'vault')}/`,
+      's3://vault-bucket/out/',
+    ]);
     expect(existsSync(join(root, 't-1'))).toBe(false);
   });
 
-  it('fails a completed task whose files did not arrive', async () => {
+  it('fails a completed task whose push failed', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(await execute(inMemoryS3({ dropPuts: true }))).toMatchObject({
+    expect(
+      await execute(
+        scriptedS7cmd(
+          { exitCode: 0, stderr: '' },
+          { exitCode: 1, stderr: 'SlowDown' },
+        ),
+      ),
+    ).toMatchObject({
       state: 'TASK_STATE_FAILED',
       cause: { code: 'WORKING_DIRECTORY_UNSYNCED' },
     });

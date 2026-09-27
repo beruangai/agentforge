@@ -2,10 +2,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCommand } from '../../../__fixtures__/run-command.ts';
-import {
-  AGENTFORGE_BASE_IMAGE,
-  stageAgentForgeRuntimeImage,
-} from './agentforge-runtime-image.ts';
+import { AGENTFORGE_BASE_IMAGE } from '../../__fixtures__/agentforge-base-image.ts';
+import { stageAgentForgeRuntimeImage } from './agentforge-runtime-image.ts';
 import type { ResourceNames } from './aws-environment.ts';
 import {
   type AgentCoreClients,

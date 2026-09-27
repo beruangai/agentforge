@@ -1,0 +1,12 @@
+# Checks skipped for hello-agent's stack, run by the `checkov` target over
+# what `synth` produced. Remove one when the requirement it waives changes.
+skip-check:
+  # No KMS anywhere for now: AWS-managed encryption throughout (ADR 0015).
+  - CKV_AWS_119 # DynamoDB encrypted with a customer-managed KMS key
+  - CKV_AWS_158 # CloudWatch log group encrypted with KMS
+  # @aws/nx-plugin's defaults, for the readiness probe Lambda.
+  - CKV_AWS_115 # Concurrent execution limit
+  - CKV_AWS_116 # Dead Letter Queue
+  - CKV_AWS_117 # Lambda functions in VPC
+  - CKV_AWS_173 # Encrypt Lambda environment variables
+  - CKV_AWS_272 # Code signing

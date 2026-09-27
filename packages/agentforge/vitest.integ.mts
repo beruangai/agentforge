@@ -10,7 +10,8 @@ import unit from './vitest.config.mts';
  * folder under `integ/` each, selected by the `integ` target's configurations:
  *
  * - `local`: Docker and the local toolchain; no credentials, no spend
- * - `aws`: the test role in `us-east-2` (`.env.integ`); AgentCore
+ * - `aws`: the test role in `us-east-2` (`.env.integ`); AgentCore, and
+ *   working directories' `s7cmd` against a scratch bucket
  * - `model`: the subscription token (`.env.integ.local`); model inference
  *
  * AgentCore's files run in parallel: each provisions and deletes its own
@@ -56,6 +57,15 @@ export default defineConfig({
           name: '@beruangai/agentforge:integ:aws:agentcore',
           include: [`integ/aws/agentcore/${testFiles}`],
           fileParallelism: true,
+        },
+      },
+      {
+        root: import.meta.dirname,
+        test: {
+          ...integration,
+          name: '@beruangai/agentforge:integ:aws:filesystem-s3-sync',
+          include: [`integ/aws/filesystem-s3-sync/${testFiles}`],
+          fileParallelism: false,
         },
       },
       {
