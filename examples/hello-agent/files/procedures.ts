@@ -68,7 +68,7 @@ export const router = os.router({
       filesystems({
         notebook: new S3Filesystem({
           ...NOTEBOOK,
-          push: 'FULFILLED',
+          pushOn: ['TASK_STATE_COMPLETED'],
         }),
       }),
     )

@@ -10,6 +10,7 @@ import { type Envelope, EnvelopeSchema } from '#core/contract/envelope.ts';
 import {
   type Outcome,
   OutcomeSchema,
+  TaskStateEnum,
   type TaskState as TaskStateName,
 } from '#core/contract/task.ts';
 
@@ -19,7 +20,7 @@ export const OUTCOME_ARTIFACT_ID = 'outcome';
 export function stateOf(task: Task): TaskStateName {
   const state = task.status?.state;
   if (state === undefined) throw new Error(`task ${task.id} has no status`);
-  return taskStateToJSON(state) as TaskStateName;
+  return TaskStateEnum.parse(taskStateToJSON(state));
 }
 
 export function newTask(options: {

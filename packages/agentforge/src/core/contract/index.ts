@@ -19,9 +19,9 @@ export {
   timeBudgetOf,
 } from './procedures.ts';
 export {
-  CAUSE_CODES,
   type Cause,
   type CauseCode,
+  CauseCodeEnum,
   CauseSchema,
   cause,
   isTerminal,
@@ -31,7 +31,8 @@ export {
   PriorAttemptSchema,
   type RunRecord,
   RunRecordSchema,
-  TASK_STATES,
   type TaskState,
-  TERMINAL_TASK_STATES,
+  TaskStateEnum,
+  type TerminalTaskState,
+  TerminalTaskStateEnum,
 } from './task.ts';

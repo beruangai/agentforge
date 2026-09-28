@@ -17,8 +17,7 @@ import {
   type Cause,
   OutcomeSchema,
   type RunRecord,
-  TASK_STATES,
-  type TaskState,
+  TaskStateEnum,
 } from '#core/contract/task.ts';
 import type { Transport } from './transport.ts';
 
@@ -186,10 +185,13 @@ function taskView<Output>(
   parseOutput: ((value: unknown) => Output) | undefined,
 ): TaskView<Output> {
   const task = value as WireTask;
-  const state = task.status?.state as TaskState | undefined;
-  if (state === undefined || !TASK_STATES.includes(state)) {
-    throw new Error(`the agent answered a task in state ${String(state)}`);
+  const parsed = TaskStateEnum.safeParse(task.status?.state);
+  if (!parsed.success) {
+    throw new Error(
+      `the agent answered a task in state ${String(task.status?.state)}`,
+    );
   }
+  const state = parsed.data;
   const base: TaskViewBase = {
     taskId: task.id,
     contextId: task.contextId,

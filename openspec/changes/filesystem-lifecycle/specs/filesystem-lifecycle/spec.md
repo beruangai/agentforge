@@ -18,7 +18,7 @@ A procedure's filesystems SHALL be registered by middleware, by name. Registerin
 - **THEN** the procedure mounts only `notes`
 
 ### Requirement: Filesystems mount before the handler and unmount after the outcome
-Every registered filesystem SHALL be mounted, pulling its scope from its store, before the procedure's handler runs, and SHALL be unmounted once the task's outcome is known. Unmounting SHALL push as the filesystem declares — `FULFILLED` when the task succeeds, `SETTLED` when it succeeds or fails, never on cancellation, and never when it declares no push — and the outcome SHALL be published only after those pushes are verified. A task SHALL never report `TASK_STATE_COMPLETED` over a push that was not verified.
+Every registered filesystem SHALL be mounted, pulling its scope from its store, before the procedure's handler runs, and SHALL be unmounted once the task's outcome is known. Unmounting SHALL push only when the filesystem's `pushOn` lists the task's terminal state (`TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`), never on cancellation — and the outcome SHALL be published only after those pushes are verified. A task SHALL never report `TASK_STATE_COMPLETED` over a push that was not verified.
 
 #### Scenario: The handler reads a pulled filesystem before any agent runs
 - **WHEN** a procedure registers a filesystem
@@ -29,7 +29,7 @@ Every registered filesystem SHALL be mounted, pulling its scope from its store, 
 - **THEN** the task ends `TASK_STATE_FAILED` with cause `FILESYSTEM_UNSYNCED`, retryable
 
 #### Scenario: A push that fails keeps a failed task's cause
-- **WHEN** a failed task's `SETTLED` push fails
+- **WHEN** a failed task's push, on `TASK_STATE_FAILED`, fails
 - **THEN** the task keeps its own cause, and the push's failure is added to the cause's message
 
 #### Scenario: A mount that fails fails the task

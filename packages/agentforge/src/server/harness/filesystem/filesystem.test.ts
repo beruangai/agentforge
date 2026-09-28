@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskContext } from '../task-process.ts';
 import { ScriptedFilesystem } from './__fixtures__/scripted-filesystem.ts';
-import { FilesystemUnsynced, type TaskEnding } from './filesystem.ts';
+import { type FilesystemOptions, FilesystemUnsynced } from './filesystem.ts';
 
 let root: string;
 beforeEach(async () => {
@@ -28,7 +28,7 @@ describe('Filesystem', () => {
     const localPath = join(root, 'vault');
     const filesystem = new ScriptedFilesystem({
       localPath,
-      push: 'FULFILLED',
+      pushOn: ['TASK_STATE_COMPLETED'],
       scope: ({ input }) => ({
         remotePath: `topics/${(input as { topic: string }).topic}/`,
         write: ['notes/today.md'],
@@ -51,21 +51,38 @@ describe('Filesystem', () => {
     expect(vault.mounted.permissions.allow).toEqual([`Read(/${localPath}/**)`]);
   });
 
-  it.each<[string, 'FULFILLED' | 'SETTLED' | undefined, TaskEnding, boolean]>([
-    ['FULFILLED', 'FULFILLED', 'FULFILLED', true],
-    ['FULFILLED', 'FULFILLED', 'REJECTED', false],
-    ['SETTLED', 'SETTLED', 'REJECTED', true],
-    ['SETTLED', 'SETTLED', 'CANCELED', false],
-    ['absent', undefined, 'FULFILLED', false],
+  it.each<
+    [
+      string,
+      FilesystemOptions['pushOn'],
+      'TASK_STATE_COMPLETED' | 'TASK_STATE_FAILED' | 'TASK_STATE_CANCELED',
+      boolean,
+    ]
+  >([
+    ['COMPLETED', ['TASK_STATE_COMPLETED'], 'TASK_STATE_COMPLETED', true],
+    ['COMPLETED', ['TASK_STATE_COMPLETED'], 'TASK_STATE_FAILED', false],
+    [
+      'COMPLETED and FAILED',
+      ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
+      'TASK_STATE_FAILED',
+      true,
+    ],
+    [
+      'COMPLETED and FAILED',
+      ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
+      'TASK_STATE_CANCELED',
+      false,
+    ],
+    ['absent', undefined, 'TASK_STATE_COMPLETED', false],
   ])(
-    'push %s, the task %s: pushes %s; and removes the mount',
-    async (_label, push, ending, pushes) => {
+    'pushOn %s, the task ends %s: pushes %s; and removes the mount',
+    async (_label, pushOn, state, pushes) => {
       const localPath = join(root, 'vault');
       const filesystem = new ScriptedFilesystem({
         localPath,
-        ...(push === undefined ? {} : { push }),
+        ...(pushOn === undefined ? {} : { pushOn }),
       });
-      await (await mount(filesystem)).unmount(ending);
+      await (await mount(filesystem)).unmount(state);
       expect(filesystem.calls).toEqual(pushes ? ['pull ', 'push '] : ['pull ']);
       expect(existsSync(localPath)).toBe(false);
     },
@@ -85,11 +102,11 @@ describe('Filesystem', () => {
     expect(existsSync(localPath)).toBe(false);
     const vault = await mount(
       new ScriptedFilesystem(
-        { localPath, push: 'FULFILLED' },
+        { localPath, pushOn: ['TASK_STATE_COMPLETED'] },
         { push: unsynced },
       ),
     );
-    await expect(vault.unmount('FULFILLED')).rejects.toMatchObject({
+    await expect(vault.unmount('TASK_STATE_COMPLETED')).rejects.toMatchObject({
       taskCause: { code: 'FILESYSTEM_UNSYNCED' },
     });
     expect(existsSync(localPath)).toBe(false);
@@ -100,12 +117,12 @@ describe('Filesystem', () => {
     vi.setSystemTime(new Date('2026-09-27T00:00:00Z'));
     const filesystem = new ScriptedFilesystem({
       localPath: join(root, 'vault'),
-      push: 'SETTLED',
+      pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
       checkpoints: { intervalSeconds: 5, settleSeconds: 60 },
     });
     const vault = await mount(filesystem);
     await vi.advanceTimersByTimeAsync(5_000);
-    await vault.unmount('FULFILLED');
+    await vault.unmount('TASK_STATE_COMPLETED');
     await vi.advanceTimersByTimeAsync(5_000);
     expect(filesystem.calls).toEqual([
       'pull ',
@@ -119,10 +136,13 @@ describe('Filesystem', () => {
       () =>
         new ScriptedFilesystem({
           localPath: join(root, 'x'),
-          push: 'FULFILLED',
+          pushOn: ['TASK_STATE_COMPLETED'],
           checkpoints: { intervalSeconds: 5, settleSeconds: 0 },
         }),
-    ).toThrow(/need `push: "SETTLED"`/);
+    ).toThrow(/need `pushOn` to include "TASK_STATE_FAILED"/);
+    expect(
+      () => new ScriptedFilesystem({ localPath: join(root, 'x'), pushOn: [] }),
+    ).toThrow(/pushOn/);
     expect(() => new ScriptedFilesystem({ localPath: 'relative' })).toThrow(
       /absolute local path/,
     );
@@ -141,7 +161,7 @@ describe('Filesystem', () => {
       mount(
         new ScriptedFilesystem({
           localPath: join(root, 'x'),
-          push: 'FULFILLED',
+          pushOn: ['TASK_STATE_COMPLETED'],
           scope: () => ({ remotePath: '', write: [] }),
         }),
       ),

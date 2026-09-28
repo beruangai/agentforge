@@ -14,6 +14,7 @@ import {
 import {
   cause,
   isTerminal,
+  TaskStateEnum,
   type TaskState as TaskStateName,
   TERMINAL_TASK_STATES,
 } from '#core/contract/task.ts';
@@ -227,18 +228,20 @@ export class DynamoDBTaskStore implements TaskStore {
     }
     return {
       task: Task.fromJSON(JSON.parse(serialised)),
-      state: state as TaskStateName,
+      state: TaskStateEnum.parse(state),
       leaseExpiresAt: Number(item.leaseExpiresAt?.N ?? 0),
     };
   }
 }
 
-const TERMINAL_STATES = [...TERMINAL_TASK_STATES];
-const TERMINAL_PLACEHOLDERS = TERMINAL_STATES.map(
+const TERMINAL_PLACEHOLDERS = TERMINAL_TASK_STATES.map(
   (_, index) => `:terminal${index}`,
 ).join(', ');
 const TERMINAL_VALUES = Object.fromEntries(
-  TERMINAL_STATES.map((state, index) => [`:terminal${index}`, { S: state }]),
+  TERMINAL_TASK_STATES.map((state, index) => [
+    `:terminal${index}`,
+    { S: state },
+  ]),
 );
 
 function taskKey(taskId: string): string {

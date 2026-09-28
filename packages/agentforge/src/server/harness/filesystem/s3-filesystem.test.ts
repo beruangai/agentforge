@@ -30,7 +30,7 @@ function s3(
       localPath,
       bucket: 'vault',
       scope: () => ({ remotePath: 'topics/a' }),
-      push: 'FULFILLED',
+      pushOn: ['TASK_STATE_COMPLETED'],
       ...options,
     },
     {
@@ -60,7 +60,7 @@ describe('S3Filesystem', () => {
       dangerouslyEnableDeletes: true,
       exclude: ['cache/**'],
     });
-    await (await mount()).unmount('FULFILLED');
+    await (await mount()).unmount('TASK_STATE_COMPLETED');
     const exclude = expect.stringMatching(/^\(\?:\(\^\|\/\)/);
     expect(calls).toEqual([
       [
@@ -96,18 +96,18 @@ describe('S3Filesystem', () => {
 
   it('deletes only when dangerously enabled, and never on a checkpoint', async () => {
     const off = s3();
-    await (await off.mount()).unmount('FULFILLED');
+    await (await off.mount()).unmount('TASK_STATE_COMPLETED');
     expect(off.calls[1]).not.toContain('--delete');
 
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     const on = s3({
       dangerouslyEnableDeletes: true,
-      push: 'SETTLED',
+      pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
       checkpoints: { intervalSeconds: 5, settleSeconds: 60 },
     });
     const vault = await on.mount();
     await vi.advanceTimersByTimeAsync(5_000);
-    await vault.unmount('FULFILLED');
+    await vault.unmount('TASK_STATE_COMPLETED');
     const [, checkpoint, final] = on.calls;
     expect(checkpoint).toContain('--filter-mtime-before');
     expect(checkpoint).not.toContain('--delete');
@@ -121,7 +121,7 @@ describe('S3Filesystem', () => {
         write: ['notes/today.md', 'drafts/**'],
       }),
     });
-    await (await mount()).unmount('FULFILLED');
+    await (await mount()).unmount('TASK_STATE_COMPLETED');
     const exclude = new RegExp(calls[1]?.[2] ?? '');
     for (const inside of ['notes/today.md', 'drafts/a.md', 'drafts/x/.b.md']) {
       expect(exclude.test(inside), inside).toBe(false);
@@ -182,7 +182,7 @@ describe('ScratchFilesystem', () => {
       join(tmpdir(), 'agentforge-scratch', 't-1', 'scratch'),
     );
     expect(existsSync(scratch.mounted.localPath)).toBe(true);
-    await scratch.unmount('FULFILLED');
+    await scratch.unmount('TASK_STATE_COMPLETED');
     expect(existsSync(scratch.mounted.localPath)).toBe(false);
   });
 });

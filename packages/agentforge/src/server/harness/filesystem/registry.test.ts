@@ -84,7 +84,7 @@ function execute(procedure: keyof typeof contract, fail = false) {
 
 /** A filesystem that pushes on success, mounted at `name` under the test's root. */
 const at = (name: string) =>
-  ({ localPath: join(root, name), push: 'FULFILLED' }) as const;
+  ({ localPath: join(root, name), pushOn: ['TASK_STATE_COMPLETED'] }) as const;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'agentforge-registry-'));
@@ -144,7 +144,10 @@ describe('filesystems registered on a procedure', () => {
 
   it('keep a failed task’s cause, the push’s failure added to it', async () => {
     workspace = new ScriptedFilesystem(
-      { ...at('workspace'), push: 'SETTLED' },
+      {
+        ...at('workspace'),
+        pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
+      },
       { push: () => Promise.reject(new FilesystemUnsynced('refused')) },
     );
     expect(await execute('added', true)).toMatchObject({

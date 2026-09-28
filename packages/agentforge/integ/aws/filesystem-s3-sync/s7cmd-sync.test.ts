@@ -49,7 +49,7 @@ import {
 const OPTIONS: Omit<S3FilesystemOptions, 'localPath'> = {
   bucket: 'vault',
   scope: () => ({ remotePath: 'p' }),
-  push: 'FULFILLED',
+  pushOn: ['TASK_STATE_COMPLETED'],
   dangerouslyEnableDeletes: true,
   // `cache/**` holds only if s7cmd matches paths relative to the remote path.
   exclude: ['cache/**', '**/*.tmp'],
@@ -138,7 +138,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
     await writeFile(join(localPath, 'deep', 'added.md'), 'added');
     await writeFile(join(localPath, 'scratch.tmp'), 'excluded locally');
     await delay(1_100); // so a re-upload would move LastModified
-    await vault.unmount('FULFILLED');
+    await vault.unmount('TASK_STATE_COMPLETED');
 
     expect(await listRelativeKeys(s3, bucket, 'p/')).toEqual([
       '../escape.md',
@@ -171,7 +171,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
     await writeFile(join(localPath, 'notes', 'today.md'), 'today');
     await writeFile(join(localPath, 'notes', 'tomorrow.md'), 'kept local');
     await rm(join(localPath, 'outside.md'));
-    await vault.unmount('FULFILLED');
+    await vault.unmount('TASK_STATE_COMPLETED');
     expect(await listRelativeKeys(s3, bucket, 'w/')).toEqual([
       'notes/today.md',
       'outside.md',
@@ -182,7 +182,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
     const vault = await mount('checkpoints', {
       scope: () => ({ remotePath: 'c' }),
       dangerouslyEnableDeletes: false,
-      push: 'SETTLED',
+      pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
       checkpoints: { intervalSeconds: 5, settleSeconds: 3_600 },
     });
     const { localPath } = vault.mounted;
@@ -191,7 +191,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
     await utimes(join(localPath, 'settled.md'), longAgo, longAgo);
     await writeFile(join(localPath, 'fresh.md'), 'fresh');
     await delay(12_000);
-    await vault.unmount('CANCELED');
+    await vault.unmount('TASK_STATE_CANCELED');
     expect(await listRelativeKeys(s3, bucket, 'c/')).toEqual(['settled.md']);
   });
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   TELEMETRY_VARIABLE,
   type TelemetryLevel,
-  TelemetryLevelSchema,
+  TelemetryLevelEnum,
 } from '#core/telemetry.ts';
 
 /** Where the base image installs the ADOT collector. */
@@ -26,8 +26,8 @@ export function cliTelemetryEnvironment(
   level: TelemetryLevel,
 ): Record<string, string> {
   const atLeast = (floor: TelemetryLevel): boolean =>
-    TelemetryLevelSchema.options.indexOf(level) >=
-    TelemetryLevelSchema.options.indexOf(floor);
+    TelemetryLevelEnum.options.indexOf(level) >=
+    TelemetryLevelEnum.options.indexOf(floor);
   return {
     CLAUDE_CODE_ENABLE_TELEMETRY: '1',
     OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
@@ -95,7 +95,7 @@ export async function startTelemetry(
 ): Promise<Telemetry | undefined> {
   const declared = environment[TELEMETRY_VARIABLE];
   if (declared === undefined || declared === '') return undefined;
-  const level = TelemetryLevelSchema.parse(declared);
+  const level = TelemetryLevelEnum.parse(declared);
   const region = environment.AWS_REGION;
   if (!region) throw new Error('AWS_REGION must be set for telemetry');
   if (!runtimeSessionId) {

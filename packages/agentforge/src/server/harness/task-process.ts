@@ -27,7 +27,6 @@ import type {
 import type {
   MountedFilesystem,
   MountLifecycle,
-  TaskEnding,
 } from './filesystem/filesystem.ts';
 import { mountRegisteredFilesystems } from './filesystem/registry.ts';
 import {
@@ -97,7 +96,7 @@ export async function executeProcedure(
 }
 
 /**
- * Unmounts every filesystem, each pushing as its ending requires. A task
+ * Unmounts every filesystem, each pushing if its `pushOn` has the task's state. A task
  * that did not fail, whose filesystems did not all unmount, fails; a failed
  * one keeps its own cause, the unmount's failure added to its message.
  */
@@ -106,15 +105,9 @@ async function unmountAll(
   lifecycles: readonly MountLifecycle[],
 ): Promise<Outcome> {
   if (outcome.state === 'TASK_STATE_REJECTED') return outcome;
-  const ending: TaskEnding =
-    outcome.state === 'TASK_STATE_COMPLETED'
-      ? 'FULFILLED'
-      : outcome.state === 'TASK_STATE_FAILED'
-        ? 'REJECTED'
-        : 'CANCELED';
   const failures = (
     await Promise.allSettled(
-      lifecycles.map((lifecycle) => lifecycle.unmount(ending)),
+      lifecycles.map((lifecycle) => lifecycle.unmount(outcome.state)),
     )
   ).flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
   if (failures.length === 0) return outcome;

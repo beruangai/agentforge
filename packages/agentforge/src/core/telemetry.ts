@@ -9,5 +9,6 @@ import { z } from 'zod';
  */
 export const TELEMETRY_VARIABLE = 'AGENTFORGE_TELEMETRY';
 
-export const TelemetryLevelSchema = z.enum(['WARN', 'INFO', 'DEBUG', 'ALL']);
-export type TelemetryLevel = z.infer<typeof TelemetryLevelSchema>;
+export const TELEMETRY_LEVELS = ['WARN', 'INFO', 'DEBUG', 'ALL'] as const;
+export const TelemetryLevelEnum = z.enum(TELEMETRY_LEVELS);
+export type TelemetryLevel = z.infer<typeof TelemetryLevelEnum>;

@@ -12,17 +12,20 @@ export const TASK_STATES = [
   'TASK_STATE_CANCELED',
   'TASK_STATE_REJECTED',
 ] as const;
-export type TaskState = (typeof TASK_STATES)[number];
+export const TaskStateEnum = z.enum(TASK_STATES);
+export type TaskState = z.infer<typeof TaskStateEnum>;
 
-export const TERMINAL_TASK_STATES: ReadonlySet<TaskState> = new Set([
+export const TERMINAL_TASK_STATES = [
   'TASK_STATE_COMPLETED',
   'TASK_STATE_FAILED',
   'TASK_STATE_CANCELED',
   'TASK_STATE_REJECTED',
-]);
+] as const satisfies ReadonlyArray<TaskState>;
+export const TerminalTaskStateEnum = z.enum(TERMINAL_TASK_STATES);
+export type TerminalTaskState = z.infer<typeof TerminalTaskStateEnum>;
 
-export function isTerminal(state: TaskState): boolean {
-  return TERMINAL_TASK_STATES.has(state);
+export function isTerminal(state: TaskState): state is TerminalTaskState {
+  return TerminalTaskStateEnum.safeParse(state).success;
 }
 
 /** Why a task failed. The code is what a caller branches on. */
@@ -48,10 +51,11 @@ export const CAUSE_CODES = [
   /** Anything else: the procedure, the harness or the SDK threw. */
   'EXECUTION_ERROR',
 ] as const;
-export type CauseCode = (typeof CAUSE_CODES)[number];
+export const CauseCodeEnum = z.enum(CAUSE_CODES);
+export type CauseCode = z.infer<typeof CauseCodeEnum>;
 
 export const CauseSchema = z.object({
-  code: z.enum(CAUSE_CODES),
+  code: CauseCodeEnum,
   message: z.string(),
   /** What would resolve it: the first thing to try. */
   suggestedAction: z.string(),
@@ -139,10 +143,19 @@ function truncate(text: string, capBytes: number): string {
 
 /** How a task ended, as the task process reports it and the artifact carries it. */
 export const OutcomeSchema = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('TASK_STATE_COMPLETED'), output: z.unknown() }),
-  z.object({ state: z.literal('TASK_STATE_FAILED'), cause: CauseSchema }),
-  z.object({ state: z.literal('TASK_STATE_CANCELED') }),
-  z.object({ state: z.literal('TASK_STATE_REJECTED'), reason: z.string() }),
+  z.object({
+    state: z.literal(TaskStateEnum.enum.TASK_STATE_COMPLETED),
+    output: z.unknown(),
+  }),
+  z.object({
+    state: z.literal(TaskStateEnum.enum.TASK_STATE_FAILED),
+    cause: CauseSchema,
+  }),
+  z.object({ state: z.literal(TaskStateEnum.enum.TASK_STATE_CANCELED) }),
+  z.object({
+    state: z.literal(TaskStateEnum.enum.TASK_STATE_REJECTED),
+    reason: z.string(),
+  }),
 ]);
 export type Outcome = z.infer<typeof OutcomeSchema>;
 
@@ -164,7 +177,7 @@ export type RunRecord = z.infer<typeof RunRecordSchema>;
 /** The attempt before this one under the same idempotency key, if any. */
 export const PriorAttemptSchema = z.object({
   taskId: z.string(),
-  state: z.enum(TASK_STATES),
+  state: TaskStateEnum,
   cause: CauseSchema.optional(),
 });
 export type PriorAttempt = z.infer<typeof PriorAttemptSchema>;

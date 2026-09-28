@@ -1,16 +1,20 @@
 import { mkdir, rm } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { z } from 'zod';
-import { cause } from '#core/contract/task.ts';
+import {
+  cause,
+  type TerminalTaskState,
+  TerminalTaskStateEnum,
+} from '#core/contract/task.ts';
 import { TaskFailure } from '../kernel.ts';
 import type { TaskContext } from '../task-process.ts';
 
-/**
- * How a task ended, in Promise terms: `FULFILLED` when the handler returned
- * an output the contract accepts, `REJECTED` when it failed, `CANCELED` when
- * the caller withdrew it.
- */
-export type TaskEnding = 'FULFILLED' | 'REJECTED' | 'CANCELED';
+/** The task states a filesystem may push on: a cancel never pushes, and a rejected task never mounts. */
+export const PushOnStateEnum = TerminalTaskStateEnum.extract([
+  'TASK_STATE_COMPLETED',
+  'TASK_STATE_FAILED',
+]);
+export type PushOnState = z.infer<typeof PushOnStateEnum>;
 
 /** What a filesystem's scope is resolved from: the request the procedure serves. */
 export interface FilesystemRequest {
@@ -35,12 +39,12 @@ export interface FilesystemOptions {
   readonly localPath?: string;
   readonly scope: (request: FilesystemRequest) => FilesystemScope;
   /**
-   * When unmount pushes the write scope back, verified before the outcome is
-   * published: `FULFILLED`, only when the task succeeds; `SETTLED`, when it
-   * succeeds or fails. Never after a cancel. Absent, it never pushes.
+   * The task states unmount pushes the write scope back on, verified before
+   * the outcome is published: `['TASK_STATE_COMPLETED']`, or with
+   * `'TASK_STATE_FAILED'` too. Absent, it never pushes.
    */
-  readonly push?: 'FULFILLED' | 'SETTLED';
-  /** Also push every `intervalSeconds` while the task runs, only files unchanged for `settleSeconds` so writes in progress settle first; only with `push: 'SETTLED'`. */
+  readonly pushOn?: readonly PushOnState[];
+  /** Also push every `intervalSeconds` while the task runs, only files unchanged for `settleSeconds` so writes in progress settle first; only when `pushOn` has `TASK_STATE_FAILED`, since they publish before the outcome is known. */
   readonly checkpoints?: {
     readonly intervalSeconds: number;
     readonly settleSeconds: number;
@@ -57,7 +61,7 @@ const FilesystemOptionsSchema = z
       (value) => typeof value === 'function',
       'scope is a function of the request',
     ),
-    push: z.enum(['FULFILLED', 'SETTLED']).optional(),
+    pushOn: z.array(PushOnStateEnum).min(1).optional(),
     checkpoints: z
       .strictObject({
         intervalSeconds: z.number().int().min(5),
@@ -67,8 +71,9 @@ const FilesystemOptionsSchema = z
   })
   .refine(
     (options) =>
-      options.checkpoints === undefined || options.push === 'SETTLED',
-    'checkpoints publish files before the outcome is known: they need `push: "SETTLED"`',
+      options.checkpoints === undefined ||
+      options.pushOn?.includes('TASK_STATE_FAILED') === true,
+    'checkpoints publish files before the outcome is known: they need `pushOn` to include "TASK_STATE_FAILED"',
   );
 
 /** One mounted filesystem, as the scope resolved it for this task. */
@@ -185,7 +190,7 @@ export abstract class Filesystem {
         `filesystem "${task.name}": a scope's remotePath is relative, and never climbs: "${scope.remotePath}"`,
       );
     }
-    const pushes = this.options.push !== undefined;
+    const pushes = this.options.pushOn !== undefined;
     const write = scope.write ?? (pushes ? ['**'] : []);
     if (pushes && write.length === 0) {
       throw new Error(
@@ -251,14 +256,16 @@ export class MountLifecycle {
     }
   }
 
-  async unmount(ending: TaskEnding): Promise<void> {
+  /** Pushes if `pushOn` has the state the task ended in, then removes the local copy. */
+  async unmount(
+    state: Exclude<TerminalTaskState, 'TASK_STATE_REJECTED'>,
+  ): Promise<void> {
     clearInterval(this.#checkpointTimer);
     try {
       await this.#latestPush.catch(() => undefined);
-      const { push } = this.#filesystem.options;
       const shouldPush =
-        (push === 'FULFILLED' && ending === 'FULFILLED') ||
-        (push === 'SETTLED' && ending !== 'CANCELED');
+        state !== 'TASK_STATE_CANCELED' &&
+        this.#filesystem.options.pushOn?.includes(state) === true;
       if (shouldPush) {
         try {
           await this.#queuePush({});

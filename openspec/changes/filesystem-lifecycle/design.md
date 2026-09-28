@@ -19,15 +19,15 @@ interface FilesystemScope {
 interface FilesystemOptions {
   localPath?: string;        // the local directory it mounts at; each kind sets a default or requires it
   scope: (request: FilesystemRequest) => FilesystemScope;
-  push?: 'FULFILLED' | 'SETTLED'; // Promise terms: success only, or success or failure; never a cancel; absent, never
-  checkpoints?: { intervalSeconds: number; settleSeconds: number }; // only with SETTLED; pushes only files unchanged for settleSeconds
+  pushOn?: ('TASK_STATE_COMPLETED' | 'TASK_STATE_FAILED')[]; // the task states it pushes on; never a cancel; absent, never
+  checkpoints?: { intervalSeconds: number; settleSeconds: number }; // only when pushOn includes TASK_STATE_FAILED; pushes only files unchanged for settleSeconds
 }
 abstract class Filesystem {
   protected abstract pull(mount: Mount): Promise<void>;
   protected abstract push(mount: Mount, options: { modifiedBefore?: Date }): Promise<void>;
   // run by the base class from its options:
   //   mount:   resolve scope and localPath → create → pull (always) → start checkpoints
-  //   unmount: stop checkpoints → push (per `push` and the ending) → remove the local copy
+  //   unmount: stop checkpoints → push (if `pushOn` lists the task's state) → remove the local copy
 }
 class S3Filesystem extends Filesystem {}      // + bucket (a name the construct declared), exclude (globs), dangerouslyEnableDeletes (default false); localPath required
 class ScratchFilesystem extends Filesystem {} // pulls nothing, never pushes, writes anywhere; localPath defaults to a directory of the task's own
@@ -55,7 +55,8 @@ AgentRuntimeProps.filesystems?: Record<string, S3FilesystemBucket>
   - Alternative rejected: mounting inside each registration middleware. A procedure's override would come after the house default had already been pulled.
 - **Every mount pulls.** A task works from what is in the store, never blind, and a delete is always relative to what was pulled. A procedure that only adds a file scopes its `remotePath` to it, where a pull costs one listing. Pulling again mid-task is an operation for later, not an option.
 - **Operations, not options, are the abstraction.** A kind implements `pull` and `push`; checkpoints are `push({ modifiedBefore })` on a timer run by the base class. Kind-specific config such as `dangerouslyEnableDeletes` and `exclude` stays on the subclass.
-- **Scope.** `remotePath` bounds what is mounted. `read` and `write` bound the baseline permissions. A push uploads and deletes only within `write`, so a file written elsewhere in the mount never leaves the container. Read-only needs no declaration: without `push`, `write` defaults to nothing.
+- **Scope.** `remotePath` bounds what is mounted. `read` and `write` bound the baseline permissions. A push uploads and deletes only within `write`, so a file written elsewhere in the mount never leaves the container. Read-only needs no declaration: without `pushOn`, `write` defaults to nothing.
+- **Task states, not terms of its own.** A procedure's invocation is its task, so `pushOn` uses A2A's terminal task states directly.
 - **Permissions are a baseline the handler owns.** The rules follow Claude Code's absolute-path syntax, `Read(//abs/glob)` and `Edit(//abs/glob)`. The context carries them per filesystem and merged. The handler passes them to `runAgent` or not, extending them through `composeOptions`. Procedures run in `dontAsk` mode, so a path with no allow rule is denied.
 - **Local path.** `S3Filesystem` requires one, so prompts can reference it statically. `ScratchFilesystem` defaults to a directory of the task's own. Two tasks in one container on a static path are the consumer's to prevent, through `runtimeSessionId`.
 - **S3 engine unchanged.**
