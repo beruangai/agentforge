@@ -40,7 +40,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 ## A4 — Specs and audit
 
-- Retroactive OpenSpec specs for what A1 and A2 built, beside `filesystem-lifecycle` in `openspec/specs/` — succinct, significant behaviour only — written with the operator
+- Retroactive OpenSpec specs for what A1 and A2 built, beside `filesystem-lifecycle` in `openspec/specs/` — succinct, significant behaviour only — written with the operator. **Landed 2026-09-28**: eight specs, each at its highest seam, their scenarios mapped to tests and the untested ones flagged in the [archived change](../openspec/changes/archive/2026-09-28-retroactive-specs/design.md)
 - A full audit of the package, the examples and the docs for cohesion, correctness, simplicity and maintainability: layer contracts and ownership, naming and terms, dead or duplicated code, docs that no longer match the code (among them the project-key pinning `docs/research/claude-agent-sdk.md` describes and ADR 0011 does not). What it finds is fixed, or raised with the operator where it is a decision
 
 **Exit:** every built capability has a spec, and the audit's findings are closed or decided.
