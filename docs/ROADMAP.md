@@ -38,7 +38,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 Each lands on an example agent first; what it needs enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator.
 
-- Filesystems (§REQ401, [ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)): an abstract kind AgentForge mounts around a procedure, registered by middleware, scoped per request, the outcome waiting for a verified push. `S3Filesystem` on `s7cmd` over an `S3FilesystemBucket` several agents share, and `ScratchFilesystem`; git later. Specified by the OpenSpec change `filesystem-lifecycle`; `hello-agent` keeps a note in one container and reads it back in another
+- Filesystems (§REQ401, [ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)): an abstract kind AgentForge mounts around a procedure, registered by middleware, scoped per request, the outcome waiting for a verified push. `S3Filesystem` on `s7cmd` over an `S3FilesystemBucket` several agents share, and `ScratchFilesystem`; git later. Specified by [`openspec/specs/filesystem-lifecycle`](../openspec/specs/filesystem-lifecycle/spec.md). **Built 2026-09-28**: `integ/aws/filesystem-s3-sync` against `s7cmd` in the base image, and `hello-agent`'s AgentCore e2e keeps a note in one container and reads it back in another on the baseline permissions alone
 - Guardrails a procedure opts into rather than writes, each acting **within the agent's turn** so the agent can fix what it finds before it answers — never a check after the run that can only fail it. First, a stop guard for predefined cases: the files the procedure expects exist before the agent may stop. To be designed with the operator
 
 ## A4 — Consumers
