@@ -24,5 +24,5 @@
 
 ## 5. Verify
 - [x] 5.1 `nx run-many -t typecheck lint test` for the package and both examples
-- [ ] 5.2 With the operator: `integ --configuration=local`, and `integ/aws/agentcore/agentforge-runtime.test.ts`
+- [x] 5.2 With the operator: `integ --configuration=local`, and `integ/aws/agentcore/agentforge-runtime.test.ts`
 - [ ] 5.3 After the operator confirms: sync to `openspec/specs/` and archive
