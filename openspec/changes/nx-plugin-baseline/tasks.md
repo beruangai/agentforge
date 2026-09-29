@@ -22,7 +22,7 @@ Lands after `move-package-to-libs`. Groups 1–6 build the plugin and its client
 - [x] 3.1 The project record as a Zod schema (`metadata.generator`, `components[]` in `@aws/nx-plugin`'s form with `runtimeConfigKey` and `containerName`, `agentforge.detached`), read and written through one module — verified by unit tests of a valid record, an invalid one refused, and appending a component deduped by name
 - [x] 3.2 One render function per maintained artifact and per maintained key set, with the merge that keeps a consumer's other keys; scaffolded artifacts written only when absent — verified by unit tests of a manifest keeping the consumer's keys and a scaffolded file keeping an edit
 - [x] 3.3 The sync generator: renders every agentic project's maintained artifacts, skips detached ones, reports each difference in `outOfSyncMessage` (naming detaching) and writes it; a removed component drops from every spanning artifact; a detachment naming nothing maintained fails — verified by unit tests of each, and of a generator and sync producing the same tree
-- [ ] 3.4 The package README lists what is maintained, the maintained keys, what is scaffolded, and how to detach — verified by reading it against the render functions
+- [x] 3.4 The package README lists what is maintained, the maintained keys, what is scaffolded, and how to detach — verified by reading it against the render functions
 
 ## 4. `init` and `agentic-project`
 
