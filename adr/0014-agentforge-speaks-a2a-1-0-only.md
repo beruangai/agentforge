@@ -21,7 +21,7 @@ Chosen option: **1.0 only**. There is no caller to stay compatible with, so 0.3 
 
 * The card declares **one** interface, `protocolVersion: '1.0'`; `legacyCompat` is disabled on both handlers
 * The runtime allowlists **`A2A-Version`**; the client sends `1.0`
-* **The client asserts the negotiated version it receives**, because AgentCore reports a refused request as an opaque 424 that is indistinguishable from a crash
+* **The client sends `A2A-Version: 1.0` and asserts no version back**: nothing on the wire states the negotiated version — the A2A SDK's server answers with no version header or field, and `InvokeAgentRuntime` passes no container header back — and AgentForge's own client is the only caller, so a mismatch is a bug found in its tests, not in production
 * 1.0 method names are the protobuf ones — `SendMessage`, `GetTask`, `CancelTask`
 * **A part reader throws on a part it cannot decode.** Under `SendMessage` the SDK will accept a malformed part and drop its content without error, so an empty envelope must never read as an empty request
 
@@ -30,4 +30,4 @@ Chosen option: **1.0 only**. There is no caller to stay compatible with, so 0.3 
 * Good, because a version mistake fails on the first call instead of running silently on the wrong protocol
 * Good, because there is one wire format to implement, test and reason about
 * Bad, because the protocol version now depends on runtime configuration — the header allowlist — and not on the image alone
-* Bad, because the refusal a misconfigured caller sees is opaque, which is why asserting the negotiated version is a requirement rather than a nicety
+* Bad, because the refusal a misconfigured caller sees is opaque — AgentCore reports it as a 424 indistinguishable from a crash — and the client does not check the version it got

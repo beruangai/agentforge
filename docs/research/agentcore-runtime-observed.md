@@ -104,7 +104,7 @@ Under a 1.0 negotiation the server accepted a 0.3-shaped part too, so **the vers
 
 A 0.3 caller against a strict runtime does *not* receive the useful `-32009`. AgentCore wraps any non-2xx container response, so the caller sees **HTTP 424 `-32055 "Runtime client error - Please check your CloudWatch logs"`** — the same opaque error as a crash or a bad content type.
 
-The failure is loud but **undiagnosable from the outside**. That is not a reason to keep 0.3; it is a reason for the client to **assert the negotiated version it got back** rather than infer success from a 200, and for the gateway to surface the request id.
+The failure is loud but **undiagnosable from the outside**. That is not a reason to keep 0.3; it is a reason for the client to **assert the negotiated version it got back** rather than infer success from a 200, and for the gateway to surface the request id. *(2026-09-29: not built — nothing on the wire states the negotiated version, so ADR 0014 dropped the assertion.)*
 
 Two things that change with it, and both matter:
 
