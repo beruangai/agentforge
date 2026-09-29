@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process';
 import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { publishedManifest } from '../published-manifest.ts';
+import { lockContainerWorkspace } from '../src/plugin/container/container-workspace.ts';
 
 /**
  * The `container-lock` task: the container's `/workspace` root as the base
@@ -71,8 +71,8 @@ await writeFile(
   )}\n`,
 );
 const seed = await access(ROOT_LOCK).then(
-  () => ['--seed', ROOT_LOCK],
-  () => [],
+  () => ROOT_LOCK,
+  () => undefined,
 );
 const agentforge = await mkdtemp(join(tmpdir(), 'agentforge-published-'));
 try {
@@ -80,20 +80,17 @@ try {
     join(agentforge, 'package.json'),
     `${JSON.stringify(bundle, null, 2)}\n`,
   );
-  execFileSync(
-    'bun',
-    [
-      join(import.meta.dirname, 'workspace-lock.ts'),
-      '--root',
-      ROOT_MANIFEST,
-      '--member',
-      `agentforge=${agentforge}`,
-      ...seed,
-      '--out',
-      ROOT_LOCK,
+  await lockContainerWorkspace({
+    rootManifest: ROOT_MANIFEST,
+    members: [
+      {
+        containerPath: 'agentforge',
+        manifest: join(agentforge, 'package.json'),
+      },
     ],
-    { stdio: 'inherit' },
-  );
+    ...(seed === undefined ? {} : { seed }),
+    out: ROOT_LOCK,
+  });
 } finally {
   await rm(agentforge, { recursive: true, force: true });
 }

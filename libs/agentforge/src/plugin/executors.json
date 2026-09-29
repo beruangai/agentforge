@@ -1,3 +1,19 @@
 {
-  "executors": {}
+  "executors": {
+    "lock": {
+      "implementation": "./executors/lock/executor.ts",
+      "schema": "./executors/lock/schema.json",
+      "description": "Locks a layer of an agentic project's container workspace"
+    },
+    "image": {
+      "implementation": "./executors/image/executor.ts",
+      "schema": "./executors/image/schema.json",
+      "description": "Builds a layer of an agentic project's image chain"
+    },
+    "serve": {
+      "implementation": "./executors/serve/executor.ts",
+      "schema": "./executors/serve/schema.json",
+      "description": "Serves an agent's image locally, beside DynamoDB Local, until stopped"
+    }
+  }
 }

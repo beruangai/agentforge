@@ -46,6 +46,7 @@
       "cache": true,
       "inputs": [
         "{projectRoot}/container/*.ts",
+        "{projectRoot}/src/plugin/container/container-workspace.ts",
         "{projectRoot}/published-manifest.ts",
         "{projectRoot}/package.json",
         "{projectRoot}/src/plugin/*.json",

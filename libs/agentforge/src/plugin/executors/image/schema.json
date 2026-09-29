@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Builds a layer of an agentic project's image chain",
+  "type": "object",
+  "properties": {
+    "layer": {
+      "type": "string",
+      "description": "agentforge, base, or agents/<agent>",
+      "pattern": "^(agentforge|base|agents/[a-z][a-z0-9-]*)$"
+    }
+  },
+  "required": ["layer"],
+  "additionalProperties": false
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Serves an agent's image locally until stopped",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "type": "string",
+      "description": "The agent to serve, as its component names it"
+    }
+  },
+  "required": ["agent"],
+  "additionalProperties": false
+}
