@@ -1,0 +1,26 @@
+name: draft
+version: 1
+description: Stash a change's intent, context, and initial considerations before it is ready to finalize into a delivery schema
+artifacts:
+  - id: draft
+    generates: draft.md
+    description: Intent, context, decisions made so far, and open questions for a change not yet ready to finalize
+    template: draft.md
+    instruction: |
+      Capture a change you intend to make but are not ready to finalize. The
+      draft stores intent, context, and initial considerations so none of it is
+      lost when the change is finalized into a delivery schema.
+
+      A draft is a hybrid: it MAY carry proposal-shaped, design-shaped, and
+      task-shaped content together. Finalize migrates each piece to the artifact
+      that owns it. Do not create proposal.md, design.md, tasks.md, or specs/ in
+      a draft change.
+
+      Be faithful to the input, not elaborative. A thin input produces a thin
+      draft. Anything undecided goes under Open Questions, never an invented
+      answer.
+
+      A draft is not implementable. To deliver it, finalize it: switch the change
+      to a delivery schema, author that schema's artifacts from this draft, then
+      delete draft.md.
+    requires: []

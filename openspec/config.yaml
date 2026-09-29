@@ -31,18 +31,51 @@ context: |
   use an H# or T# id. An ADR in adr/ is accepted by the operator and mutated in place until a
   consumer depends on it; docs/DESIGN_OPTIONS.md holds what is still open.
 
+  OpenSpec workflow:
+    Drafts: a change on `schema: draft` stashes intent in draft.md and is not implementable.
+            /opsxx:finalize converts it to spec-driven (openspec/guide/draft-finalize.md).
+    Guides: openspec/guide/ holds project rules too long for the rules below. A rule naming a
+            guide means read it before authoring that artifact.
+
 rules:
+  draft:
+    - Read openspec/guide/draft-finalize.md before authoring or revising a draft
+    - Record under Dependencies which ADRs and open DESIGN_OPTIONS.md sections the change touches, as far as known
+    - A decision that earns an ADR (adr/README.md) made while drafting is recorded then as a proposed ADR and linked from Decisions; a decision still open stays under Open Questions
   proposal:
     - Trace to the requirements it serves (§REQ###), and name those it leaves unmet
     - Name the open design options (§ODO###) it depends on; never resolve one silently
     - Name the protocol or interface it changes, and why the change belongs there
     - Include a "Non-goals" section
     - No consumer domain vocabulary; borrow the SDK's, AgentCore's or A2A's terms verbatim
+  specs:
+    - Read openspec/guide/spec.md before authoring or revising a spec delta, and run its
+      behaviour-contract self-check before finishing
+    - One capability per significant observable behaviour — never one per schema, module, file or
+      procedure (openspec/guide/spec.md, Capability granularity)
   design:
     - Include the public API surface with TypeScript signatures
     - Include the error handling strategy and the outcomes each failure maps to
     - State which behaviours earn an integration test because their answer can drift, and which
       are settled once and belong in an ADR or a dated research note
+    - Check the in-force ADRs before deciding; a decision that contradicts an accepted one is
+      recorded as a new ADR that supersedes it, never as a design-local override
+    - A decision that earns an ADR (adr/README.md) is recorded as a proposed ADR when it is made
+      and linked from Decisions; its reasoning lives in the ADR and is not restated here
   tasks:
     - Break into implementable chunks (1-4 hours each)
     - Include test tasks alongside implementation tasks
+
+operations:
+  apply:
+    guidance:
+      - Read openspec/guide/apply.md before implementing
+      - When an artifact's assumption fails in practice, pause and surface the options; update
+        every affected artifact before committing the implementation
+      - A task's checkbox flips in the same commit as the work it represents
+  archive:
+    guidance:
+      - A change on schema draft is never archived; finalize it or delete it
+      - Every proposed ADR the change links is raised with the operator for acceptance before
+        archive; only the operator accepts one (adr/README.md)
+      - Confirm no decision in design.md that earns an ADR lacks one before archiving
