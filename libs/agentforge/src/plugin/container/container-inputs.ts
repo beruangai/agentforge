@@ -88,6 +88,32 @@ export function containerInputsOf(
   return { ...inputs, version };
 }
 
+/** What the generators read from AgentForge's own manifest. */
+export interface AgentforgeManifest {
+  readonly name: string;
+  readonly version: string;
+  readonly peerDependencies: Readonly<Record<string, string>>;
+}
+
+/** The manifest of the AgentForge running this code, source or installed. */
+export function agentforgeManifest(): AgentforgeManifest {
+  const manifest = join(
+    packageDirectoryAbove(import.meta.dirname),
+    'package.json',
+  );
+  const { name, version, peerDependencies } = JSON.parse(
+    readFileSync(manifest, 'utf8'),
+  ) as Partial<AgentforgeManifest>;
+  if (
+    typeof name !== 'string' ||
+    typeof version !== 'string' ||
+    typeof peerDependencies !== 'object'
+  ) {
+    throw new Error(`${manifest} lacks a name, version or peerDependencies`);
+  }
+  return { name, version, peerDependencies };
+}
+
 /**
  * The container inputs of the AgentForge running this code. Only this module
  * knows whether that is the installed package or its source; nothing a

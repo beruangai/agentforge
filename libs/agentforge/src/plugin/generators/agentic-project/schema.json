@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "AgentForgeAgenticProject",
+  "title": "Generates an agentic project: a base layer, and no agents",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The project's name, kebab-case",
+      "$default": { "$source": "argv", "index": 0 },
+      "x-prompt": "What is the agentic project's name?"
+    },
+    "directory": {
+      "type": "string",
+      "description": "The directory the project is created in",
+      "default": "packages"
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false
+}

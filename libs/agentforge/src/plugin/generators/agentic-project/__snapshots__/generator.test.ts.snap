@@ -1,0 +1,304 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/Dockerfile 1`] = `
+"# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+# installed version generates. To own it, name it in the project's
+# project.json metadata.agentforge.detached.files.
+#
+# The agentic image: the project's base layer at /workspace/agentic, on the
+# AgentForge image. \`agentic/$claude/\` becomes its \`.claude/\`, which every
+# agent's session composes from its cwd below. The layer's lock is the whole
+# workspace's up to it, so the install adds only what this layer adds.
+ARG BASE_IMAGE
+FROM \${BASE_IMAGE}
+COPY --chown=bun --exclude=bun.lock --exclude=\\$claude agentic/ /workspace/agentic/
+COPY --chown=bun agentic/\\$claude/ /workspace/agentic/.claude/
+COPY --chown=bun agentic/bun.lock /workspace/bun.lock
+RUN bun install --cwd /workspace --frozen-lockfile --production
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/$claude/CLAUDE.md 1`] = `
+"# golden-kata
+
+What every agent in this project is told. Replace this placeholder.
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/$claude/agents/.gitkeep 1`] = `""`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/$claude/settings.json 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json"
+}
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/$claude/skills/.gitkeep 1`] = `""`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/options.ts 1`] = `
+"import type { AgentOptions } from '@beruangai/agentforge/agent';
+
+/**
+ * What every agent in golden-kata runs with, composed under each agent's own
+ * options with \`composeOptions\`. An agent's cwd is its own directory, so the
+ * \`project\` setting source composes this layer's \`.claude/\` from the parent.
+ * Agents import it as \`@proj/golden-kata-base/options\`.
+ */
+export function baseOptions(): AgentOptions {
+  return { settingSources: ['project'] };
+}
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/package.json 1`] = `
+"{
+  "name": "@proj/golden-kata-base",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./*.ts"
+  },
+  "dependencies": {
+    "@beruangai/agentforge": "workspace:*"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.280",
+    "@anthropic-ai/sdk": "0.128.0",
+    "@a2a-js/sdk": "^1.2.0",
+    "@aws-sdk/client-cloudwatch": "^3.1138.0",
+    "@aws-sdk/client-dynamodb": "^3.1138.0",
+    "@aws-sdk/client-secrets-manager": "^3.1138.0",
+    "@aws-sdk/client-s3": "^3.1138.0",
+    "@orpc/contract": "2.0.0-beta.39",
+    "@orpc/server": "2.0.0-beta.39",
+    "express": "^5.2.1",
+    "zod": "^4.6.5"
+  }
+}
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/client.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The project client: one client over every agent of golden-kata,
+// typed by its contract, built once from how each agent is reached.
+import {
+  type AgentForgeClient,
+  agentCoreTransportsFromRuntimeConfig,
+  type RuntimeConfigSource,
+  type Transport,
+} from '@beruangai/agentforge/client';
+
+export const GOLDEN_KATA_CONTRACTS = {};
+
+/** Each agent's key in the runtime configuration its construct registers it under. */
+export const GOLDEN_KATA_RUNTIME_CONFIG_KEYS = {} as const;
+
+/** Each agent's local container, as \`serve-<agent>\` runs it. */
+export const GOLDEN_KATA_CONTAINER_NAMES = {} as const;
+
+export type GoldenKataAgent = keyof typeof GOLDEN_KATA_CONTRACTS;
+
+export type GoldenKataClient = {
+  readonly [Agent in GoldenKataAgent]: AgentForgeClient<
+    (typeof GOLDEN_KATA_CONTRACTS)[Agent]
+  >;
+};
+
+function withTransports(
+  _transports: Readonly<Record<GoldenKataAgent, Transport>>,
+): GoldenKataClient {
+  return {};
+}
+
+export const goldenKataClient = {
+  /** Each agent through the transport given for it. */
+  withTransports,
+  /** Each agent in its local container, found by name. */
+  local: (): GoldenKataClient => withTransports({}),
+  /** Each agent on AgentCore, resolved from the deployment's runtime configuration. */
+  fromRuntimeConfig: async (
+    source: RuntimeConfigSource,
+  ): Promise<GoldenKataClient> =>
+    withTransports(
+      await agentCoreTransportsFromRuntimeConfig(
+        GOLDEN_KATA_RUNTIME_CONFIG_KEYS,
+        source,
+      ),
+    ),
+};
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/package.json 1`] = `
+"{
+  "name": "@proj/golden-kata",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@anthropic-ai/sdk": "catalog:",
+    "@a2a-js/sdk": "catalog:",
+    "@aws-sdk/client-cloudwatch": "catalog:",
+    "@aws-sdk/client-dynamodb": "catalog:",
+    "@aws-sdk/client-secrets-manager": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/server": "catalog:",
+    "express": "catalog:",
+    "zod": "catalog:",
+    "@aws-sdk/client-bedrock-agentcore": "catalog:",
+    "@aws-sdk/client-appconfigdata": "catalog:",
+    "@beruangai/agentforge": "^1.0.0"
+  },
+  "exports": {
+    "./client": "./client.ts",
+    "./*": "./base/agentic/*.ts"
+  }
+}
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/project.json 1`] = `
+"{
+  "name": "@proj/golden-kata",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/golden-kata",
+  "projectType": "library",
+  "metadata": {
+    "generator": "@beruangai/agentforge:agentic-project",
+    "components": [],
+    "agentforge": {
+      "detached": {
+        "files": [],
+        "targets": []
+      }
+    }
+  },
+  "targets": {
+    "image-agentforge": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["^bundle"],
+      "options": {
+        "layer": "agentforge"
+      }
+    },
+    "lock": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["^bundle"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/base/agentic/bun.lock"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "image": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock", "image-agentforge"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "assemble": {
+      "executor": "nx:noop",
+      "dependsOn": []
+    }
+  }
+}
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/tsconfig.json 1`] = `
+"{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "customConditions": [
+      "agentforge-agent"
+    ],
+    "paths": {
+      "@proj/golden-kata-base/*": [
+        "./base/agentic/*.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > project construct 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+import type { IGrantable } from 'aws-cdk-lib/aws-iam';
+import { Construct } from 'constructs';
+import { RuntimeConfig } from '../../../core/runtime-config.js';
+
+export interface GoldenKataProps {
+  /** Each agent's runtime options. */
+  readonly agents?: Record<string, never>;
+}
+
+/**
+ * golden-kata's agents, each its own AgentCore runtime registered in the stage's
+ * runtime configuration, and the grant a caller of the project needs.
+ */
+export class GoldenKata extends Construct {
+  readonly agents: Record<string, never>;
+  /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
+  readonly runtimeConfigApplicationId: string;
+
+  constructor(scope: Construct, id: string, _props: GoldenKataProps = {}) {
+    super(scope, id);
+    this.agents = {};
+    this.runtimeConfigApplicationId =
+      RuntimeConfig.ensure(this).appConfigApplicationId;
+  }
+
+  /** Invocation of exactly this project's agents, and read of the stage's runtime configuration. */
+  grantInvoke(grantee: IGrantable): void {
+    RuntimeConfig.ensure(this).grantReadAppConfig(grantee);
+  }
+}
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents 1`] = `
+[
+  "packages/examples/golden-kata/base/Dockerfile",
+  "packages/examples/golden-kata/base/agentic/$claude/CLAUDE.md",
+  "packages/examples/golden-kata/base/agentic/$claude/agents/.gitkeep",
+  "packages/examples/golden-kata/base/agentic/$claude/settings.json",
+  "packages/examples/golden-kata/base/agentic/$claude/skills/.gitkeep",
+  "packages/examples/golden-kata/base/agentic/options.ts",
+  "packages/examples/golden-kata/base/agentic/package.json",
+  "packages/examples/golden-kata/client.ts",
+  "packages/examples/golden-kata/package.json",
+  "packages/examples/golden-kata/project.json",
+  "packages/examples/golden-kata/tsconfig.json",
+]
+`;

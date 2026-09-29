@@ -4,6 +4,25 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /**
+ * What the container workspace's root depends on: the peers AgentForge's
+ * server and harness import at run time, which every layer above shares and
+ * declares as peers. The client's and the constructs' peers are not.
+ */
+export const CONTAINER_ROOT_DEPENDENCIES = [
+  '@anthropic-ai/claude-agent-sdk',
+  '@anthropic-ai/sdk',
+  '@a2a-js/sdk',
+  '@aws-sdk/client-cloudwatch',
+  '@aws-sdk/client-dynamodb',
+  '@aws-sdk/client-secrets-manager',
+  '@aws-sdk/client-s3',
+  '@orpc/contract',
+  '@orpc/server',
+  'express',
+  'zod',
+] as const;
+
+/**
  * The container's `/workspace` is a Bun workspace: AgentForge at `agentforge/`,
  * an agentic project's base layer at `agentic/`, its agent at `agentic/agent/`.
  * Each image layer installs frozen from a lock of the whole workspace up to it.

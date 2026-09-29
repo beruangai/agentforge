@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "AgentForgeAgent",
+  "title": "Generates an agent as a component of an agentic project",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "string",
+      "description": "The agentic project the agent belongs to",
+      "x-prompt": "Which agentic project is the agent part of?"
+    },
+    "name": {
+      "type": "string",
+      "description": "The agent's name, kebab-case",
+      "$default": { "$source": "argv", "index": 0 },
+      "x-prompt": "What is the agent's name?"
+    },
+    "procedure": {
+      "type": "string",
+      "description": "The stub procedure's name, PascalCase",
+      "default": "Run"
+    }
+  },
+  "required": ["project", "name"],
+  "additionalProperties": false
+}

@@ -1,0 +1,598 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`agent > adds a second agent to every artifact spanning the project's agents > client of two 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The project client: one client over every agent of golden-kata,
+// typed by its contract, built once from how each agent is reached.
+import {
+  type AgentForgeClient,
+  agentCoreTransportsFromRuntimeConfig,
+  createClient,
+  localContainerTransport,
+  type RuntimeConfigSource,
+  type Transport,
+} from '@beruangai/agentforge/client';
+import { grader } from './agents/grader/agent/contract.ts';
+import { writer } from './agents/writer/agent/contract.ts';
+
+export const GOLDEN_KATA_CONTRACTS = {
+  writer,
+  grader,
+};
+
+/** Each agent's key in the runtime configuration its construct registers it under. */
+export const GOLDEN_KATA_RUNTIME_CONFIG_KEYS = {
+  writer: 'GoldenKataWriter',
+  grader: 'GoldenKataGrader',
+} as const;
+
+/** Each agent's local container, as \`serve-<agent>\` runs it. */
+export const GOLDEN_KATA_CONTAINER_NAMES = {
+  writer: 'proj-golden-kata-writer',
+  grader: 'proj-golden-kata-grader',
+} as const;
+
+export type GoldenKataAgent = keyof typeof GOLDEN_KATA_CONTRACTS;
+
+export type GoldenKataClient = {
+  readonly [Agent in GoldenKataAgent]: AgentForgeClient<
+    (typeof GOLDEN_KATA_CONTRACTS)[Agent]
+  >;
+};
+
+function withTransports(
+  transports: Readonly<Record<GoldenKataAgent, Transport>>,
+): GoldenKataClient {
+  return {
+    writer: createClient(GOLDEN_KATA_CONTRACTS.writer, transports.writer),
+    grader: createClient(GOLDEN_KATA_CONTRACTS.grader, transports.grader),
+  };
+}
+
+export const goldenKataClient = {
+  /** Each agent through the transport given for it. */
+  withTransports,
+  /** Each agent in its local container, found by name. */
+  local: (): GoldenKataClient =>
+    withTransports({
+      writer: localContainerTransport(GOLDEN_KATA_CONTAINER_NAMES.writer),
+      grader: localContainerTransport(GOLDEN_KATA_CONTAINER_NAMES.grader),
+    }),
+  /** Each agent on AgentCore, resolved from the deployment's runtime configuration. */
+  fromRuntimeConfig: async (
+    source: RuntimeConfigSource,
+  ): Promise<GoldenKataClient> =>
+    withTransports(
+      await agentCoreTransportsFromRuntimeConfig(
+        GOLDEN_KATA_RUNTIME_CONFIG_KEYS,
+        source,
+      ),
+    ),
+};
+"
+`;
+
+exports[`agent > adds a second agent to every artifact spanning the project's agents > project construct of two 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+import type { IGrantable } from 'aws-cdk-lib/aws-iam';
+import { Construct } from 'constructs';
+import { RuntimeConfig } from '../../../core/runtime-config.js';
+import {
+  GoldenKataGrader,
+  type GoldenKataGraderProps,
+} from '../../agents/golden-kata-grader/golden-kata-grader.js';
+import {
+  GoldenKataWriter,
+  type GoldenKataWriterProps,
+} from '../../agents/golden-kata-writer/golden-kata-writer.js';
+
+export interface GoldenKataProps {
+  /** Each agent's runtime options. */
+  readonly agents?: {
+    readonly writer?: GoldenKataWriterProps;
+    readonly grader?: GoldenKataGraderProps;
+  };
+}
+
+/**
+ * golden-kata's agents, each its own AgentCore runtime registered in the stage's
+ * runtime configuration, and the grant a caller of the project needs.
+ */
+export class GoldenKata extends Construct {
+  readonly agents: {
+    readonly writer: GoldenKataWriter;
+    readonly grader: GoldenKataGrader;
+  };
+  /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
+  readonly runtimeConfigApplicationId: string;
+
+  constructor(scope: Construct, id: string, props: GoldenKataProps = {}) {
+    super(scope, id);
+    this.agents = {
+      writer: new GoldenKataWriter(this, 'Writer', props.agents?.writer),
+      grader: new GoldenKataGrader(this, 'Grader', props.agents?.grader),
+    };
+    this.runtimeConfigApplicationId =
+      RuntimeConfig.ensure(this).appConfigApplicationId;
+  }
+
+  /** Invocation of exactly this project's agents, and read of the stage's runtime configuration. */
+  grantInvoke(grantee: IGrantable): void {
+    this.agents.writer.grantInvoke(grantee);
+    this.agents.grader.grantInvoke(grantee);
+    RuntimeConfig.ensure(this).grantReadAppConfig(grantee);
+  }
+}
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > agent construct 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  AgentRuntime,
+  type AgentRuntimeProps,
+} from '@beruangai/agentforge/infra';
+import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
+import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
+import type { Construct } from 'constructs';
+import { RuntimeConfig } from '../../../core/runtime-config.js';
+import { findWorkspaceRoot } from '../../../core/workspace.js';
+
+const WORKSPACE_ROOT = findWorkspaceRoot(fileURLToPath(import.meta.url));
+/** The agent's layer: its image's build context. */
+const LAYER_DIRECTORY = join(
+  WORKSPACE_ROOT,
+  'packages/examples/golden-kata/agents/writer',
+);
+/** The id of the agentic image the agent's image builds on. */
+const PARENT_IMAGE_ID_FILE = join(
+  WORKSPACE_ROOT,
+  'dist/packages/examples/golden-kata/image/base.id',
+);
+
+function parentImageId(): string {
+  try {
+    return readFileSync(PARENT_IMAGE_ID_FILE, 'utf8').trim();
+  } catch (error) {
+    throw new Error(
+      \`\${PARENT_IMAGE_ID_FILE} is missing: build the agentic image first, with nx run @proj/golden-kata:image\`,
+      { cause: error },
+    );
+  }
+}
+
+export type GoldenKataWriterProps = Omit<
+  AgentRuntimeProps,
+  'agentRuntimeArtifact'
+>;
+
+/**
+ * golden-kata's writer agent as its own AgentCore runtime, registered in the
+ * runtime configuration as GoldenKataWriter.
+ */
+export class GoldenKataWriter extends AgentRuntime {
+  constructor(scope: Construct, id: string, props: GoldenKataWriterProps = {}) {
+    super(scope, id, {
+      ...props,
+      agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
+        platform: Platform.LINUX_ARM64,
+        buildArgs: { BASE_IMAGE: 'proj/golden-kata:local' },
+        // The asset hash covers the agent's layer only; a change below it
+        // changes the agentic image's id, and redeploys the agent.
+        extraHash: parentImageId(),
+      }),
+    });
+    const runtimeConfig = RuntimeConfig.ensure(this);
+    runtimeConfig.set('agentcore', 'agentRuntimes', {
+      ...runtimeConfig.get('agentcore').agentRuntimes,
+      GoldenKataWriter: { arn: this.agentRuntimeArn },
+    });
+  }
+}
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > app index 1`] = `
+"export * from './agentic-projects/index.js';
+export * from './agents/index.js';
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > client.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The project client: one client over every agent of golden-kata,
+// typed by its contract, built once from how each agent is reached.
+import {
+  type AgentForgeClient,
+  agentCoreTransportsFromRuntimeConfig,
+  createClient,
+  localContainerTransport,
+  type RuntimeConfigSource,
+  type Transport,
+} from '@beruangai/agentforge/client';
+import { writer } from './agents/writer/agent/contract.ts';
+
+export const GOLDEN_KATA_CONTRACTS = {
+  writer,
+};
+
+/** Each agent's key in the runtime configuration its construct registers it under. */
+export const GOLDEN_KATA_RUNTIME_CONFIG_KEYS = {
+  writer: 'GoldenKataWriter',
+} as const;
+
+/** Each agent's local container, as \`serve-<agent>\` runs it. */
+export const GOLDEN_KATA_CONTAINER_NAMES = {
+  writer: 'proj-golden-kata-writer',
+} as const;
+
+export type GoldenKataAgent = keyof typeof GOLDEN_KATA_CONTRACTS;
+
+export type GoldenKataClient = {
+  readonly [Agent in GoldenKataAgent]: AgentForgeClient<
+    (typeof GOLDEN_KATA_CONTRACTS)[Agent]
+  >;
+};
+
+function withTransports(
+  transports: Readonly<Record<GoldenKataAgent, Transport>>,
+): GoldenKataClient {
+  return {
+    writer: createClient(GOLDEN_KATA_CONTRACTS.writer, transports.writer),
+  };
+}
+
+export const goldenKataClient = {
+  /** Each agent through the transport given for it. */
+  withTransports,
+  /** Each agent in its local container, found by name. */
+  local: (): GoldenKataClient =>
+    withTransports({
+      writer: localContainerTransport(GOLDEN_KATA_CONTAINER_NAMES.writer),
+    }),
+  /** Each agent on AgentCore, resolved from the deployment's runtime configuration. */
+  fromRuntimeConfig: async (
+    source: RuntimeConfigSource,
+  ): Promise<GoldenKataClient> =>
+    withTransports(
+      await agentCoreTransportsFromRuntimeConfig(
+        GOLDEN_KATA_RUNTIME_CONFIG_KEYS,
+        source,
+      ),
+    ),
+};
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > package.json 1`] = `
+"{
+  "name": "@proj/golden-kata",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@anthropic-ai/sdk": "catalog:",
+    "@a2a-js/sdk": "catalog:",
+    "@aws-sdk/client-cloudwatch": "catalog:",
+    "@aws-sdk/client-dynamodb": "catalog:",
+    "@aws-sdk/client-secrets-manager": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/server": "catalog:",
+    "express": "catalog:",
+    "zod": "catalog:",
+    "@aws-sdk/client-bedrock-agentcore": "catalog:",
+    "@aws-sdk/client-appconfigdata": "catalog:",
+    "@beruangai/agentforge": "^1.0.0"
+  },
+  "exports": {
+    "./client": "./client.ts",
+    "./writer": "./agents/writer/agent/contract.ts",
+    "./*": "./base/agentic/*.ts"
+  }
+}
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/Dockerfile 1`] = `
+"# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+# installed version generates. To own it, name it in the project's
+# project.json metadata.agentforge.detached.files.
+#
+# The writer agent's image: its layer at /workspace/agentic/agent — every
+# run's cwd — on the project's agentic image. \`agent/$claude/\` becomes its
+# \`.claude/\`, the one place a session reads \`settings.json\` and hooks from.
+ARG BASE_IMAGE
+FROM \${BASE_IMAGE}
+COPY --chown=bun --exclude=bun.lock --exclude=\\$claude agent/ /workspace/agentic/agent/
+COPY --chown=bun agent/\\$claude/ /workspace/agentic/agent/.claude/
+COPY --chown=bun agent/bun.lock /workspace/bun.lock
+RUN bun install --cwd /workspace --frozen-lockfile --production
+ENV AGENTFORGE_AGENT_NAME=writer
+CMD ["bun", "--conditions=agentforge-agent", "server.ts"]
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/$claude/agents/.gitkeep 1`] = `""`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/$claude/settings.json 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json"
+}
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/$claude/skills/.gitkeep 1`] = `""`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/contract.ts 1`] = `
+"import { timeBudget } from '@beruangai/agentforge/contract';
+import { oc } from '@orpc/contract';
+import { z } from 'zod';
+
+/** What callers import to call the writer agent. */
+export const writer = {
+  Write: oc.meta(timeBudget(300)).input(z.object({})).output(z.object({})),
+};
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/package.json 1`] = `
+"{
+  "name": "@proj/golden-kata-writer",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@beruangai/agentforge": "workspace:*",
+    "@proj/golden-kata-base": "workspace:*"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.280",
+    "@anthropic-ai/sdk": "0.128.0",
+    "@a2a-js/sdk": "^1.2.0",
+    "@aws-sdk/client-cloudwatch": "^3.1138.0",
+    "@aws-sdk/client-dynamodb": "^3.1138.0",
+    "@aws-sdk/client-secrets-manager": "^3.1138.0",
+    "@aws-sdk/client-s3": "^3.1138.0",
+    "@orpc/contract": "2.0.0-beta.39",
+    "@orpc/server": "2.0.0-beta.39",
+    "express": "^5.2.1",
+    "zod": "^4.6.5"
+  }
+}
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/procedures.ts 1`] = `
+"import { implementAgent } from '@beruangai/agentforge/agent';
+import { writer } from './contract.ts';
+
+const os = implementAgent(writer);
+
+/**
+ * The writer agent's procedures. A handler runs the agent with
+ * \`context.runAgent\`, its options composed over the base layer's:
+ * \`composeOptions(baseOptions(), { … })\`, with \`baseOptions\` from
+ * \`@proj/golden-kata-base/options\`.
+ */
+export const router = os.router({
+  Write: os.Write.handler(async () => {
+    throw new Error('not implemented: writer.Write');
+  }),
+});
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/server.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The container's entry: AgentForge's server, running \`task.ts\` once per task.
+// Everything else comes from the environment.
+import { startServer } from '@beruangai/agentforge/server';
+
+await startServer({ taskEntry: new URL('./task.ts', import.meta.url) });
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/task.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The task entry: the one place the harness and this agent's procedures meet.
+import { runTaskProcess } from '@beruangai/agentforge/agent';
+import { writer } from './contract.ts';
+import { router } from './procedures.ts';
+
+runTaskProcess({ contract: writer, router });
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > project construct 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+import type { IGrantable } from 'aws-cdk-lib/aws-iam';
+import { Construct } from 'constructs';
+import { RuntimeConfig } from '../../../core/runtime-config.js';
+import {
+  GoldenKataWriter,
+  type GoldenKataWriterProps,
+} from '../../agents/golden-kata-writer/golden-kata-writer.js';
+
+export interface GoldenKataProps {
+  /** Each agent's runtime options. */
+  readonly agents?: {
+    readonly writer?: GoldenKataWriterProps;
+  };
+}
+
+/**
+ * golden-kata's agents, each its own AgentCore runtime registered in the stage's
+ * runtime configuration, and the grant a caller of the project needs.
+ */
+export class GoldenKata extends Construct {
+  readonly agents: {
+    readonly writer: GoldenKataWriter;
+  };
+  /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
+  readonly runtimeConfigApplicationId: string;
+
+  constructor(scope: Construct, id: string, props: GoldenKataProps = {}) {
+    super(scope, id);
+    this.agents = {
+      writer: new GoldenKataWriter(this, 'Writer', props.agents?.writer),
+    };
+    this.runtimeConfigApplicationId =
+      RuntimeConfig.ensure(this).appConfigApplicationId;
+  }
+
+  /** Invocation of exactly this project's agents, and read of the stage's runtime configuration. */
+  grantInvoke(grantee: IGrantable): void {
+    this.agents.writer.grantInvoke(grantee);
+    RuntimeConfig.ensure(this).grantReadAppConfig(grantee);
+  }
+}
+"
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct > targets 1`] = `
+{
+  "assemble": {
+    "dependsOn": [
+      "image-writer",
+    ],
+    "executor": "nx:noop",
+  },
+  "image": {
+    "cache": false,
+    "dependsOn": [
+      "lock",
+      "image-agentforge",
+    ],
+    "executor": "@beruangai/agentforge:image",
+    "options": {
+      "layer": "base",
+    },
+  },
+  "image-agentforge": {
+    "cache": false,
+    "dependsOn": [
+      "^bundle",
+    ],
+    "executor": "@beruangai/agentforge:image",
+    "options": {
+      "layer": "agentforge",
+    },
+  },
+  "image-writer": {
+    "cache": false,
+    "dependsOn": [
+      "lock-writer",
+      "image",
+    ],
+    "executor": "@beruangai/agentforge:image",
+    "options": {
+      "layer": "agents/writer",
+    },
+  },
+  "lock": {
+    "cache": true,
+    "dependsOn": [
+      "^bundle",
+    ],
+    "executor": "@beruangai/agentforge:lock",
+    "inputs": [
+      "{projectRoot}/base/agentic/package.json",
+      {
+        "dependentTasksOutputFiles": "**/package.json",
+        "transitive": true,
+      },
+      {
+        "dependentTasksOutputFiles": "**/bun.lock",
+        "transitive": true,
+      },
+      {
+        "runtime": "bun --version",
+      },
+    ],
+    "options": {
+      "layer": "base",
+    },
+    "outputs": [
+      "{projectRoot}/base/agentic/bun.lock",
+    ],
+  },
+  "lock-writer": {
+    "cache": true,
+    "dependsOn": [
+      "lock",
+    ],
+    "executor": "@beruangai/agentforge:lock",
+    "inputs": [
+      "{projectRoot}/base/agentic/package.json",
+      "{projectRoot}/agents/writer/agent/package.json",
+      {
+        "dependentTasksOutputFiles": "**/package.json",
+        "transitive": true,
+      },
+      {
+        "dependentTasksOutputFiles": "**/bun.lock",
+        "transitive": true,
+      },
+      {
+        "runtime": "bun --version",
+      },
+    ],
+    "options": {
+      "layer": "agents/writer",
+    },
+    "outputs": [
+      "{projectRoot}/agents/writer/agent/bun.lock",
+    ],
+  },
+  "serve-writer": {
+    "configurations": {
+      "serve": {},
+    },
+    "continuous": true,
+    "defaultConfiguration": "serve",
+    "dependsOn": [
+      "image-writer",
+    ],
+    "executor": "@beruangai/agentforge:serve",
+    "options": {
+      "agent": "writer",
+    },
+  },
+}
+`;
+
+exports[`agent > generates the agent's folder, record, image, entries and construct 1`] = `
+[
+  "packages/examples/golden-kata/agents/writer/Dockerfile",
+  "packages/examples/golden-kata/agents/writer/agent/$claude/agents/.gitkeep",
+  "packages/examples/golden-kata/agents/writer/agent/$claude/settings.json",
+  "packages/examples/golden-kata/agents/writer/agent/$claude/skills/.gitkeep",
+  "packages/examples/golden-kata/agents/writer/agent/contract.ts",
+  "packages/examples/golden-kata/agents/writer/agent/package.json",
+  "packages/examples/golden-kata/agents/writer/agent/procedures.ts",
+  "packages/examples/golden-kata/agents/writer/agent/server.ts",
+  "packages/examples/golden-kata/agents/writer/agent/task.ts",
+]
+`;

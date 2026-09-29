@@ -130,7 +130,7 @@ Each agent's construct registers its ARN under namespace `agentcore`, key `agent
 <directory>/<name>/                                   agentic project
   project.json  package.json  tsconfig.json  client.ts
   base/Dockerfile
-  base/agentic/package.json                           → /workspace/agentic
+  base/agentic/package.json                           → /workspace/agentic, @<scope>/<project>-base
   base/agentic/$claude/{CLAUDE.md, settings.json, skills/, agents/}
   base/agentic/options.ts                             baseOptions(), composed by every agent
   agents/<agent>/Dockerfile
@@ -146,7 +146,7 @@ The contract is only what a generator creates. Files the consumer or a build cre
 | Ownership | Artifacts | On sync or regeneration |
 |---|---|---|
 | **Maintained** | Dockerfiles, `server.ts`, `task.ts`, `client.ts`, the agent and project constructs and their star exports, the project's targets | Rewritten to what the installed version renders from the components |
-| **Maintained keys** | A container member's `name`, `type`, `exports` (base layer), its `workspace:*` layers and the peers AgentForge's root provides; the host manifest's AgentForge dependency and its `exports`; `agentforge-agent` in the project's `customConditions`; the shared constructs project's `assemble` edge and its dependency on AgentForge | Those keys rewritten; every other key kept |
+| **Maintained keys** | A container member's `name`, `type`, `exports` (base layer), its `workspace:*` layers and the peers AgentForge's root provides; the host manifest's AgentForge dependency and its `exports`; `agentforge-agent` in the project's `customConditions` and the base layer's `paths` entry; the shared constructs project's `assemble` edge and its dependency on AgentForge | Those keys rewritten; every other key kept |
 | **Scaffolded** | Contracts, procedures, `options.ts`, `$claude/` | Written once when absent; never touched again by anything |
 | **Detached** | A maintained file or target named in `metadata.agentforge.detached` | Never touched; the consumer owns its updates |
 
@@ -154,14 +154,14 @@ Dockerfiles stay maintained, though `ARG BASE_IMAGE` means an upgrade rarely cha
 
 ### Sync is the generators' own rendering
 
-Each maintained artifact has one render function; the generators call them, and the sync generator calls them all for every agentic project, reporting each differing, non-detached artifact in `outOfSyncMessage` — which names detaching as the way to keep an edit — and writing it, so regeneration and sync cannot disagree. A `detached` entry naming nothing maintained fails sync, naming it. `init` attaches the sync generator through `targetDefaults` keyed by the plugin's executors (`@beruangai/agentforge:lock`, `:image`), deduped as `@aws/nx-plugin` does, so a stale project is fixed before a lock or image task runs and `nx sync:check` fails in CI.
+Each maintained artifact has one render function — code, not templates, since most are rendered from the component list; the generators call them, and the sync generator calls them all for every agentic project, reporting each differing, non-detached artifact in `outOfSyncMessage` — which names detaching as the way to keep an edit — and writing it, so regeneration and sync cannot disagree. A `detached` entry naming nothing maintained fails sync, naming it. `init` attaches the sync generator through `targetDefaults` keyed by the plugin's executors (`@beruangai/agentforge:lock`, `:image`), deduped as `@aws/nx-plugin` does, so a stale project is fixed before a lock or image task runs and `nx sync:check` fails in CI.
 
 ### Targets
 
 | Target | Executor | Depends on |
 |---|---|---|
 | `image-agentforge` | `image`, layer `agentforge` | `^bundle` — a no-op for an installed package; in this repository it builds the package first |
-| `lock` | `lock`, layer `base` | — |
+| `lock` | `lock`, layer `base` | `^bundle`, as `image-agentforge`: the lock is seeded from AgentForge's container lock |
 | `image` | `image`, layer `base` | `lock`, `image-agentforge` |
 | `lock-<agent>` | `lock`, layer `agents/<agent>` | `lock` |
 | `image-<agent>` | `image`, layer `agents/<agent>` | `lock-<agent>`, `image` |
@@ -178,9 +178,11 @@ The package ships its Dockerfile, the bundle, and the container workspace's root
 
 The AgentForge image is `agentforge/a2a-claude:<version>`; an agentic image `<scope>/<project>:local`; an agent image `<scope>/<project>-<agent>:local`. Each Dockerfile starts `ARG BASE_IMAGE` / `FROM ${BASE_IMAGE}`, which the `image` executor passes and the agent's construct passes to its asset. The `image` executor writes each image's id to `dist/{projectRoot}/image/<layer>.id`; the agent's construct reads its parent's id as its asset's `extraHash`, so a change below an agent redeploys it, and throws, naming the file and the target that writes it, when it is missing.
 
-### Layers are imported by package name everywhere
+### The base layer has its own package name, one in the host and the image
 
-The host `package.json` exports the base layer (`"./*": "./base/agentic/*.ts"`), each agent's contract (`"./<agent>": "./agents/<agent>/agent/contract.ts"`) and the client (`"./client"`); the container member of the same name exports the same base modules. An agent imports `@<scope>/<project>/options` and resolves it in the host through the workspace and in the image through the container workspace, with no tsconfig `paths`. The source condition moves to the root `tsconfig.base.json` `customConditions`, where `@aws/nx-plugin`'s preset puts a workspace's own scope, so generated projects carry only `agentforge-agent`. How `golden-kata-infra`'s synth resolves AgentForge at run time in this repository is settled when it is built.
+The base layer's container member is `@<scope>/<project>-base`, exporting its modules (`"./*": "./*.ts"`); an agent imports `@<scope>/<project>-base/options`. In the image the container workspace links it; in the host the project's `tsconfig.json` maps it (`paths`, `"@<scope>/<project>-base/*": ["./base/agentic/*.ts"]`) — the host's workspaces do not reach nested layers, and adding them would edit the consumer's root. So an agent's imports read the same in both places and name only what is in its image. The host `package.json` exports the client (`"./client"`), each agent's contract (`"./<agent>"`) and the base layer (`"./*": "./base/agentic/*.ts"`) for callers. `base` is reserved as an agent name. The source condition moves to the root `tsconfig.base.json` `customConditions`, where `@aws/nx-plugin`'s preset puts a workspace's own scope, so generated projects carry only `agentforge-agent`.
+
+A caller outside the project that imports the client reaches a contract importing `@<scope>/<project>-base/*`, which only the project's `paths` resolves: its own tsconfig, and its test runner's resolver, need the same mapping. Accepted for this change; `golden-kata`'s e2e runs inside the project, and the next change's Temporal worker is where it is met.
 
 ### Dependencies `init` adds
 
@@ -218,7 +220,7 @@ Bounded: no loop, a 180-second time budget per procedure, capped turns, Haiku. I
 
 ## Testing
 
-- **`test`**: each generator against `createTreeUsingTsSolutionSetup` — snapshots, a re-run leaving the tree unchanged, a second agent re-rendering the targets, client and constructs, a scaffolded file kept after an edit, a detached artifact untouched and a bad `detached` entry refused, sync reporting and restoring a drifted artifact and dropping a removed component; `localContainerTransport` and `agentCoreTransportsFromRuntimeConfig` against a scripted `docker` and AppConfig Data client, including their failures; each executor's command construction; `golden-kata`'s `runCases`, bespoke.
+- **`test`**: each generator against `createTreeUsingTsSolutionSetup`, with `sharedConstructsGenerator` replaced by a fixture creating the constructs project (its GritQL clones a standard library from GitHub) — snapshots, a re-run leaving the tree unchanged, a second agent re-rendering the targets, client and constructs, a scaffolded file kept after an edit, a detached artifact untouched and a bad `detached` entry refused, sync reporting and restoring a drifted artifact and dropping a removed component; `localContainerTransport` and `agentCoreTransportsFromRuntimeConfig` against a scripted `docker` and AppConfig Data client, including their failures; each executor's command construction; `golden-kata`'s `runCases`, bespoke.
 - **`e2e`**: `golden-kata` locally (A5's exit) and on AgentCore; a template assertion in `golden-kata-infra` that the caller role is granted exactly the two runtimes and the configuration read. `nx sync:check` catches `golden-kata` drifting from what the plugin generates.
 - **Settled once, in `docs/research/aws-nx-plugin.md` with its date, not tested**: Nx loading the plugin from source; Docker building from an installed package's directory; the AppConfig deployment being readable once `cdk deploy` returns.
 

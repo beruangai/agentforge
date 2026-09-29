@@ -2,7 +2,10 @@ import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { publishedManifest } from '../published-manifest.ts';
-import { lockContainerWorkspace } from '../src/plugin/container/container-workspace.ts';
+import {
+  CONTAINER_ROOT_DEPENDENCIES,
+  lockContainerWorkspace,
+} from '../src/plugin/container/container-workspace.ts';
 
 /**
  * The `container-lock` task: the container's `/workspace` root as the base
@@ -18,21 +21,6 @@ const WORKSPACE_ROOT = join(import.meta.dirname, '..', '..', '..');
 const ROOT_MANIFEST = join(import.meta.dirname, 'workspace', 'package.json');
 const ROOT_LOCK = join(import.meta.dirname, 'workspace', 'bun.lock');
 
-/** What the server and the harness import at run time; the client's peers are not. */
-const RUNTIME_PEERS = [
-  '@anthropic-ai/claude-agent-sdk',
-  '@anthropic-ai/sdk',
-  '@a2a-js/sdk',
-  '@aws-sdk/client-cloudwatch',
-  '@aws-sdk/client-dynamodb',
-  '@aws-sdk/client-secrets-manager',
-  '@aws-sdk/client-s3',
-  '@orpc/contract',
-  '@orpc/server',
-  'express',
-  'zod',
-] as const;
-
 const { catalog } = JSON.parse(
   await readFile(join(WORKSPACE_ROOT, 'package.json'), 'utf8'),
 ) as { catalog: Record<string, string> };
@@ -42,7 +30,7 @@ const bundle = (await publishedManifest()) as {
 };
 
 const dependencies = Object.fromEntries(
-  RUNTIME_PEERS.map((name) => {
+  CONTAINER_ROOT_DEPENDENCIES.map((name) => {
     if (bundle.peerDependencies[name] === undefined) {
       throw new Error(`${name} is not a peer of ${bundle.name}`);
     }

@@ -5,6 +5,22 @@
       "factory": "./generators/init/generator.ts",
       "schema": "./generators/init/schema.json",
       "description": "Adds AgentForge to a workspace: its dependencies, and the sync generator attached to its build tasks"
+    },
+    "agentic-project": {
+      "factory": "./generators/agentic-project/generator.ts",
+      "schema": "./generators/agentic-project/schema.json",
+      "description": "Generates an agentic project: a base layer every agent shares, and no agents"
+    },
+    "agent": {
+      "factory": "./generators/agent/generator.ts",
+      "schema": "./generators/agent/schema.json",
+      "description": "Generates an agent as a component of an agentic project"
+    },
+    "sync": {
+      "factory": "./generators/sync/generator.ts",
+      "schema": "./generators/sync/schema.json",
+      "description": "Keeps every agentic project's maintained artifacts current",
+      "hidden": true
     }
   }
 }

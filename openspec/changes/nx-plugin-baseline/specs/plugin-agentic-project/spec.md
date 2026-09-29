@@ -16,7 +16,7 @@ The plugin SHALL provide an initialisation, run when AgentForge is added to a wo
 - **THEN** nothing in the workspace changes
 
 ### Requirement: Generating an agentic project
-The plugin SHALL generate an agentic project holding a base layer and no agents. The base layer's modules SHALL be importable by the project's package name both in the consumer's workspace and inside every agent's image, and its Claude configuration — instructions, skills, subagents and settings, scaffolded as placeholders — SHALL compose into every agent's session. Generating a project that exists SHALL change nothing in a synced workspace.
+The plugin SHALL generate an agentic project holding a base layer and no agents. The base layer's modules SHALL be importable by one package name, the same in the consumer's workspace and inside every agent's image, and its Claude configuration — instructions, skills, subagents and settings, scaffolded as placeholders — SHALL compose into every agent's session. Generating a project that exists SHALL change nothing in a synced workspace.
 
 #### Scenario: A new project
 - **WHEN** a consumer generates an agentic project
