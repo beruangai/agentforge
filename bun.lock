@@ -36,6 +36,7 @@
         "@a2a-js/sdk": "catalog:",
         "@anthropic-ai/claude-agent-sdk": "catalog:",
         "@anthropic-ai/sdk": "catalog:",
+        "@aws-sdk/client-appconfigdata": "catalog:",
         "@aws-sdk/client-bedrock-agentcore": "catalog:",
         "@aws-sdk/client-bedrock-agentcore-control": "catalog:",
         "@aws-sdk/client-cloudwatch": "catalog:",
@@ -76,6 +77,7 @@
         "@a2a-js/sdk": "^1.2.0",
         "@anthropic-ai/claude-agent-sdk": "0.3.280",
         "@anthropic-ai/sdk": "0.128.0",
+        "@aws-sdk/client-appconfigdata": "^3.1138.0",
         "@aws-sdk/client-bedrock-agentcore": "^3.1138.0",
         "@aws-sdk/client-cloudwatch": "^3.1138.0",
         "@aws-sdk/client-dynamodb": "^3.1138.0",
@@ -97,6 +99,7 @@
         "@a2a-js/sdk",
         "@anthropic-ai/claude-agent-sdk",
         "@anthropic-ai/sdk",
+        "@aws-sdk/client-appconfigdata",
         "@aws-sdk/client-bedrock-agentcore",
         "@aws-sdk/client-cloudwatch",
         "@aws-sdk/client-dynamodb",
@@ -118,6 +121,7 @@
     "@a2a-js/sdk": "1.2.0",
     "@anthropic-ai/claude-agent-sdk": "0.3.280",
     "@anthropic-ai/sdk": "0.128.0",
+    "@aws-sdk/client-appconfigdata": "3.1138.0",
     "@aws-sdk/client-bedrock-agentcore": "3.1138.0",
     "@aws-sdk/client-bedrock-agentcore-control": "3.1138.0",
     "@aws-sdk/client-cloudwatch": "3.1138.0",
@@ -205,6 +209,8 @@
     "@aws-cdk/cloud-assembly-schema": ["@aws-cdk/cloud-assembly-schema@54.25.0", "", { "dependencies": { "jsonschema": "^1.5.0", "semver": "^7.8.5" } }, "sha512-aZkzPqWLg1Oozm53NeyrBZPguTq3e6v7NpQ3QOGULj0IIrodLzGPM7fmAvjcJcHzjtuZU9IP1gIY92nKIM+Bvw=="],
 
     "@aws-sdk/checksums": ["@aws-sdk/checksums@3.1001.1", "", { "dependencies": { "@aws-sdk/core": "^3.978.1", "@aws-sdk/types": "^3.974.6", "@smithy/core": "^3.35.0", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-x12Q17KYlJAd3nKf8LV5LV0vt8sh8/6YfQLGPtrGnQf/tW4jqxPGq5GPpuVitpQYM3eUR4XB7CbxZf751NMbLw=="],
+
+    "@aws-sdk/client-appconfigdata": ["@aws-sdk/client-appconfigdata@3.1138.0", "", { "dependencies": { "@aws-sdk/core": "^3.978.1", "@aws-sdk/credential-provider-node": "^3.972.84", "@aws-sdk/types": "^3.974.6", "@smithy/core": "^3.35.0", "@smithy/fetch-http-handler": "^5.8.0", "@smithy/node-http-handler": "^4.12.1", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-FTD1KZSS7NVC5F8RwVj1Yc5EMgUVzvYHwkHBjbyneMDYDXpIkwiO8ZZIQhmiqc2mKBiVgQ5HFfMEmdZ1SqArdA=="],
 
     "@aws-sdk/client-bedrock-agentcore": ["@aws-sdk/client-bedrock-agentcore@3.1138.0", "", { "dependencies": { "@aws-sdk/core": "^3.978.1", "@aws-sdk/credential-provider-node": "^3.972.84", "@aws-sdk/types": "^3.974.6", "@smithy/core": "^3.35.0", "@smithy/fetch-http-handler": "^5.8.0", "@smithy/node-http-handler": "^4.12.1", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-966A84E23meETuSojPvSf1JVo+bDzjN5+4c9lrhThP8j9aBQzit8DjXrnSY/nLsyhLVxnuJ/OHUAyqG0PSc7TA=="],
 

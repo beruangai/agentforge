@@ -12,6 +12,11 @@ export {
   type TaskView,
   type TerminalTaskView,
 } from './client.ts';
+export { localContainerTransport } from './local-container-transport.ts';
+export {
+  agentCoreTransportsFromRuntimeConfig,
+  type RuntimeConfigSource,
+} from './runtime-config.ts';
 export {
   AgentForgeRequestError,
   agentCoreTransport,

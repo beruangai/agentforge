@@ -39,6 +39,7 @@
     "@a2a-js/sdk": "1.2.0",
     "@anthropic-ai/claude-agent-sdk": "0.3.280",
     "@anthropic-ai/sdk": "0.128.0",
+    "@aws-sdk/client-appconfigdata": "3.1138.0",
     "@aws-sdk/client-bedrock-agentcore": "3.1138.0",
     "@aws-sdk/client-bedrock-agentcore-control": "3.1138.0",
     "@aws-sdk/client-cloudwatch": "3.1138.0",
