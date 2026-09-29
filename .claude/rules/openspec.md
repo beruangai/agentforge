@@ -6,6 +6,16 @@ paths:
 <OPENSPEC_PROJECT_RULES>
 These rules override default OpenSpec protocol behavior. Follow exactly.
 
+## The guides are the source of truth
+
+`openspec/guide/` owns the detail; this file holds only what no guide does, and points at them. `openspec/config.yaml` loads each guide as a rule on the artifact or operation it governs.
+
+| Read before | Guide |
+|---|---|
+| Authoring or revising a spec delta — capability granularity and naming, the behavior-contract self-check, deltas, citations, scenarios | [`openspec/guide/spec.md`](../../openspec/guide/spec.md) |
+| Implementing a change — current state, deviation handling, tasks and commits, verification | [`openspec/guide/apply.md`](../../openspec/guide/apply.md) |
+| Drafting a change, finalizing one, or verifying its artifacts | [`openspec/guide/draft-finalize.md`](../../openspec/guide/draft-finalize.md) |
+
 ## Document Scope
 
 **proposal.md** = Problem/solution space only.
@@ -22,57 +32,16 @@ These rules override default OpenSpec protocol behavior. Follow exactly.
 - Small, verifiable work items
 - Note dependencies and parallelization opportunities
 
-## Drafting Proposals
+## Iterating before the artifacts are fixed
 
-When drafting a proposal, only generate `proposal.md` and `design.md` until user agrees and confirms. Then finalize the `proposal.md` and `design.md`, generated the specs changes (`openspec/change/{change}/specs/*`), then generate the `tasks.md`.
-
-This prevent wasted cycles during proposal and design iterations before finalized.
+A change whose shape is not yet settled is a draft — `schema: draft`, one `draft.md`, not implementable — and `/opsxx:finalize` authors the artifacts from it in one pass ([`draft-finalize.md`](../../openspec/guide/draft-finalize.md)). Do not iterate a proposal by rewriting downstream artifacts on every turn; the `spec-driven` order is proposal → specs → design → tasks, and specs come before design.
 
 ## Terminology
 
 Unify naming across all docs. If CLI uses `<agent> <command>`, use it everywhere—not `<group> <action>` in one place and `[agent] [action]` in another.
 
-## Spec Naming
-
-**Prefix specs with the owning concept.** OpenSpec doesn't support namespaced or nested specs, and AgentForge is one package, so a package prefix would say nothing. Prefix a capability with the concept folder that owns it — `runtime`, `harness`, `client`, `infra`, `core`, `filesystem`:
-- `runtime-task-admission`, not `admission`
-- `harness-kernel-settlement`, not `settlement`
-
-## Spec Content
-
-**Requirements-focused, not implementation-mirroring.** Specs define WHAT the system must do, not HOW it's built. Implementation details should be able to drift without breaking spec-level requirements:
-- Specify observable behaviors, inputs, outputs, and constraints
-- Avoid referencing internal file names, class names, or module structure
-- Use scenarios that test from the consumer/boundary perspective
-- Implementation-level concerns belong in design.md, not specs
-
-## Spec Granularity
-
-**Merge aggressively to minimal separate specs.** Each spec should cover a meaningful behavioral surface area, not mirror internal modules. Fewer, broader specs are preferred over many fine-grained ones.
-
-## Spec Deltas
-
-**Prefer REMOVED/ADDED over MODIFIED.** MODIFIED requires full copy/paste replacement of entire requirement. For most changes, surgical REMOVED/ADDED pairs are more concise and maintainable:
-
-- Changing a scenario? REMOVED old scenario, ADDED new scenario
-- Adding scenarios to existing requirement? Just ADDED (no MODIFIED needed)
-- Rewriting entire requirement? Then MODIFIED is appropriate
-
-**MODIFIED is rarely correct.** If keeping most scenarios unchanged, use REMOVED/ADDED pairs instead.
-
 ## Archiving
 
-**Pre-archive: finalize deltas.** Before `openspec archive <id>`:
-
-1. Read source-of-truth specs being changed
-2. Evaluate each MODIFIED—should it be REMOVED/ADDED pairs instead?
-3. If keeping MODIFIED, ensure it's complete replacement (merge intent with existing)
-4. Then run standard `openspec archive <id>` flow
-
-## Applying Proposals
-
-design.md is directional—validate against actual codebase before implementing. Trace execution flow first. Establish ownership (who computes/sets state vs. who reads).
-
-Use efficient and effective delegate via subagents and agent teams depending on proposal implementation complexity.
+Finalize the deltas before `openspec archive <id>` — the MODIFIED re-examination in [`spec.md`](../../openspec/guide/spec.md) § Deltas — then run the standard flow.
 
 </OPENSPEC_PROJECT_RULES>

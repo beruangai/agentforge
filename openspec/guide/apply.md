@@ -8,6 +8,7 @@ Project rules for implementing a change, on top of `/opsx:apply` (change selecti
 - **Trace the flow end to end** before changing how a capability behaves — caller, client, runtime, task process, harness, Agent SDK.
 - **Find the single writer.** Identify which component owns each piece of state the change touches, and which only read it.
 - **Read `docs/lineage/`** when the change has a predecessor equivalent — it is evidence of what hurt, never a specification.
+- **Delegate to subagents** where the change's size earns it — independent surfaces in parallel, one context each.
 
 ## Deviation handling
 

@@ -25,6 +25,13 @@ A payload's field-level contract is how a behavior is realized, not a behavior. 
 
 **Size by behaviors, not implementation.** A long spec that mirrors implementation detail needs its altitude raised, not a split.
 
+## Capability naming
+
+**Prefix a capability with the concept folder that owns it.** OpenSpec supports neither namespaced nor nested specs, and AgentForge is one package, so a package prefix would say nothing. The owning concept does: `core`, `runtime`, `harness`, `client`, `infra`, `filesystem`.
+
+- `runtime-task-admission`, not `admission`
+- `harness-kernel-settlement`, not `settlement`
+
 ## Behavior-contract self-check
 
 Run before finishing any spec or delta. Every hit is reworded to observable behavior or deleted:
@@ -43,6 +50,18 @@ grep -nEi '(packages/|examples/|\.m?ts\b|\bzod\b|\borpc\b|\bvitest\b|\bnx\b|\bbu
 ```
 
 A clean grep is necessary, not sufficient. Apply the quick test to every requirement as well.
+
+## Deltas
+
+**Prefer REMOVED/ADDED pairs over MODIFIED.** MODIFIED replaces a whole requirement by copy, so it is rarely the smallest correct edit:
+
+| Change | Delta |
+|---|---|
+| A scenario changes | REMOVED the old scenario, ADDED the new one |
+| Scenarios are added to an existing requirement | ADDED alone — no MODIFIED |
+| A requirement is rewritten end to end | MODIFIED, carrying the complete replacement |
+
+Before archiving, read the baseline spec each delta lands on and re-examine every MODIFIED: a REMOVED/ADDED pair is usually what it should have been. One that stays MODIFIED must be a complete replacement that merges its intent with what is already there.
 
 ## Cite on first mention
 
