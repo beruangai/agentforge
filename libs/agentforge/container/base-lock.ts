@@ -12,10 +12,7 @@ import { join } from 'node:path';
  */
 const PACKAGE_ROOT = join(import.meta.dirname, '..');
 const WORKSPACE_ROOT = join(PACKAGE_ROOT, '..', '..');
-const BUNDLE_DIRECTORY = join(
-  WORKSPACE_ROOT,
-  'dist/packages/agentforge/bundle',
-);
+const BUNDLE_DIRECTORY = join(WORKSPACE_ROOT, 'dist/libs/agentforge/bundle');
 const ROOT_MANIFEST = join(import.meta.dirname, 'workspace', 'package.json');
 const ROOT_LOCK = join(import.meta.dirname, 'workspace', 'bun.lock');
 

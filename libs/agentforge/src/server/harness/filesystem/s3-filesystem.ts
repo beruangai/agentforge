@@ -37,7 +37,7 @@ export interface S7cmdResult {
 
 export type S7cmdRunner = (args: readonly string[]) => Promise<S7cmdResult>;
 
-/** The base image installs it on the `PATH` (packages/agentforge/Dockerfile). */
+/** The base image installs it on the `PATH` (libs/agentforge/Dockerfile). */
 const S7CMD = 's7cmd';
 /** How much of `s7cmd`'s stderr a failure carries. */
 const STDERR_TAIL_CHARACTERS = 2_000;

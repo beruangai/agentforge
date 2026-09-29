@@ -57,7 +57,7 @@
         "vitest": "catalog:",
       },
     },
-    "packages/agentforge": {
+    "libs/agentforge": {
       "name": "@beruangai/agentforge",
       "version": "0.0.0",
       "dependencies": {
@@ -499,7 +499,7 @@
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
 
-    "@beruangai/agentforge": ["@beruangai/agentforge@workspace:packages/agentforge"],
+    "@beruangai/agentforge": ["@beruangai/agentforge@workspace:libs/agentforge"],
 
     "@beruangai/example-agentic-project": ["@beruangai/example-agentic-project@workspace:examples/agentic-project"],
 

@@ -5,7 +5,7 @@
 | Target | Where | What | Runs | Credentials |
 |---|---|---|---|---|
 | `test` | Colocated `src/**/*.test.ts` | Units against nothing external; the kernel against a scripted `query()` | Every build | None |
-| `integ` | `packages/agentforge/integ/<dimension>/<concept>/` | One live slice: something AgentForge relies on, against the real thing | Before publishing, never on every commit | Per dimension, below |
+| `integ` | `libs/agentforge/integ/<dimension>/<concept>/` | One live slice: something AgentForge relies on, against the real thing | Before publishing, never on every commit | Per dimension, below |
 | `e2e` | `examples/<agent>/e2e/<place>/` | The whole path: a caller, the client or the Temporal activity, the agent's image, a real model, back as a typed outcome | Before publishing | The subscription token; AWS from A2 |
 
 A live slice is integration however expensive it is; e2e means the whole path.

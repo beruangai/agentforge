@@ -35,7 +35,7 @@ Settled and not reopened: **AgentForge owns its requirements**, and the operator
 
 ## Conventions
 
-- **Organize by concept, in folders, not projects.** `packages/agentforge` is the one publishing project: `core/`, `server/runtime/`, `server/harness/`, `client/` (with `temporal/`), `infra/`. A concept owns its code, schemas and tests; file names carry the type. Never a `types/` or `utils/` tree. Example agents are their own projects in `examples/`, because each is a consumer.
+- **Organize by concept, in folders, not projects.** `libs/agentforge` is the one publishing project: `core/`, `server/runtime/`, `server/harness/`, `client/` (with `temporal/`), `infra/`. A concept owns its code, schemas and tests; file names carry the type. Never a `types/` or `utils/` tree. Example agents are their own projects in `examples/`, because each is a consumer.
 - **Imports inside the package use `.ts` extensions**, and `#core/*` for a module in `core/`.
 - **One output root**: `dist/{projectRoot}/<task>/`. The published package is the `bundle` task's output.
 - **Node 26 and TypeScript on Bun**, declared once.

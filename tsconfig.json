@@ -4,7 +4,7 @@
   "files": [],
   "references": [
     {
-      "path": "./packages/agentforge"
+      "path": "./libs/agentforge"
     }
   ]
 }

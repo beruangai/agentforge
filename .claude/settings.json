@@ -20,7 +20,7 @@
     "baseRef": "head",
     "symlinkDirectories": [
       "node_modules",
-      "packages/agentforge/node_modules",
+      "libs/agentforge/node_modules",
       ".nx/cache",
       ".local"
     ]

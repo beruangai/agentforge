@@ -4,10 +4,10 @@ import { defineConfig } from 'tsdown';
 
 /**
  * The published package is assembled under the workspace's one output root,
- * `dist/packages/agentforge/bundle/` — named for the task that builds it —, so the source directory stays clean
+ * `dist/libs/agentforge/bundle/` — named for the task that builds it —, so the source directory stays clean
  * and everything built sits beside everything else produced.
  */
-const BUNDLE_DIRECTORY = '../../dist/packages/agentforge/bundle';
+const BUNDLE_DIRECTORY = '../../dist/libs/agentforge/bundle';
 
 /**
  * One package, six entry points. Code shared between entry points is split

@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "incremental": true,
-    "tsBuildInfoFile": "../../dist/packages/agentforge/typecheck/tsconfig.lib.tsbuildinfo",
+    "tsBuildInfoFile": "../../dist/libs/agentforge/typecheck/tsconfig.lib.tsbuildinfo",
     "allowImportingTsExtensions": true
   },
   "include": [

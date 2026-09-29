@@ -30,7 +30,7 @@
   },
   "type": "module",
   "workspaces": [
-    "packages/*",
+    "libs/*",
     "examples/*"
   ],
   "catalog": {

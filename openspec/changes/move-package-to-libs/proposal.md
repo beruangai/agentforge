@@ -7,7 +7,7 @@
 ## What Changes
 
 - `packages/agentforge` moves to `libs/agentforge`, keeping its project name `@beruangai/agentforge` and its depth, so every relative path inside it is unchanged.
-- Root `workspaces` gain `libs/*`; the workspace references, lint overrides, Docker ignore, worktree symlinks and every document naming the old path follow it. Build output moves with it to `dist/libs/agentforge/`.
+- Root `workspaces` replace `packages/*`, now empty, with `libs/*`; the workspace references, lint overrides, Docker ignore, worktree symlinks and every document naming the old path follow it. Build output moves with it to `dist/libs/agentforge/`.
 - `claudeMdExcludes` keeps `packages/**`: the examples' layer instructions will live there, and an IDE session must not load an agent's `CLAUDE.md`.
 - The examples' targets that name the old path are updated so they keep building until `nx-plugin-baseline` detaches them.
 

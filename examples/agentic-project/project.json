@@ -38,7 +38,7 @@
       ],
       "inputs": [
         "{projectRoot}/base/files/package.json",
-        "{workspaceRoot}/packages/agentforge/container/**/*",
+        "{workspaceRoot}/libs/agentforge/container/**/*",
         {
           "dependentTasksOutputFiles": "**/package.json"
         },
@@ -48,7 +48,7 @@
       ],
       "outputs": ["{projectRoot}/base/files/bun.lock"],
       "options": {
-        "command": "bun ../../packages/agentforge/container/workspace-lock.ts --root ../../packages/agentforge/container/workspace/package.json --member agentforge=../../dist/packages/agentforge/bundle --member agentic=base/files --seed ../../packages/agentforge/container/workspace/bun.lock --out base/files/bun.lock",
+        "command": "bun ../../libs/agentforge/container/workspace-lock.ts --root ../../libs/agentforge/container/workspace/package.json --member agentforge=../../dist/libs/agentforge/bundle --member agentic=base/files --seed ../../libs/agentforge/container/workspace/bun.lock --out base/files/bun.lock",
         "cwd": "{projectRoot}"
       }
     },
@@ -59,7 +59,7 @@
       "inputs": [
         "{projectRoot}/base/files/package.json",
         "{projectRoot}/agents/reviewer/files/package.json",
-        "{workspaceRoot}/packages/agentforge/container/**/*",
+        "{workspaceRoot}/libs/agentforge/container/**/*",
         {
           "dependentTasksOutputFiles": "**/package.json"
         },
@@ -69,7 +69,7 @@
       ],
       "outputs": ["{projectRoot}/agents/reviewer/files/bun.lock"],
       "options": {
-        "command": "bun ../../packages/agentforge/container/workspace-lock.ts --root ../../packages/agentforge/container/workspace/package.json --member agentforge=../../dist/packages/agentforge/bundle --member agentic=base/files --member agentic/agent=agents/reviewer/files --seed base/files/bun.lock --out agents/reviewer/files/bun.lock",
+        "command": "bun ../../libs/agentforge/container/workspace-lock.ts --root ../../libs/agentforge/container/workspace/package.json --member agentforge=../../dist/libs/agentforge/bundle --member agentic=base/files --member agentic/agent=agents/reviewer/files --seed base/files/bun.lock --out agents/reviewer/files/bun.lock",
         "cwd": "{projectRoot}"
       }
     },
@@ -80,7 +80,7 @@
       "inputs": [
         "{projectRoot}/base/files/package.json",
         "{projectRoot}/agents/fixer/files/package.json",
-        "{workspaceRoot}/packages/agentforge/container/**/*",
+        "{workspaceRoot}/libs/agentforge/container/**/*",
         {
           "dependentTasksOutputFiles": "**/package.json"
         },
@@ -90,7 +90,7 @@
       ],
       "outputs": ["{projectRoot}/agents/fixer/files/bun.lock"],
       "options": {
-        "command": "bun ../../packages/agentforge/container/workspace-lock.ts --root ../../packages/agentforge/container/workspace/package.json --member agentforge=../../dist/packages/agentforge/bundle --member agentic=base/files --member agentic/agent=agents/fixer/files --seed base/files/bun.lock --out agents/fixer/files/bun.lock",
+        "command": "bun ../../libs/agentforge/container/workspace-lock.ts --root ../../libs/agentforge/container/workspace/package.json --member agentforge=../../dist/libs/agentforge/bundle --member agentic=base/files --member agentic/agent=agents/fixer/files --seed base/files/bun.lock --out agents/fixer/files/bun.lock",
         "cwd": "{projectRoot}"
       }
     },

@@ -70,7 +70,7 @@
       }
     },
     {
-      "includes": ["packages/agentforge/src/core/**"],
+      "includes": ["libs/agentforge/src/core/**"],
       "linter": {
         "rules": {
           "style": {
@@ -99,7 +99,7 @@
       }
     },
     {
-      "includes": ["packages/agentforge/src/server/runtime/**"],
+      "includes": ["libs/agentforge/src/server/runtime/**"],
       "linter": {
         "rules": {
           "style": {
@@ -122,7 +122,7 @@
       }
     },
     {
-      "includes": ["packages/agentforge/src/server/harness/**"],
+      "includes": ["libs/agentforge/src/server/harness/**"],
       "linter": {
         "rules": {
           "style": {
@@ -142,7 +142,7 @@
       }
     },
     {
-      "includes": ["packages/agentforge/src/client/**"],
+      "includes": ["libs/agentforge/src/client/**"],
       "linter": {
         "rules": {
           "style": {
@@ -166,7 +166,7 @@
       }
     },
     {
-      "includes": ["packages/agentforge/src/infra/**"],
+      "includes": ["libs/agentforge/src/infra/**"],
       "linter": {
         "rules": {
           "style": {

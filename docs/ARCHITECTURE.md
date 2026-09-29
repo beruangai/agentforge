@@ -184,7 +184,7 @@ One published package, `@beruangai/agentforge`, with an entry point per environm
 `/agent` and `/server` resolve only under the `agentforge-agent` export condition, so a worker's build cannot import them. Every entry also carries a `@beruangai/source` condition pointing at its source, for projects inside this workspace, and publishing strips it. What only one environment needs — the Agent SDK, the A2A SDK, Express, the AWS clients, Temporal — is an optional peer; `@orpc/contract` and Zod are required peers, so a consumer's schemas and AgentForge's are one copy. Peer ranges are caret for stable packages and exact for pre-1.0 and beta ones.
 
 ```
-packages/agentforge/          @beruangai/agentforge — the one Nx project that publishes
+libs/agentforge/              @beruangai/agentforge — the one Nx project that publishes
   src/core/                   contract helpers, task shapes, task-process messages
   src/server/runtime/         layer 1: server, gateway, executor, task store
   src/server/harness/         layer 2: implementAgent, task process, kernel; filesystem/ the filesystems
@@ -203,7 +203,7 @@ Imports inside the package use `.ts` extensions, and `#core/*` for a module in `
 | Tier | Where | Against | Runs |
 |---|---|---|---|
 | `test` | Colocated `*.test.ts` | Nothing external; the kernel against a scripted `query()` | Every build |
-| `integ` | `packages/agentforge/integ/` | One live slice: the runtime with real processes and DynamoDB Local (`local`), AgentCore (`aws`), the Agent SDK against a model (`model`) | Before publishing |
+| `integ` | `libs/agentforge/integ/` | One live slice: the runtime with real processes and DynamoDB Local (`local`), AgentCore (`aws`), the Agent SDK against a model (`model`) | Before publishing |
 | `e2e` | `examples/*/e2e/` | The whole path: a caller, the client or the Temporal activity, the agent's image, a real model — in Docker (`local`) or deployed on AgentCore (`agentcore`) | Before publishing |
 
 The examples are the dogfood: AgentForge's own agents, built and verified exactly as a consumer's would be — the image from the published bundle, the procedures through the client — before any consumer adopts a change. Rules are in `.claude/rules/testing.md`.

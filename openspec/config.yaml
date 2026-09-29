@@ -3,7 +3,7 @@ schema: spec-driven
 context: |
   AgentForge: a procedure wrapper for the Claude Agent SDK, built for StrategyFoundry and
   TrendBot, not for public use.
-  Tech stack: TypeScript on Bun, one Nx project (packages/agentforge) on @aws/nx-plugin, Vitest, Zod, oRPC, AWS CDK.
+  Tech stack: TypeScript on Bun, one Nx project (libs/agentforge) on @aws/nx-plugin, Vitest, Zod, oRPC, AWS CDK.
 
   Four layers with a contract at every boundary (docs/ARCHITECTURE.md §1):
   1 runtime (A2A server and client, gateway, executor, durable task store),

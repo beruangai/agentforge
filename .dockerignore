@@ -2,7 +2,7 @@
 **
 !package.json
 !bun.lock
-!packages/*/package.json
+!libs/*/package.json
 !examples/*/package.json
 !examples/*/src
-!dist/packages/agentforge/bundle
+!dist/libs/agentforge/bundle

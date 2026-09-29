@@ -135,7 +135,7 @@ export type ToolResult = {
 
 /**
  * Every message of one run, appended to
- * `dist/packages/agentforge/integ/<concept>/<name>.jsonl` as it arrives, so the
+ * `dist/libs/agentforge/integ/<concept>/<name>.jsonl` as it arrives, so the
  * evidence survives a throw or a timeout.
  */
 export class QueryRecording {

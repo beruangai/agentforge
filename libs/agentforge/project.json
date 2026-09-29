@@ -1,7 +1,7 @@
 {
   "name": "@beruangai/agentforge",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "packages/agentforge/src",
+  "sourceRoot": "libs/agentforge/src",
   "projectType": "library",
   "tags": [],
   "metadata": {
@@ -36,7 +36,7 @@
       "inputs": ["production"],
       "outputs": ["{workspaceRoot}/dist/{projectRoot}/bundle"],
       "options": {
-        "command": "tsdown && publint run ../../dist/packages/agentforge/bundle --strict --pack npm",
+        "command": "tsdown && publint run ../../dist/libs/agentforge/bundle --strict --pack npm",
         "cwd": "{projectRoot}"
       }
     },
@@ -127,7 +127,7 @@
       "cache": false,
       "dependsOn": ["container-lock"],
       "options": {
-        "command": "docker build --platform linux/arm64 -f Dockerfile --build-context container=container/workspace -t agentforge/a2a-claude:local ../../dist/packages/agentforge/bundle",
+        "command": "docker build --platform linux/arm64 -f Dockerfile --build-context container=container/workspace -t agentforge/a2a-claude:local ../../dist/libs/agentforge/bundle",
         "cwd": "{projectRoot}"
       }
     }

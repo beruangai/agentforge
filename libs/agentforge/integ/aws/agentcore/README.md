@@ -43,10 +43,10 @@ It is a role in this account rather than an Identity Center permission set becau
 
 ```bash
 aws iam create-role --role-name AgentForgeTestInteg \
-  --assume-role-policy-document file://packages/agentforge/integ/aws/test-role-trust-policy.json
+  --assume-role-policy-document file://libs/agentforge/integ/aws/test-role-trust-policy.json
 aws iam put-role-policy --role-name AgentForgeTestInteg \
   --policy-name agentforge-integ-test \
-  --policy-document file://packages/agentforge/integ/aws/test-role-permissions-policy.json
+  --policy-document file://libs/agentforge/integ/aws/test-role-permissions-policy.json
 ```
 
 and a profile for it in `~/.aws/config`, reached from the `agentforge` SSO profile:
@@ -65,7 +65,7 @@ The policy is scoped by region and name rather than pared to the last action: ta
 **2. The execution role AgentCore assumes** — trusted by `bedrock-agentcore.amazonaws.com` for this account and `us-east-2` only; it pulls from ECR, writes the runtime's logs, and may touch DynamoDB tables and S3 buckets named `agentforge-integ-*`:
 
 ```bash
-FIXTURES=packages/agentforge/integ/aws/agentcore/__fixtures__
+FIXTURES=libs/agentforge/integ/aws/agentcore/__fixtures__
 aws iam create-role --role-name agentforge-integ-agentcore-execution \
   --tags Key=agentforge:integ,Value=true \
   --assume-role-policy-document "file://$FIXTURES/execution-role-trust-policy.json"
