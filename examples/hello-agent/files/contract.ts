@@ -3,7 +3,7 @@ import { oc } from '@orpc/contract';
 import { z } from 'zod';
 
 /** A topic names the notebook's prefix its note is kept under. */
-const TopicField = z.string().regex(/^[a-z0-9-]{1,64}$/);
+export const TopicField = z.string().regex(/^[a-z0-9-]{1,64}$/);
 
 /**
  * What callers import. Each procedure is an oRPC contract; AgentForge derives

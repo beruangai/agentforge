@@ -1,5 +1,5 @@
 /**
- * §C — is the post-SIGTERM grace period a fixed window, or does AgentCore kill
+ * research §C — is the post-SIGTERM grace period a fixed window, or does AgentCore kill
  * the container once it stops reporting HealthyBusy?
  *
  * The first run could not tell them apart: a 60 s task was stopped and the
@@ -52,7 +52,7 @@ const SAME_OFFSET_WITHIN_MILLISECONDS = 3_000;
 const READ_HEARTBEATS_AFTER_STOP_MILLISECONDS = 130_000;
 const LOG_CLOCK_MARGIN_MILLISECONDS = 60_000;
 
-describe('the grace period after StopRuntimeSession (§C)', () => {
+describe('the grace period after StopRuntimeSession (research §C)', () => {
   const resources = createResourceStack();
   let fixture: FixtureRuntime;
   let a2a: A2aOverAgentCore;

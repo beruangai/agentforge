@@ -16,6 +16,7 @@ const contract = {
   ),
   nested: {
     broken: oc.input(z.object({})).output(z.object({ ok: z.boolean() })),
+    failing: oc.input(z.object({})).output(z.object({ ok: z.boolean() })),
   },
 };
 
@@ -35,6 +36,9 @@ const router = os.router({
   nested: {
     // Returns what the contract refuses.
     broken: os.nested.broken.handler(async () => ({ ok: 'yes' }) as never),
+    failing: os.nested.failing.handler(async () => {
+      throw new Error('the handler gave up');
+    }),
   },
 });
 
@@ -117,7 +121,28 @@ describe('executeProcedure', () => {
     );
     expect(outcome).toMatchObject({
       state: 'TASK_STATE_FAILED',
-      cause: { code: 'OUTPUT_INVALID' },
+      cause: {
+        code: 'OUTPUT_INVALID',
+        message: expect.stringMatching(/at ok/),
+        payload: { ok: 'yes' },
+      },
+    });
+  });
+
+  it('fails with the message of an error the handler throws', async () => {
+    const outcome = await execute(
+      invocation({
+        procedure: 'nested.failing',
+        contractHash: contractHash(contract.nested.failing),
+        input: {},
+      }),
+    );
+    expect(outcome).toMatchObject({
+      state: 'TASK_STATE_FAILED',
+      cause: {
+        code: 'EXECUTION_ERROR',
+        message: 'Error: the handler gave up',
+      },
     });
   });
 

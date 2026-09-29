@@ -1,5 +1,5 @@
 /**
- * §B — the provisioning window: what a caller sees between `CreateAgentRuntime`
+ * research §B — the provisioning window: what a caller sees between `CreateAgentRuntime`
  * and the first invocation that works.
  *
  * The documentation describes a retryable HTTP 409 while a session is
@@ -56,7 +56,7 @@ interface WindowObservation {
   readonly invocation: Invocation;
 }
 
-describe('the AgentCore provisioning window (§B)', () => {
+describe('the AgentCore provisioning window (research §B)', () => {
   const resources = createResourceStack();
   let prepared: PreparedFixtureImage;
 

@@ -1,6 +1,6 @@
 # Glossary
 
-**Borrow before inventing, and never shorten**: the Claude Agent SDK's, AgentCore's or A2A's term first, verbatim — the protocol calls it `GetTask`, so it is `GetTask` — then a term here, and only then a new one. No consumer's vocabulary: a *directive* is a **procedure**, a *vault* is a **working directory**.
+**Borrow before inventing, and never shorten**: the Claude Agent SDK's, AgentCore's or A2A's term first, verbatim — the protocol calls it `GetTask`, so it is `GetTask` — then a term here, and only then a new one. No consumer's vocabulary: a *directive* is a **procedure**, a *vault* is a **filesystem**.
 
 ## Layers and parts
 
@@ -36,7 +36,7 @@
 
 **Agent run** — One `context.runAgent({ prompt, output, options })`, recorded as a **run record**.
 
-**Task context** — What a handler receives beside its input: the ids, the attempt and prior attempt, metadata, the cancellation signal, `runAgent`.
+**Task context** — What a handler receives beside its input: the ids, the attempt and prior attempt, metadata, the cancellation signal, `runAgent`, and the mounted `filesystems` with their merged `filesystemPermissions`.
 
 **Time budget** — How long a task may run; declared with `timeBudget(seconds)` in the contract's meta, overridable per call, enforced by the executor.
 
@@ -54,7 +54,7 @@
 
 **Idempotency key** — The caller's name for one logical execution; a start with it attaches to its live or completed task ([ADR 0009](../adr/0009-the-caller-supplies-the-idempotency-key.md)).
 
-**Attempt** — One task under an idempotency key. A new one starts only once the last failed, was cancelled or was lost, and it is told how.
+**Attempt** — One task under an idempotency key. A new one starts only once the last failed, was cancelled, was lost or was rejected by the procedure, and it is told how.
 
 **Continuity key** — Optional and opaque: at most one live task under it per container.
 
@@ -70,9 +70,13 @@
 
 **Session** — The Agent SDK's: one transcript, started or resumed by id.
 
+**Session store** — The SDK's `SessionStore`: where a run's transcript is mirrored so a session resumes in another container. Deployed, AgentForge's is the agent's **session bucket**, an S3 bucket the construct provisions and names in `AGENTFORGE_SESSION_BUCKET`; a procedure may name its own.
+
 **`cwd`** — The SDK's working directory, and the capability root: which `.claude/` layers apply.
 
-**Filesystem** — Files AgentForge manages for a procedure, persistent or scratch: a kind (`S3Filesystem`, `ScratchFilesystem`, or a consumer's subclass) registered by name with the `filesystems()` middleware, mounted before the handler and unmounted once the outcome is known. To **mount** one is to pull its store into a local directory — not a runtime or container mount. Its operations are **pull** and **push**; `pushOn` lists the task states it pushes on — `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, or both; never a cancel, and absent it never pushes. A **checkpoint** is a push, while the task runs, of what has settled. Its **scope** — the `remotePath` mounted and the `read` and `write` globs within it — is resolved per request; the handler receives its `localPath` and **baseline permissions** and decides what an agent gets ([ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)).
+**Working directory** — The SDK's name for `cwd`, as §REQ401 uses it. The files a procedure works on are its **filesystems**, not its working directory.
+
+**Filesystem** — Files AgentForge manages for a procedure, persistent or scratch: a kind (`S3Filesystem`, `ScratchFilesystem`, or a consumer's subclass) registered by name with the `filesystems()` middleware, mounted before the handler and unmounted once the outcome is known. To **mount** one is to pull its store into a local directory — not a runtime or container mount. Its operations are **pull** and **push**; `pushOn` lists the task states it pushes on — `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, or both; never a cancel or a timeout, and absent it never pushes. A **checkpoint** is a push, while the task runs, of what has settled. Its **scope** — the `remotePath` mounted and the `read` and `write` globs within it — is resolved per request; the handler receives its `localPath` and **baseline permissions** and decides what an agent gets ([ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)).
 
 ## Delivery
 
@@ -92,4 +96,4 @@
 
 **Consumer** — StrategyFoundry or TrendBot.
 
-**Requirement** — A numbered behavior in [REQUIREMENTS.md](REQUIREMENTS.md), cited as `§REQ304`. Distinct from an ADR, which records why, and a DESIGN_OPTIONS section (`§K`), which is still open.
+**Requirement** — A numbered behavior in [REQUIREMENTS.md](REQUIREMENTS.md), cited as `§REQ304`. Distinct from an ADR, which records why, and an open design option in [DESIGN_OPTIONS.md](DESIGN_OPTIONS.md) (`§ODO003`), which is still open.

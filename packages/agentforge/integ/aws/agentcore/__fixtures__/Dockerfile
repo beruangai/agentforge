@@ -1,6 +1,6 @@
 # The AgentCore fixture container. ARM64 only — AgentCore Runtime takes nothing
-# else. BUN_IMAGE has no default: the test passes oven/bun:1.4.0-alpine pinned
-# by digest, so a build outside the test fails rather than floating on a tag.
+# else. BUN_IMAGE has no default: the test passes the base image's own pinned
+# Bun image, so a build outside the test fails rather than floating on a tag.
 ARG BUN_IMAGE
 FROM ${BUN_IMAGE}
 WORKDIR /opt/agentforge

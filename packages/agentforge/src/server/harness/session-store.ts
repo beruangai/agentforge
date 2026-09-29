@@ -100,22 +100,21 @@ export class S3SessionStore implements SessionStore {
     const prefix = keyPrefix(key);
     const subkeys = new Set<string>();
     for (const objectKey of await this.listUnder(prefix)) {
-      const subpath = objectKey
-        .slice(prefix.length)
-        .split('/')
-        .slice(0, -1)
-        .join('/');
-      if (subpath !== '') subkeys.add(subpath);
+      const segments = objectKey.slice(prefix.length).split('/').slice(0, -1);
+      if (segments.length === 0) continue;
+      // No legitimate writer produces a traversing or empty segment.
+      if (
+        segments.some(
+          (segment) => segment === '..' || segment === '.' || segment === '',
+        )
+      ) {
+        throw new Error(
+          `s3://${this.bucket}/${objectKey} is under a subpath that is not a plain relative path`,
+        );
+      }
+      subkeys.add(segments.join('/'));
     }
-    // No legitimate writer produces a traversing segment.
-    return [...subkeys].filter(
-      (subpath) =>
-        !subpath
-          .split('/')
-          .some(
-            (segment) => segment === '..' || segment === '.' || segment === '',
-          ),
-    );
+    return [...subkeys];
   }
 
   private async listUnder(

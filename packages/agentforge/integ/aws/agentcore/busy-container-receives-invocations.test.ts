@@ -1,5 +1,5 @@
 /**
- * §B — a busy container still receives invocations.
+ * research §B — a busy container still receives invocations.
  *
  * `ARCHITECTURE.md` §4 asserts that `/ping` is a lifecycle signal rather than
  * admission control, so a container receives a start, a poll or a cancel
@@ -41,7 +41,7 @@ import {
 /** A call held behind the 25-second task would take tens of seconds. */
 const DELIVERED_WHILE_BUSY_WITHIN_MILLISECONDS = 5_000;
 
-describe('a busy AgentCore container (§B)', () => {
+describe('a busy AgentCore container (research §B)', () => {
   const resources = createResourceStack();
   let fixture: FixtureRuntime;
   let a2a: A2aOverAgentCore;

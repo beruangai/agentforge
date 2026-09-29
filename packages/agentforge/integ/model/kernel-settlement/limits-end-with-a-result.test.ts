@@ -1,7 +1,7 @@
 /**
  * A turn or budget limit ends the run with an ordinary result, under the
  * kernel's input mode — streaming input, background work off, the input ended
- * on the first result (docs/ARCHITECTURE.md §7).
+ * on the first result (docs/ARCHITECTURE.md §6).
  *
  * The kernel classifies an outcome from the result — `subtype`,
  * `terminal_reason`, `is_error` — never from an error's text. In
@@ -15,8 +15,9 @@
 import type { Options, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
+import { BACKGROUND_WORK_DISABLED } from '../../../src/server/harness/kernel.ts';
+import { structuredOutputJsonSchema } from '../../../src/server/harness/structured-output.ts';
 import {
-  BACKGROUND_WORK_DISABLED,
   createSandbox,
   createSubscriptionEnvironment,
   ProcessOutlivedItsInputError,
@@ -24,9 +25,9 @@ import {
   runWithStreamingInput,
 } from '../../__fixtures__/claude-agent-sdk.ts';
 
-const OUTPUT_JSON_SCHEMA = z.toJSONSchema(z.object({ answer: z.string() }), {
-  target: 'draft-7',
-});
+const OUTPUT_JSON_SCHEMA = structuredOutputJsonSchema(
+  z.object({ answer: z.string() }),
+);
 
 type Scenario = {
   name: string;

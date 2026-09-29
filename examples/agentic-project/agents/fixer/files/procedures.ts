@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { composeOptions, implementAgent } from '@beruangai/agentforge/agent';
 import { houseOptions } from '@example/agentic-project/house-options';
-import { HOUSE_RULE_IDS } from '@example/agentic-project/house-rules';
+import { HouseRuleIdEnum } from '@example/agentic-project/house-rules';
 import { placeSourceFile } from '@example/agentic-project/source-file';
 import { z } from 'zod';
 import { fixer } from './contract.ts';
@@ -16,7 +16,7 @@ export const router = os.router({
     const path = await placeSourceFile(workingDirectory, input);
     const run = await context.runAgent({
       prompt: `Bring ${path} into the house style by editing it in place. Then report the ids of the rules you applied.`,
-      output: z.object({ rulesApplied: z.array(z.enum(HOUSE_RULE_IDS)) }),
+      output: z.object({ rulesApplied: z.array(HouseRuleIdEnum) }),
       // The house options, plus what this agent alone may do: edit.
       options: composeOptions(houseOptions(workingDirectory), {
         tools: ['Edit'],

@@ -12,12 +12,18 @@ const HOUSE_RULES_SERVER = fileURLToPath(
 /** File tools stay inside the working directory; anything else is denied in the turn. */
 function stayInWorkingDirectory(workingDirectory: string): HookCallback {
   return async (input) => {
-    const toolInput = (input as { tool_input?: { file_path?: unknown } })
-      .tool_input;
-    const filePath = toolInput?.file_path;
+    if (input.hook_event_name !== 'PreToolUse') {
+      throw new Error(
+        `stayInWorkingDirectory is a PreToolUse hook, called for ${input.hook_event_name}`,
+      );
+    }
+    const toolInput = input.tool_input;
     if (
-      typeof filePath === 'string' &&
-      !filePath.startsWith(`${workingDirectory}/`)
+      typeof toolInput === 'object' &&
+      toolInput !== null &&
+      'file_path' in toolInput &&
+      typeof toolInput.file_path === 'string' &&
+      !toolInput.file_path.startsWith(`${workingDirectory}/`)
     ) {
       return {
         hookSpecificOutput: {

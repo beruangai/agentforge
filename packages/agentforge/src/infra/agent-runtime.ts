@@ -38,6 +38,7 @@ import {
 } from 'aws-cdk-lib/aws-s3';
 import type { ISecret } from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
+import { A2A_VERSION_HEADER } from '#core/a2a-version.ts';
 import {
   FILESYSTEM_BUCKETS_VARIABLE,
   FILESYSTEM_NAME_PATTERN,
@@ -51,6 +52,7 @@ import {
 import { SECRETS_VARIABLE } from '#core/secrets.ts';
 import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
 import {
+  TASK_TABLE_NAME_VARIABLE,
   TASK_TABLE_PARTITION_KEY,
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
 } from '#core/task-table.ts';
@@ -58,10 +60,6 @@ import { TELEMETRY_VARIABLE, type TelemetryLevel } from '#core/telemetry.ts';
 import { suppressRules } from './checkov.ts';
 import type { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
 
-/** The one request header AgentForge relies on AgentCore forwarding (ADR 0014). */
-const A2A_VERSION_HEADER = 'A2A-Version';
-/** Set by the construct: where the server keeps task state. */
-const TABLE_NAME_VARIABLE = 'AGENTFORGE_TABLE_NAME';
 /**
  * How long the probe may wait for the runtime to serve: a V2 create takes
  * minutes while the snapshot is prepared (~184 s observed), and Lambda's
@@ -69,8 +67,16 @@ const TABLE_NAME_VARIABLE = 'AGENTFORGE_TABLE_NAME';
  */
 const READINESS_TIMEOUT = Duration.minutes(14);
 
+/**
+ * The L2 `Runtime`'s props, less the protocol, which is A2A, and the
+ * authorizer: the readiness probe, `grantInvoke` and `agentCoreTransport` all
+ * sign with IAM SigV4, so a JWT authorizer could only fail the deploy.
+ */
 export interface AgentRuntimeProps
-  extends Omit<RuntimeProps, 'protocolConfiguration'> {
+  extends Omit<
+    RuntimeProps,
+    'protocolConfiguration' | 'authorizerConfiguration'
+  > {
   /**
    * What happens to the task table and the session bucket when the stack
    * deletes them. `DESTROY` deletes the bucket only when it is empty, and
@@ -149,7 +155,7 @@ export class AgentRuntime extends Construct {
       ...runtimeProps
     } = props;
     for (const owned of [
-      TABLE_NAME_VARIABLE,
+      TASK_TABLE_NAME_VARIABLE,
       SESSION_BUCKET_VARIABLE,
       METRICS_VARIABLE,
       SECRETS_VARIABLE,
@@ -224,7 +230,7 @@ export class AgentRuntime extends Construct {
       },
       environmentVariables: {
         ...environmentVariables,
-        [TABLE_NAME_VARIABLE]: this.taskTable.tableName,
+        [TASK_TABLE_NAME_VARIABLE]: this.taskTable.tableName,
         [SESSION_BUCKET_VARIABLE]: this.sessionBucket.bucketName,
         [TELEMETRY_VARIABLE]: telemetry,
         ...(Object.keys(secrets).length === 0

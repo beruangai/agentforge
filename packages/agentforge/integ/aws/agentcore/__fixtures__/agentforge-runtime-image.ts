@@ -1,14 +1,13 @@
 import { cp } from 'node:fs/promises';
 import { join } from 'node:path';
-import { buildAgentForgeBaseImage } from '../../__fixtures__/agentforge-base-image.ts';
 
 const PACKAGE_ROOT = join(import.meta.dirname, '..', '..', '..', '..');
 /**
- * AgentForge's base image, built locally from the package's own `Dockerfile`
- * over the `bundle` task's output and the `container-lock` task's, and the
- * build context of an image over it running AgentForge's server from source
- * with the runtime fixture's procedures — no model. The construct's CDK asset
- * builds that image and publishes it, as a consumer's agent image is.
+ * The build context of an image over AgentForge's base image — built by the
+ * package's `image` target, which `integ` depends on — running AgentForge's
+ * server from source with the runtime fixture's procedures — no model. The
+ * construct's CDK asset builds that image and publishes it, as a consumer's
+ * agent image is.
  */
 export async function stageAgentForgeRuntimeImage(
   contextDirectory: string,
@@ -28,5 +27,4 @@ export async function stageAgentForgeRuntimeImage(
     join(import.meta.dirname, 'agentforge-runtime.Dockerfile'),
     join(contextDirectory, 'Dockerfile'),
   );
-  await buildAgentForgeBaseImage();
 }

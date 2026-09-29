@@ -90,9 +90,11 @@ export function procedureActivity<Input, Output>(
               }),
         });
       case 'TASK_STATE_REJECTED':
+        // Refused before any work: the same start would be refused again.
         throw ApplicationFailure.create({
           type: 'TASK_STATE_REJECTED',
           message: ended.reason,
+          nonRetryable: true,
         });
       case 'TASK_STATE_CANCELED':
         // Someone else cancelled it: a new attempt may run.

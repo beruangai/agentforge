@@ -6,8 +6,9 @@ import type { AgentOptions } from './kernel.ts';
  * later parts winning — except where losing a contribution would be silent
  * (§REQ204). Arrays accumulate, without duplicates: hooks per event, allowed
  * and disallowed tools, and every other list. Plain objects merge key by key,
- * the environment among them. An MCP server named twice is an error rather
- * than a merge of two servers' configuration.
+ * the environment among them. A value given as `undefined` changes nothing,
+ * so it cannot erase what an earlier part set. An MCP server named twice is an
+ * error rather than a merge of two servers' configuration.
  */
 export function composeOptions(...parts: AgentOptions[]): AgentOptions {
   const named = new Set<string>();
@@ -19,5 +20,8 @@ export function composeOptions(...parts: AgentOptions[]): AgentOptions {
       named.add(name);
     }
   }
-  return deepMerge(...parts) as AgentOptions;
+  return deepMerge.withOptions(
+    { allowUndefinedOverrides: false },
+    ...parts,
+  ) as AgentOptions;
 }

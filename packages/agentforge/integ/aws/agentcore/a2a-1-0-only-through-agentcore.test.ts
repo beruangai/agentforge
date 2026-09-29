@@ -1,5 +1,5 @@
 /**
- * §I, end to end on the real platform — A2A 1.0 only, AgentForge's own
+ * ADR 0014, end to end on the real platform — A2A 1.0 only, AgentForge's own
  * configuration (ADR 0014): the card declares one interface at 1.0,
  * `legacyCompat` is off, and the runtime allowlists `A2A-Version`.
  *

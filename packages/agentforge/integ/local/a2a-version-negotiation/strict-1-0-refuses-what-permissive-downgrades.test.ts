@@ -1,5 +1,5 @@
 /**
- * §I — can AgentForge run A2A 1.0 ONLY, and never carry 0.3? (ADR 0014)
+ * ADR 0014 — can AgentForge run A2A 1.0 ONLY, and never carry 0.3? (ADR 0014)
  *
  * A2A is AgentForge's transport, never exposed to a consumer or an agent, so
  * there is no caller to stay compatible with. The question is whether
@@ -143,7 +143,7 @@ const MATRIX: {
   },
 ];
 
-describe('A2A 1.0 only, or 1.0 with 0.3 underneath (§I, ADR 0014)', () => {
+describe('A2A 1.0 only, or 1.0 with 0.3 underneath (ADR 0014, ADR 0014)', () => {
   let strict: VersionNegotiationServer;
   let permissive: VersionNegotiationServer;
 

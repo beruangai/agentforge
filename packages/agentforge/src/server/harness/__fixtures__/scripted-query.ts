@@ -8,19 +8,22 @@ export interface ScriptedQuery {
   readonly query: QueryFunction;
   readonly calls: { options: Record<string, unknown> }[];
   readonly interrupted: () => boolean;
+  readonly closed: () => boolean;
 }
 
 /**
  * A stand-in for the SDK's `query()`: reads the first prompt message, then
  * yields the scripted messages. `hang` holds the stream open after them
- * until interrupted, like a turn still running.
+ * until interrupted, like a turn still running; `crash` throws after them,
+ * as a stream that failed.
  */
 export function scriptedQuery(
   messages: SDKMessage[],
-  behaviour: { hang?: boolean } = {},
+  behaviour: { hang?: boolean; crash?: Error } = {},
 ): ScriptedQuery {
   const calls: { options: Record<string, unknown> }[] = [];
   let interrupted = false;
+  let closed = false;
   let release: () => void = () => undefined;
   const query = ((parameters: Parameters<QueryFunction>[0]) => {
     calls.push({ options: { ...parameters.options } });
@@ -30,6 +33,7 @@ export function scriptedQuery(
         await prompt[Symbol.asyncIterator]().next();
       }
       for (const message of messages) yield message;
+      if (behaviour.crash !== undefined) throw behaviour.crash;
       if (behaviour.hang) {
         await new Promise<void>((resolve) => {
           release = resolve;
@@ -48,11 +52,17 @@ export function scriptedQuery(
         return undefined;
       },
       close: () => {
+        closed = true;
         release();
       },
     });
   }) as unknown as QueryFunction;
-  return { query, calls, interrupted: () => interrupted };
+  return {
+    query,
+    calls,
+    interrupted: () => interrupted,
+    closed: () => closed,
+  };
 }
 
 export function result(

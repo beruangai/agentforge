@@ -9,12 +9,13 @@ AgentForge's own agent: the smallest thing a consumer would ship, built and veri
 | `files/package.json` | The member's manifest: AgentForge from the workspace; zod and oRPC as peers the base image provides |
 | `files/$claude/` | The agent's `.claude/`, copied as `/workspace/agentic/agent/.claude`: skills, subagents, and the only `settings.json` and hooks a session reads |
 | `files/bun.lock` | The lock of the whole workspace up to this agent, seeded from the base image's; `nx run @beruangai/example-hello-agent:lock` writes it |
-| `contract.ts` | The contract callers import: two procedures, one with a declared time budget |
-| `procedures.ts` | The implementation: each handler calls `context.runAgent` once |
-| `task.ts` | The task entry: the server runs it once per task, in its own process |
-| `server.ts` | The container's entry: starts the server and names `task.ts` as its task entry |
+| `files/contract.ts` | The contract callers import: four procedures, one with a declared time budget |
+| `files/procedures.ts` | The implementation: each handler calls `context.runAgent` once; the note procedures mount an S3 filesystem, `notebook`, and give the run its baseline permissions |
+| `files/task.ts` | The task entry: the server runs it once per task, in its own process |
+| `files/server.ts` | The container's entry: starts the server and names `task.ts` as its task entry |
 | `Dockerfile` | `FROM agentforge/a2a-claude`, plus the member and its lock, installed frozen |
-| `infra/app.ts` | The deployment: one `AgentRuntime` serving this directory's image |
+| `infra/app.ts` | The deployment: one `AgentRuntime` serving this directory's image, and the `notebook` filesystem's `S3FilesystemBucket` |
+| `infra/empty-buckets.ts` | Empties the deployment's versioned buckets, so `destroy` can delete them |
 | `e2e/local/` | The whole path against a real model, in Docker: the client, and the Temporal activity |
 | `e2e/agentcore/` | The same path against the deployed runtime, through `agentCoreTransport`, and a platform stop ending a task `LOST` |
 
@@ -28,7 +29,7 @@ That builds AgentForge's bundle, the base image's lock and image, this agent's l
 bunx nx run @beruangai/example-hello-agent:deploy
 ```
 
-Deploys the stack `agentforge-example-hello-agent` to `us-east-2` as the test role (`.env.integ`), through the CDK bootstrap roles; it returns once the runtime serves, and writes the runtime's ARN to `dist/examples/hello-agent/deploy/outputs.json`. `destroy` removes it. The account needs CloudWatch Transaction Search enabled once, for the runtime's tracing. The target runs `cdk` with an empty throwaway Docker configuration: the asset publish always runs `docker login`, and Docker Desktop's own credential helper would wait on a keychain prompt no one sees. The 12-hour ECR login still lands in the keychain, through `docker-credential-osxkeychain`. The runtime reads the subscription token from the Secrets Manager secret `agentforge/claude-code-oauth-token`, which the operator creates once in `us-east-2` with their own credentials, from their own shell:
+Deploys the stack `agentforge-example-hello-agent` to `us-east-2` as the test role (`.env.integ`), through the CDK bootstrap roles; it returns once the runtime serves, and writes the runtime's ARN to `dist/examples/hello-agent/deploy/outputs.json`. The stack stays deployed between e2e runs, so a change shows whether it updates the deployed resources in place or replaces them. `destroy` is run on demand, never by a test: it empties the session and notebook buckets and removes everything — this test deployment sets `RemovalPolicy.DESTROY`, where a consumer's keeps the construct's default, `RETAIN`. It reads the bucket names from the last deploy's outputs, and destroys what `synth` last wrote to `cdk.out`. The account needs CloudWatch Transaction Search enabled once, for the runtime's tracing. The target runs `cdk` with an empty throwaway Docker configuration: the asset publish always runs `docker login`, and Docker Desktop's own credential helper would wait on a keychain prompt no one sees. The 12-hour ECR login still lands in the keychain, through `docker-credential-osxkeychain`. The runtime reads the subscription token from the Secrets Manager secret `agentforge/claude-code-oauth-token`, which the operator creates once in `us-east-2` with their own credentials, from their own shell:
 
 ```bash
 aws secretsmanager create-secret --region us-east-2 --name agentforge/claude-code-oauth-token --secret-string "$CLAUDE_CODE_OAUTH_TOKEN"

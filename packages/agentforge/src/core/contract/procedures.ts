@@ -6,9 +6,22 @@ import {
 import { hash as ohash } from 'ohash';
 import { z } from 'zod';
 
+/**
+ * The longest time budget the executor can enforce: its timer holds at most
+ * 2³¹ − 1 milliseconds, and a longer one fires at once.
+ */
+export const MAX_TIME_BUDGET_SECONDS = Math.floor((2 ** 31 - 1) / 1000);
+
+/** A time budget, in whole seconds the executor can enforce. */
+export const TimeBudgetSecondsField = z
+  .number()
+  .int()
+  .positive()
+  .max(MAX_TIME_BUDGET_SECONDS);
+
 const [timeBudgetMeta, readTimeBudget] = defineMeta(
   'agentforge.timeBudgetSeconds',
-  (incoming: number) => z.number().int().positive().parse(incoming),
+  (incoming: number) => TimeBudgetSecondsField.parse(incoming),
 );
 
 /**

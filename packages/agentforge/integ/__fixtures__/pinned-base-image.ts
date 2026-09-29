@@ -1,19 +1,28 @@
-/**
- * The external base the integration images are built `FROM`, pinned by digest.
- *
- * A constant rather than the digest the tag resolves to at test time: the input
- * would otherwise move whenever `oven/bun` republishes `1.4.0-alpine`, and the
- * practice being modelled is a digest written down in the build, not one
- * looked up by it. A pin the registry stops serving fails as a build error.
- *
- * The tag is kept for the reader; with both present, the digest is what every
- * consumer resolves. It is the OCI index, so `linux/arm64` is chosen from it.
- */
-export const PINNED_BUN_BASE_IMAGE = {
-  repository: 'docker.io/oven/bun',
-  tag: '1.4.0-alpine',
-  indexDigest:
-    'sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb',
-} as const;
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
-export const PINNED_BUN_BASE_IMAGE_REFERENCE = `${PINNED_BUN_BASE_IMAGE.repository}:${PINNED_BUN_BASE_IMAGE.tag}@${PINNED_BUN_BASE_IMAGE.indexDigest}`;
+/** The base image's `Dockerfile`, which pins the Bun image it is built on. */
+const BASE_DOCKERFILE = join(import.meta.dirname, '..', '..', 'Dockerfile');
+const BUN_IMAGE_ARGUMENT = /^ARG BUN_IMAGE=(\S+)$/m;
+
+/**
+ * The external base the integration images are built `FROM`: the Bun image
+ * the base image's `Dockerfile` pins by digest, read from it, so a bump there
+ * moves the integration images with it. It is the OCI index, so
+ * `linux/arm64` is chosen from it. A pin the registry stops serving fails as a
+ * build error.
+ */
+export async function readPinnedBunBaseImage(): Promise<string> {
+  const reference = BUN_IMAGE_ARGUMENT.exec(
+    await readFile(BASE_DOCKERFILE, 'utf8'),
+  )?.[1];
+  if (reference === undefined) {
+    throw new Error(`${BASE_DOCKERFILE} declares no ARG BUN_IMAGE=<image>`);
+  }
+  if (!reference.includes('@sha256:')) {
+    throw new Error(
+      `${BASE_DOCKERFILE} pins BUN_IMAGE by tag alone, not by digest: ${reference}`,
+    );
+  }
+  return reference;
+}

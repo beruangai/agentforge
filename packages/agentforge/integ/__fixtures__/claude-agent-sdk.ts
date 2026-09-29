@@ -94,15 +94,6 @@ export function createSandbox(name: string): Sandbox {
  */
 export const CARRIER_TOOL_NAME = 'StructuredOutput';
 
-/**
- * What the kernel passes through `env` on every query: removes
- * `run_in_background` from Bash and the subagent tool, and turns off
- * auto-backgrounding (docs/ARCHITECTURE.md §7).
- */
-export const BACKGROUND_WORK_DISABLED: Record<string, string> = {
-  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
-};
-
 /** The environment for a run billed to the operator's subscription. */
 export function createSubscriptionEnvironment(
   configDirectory: string,

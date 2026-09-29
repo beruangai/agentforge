@@ -1,9 +1,10 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
 import {
   CACHE_MARKER_BLOCK,
+  type ContextBlock,
   createStreamingInput,
   createUserMessage,
   documentBlock,
@@ -67,6 +68,14 @@ describe('createUserMessage', () => {
       /none of/,
     );
   });
+
+  it('gives a context block no `type`, which would route it as something else', () => {
+    expectTypeOf({
+      tag: 'note',
+      type: 'text' as const,
+      context: 'x',
+    }).not.toExtend<ContextBlock>();
+  });
 });
 
 describe('a command block', () => {
@@ -90,6 +99,12 @@ describe('a command block', () => {
         context: '<filepath>notes.md</filepath>\nthe brief',
       },
     ]);
+  });
+
+  it('refuses an argument containing a double quote', async () => {
+    await expect(
+      contentOf({ type: 'command', command: 'review', args: ['a" "b'] }),
+    ).rejects.toThrow(/an argument containing '"'/);
   });
 
   it('keeps a leading slash, and places cache markers around its blocks', async () => {

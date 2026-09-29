@@ -133,14 +133,8 @@
     "destroy": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": [
-        {
-          "projects": ["@beruangai/agentforge"],
-          "target": "image"
-        }
-      ],
       "options": {
-        "command": "export AGENTFORGE_BASE_IMAGE_ID=\"$(docker image inspect --format '{{.Id}}' agentforge/a2a-claude:local)\" && cdk --app \"bun --conditions=@beruangai/source infra/app.ts\" --output ../../dist/examples/hello-agent/cdk.out --no-notices destroy --force",
+        "command": "bun infra/empty-buckets.ts ../../dist/examples/hello-agent/deploy/outputs.json && cdk --app ../../dist/examples/hello-agent/cdk.out --no-notices destroy --force",
         "cwd": "{projectRoot}",
         "envFile": "{workspaceRoot}/.env.integ",
         "env": {

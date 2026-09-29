@@ -2,7 +2,7 @@
  * Dispatched work does not cost the final submission, under the kernel's own
  * configuration: streaming input and output, background work switched off per
  * query, the first result published and the input then ended
- * (docs/ARCHITECTURE.md §7).
+ * (docs/ARCHITECTURE.md §6).
  *
  * The kernel publishes the first result's `structured_output`. What it relies
  * on, and what this asserts, is that a turn which dispatches real work —
@@ -25,8 +25,9 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
+import { BACKGROUND_WORK_DISABLED } from '../../../src/server/harness/kernel.ts';
+import { structuredOutputJsonSchema } from '../../../src/server/harness/structured-output.ts';
 import {
-  BACKGROUND_WORK_DISABLED,
   CARRIER_TOOL_NAME,
   createSandbox,
   createSubscriptionEnvironment,
@@ -43,7 +44,7 @@ const OutputSchema = z.object({
   names: z.array(z.string()).describe('the file names, sorted'),
 });
 
-const OUTPUT_JSON_SCHEMA = z.toJSONSchema(OutputSchema, { target: 'draft-7' });
+const OUTPUT_JSON_SCHEMA = structuredOutputJsonSchema(OutputSchema);
 
 /** Something to dispatch work over. */
 const FIXTURE_FILE_SIZES: Record<string, number> = {

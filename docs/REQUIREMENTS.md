@@ -10,7 +10,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 - **A requirement states behavior, never mechanism.** How it is met is AgentForge's, entirely.
 - **One consumer's need is met by configuration, or by a helper it calls** — never by a branch in the harness or the runtime.
 - **The consumer owns its isolation strategy and its side effects**, including recovery when one may have partly happened.
-- **No consumer vocabulary enters AgentForge.** A StrategyFoundry *directive* and a TrendBot *directive* are both a **procedure**; a *vault* is a working directory.
+- **No consumer vocabulary enters AgentForge.** A StrategyFoundry *directive* and a TrendBot *directive* are both a **procedure**; a *vault* is a filesystem.
 - **A breaking change here is reviewed with the operator** against both consumers, once, rather than negotiated twice.
 
 ## Numbering
@@ -90,7 +90,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ702** | A procedure runs in isolation against a fixture, with no container and no workflow engine |
 | **REQ704** | A consumer extends the base image with what its procedures need |
 | **REQ705** | Authentication is the operator's subscription; no pay-per-use key is present, and each deployment reads only the secrets it declares |
-| **REQ706** | Identifiers AgentForge mints are uuid7 |
+| **REQ706** | Identifiers AgentForge mints itself are uuid7; an id a platform or SDK mints — an A2A task id — is carried as it comes |
 | **REQ707** | Each deployed agent is resolvable by name, serves the image it was deployed with, and reports liveness without running an agent — and nothing a procedure does delays that report |
 | **REQ708** | A caller invokes remotely with least privilege — exactly its own agents, and nothing else |
 

@@ -14,7 +14,7 @@
 ARG BUN_IMAGE=docker.io/oven/bun:1.4.0-alpine@sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb
 ARG COLLECTOR_IMAGE=public.ecr.aws/aws-observability/aws-otel-collector:v0.50.0@sha256:7968fb60db6a2390a47ba6a2df029745638486e285c9b2487da1b722d0855a3e
 FROM ${COLLECTOR_IMAGE} AS collector
-# `s7cmd` syncs working directories (ADR 0015): a static musl build, pinned by
+# `s7cmd` syncs S3 filesystems (ADR 0015): a static musl build, pinned by
 # the sha256 its release publishes. A new release is admitted by changing both
 # and passing integ/aws/filesystem-s3-sync.
 FROM ${BUN_IMAGE} AS s7cmd

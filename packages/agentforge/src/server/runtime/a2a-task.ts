@@ -1,23 +1,20 @@
 import {
-  type Artifact,
+  Artifact,
   type Message,
   type Task,
-  TaskState,
   taskStateFromJSON,
   taskStateToJSON,
 } from '@a2a-js/sdk';
 import { type Envelope, EnvelopeSchema } from '#core/contract/envelope.ts';
 import {
+  OUTCOME_ARTIFACT_ID,
   type Outcome,
-  OutcomeSchema,
+  outcomeOfArtifacts,
+  type TaskState,
   TaskStateEnum,
-  type TaskState as TaskStateName,
 } from '#core/contract/task.ts';
 
-/** The artifact every finished task carries its outcome in. */
-export const OUTCOME_ARTIFACT_ID = 'outcome';
-
-export function stateOf(task: Task): TaskStateName {
+export function stateOf(task: Task): TaskState {
   const state = task.status?.state;
   if (state === undefined) throw new Error(`task ${task.id} has no status`);
   return TaskStateEnum.parse(taskStateToJSON(state));
@@ -26,7 +23,7 @@ export function stateOf(task: Task): TaskStateName {
 export function newTask(options: {
   id: string;
   contextId: string;
-  state: TaskStateName;
+  state: TaskState;
   metadata: Record<string, unknown>;
 }): Task {
   return {
@@ -77,11 +74,9 @@ export function finishedTask(
 }
 
 export function outcomeOf(task: Task): Outcome | undefined {
-  const part = task.artifacts
-    .find((artifact) => artifact.artifactId === OUTCOME_ARTIFACT_ID)
-    ?.parts.find((candidate) => candidate.content?.$case === 'data');
-  if (part?.content?.$case !== 'data') return undefined;
-  return OutcomeSchema.parse(part.content.value);
+  return outcomeOfArtifacts(
+    task.artifacts.map((artifact) => Artifact.toJSON(artifact)),
+  );
 }
 
 /**
@@ -102,5 +97,3 @@ export function readEnvelope(message: Message | undefined): Envelope {
   }
   return EnvelopeSchema.parse(part.content.value);
 }
-
-export { TaskState };

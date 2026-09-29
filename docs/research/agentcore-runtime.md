@@ -18,7 +18,7 @@ From [AgentCore Runtime quotas](https://docs.aws.amazon.com/bedrock-agentcore/la
 | Maximum session lifetime | 8 hours | Yes — `maxLifetime` |
 | Payload size | 100 MB | No |
 | `runtimeSessionId` length | at least 33 characters | — |
-| Container image size | 2 GB | No — read 2026-09-24; it bounds how much the layered agentic base images of `ARCHITECTURE.md` §6 may carry |
+| Container image size | 2 GB | No — read 2026-09-24; it bounds how much the layered agentic base images of `ARCHITECTURE.md` §7 may carry |
 | Environment variables, total | 4 KB on V1; **2.5 KB on V2** for a container agent | No — read 2026-09-24, [platform versions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html#runtime-platform-versions); AWS says V2 will be raised to match |
 
 ## Regions
@@ -34,7 +34,7 @@ From [isolated sessions](https://docs.aws.amazon.com/bedrock-agentcore/latest/de
 - Session states are **Active** (a request, a command, or background work), **Idle**, and **Stopped**. A stopped session "transitions back to Active on the next invocation and a new compute is provisioned"; the session id itself stays valid.
 - Compute is ephemeral: memory and disk last only for the compute lifecycle. Session storage — a configured persistent mount — survives stop and resume ([filesystem configurations](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-filesystem-configurations.html)).
 - While a session is being provisioned or torn down, a second operation returns a retryable HTTP 409 `RetryableConflictException`. "Already-running sessions are not affected."
-- **Nothing in the documentation limits how many tasks may run inside one session, or says an invocation to a busy session is refused** — `DESIGN_OPTIONS.md` §B. The long-running guide describes the opposite pattern: start work, respond at once, and let the caller "check back later for results".
+- **Nothing in the documentation limits how many tasks may run inside one session, or says an invocation to a busy session is refused** — since observed, [`agentcore-runtime-observed.md`](agentcore-runtime-observed.md) §B. The long-running guide describes the opposite pattern: start work, respond at once, and let the caller "check back later for results".
 
 ## Request headers
 
@@ -119,7 +119,7 @@ From [platform versions](https://docs.aws.amazon.com/bedrock-agentcore/latest/de
 
 ## Stopping a session
 
-[`StopRuntimeSession`](https://docs.aws.amazon.com/bedrock-agentcore/latest/APIReference/API_StopRuntimeSession.html) stops a running session. Termination timing, signal handling, and what survives on a mount are not documented — `DESIGN_OPTIONS.md` §C.
+[`StopRuntimeSession`](https://docs.aws.amazon.com/bedrock-agentcore/latest/APIReference/API_StopRuntimeSession.html) stops a running session. Termination timing, signal handling, and what survives on a mount are not documented — since observed, [`agentcore-runtime-observed.md`](agentcore-runtime-observed.md) §C.
 
 ## TypeScript SDK
 

@@ -1,8 +1,8 @@
 /**
  * The container the AgentCore integration tests run: an A2A server on
- * AgentCore's contract, instrumented for §B, §C and §I. It is the thing
- * AgentCore's behaviour is observed through — NOT AgentForge's server, which is
- * built in A1. No model is called — a "task" is a timer — so the tests are
+ * AgentCore's contract, instrumented for what `docs/research/agentcore-runtime-observed.md`
+ * answers (its §B and §C) and ADR 0014. It is the thing AgentCore's behaviour is
+ * observed through — NOT AgentForge's server, which `agentforge-runtime.test.ts` deploys. No model is called — a "task" is a timer — so the tests are
  * deterministic and cost nothing but compute.
  *
  * Bundled with `bun build --target=bun` and run on Bun inside the image.
@@ -13,11 +13,11 @@
  *
  * What it records, so the tests can assert rather than infer:
  *   - a CONTAINER ID, returned on every task, so which container answered is
- *     observed (§B, §C)
+ *     observed (research §B, research §C)
  *   - every invocation's `A2A-Version`, session id and JSON-RPC method, to
- *     stdout, so what reached the container is observed (§I)
- *   - live task count, driving /ping (§B)
- *   - SIGTERM receipt and a heartbeat after it, for `StopRuntimeSession` (§C),
+ *     stdout, so what reached the container is observed (ADR 0014)
+ *   - live task count, driving /ping (research §B)
+ *   - SIGTERM receipt and a heartbeat after it, for `StopRuntimeSession` (research §C),
  *     and an outcome written from the SIGTERM handler
  *
  * Nothing that must differ per container is taken at startup. On platform
@@ -67,9 +67,9 @@ function containerId(): string {
   return mintedContainerId;
 }
 
-/** Live tasks. `/ping` reports HealthyBusy while any is running (§B). */
+/** Live tasks. `/ping` reports HealthyBusy while any is running (research §B). */
 const liveTaskIds = new Set<string>();
-/** Where to record an outcome if SIGTERM arrives (§C). Set by a task. */
+/** Where to record an outcome if SIGTERM arrives (research §C). Set by a task. */
 let outcomeTarget: OutcomeTarget | undefined;
 let sigtermAt: number | undefined;
 
@@ -90,7 +90,7 @@ function describeError(error: unknown): { name: string; message: string } {
 const dynamoDB = new DynamoDBClient({});
 
 /**
- * FINDING (§I, 2026-09-22): under the 1.0 RPC method name `SendMessage`, a part
+ * FINDING (ADR 0014, 2026-09-22): under the 1.0 RPC method name `SendMessage`, a part
  * whose content the parser does not recognise is accepted and its content
  * dropped — `filename` and `mediaType` survive, `content` does not, and nothing
  * errors. An executor reading the envelope trustingly falls through to its
@@ -188,7 +188,7 @@ class TimerExecutor implements AgentExecutor {
 
 const url = process.env.AGENTCORE_RUNTIME_URL ?? `http://0.0.0.0:${port}/`;
 /**
- * §I — refuse 0.3 entirely. With A2A_ONE_ZERO_ONLY the card declares ONE
+ * ADR 0014 — refuse 0.3 entirely. With A2A_ONE_ZERO_ONLY the card declares ONE
  * interface, 1.0, and `legacyCompat` is off (ADR 0014). With `legacyCompat`
  * ON, a missing `A2A-Version` allowlist entry downgrades every call to 0.3 and
  * everything appears to work on the wrong protocol; OFF, the same mistake
@@ -237,7 +237,7 @@ const app = express();
 // refusing a content type it does not accept.
 app.use(express.json({ limit: '10mb', type: () => true }));
 app.use((request, _response, next) => {
-  // To stdout, so what reached the container reaches CloudWatch and §I is
+  // To stdout, so what reached the container reaches CloudWatch and ADR 0014 is
   // answerable without reaching into the container. Invocations only: the
   // container id is minted on first use, after a V2 restore.
   if (request.method === 'POST') {
@@ -291,7 +291,7 @@ process.on('SIGTERM', () => {
     at: receivedAt,
     liveTasks: liveTaskIds.size,
   });
-  // §C — is the grace period USABLE? Knowing how long a container has is only
+  // research §C — is the grace period USABLE? Knowing how long a container has is only
   // half the answer; what matters is whether it can still reach the
   // network and record an outcome in them. So the first thing the handler
   // does is write one, and time it.

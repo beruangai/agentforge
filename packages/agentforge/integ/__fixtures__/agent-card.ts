@@ -15,7 +15,7 @@ export type FixtureAgentCard = AgentCard & {
 };
 
 /**
- * §I — with `a2aOneZeroOnly` the card declares ONE interface, 1.0, and the server
+ * ADR 0014 — with `a2aOneZeroOnly` the card declares ONE interface, 1.0, and the server
  * turns `legacyCompat` off: AgentForge's configuration (ADR 0014). Without it
  * the card declares 1.0 and 0.3, and an absent `A2A-Version` negotiates 0.3 —
  * the permissive configuration, kept only as the control that shows what the

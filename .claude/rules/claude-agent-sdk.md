@@ -15,8 +15,8 @@ The platform evolves rapidly. Always verify patterns against current docs, and r
 
 ## Structured outputs
 
-Do not rely on remembered rules for converting Zod schemas to the structured-output JSON Schema (draft target, `$defs`, `format`, `const`/`enum`, non-object roots). They changed across SDK versions and are re-established against the current SDK by the settlement spike in `docs/DESIGN_OPTIONS.md` §E. Verify before encoding any conversion.
+Do not rely on remembered rules for converting Zod schemas to the structured-output JSON Schema (draft target, `$defs`, `format`, `const`/`enum`, non-object roots). They changed across SDK versions; what holds on the current SDK is in `docs/research/claude-agent-sdk.md` (structured outputs), re-verified by `integ/model/structured-output/`. Verify before encoding any conversion.
 
 ## Settlement
 
-the predecessor harness's rules for deciding when a run is final — foreground-only agent work, recovering a dropped submission, background-task tracking — are evidence, not fact. `docs/DESIGN_OPTIONS.md` §E establishes what holds on the current SDK.
+the predecessor harness's rules for deciding when a run is final — foreground-only agent work, recovering a dropped submission, background-task tracking — are evidence, not fact. `docs/research/kernel-settlement.md` establishes what holds on the current SDK; whether background work can be allowed is open, `docs/DESIGN_OPTIONS.md` §ODO006.

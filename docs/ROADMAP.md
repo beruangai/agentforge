@@ -17,7 +17,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - The base image and the agent image from the lockfile
 - `hello-agent`'s e2e: a typed output, a resumed session in the same container, an idempotent attach, a cancel mid-Bash; the Temporal activity completing and cancelling
 
-**Not in A1, and why**: cross-container resume (§F — needs the S3 `SessionStore`, and one container resumes today); telemetry and metrics (§T, with A2's dashboard); generators (§K, once a second agent shows what to generate).
+**Not in A1, and why**: cross-container resume (needs the S3 `SessionStore`, and one container resumes today); telemetry and metrics (with A2's dashboard); generators (§ODO003, once a second agent shows what to generate).
 
 ## A2 — The same agent on AgentCore
 
@@ -25,9 +25,9 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 - The construct and deploy path: runtime on V2, its role, the task table, the leaf image in ECR, a deploy that waits until the runtime serves. **Built 2026-09-25** as `AgentRuntime`, verified by `agentforge-runtime.test.ts` deploying through it
 - Ids minted after a V2 restore are distinct. **Settled 2026-09-26**: Bun's generator replays across restores once drawn from before the snapshot, so the server draws nothing before it; the same test, deployed with a secret and telemetry, re-checks it
-- The admission default measured (§G). **Settled 2026-09-26**: 4 kept, ~165 MB per running task measured
+- The admission default measured. **Settled 2026-09-26**: 4 kept, ~165 MB per running task measured
 - `hello-agent`'s e2e against the deployed runtime through `agentCoreTransport`, including a container stop mid-task ending `LOST` and a retry attaching. **Built 2026-09-26** as `e2e-agentcore`
-- Telemetry and per-agent metrics (§T). **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels), **its `gen_ai.*` mapping 2026-09-27**, and **the per-agent counts and dashboard 2026-09-27** (§REQ604); a transcript view waits on the CLI (§T)
+- Telemetry and per-agent metrics. **The CLI's telemetry built 2026-09-26** (AgentCore Observability, the ADOT collector, levels), **its `gen_ai.*` mapping 2026-09-27**, and **the per-agent counts and dashboard 2026-09-27** (§REQ604); a transcript view waits on the CLI (§ODO002)
 - Sessions persist beyond their container (§REQ402): every transcript in the agent's session bucket through the SDK's `SessionStore`, so a session outlives the container and a later task resumes it in another. **Built 2026-09-27**: `hello-agent`'s AgentCore e2e resumes a session in another container after its own is stopped
 
 **Exit:** the same procedure, unchanged, runs against a deployed agent and survives a container stop, and its session persists beyond the container and resumes in another.
@@ -41,13 +41,13 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 ## A4 — Specs and audit
 
 - Retroactive OpenSpec specs for what A1 and A2 built, beside `filesystem-lifecycle` in `openspec/specs/` — succinct, significant behaviour only — written with the operator. **Landed 2026-09-28**: eight specs, each at its highest seam, their scenarios mapped to tests and the untested ones flagged in the [archived change](../openspec/changes/archive/2026-09-28-retroactive-specs/design.md)
-- A full audit of the package, the examples and the docs for cohesion, correctness, simplicity and maintainability: layer contracts and ownership, naming and terms, dead or duplicated code, docs that no longer match the code (among them the project-key pinning `docs/research/claude-agent-sdk.md` describes and ADR 0011 does not). What it finds is fixed, or raised with the operator where it is a decision
+- A full audit of the package, the examples and the docs for cohesion, correctness, simplicity and maintainability: layer contracts and ownership, naming and terms, dead or duplicated code, docs that no longer match the code (among them the project-key pinning `docs/research/claude-agent-sdk.md` describes and ADR 0011 does not). What it finds is fixed, or raised with the operator where it is a decision. **Audited 2026-09-28; the operator's chosen fixes applied 2026-09-29**, each verified against the code first, with unit tests, and design options renumbered `§ODO###`. Open: the decisions still with the operator, and the integ and e2e runs the fixes touch
 
 **Exit:** every built capability has a spec, and the audit's findings are closed or decided.
 
 ## A5 — The Nx plugin
 
-- The plugin's generators and sync generator (§K). [`examples/agentic-project`](../examples/agentic-project) — built by hand 2026-09-25: `reviewer` and `fixer` over a shared skill, `CLAUDE.md`, MCP server and house options, each layer a member of the container workspace — shows what to generate, but it is not the target state: the plugin generates an improved one, regenerating `agentic-project` or a sibling that retires it. `hello-agent` stays flat, the minimal consumer
+- The plugin's generators and sync generator (§ODO003). [`examples/agentic-project`](../examples/agentic-project) — built by hand 2026-09-25: `reviewer` and `fixer` over a shared skill, `CLAUDE.md`, MCP server and house options, each layer a member of the container workspace — shows what to generate, but it is not the target state: the plugin generates an improved one, regenerating `agentic-project` or a sibling that retires it. `hello-agent` stays flat, the minimal consumer
 - Iterated with the operator capability by capability, so each generates and syncs as a consumer's adoption needs
 - The plugin manages its examples in this repository, so its sync and updates are dogfooded here
 

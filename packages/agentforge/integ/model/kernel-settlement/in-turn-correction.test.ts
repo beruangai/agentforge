@@ -1,18 +1,17 @@
 /**
- * DESIGN_OPTIONS §E, question 3:
- *   "Does an in-turn PreToolUse rejection still add anything over native
- *    re-prompting, and does its matcher name a tool that actually exists?"
+ * Does an in-turn PreToolUse rejection still add anything over native
+ * re-prompting, and does its matcher name a tool that actually exists?
  *
  * The structured-output submission is carried by a real tool named
  * `StructuredOutput` (foreground-settlement.test.ts), so a PreToolUse matcher
  * can name it. What is asserted here is what a hook over it does that the
  * SDK's own validation and re-prompting cannot. Every run uses the kernel's
  * configuration: streaming input, background work off, the input ended on the
- * first result (docs/ARCHITECTURE.md §7).
+ * first result (docs/ARCHITECTURE.md §6).
  *
  * Two SCENARIOS, the two things AgentForge relies on a hook for:
  *
- *   hook-only-rule       a cross-field rule draft-07 cannot express, enforced
+ *   hook-only-rule       a cross-field rule JSON Schema cannot express, enforced
  *                        by a PreToolUse denial. Whether the model then complies
  *                        or argues is its choice and varies run to run; what is
  *                        asserted is what holds either way — the denial reaches
@@ -39,8 +38,9 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
+import { BACKGROUND_WORK_DISABLED } from '../../../src/server/harness/kernel.ts';
+import { structuredOutputJsonSchema } from '../../../src/server/harness/structured-output.ts';
 import {
-  BACKGROUND_WORK_DISABLED,
   CARRIER_TOOL_NAME,
   createSandbox,
   createSubscriptionEnvironment,
@@ -96,7 +96,7 @@ type Scenario = {
   repair?: (input: CarrierInput) => CarrierInput | undefined;
 };
 
-// Cross-field AND unstated in the PROMPT or the schema: draft-07 cannot
+// Cross-field AND unstated in the PROMPT or the schema: JSON Schema cannot
 // express it, and the model cannot guess it, so the denial path is guaranteed
 // to be exercised rather than merely available.
 const checkTotalInWholeKilobytes = (
@@ -144,10 +144,9 @@ async function runScenario(scenario: Scenario) {
     writeFileSync(join(sandbox.workingDirectory, name), 'x'.repeat(size));
   }
 
-  const OUTPUT_JSON_SCHEMA = z.toJSONSchema(z.object(BaseOutputShape), {
-    target: 'draft-7',
-    io: 'input',
-  });
+  const OUTPUT_JSON_SCHEMA = structuredOutputJsonSchema(
+    z.object(BaseOutputShape),
+  );
 
   const hookCalls: HookCall[] = [];
   let denials = 0;

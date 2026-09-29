@@ -11,7 +11,7 @@ import unit from './vitest.config.mts';
  *
  * - `local`: Docker and the local toolchain; no credentials, no spend
  * - `aws`: the test role in `us-east-2` (`.env.integ`); AgentCore, and
- *   working directories' `s7cmd` against a scratch bucket
+ *   S3 filesystems' `s7cmd` against a scratch bucket
  * - `model`: the subscription token (`.env.integ.local`); model inference
  *
  * AgentCore's files run in parallel: each provisions and deletes its own

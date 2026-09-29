@@ -8,7 +8,7 @@
  */
 import { z } from 'zod';
 
-/** Where the container records an outcome from its SIGTERM handler (§C). */
+/** Where the container records an outcome from its SIGTERM handler (research §C). */
 export const OutcomeTargetSchema = z
   .object({
     tableName: z.string().min(1),
@@ -34,7 +34,7 @@ export type FixtureEnvelope = z.infer<typeof FixtureEnvelopeSchema>;
  * returns what the CREATING container reported, not the answering one.
  */
 export const FixtureTaskMetadataSchema = z.object({
-  /** Minted on the container's first invocation, so a second container is detectable (§B). */
+  /** Minted on the container's first invocation, so a second container is detectable (research §B). */
   containerId: z.string(),
   /** Tasks live in this container at the moment it answered, this one included. */
   liveTasks: z.number(),

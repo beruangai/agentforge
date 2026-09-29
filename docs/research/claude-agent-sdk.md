@@ -1,6 +1,6 @@
 # Claude Agent SDK — Verified Facts
 
-Read at the source on 2026-09-20. Only what bears on AgentForge's design. Behavior the predecessor harness relied on is **not** recorded here as fact — it is re-established by the settlement spike, [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
+Read at the source on 2026-09-20. Only what bears on AgentForge's design. Behavior the predecessor harness relied on is **not** recorded here as fact — it is re-established by the settlement spike, [`kernel-settlement.md`](kernel-settlement.md).
 
 ## Sessions
 
@@ -22,7 +22,7 @@ From [Persist sessions to external storage](https://code.claude.com/docs/en/agen
 - **Dual write:** the subprocess always writes locally first and the SDK forwards the batch to the store. On a run resumed *from the store*, the local copy is deleted at run end, so the store holds the only durable copy.
 - **Mirror writes are best-effort:** up to three attempts, then the batch is dropped, an error is logged and a `{ type: "system", subtype: "mirror_error" }` message is emitted. **A call that times out is not retried.** Retries can re-deliver entries, so an adapter deduplicates by `entry.uuid`.
 - **Flushing is batched by default** — `sessionStoreFlush: 'batched'` flushes at the end of a turn — so a container that dies mid-turn loses what was not yet flushed; `'eager'` flushes as entries arrive. Loading from the store times out after `loadTimeoutMs`, 60 s by default. The store API is marked `@alpha` (re-read 2026-09-24).
-- **Resuming from the store swaps the config directory.** The SDK writes the loaded session into a temporary directory and runs the CLI with `CLAUDE_CONFIG_DIR` pointing there, seeding only credentials, `.claude.json` and the user `settings.json`. Whatever else the user scope held — skills, subagents, commands, `CLAUDE.md` — is not there on a resumed run unless it is supplied another way (re-read 2026-09-24; not yet measured, [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §F).
+- **Resuming from the store swaps the config directory.** The SDK writes the loaded session into a temporary directory and runs the CLI with `CLAUDE_CONFIG_DIR` pointing there, seeding only credentials, `.claude.json` and the user `settings.json`. Whatever else the user scope held — skills, subagents, commands, `CLAUDE.md` — is not there on a resumed run unless it is supplied another way (re-read 2026-09-24; not yet measured, [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §ODO008).
 - Conflicts: `persistSession: false` and file checkpointing both throw at startup when combined with a store.
 - Reference adapters for S3, Redis and Postgres ship in the SDK repositories, with a conformance suite. Retention is the adapter's responsibility; the SDK never deletes.
 
@@ -45,9 +45,9 @@ Established against the current SDK, superseding the predecessor harness's worka
 - **Enforcement is the CLI's, in the turn, not the backend's** (spiked 2026-09-25, `claude-sonnet-5`): there is no constrained decoding — the model can submit unparseable JSON — and the CLI validates each `StructuredOutput` call against the schema, answering a violation with an `is_error` tool result the agent retries against (`must be equal to one of the allowed values`, `must be integer`). `enum`, `const`, `type` and `required` are enforced this way; **`format` is not** — `"not a url at all"` for `format: uri` and `"banana"` for `format: uuid` were accepted as `success`. With `format` present the run still engaged structured output, so the predecessor's "`format` makes the backend fall back to prose" did not reproduce. A contract's `format` (and any refinement) is therefore caught only by the kernel's parse after the run, as `OUTPUT_INVALID`, with no in-turn retry.
 - An invalid schema now fails at startup rather than being ignored (since CLI v2.1.205).
 
-What remains for AgentForge is the outer validation and the typed `output_invalid` outcome, not a pile of conversion workarounds.
+What remains for AgentForge is the outer validation and the typed `OUTPUT_INVALID` outcome, not a pile of conversion workarounds.
 
-**The rest of §E is settled by spike** — see [`kernel-settlement.md`](kernel-settlement.md), read 2026-09-22 against `0.3.278` and re-run 2026-09-24 against `0.3.280`. In particular: the submission is carried by a real tool named `StructuredOutput` that is advertised in `init.tools`, so a `PreToolUse` matcher can name it; a matcher naming a tool that does not exist fires zero times, silently.
+**Settlement is settled by spike** — see [`kernel-settlement.md`](kernel-settlement.md), read 2026-09-22 against `0.3.278` and re-run 2026-09-24 against `0.3.280`. In particular: the submission is carried by a real tool named `StructuredOutput` that is advertised in `init.tools`, so a `PreToolUse` matcher can name it; a matcher naming a tool that does not exist fires zero times, silently.
 
 ## Reading how a run ended — re-read 2026-09-24 against `0.3.280`
 
@@ -62,8 +62,8 @@ What remains for AgentForge is the outer validation and the typed `output_invali
 
 ## What this means here
 
-- The working directory is not cosmetic: it keys the project, the transcript location, and the store lookup — which is why AgentForge pins the project key with `CLAUDE_CODE_PROJECT_DIR_NAME` rather than deriving it from a path (`ARCHITECTURE.md` §6).
-- Cross-container resume (§REQ402) goes through the store adapter; mounts were ruled out ([ADR 0011](../../adr/0011-state-persists-through-apis-not-mounts.md)). What a resumed run is missing is measured in the §F spike.
+- The working directory is not cosmetic: it keys the project, the transcript location, and the store lookup. AgentForge pins nothing: the project key is the SDK's own, derived from the run's cwd — the agent's directory unless a procedure sets `cwd` — so a resume must run from the directory its session began in ([ADR 0011](../../adr/0011-state-persists-through-apis-not-mounts.md)).
+- Cross-container resume (§REQ402) goes through the store adapter; mounts were ruled out ([ADR 0011](../../adr/0011-state-persists-through-apis-not-mounts.md)). Whether a resumed run misses anything its config directory held beyond the transcript is open, §ODO008.
 - Mirror failure is a real failure mode to surface rather than swallow: `mirror_error` must reach the task record, not be logged and forgotten.
 
 

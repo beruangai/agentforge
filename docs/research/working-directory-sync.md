@@ -2,7 +2,7 @@
 
 **Measured on 2026-09-22** with `s7cmd` **1.8.3**; **re-checked on 2026-09-27** with **1.8.5**, the release the base image pins, through `packages/agentforge/integ/aws/filesystem-s3-sync/`, which drives `S3Filesystem`'s own sync with `s7cmd` in the base image as built. Decided in [ADR 0015](../../adr/0015-filesystems-mount-around-a-procedure.md).
 
-§F rests three design choices on this tool: that `LastModifiedDate` filtering is a usable **quiescence heuristic**, that exclusions work, and that **delete propagation is an explicit choice rather than a default**. All three were assumptions. All three hold.
+The working-directory design — since filesystems ([ADR 0015](../../adr/0015-filesystems-mount-around-a-procedure.md)) — rests three design choices on this tool: that `LastModifiedDate` filtering is a usable **quiescence heuristic**, that exclusions work, and that **delete propagation is an explicit choice rather than a default**. All three were assumptions. All three hold.
 
 ## It runs in the base image, and it is static
 
@@ -16,7 +16,7 @@ The risk the note did not name is **musl**: the AgentForge base is Alpine, and a
 | binary | 12.7 MB |
 | pinning | the release publishes a `.sha256`, and the downloaded archive **matched it** — `1ffd41f6…5056348` |
 
-So the base image can install it with a verified digest and no package manager, which is what "pin it by digest" in §F needs to be actionable.
+So the base image can install it with a verified digest and no package manager, which is what "pin it by digest" in ADR 0015 needs to be actionable.
 
 ## Every behavioural claim holds
 
@@ -33,7 +33,7 @@ Eight checks against a real bucket, over a working directory shaped like an agen
 | S3 → local round trip | came back intact |
 | `--additional-checksum-algorithm SHA256` | accepted |
 
-**The quiescence result is the one that matters**, because §F's "a file mid-write is left for the next pass" depends on it and nothing else in the tool offers it. `--filter-mtime-before` takes an **absolute timestamp**, so a caller computes the cutoff — `now − threshold` — on every pass rather than declaring a duration once. That is a small implementation detail with a real consequence: the threshold lives in the sync runner, not in the tool's configuration.
+**The quiescence result is the one that matters**, because a checkpoint's "a file mid-write is left for the next pass" depends on it and nothing else in the tool offers it. `--filter-mtime-before` takes an **absolute timestamp**, so a caller computes the cutoff — `now − threshold` — on every pass rather than declaring a duration once. That is a small implementation detail with a real consequence: the threshold lives in the sync runner, not in the tool's configuration.
 
 > One caveat on the method. On the first run the exclusions check **passed falsely**: `aws … --output text` prints the literal `None` for an empty result, and the catch-all arm accepted it, so "nothing was uploaded" read as "the right things were uploaded". The harness now filters `None`, and the re-run shows the real result. Recorded because the same shape of bug — a permissive default arm swallowing an empty result — would pass a green test suite just as easily.
 

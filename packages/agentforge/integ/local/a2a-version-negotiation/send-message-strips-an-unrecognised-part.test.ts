@@ -1,5 +1,5 @@
 /**
- * §I — the part shape is a wire question, not a version question.
+ * ADR 0014 — the part shape is a wire question, not a version question.
  *
  * `@a2a-js/sdk@1.2.0` is protobuf-typed: its `Part` is
  * `{ content: { $case: 'data', value } }`, which is the SDK's INTERNAL
@@ -29,7 +29,7 @@ import {
   type VersionNegotiationServer,
 } from './__fixtures__/version-negotiation-server.ts';
 
-describe('what SendMessage does to a part it does not recognise (§I)', () => {
+describe('what SendMessage does to a part it does not recognise (ADR 0014)', () => {
   let strict: VersionNegotiationServer;
 
   beforeAll(async () => {

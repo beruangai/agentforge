@@ -14,8 +14,8 @@ import {
 import {
   cause,
   isTerminal,
+  type TaskState,
   TaskStateEnum,
-  type TaskState as TaskStateName,
   TERMINAL_TASK_STATES,
 } from '#core/contract/task.ts';
 import { OPERATIONAL_METRICS } from '#core/metrics.ts';
@@ -39,7 +39,8 @@ const RETENTION_SECONDS = 7 * 24 * 60 * 60;
  *
  * A terminal state is final. Every write is conditional on the stored task not
  * being terminal, so a container finishing a task that another reader already
- * derived lost cannot overwrite it — the later write is refused, not raced.
+ * derived lost cannot overwrite it — the later write is refused, not raced. A
+ * derived loss is marked, so not even a failure of the same state replaces it.
  */
 export class DynamoDBTaskStore implements TaskStore {
   readonly #client: DynamoDBClient;
@@ -68,9 +69,14 @@ export class DynamoDBTaskStore implements TaskStore {
             ? 'SET #task = :task, #state = :state, expiresAt = :expiresAt REMOVE leaseExpiresAt'
             : 'SET #task = :task, #state = :state, expiresAt = :expiresAt, leaseExpiresAt = :lease',
           // A repeat of the same end is allowed: the executor saves the final
-          // task itself, and the A2A SDK then saves its own copy of it.
-          ConditionExpression: `attribute_not_exists(#state) OR NOT (#state IN (${TERMINAL_PLACEHOLDERS})) OR #state = :state`,
-          ExpressionAttributeNames: { '#task': 'task', '#state': 'state' },
+          // task itself, and the A2A SDK then saves its own copy of it. A
+          // derived loss is never replaced, whatever the write.
+          ConditionExpression: `(attribute_not_exists(#state) OR NOT (#state IN (${TERMINAL_PLACEHOLDERS})) OR #state = :state) AND attribute_not_exists(#derivedLost)`,
+          ExpressionAttributeNames: {
+            '#task': 'task',
+            '#state': 'state',
+            '#derivedLost': DERIVED_LOST_ATTRIBUTE,
+          },
           ExpressionAttributeValues: {
             ':task': { S: JSON.stringify(Task.toJSON(task)) },
             ':state': { S: state },
@@ -102,8 +108,11 @@ export class DynamoDBTaskStore implements TaskStore {
   ): Promise<Task | undefined> {
     const item = await this.readTaskItem(taskId);
     if (item === undefined) return undefined;
-    if (isTerminal(item.state) || item.leaseExpiresAt > Date.now())
-      return item.task;
+    if (isTerminal(item.state)) return item.task;
+    if (item.leaseExpiresAt === undefined) {
+      throw new Error(`task ${taskId} is stored live without a lease`);
+    }
+    if (item.leaseExpiresAt > Date.now()) return item.task;
     const lost = finishedTask(item.task, {
       state: 'TASK_STATE_FAILED',
       cause: cause(
@@ -119,6 +128,7 @@ export class DynamoDBTaskStore implements TaskStore {
             pk: { S: taskKey(taskId) },
             task: { S: JSON.stringify(Task.toJSON(lost)) },
             state: { S: 'TASK_STATE_FAILED' },
+            [DERIVED_LOST_ATTRIBUTE]: { BOOL: true },
             expiresAt: {
               N: String(Math.floor(Date.now() / 1000) + RETENTION_SECONDS),
             },
@@ -147,20 +157,30 @@ export class DynamoDBTaskStore implements TaskStore {
     throw new Error('ListTasks is not supported by AgentForge');
   }
 
-  async renewLease(taskId: string): Promise<void> {
-    await this.#client.send(
-      new UpdateItemCommand({
-        TableName: this.#tableName,
-        Key: { pk: { S: taskKey(taskId) } },
-        UpdateExpression: 'SET leaseExpiresAt = :lease',
-        ConditionExpression: `attribute_exists(pk) AND NOT (#state IN (${TERMINAL_PLACEHOLDERS}))`,
-        ExpressionAttributeNames: { '#state': 'state' },
-        ExpressionAttributeValues: {
-          ':lease': { N: String(Date.now() + LEASE_MILLISECONDS) },
-          ...TERMINAL_VALUES,
-        },
-      }),
-    );
+  /**
+   * Pushes the lease forward. False when the stored task has already ended —
+   * derived lost, most likely — or is gone: the task must not run on.
+   */
+  async renewLease(taskId: string): Promise<boolean> {
+    try {
+      await this.#client.send(
+        new UpdateItemCommand({
+          TableName: this.#tableName,
+          Key: { pk: { S: taskKey(taskId) } },
+          UpdateExpression: 'SET leaseExpiresAt = :lease',
+          ConditionExpression: `attribute_exists(pk) AND NOT (#state IN (${TERMINAL_PLACEHOLDERS}))`,
+          ExpressionAttributeNames: { '#state': 'state' },
+          ExpressionAttributeValues: {
+            ':lease': { N: String(Date.now() + LEASE_MILLISECONDS) },
+            ...TERMINAL_VALUES,
+          },
+        }),
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof ConditionalCheckFailedException) return false;
+      throw error;
+    }
   }
 
   /** The latest task started under an idempotency key. */
@@ -210,7 +230,8 @@ export class DynamoDBTaskStore implements TaskStore {
   private async readTaskItem(
     taskId: string,
   ): Promise<
-    { task: Task; state: TaskStateName; leaseExpiresAt: number } | undefined
+    | { task: Task; state: TaskState; leaseExpiresAt: number | undefined }
+    | undefined
   > {
     const response = await this.#client.send(
       new GetItemCommand({
@@ -229,10 +250,16 @@ export class DynamoDBTaskStore implements TaskStore {
     return {
       task: Task.fromJSON(JSON.parse(serialised)),
       state: TaskStateEnum.parse(state),
-      leaseExpiresAt: Number(item.leaseExpiresAt?.N ?? 0),
+      leaseExpiresAt:
+        item.leaseExpiresAt?.N === undefined
+          ? undefined
+          : Number(item.leaseExpiresAt.N),
     };
   }
 }
+
+/** Marks a loss derived by a reader, which no later write replaces. */
+const DERIVED_LOST_ATTRIBUTE = 'derivedLost';
 
 const TERMINAL_PLACEHOLDERS = TERMINAL_TASK_STATES.map(
   (_, index) => `:terminal${index}`,

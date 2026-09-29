@@ -18,7 +18,7 @@ Measured by the integration tests in `us-east-2`, the grace period twice.
 - **An outcome written first thing in the SIGTERM handler still lands** on V2.
 
 
-**Measured on 2026-09-22** against a real runtime in `us-west-2`, and **re-run on 2026-09-24 in `us-east-2`** by the integration tests, which all pass there — every finding below held except the pre-warmed pool, as noted. Account 913756569129: an ARM64 container, `PUBLIC` network mode, `serverProtocol: A2A`, built on `@a2a-js/sdk@1.2.0`. Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §B, §C's platform half, and the AgentCore half of §I.
+**Measured on 2026-09-22** against a real runtime in `us-west-2`, and **re-run on 2026-09-24 in `us-east-2`** by the integration tests, which all pass there — every finding below held except the pre-warmed pool, as noted. Account 913756569129: an ARM64 container, `PUBLIC` network mode, `serverProtocol: A2A`, built on `@a2a-js/sdk@1.2.0`. Answers three questions since settled, each a section below — §B, one session and one container; §C, `StopRuntimeSession`, its platform half; and §A, the lease — and the AgentCore half of how the A2A server is assembled. The letters are this note's own; they no longer name design options.
 
 This note is **observed behaviour**. [`agentcore-runtime.md`](agentcore-runtime.md) is what the documentation *says*; where the two differ, this note names the difference. Source: `spikes/agentcore/`, carried at A0 into `packages/agentforge/integ/aws/agentcore/`, which re-checks it against the platform. The container mints a container id — on its first invocation since V2, whose containers are all restored from one snapshot — and returns it on every task, so "the same container" is observed rather than inferred.
 

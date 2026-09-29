@@ -84,6 +84,18 @@ describe('S3SessionStore', () => {
     ]);
   });
 
+  it('fails a listing over a subpath that climbs', async () => {
+    const { client, objects } = inMemoryS3();
+    const store = new S3SessionStore({ bucket: 'b', client });
+    objects.set(
+      'project/session/subagents/../../other/part-0000000000001-000000.jsonl',
+      '{}\n',
+    );
+    await expect(store.listSubkeys(KEY)).rejects.toThrow(
+      /not a plain relative path/,
+    );
+  });
+
   it('fails a load over a line that is not JSON', async () => {
     const { client, objects } = inMemoryS3();
     const store = new S3SessionStore({ bucket: 'b', client });

@@ -6,7 +6,10 @@ import { DefaultRequestHandler } from '@a2a-js/sdk/server';
 import { jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import express from 'express';
+import { A2A_PROTOCOL_VERSION } from '#core/a2a-version.ts';
 import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
+import { TimeBudgetSecondsField } from '#core/contract/procedures.ts';
+import { TASK_TABLE_NAME_VARIABLE } from '#core/task-table.ts';
 import { TaskProcessExecutor } from './executor.ts';
 import { createGateway } from './gateway.ts';
 import { createOperationalMetrics } from './metrics.ts';
@@ -56,12 +59,12 @@ function serverConfig(
     }
     return value;
   };
-  const positive = (name: string, fallback: number): number => {
+  const positiveInteger = (name: string, fallback: number): number => {
     const value = environment[name];
     if (value === undefined || value === '') return fallback;
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      throw new Error(`${name} must be a positive number, not "${value}"`);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      throw new Error(`${name} must be a positive integer, not "${value}"`);
     }
     return parsed;
   };
@@ -70,16 +73,19 @@ function serverConfig(
   return {
     taskEntry: options.taskEntry,
     agentName: options.agentName ?? required('AGENTFORGE_AGENT_NAME'),
-    tableName: options.tableName ?? required('AGENTFORGE_TABLE_NAME'),
+    tableName: options.tableName ?? required(TASK_TABLE_NAME_VARIABLE),
     ...(endpoint === undefined || endpoint === ''
       ? {}
       : { dynamoDBEndpoint: endpoint }),
     admissionLimit:
-      options.admissionLimit ?? positive('AGENTFORGE_ADMISSION_LIMIT', 4),
-    defaultTimeBudgetSeconds:
+      options.admissionLimit ??
+      positiveInteger('AGENTFORGE_ADMISSION_LIMIT', 4),
+    // Whole seconds the executor's timer can hold, however it is given.
+    defaultTimeBudgetSeconds: TimeBudgetSecondsField.parse(
       options.defaultTimeBudgetSeconds ??
-      positive('AGENTFORGE_TIME_BUDGET_SECONDS', 3_600),
-    port: options.port ?? positive('AGENTFORGE_PORT', 9_000),
+        positiveInteger('AGENTFORGE_TIME_BUDGET_SECONDS', 3_600),
+    ),
+    port: options.port ?? positiveInteger('AGENTFORGE_PORT', 9_000),
     host: options.host ?? environment.AGENTFORGE_HOST ?? '0.0.0.0',
   };
 }
@@ -196,6 +202,7 @@ export async function startServer(
   );
 
   const close = async (): Promise<void> => {
+    // Refuses every start from here on, then stops the tasks already running.
     await executor.shutdown();
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
@@ -224,7 +231,12 @@ function agentCard(name: string, url: string): AgentCard {
     version: '1.0.0',
     provider: undefined,
     supportedInterfaces: [
-      { url, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '1.0' },
+      {
+        url,
+        protocolBinding: 'JSONRPC',
+        tenant: '',
+        protocolVersion: A2A_PROTOCOL_VERSION,
+      },
     ],
     capabilities: {
       streaming: false,

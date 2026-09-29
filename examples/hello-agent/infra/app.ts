@@ -3,7 +3,7 @@
 // runs it with the test role in us-east-2, after the base image it builds FROM.
 
 import { AgentRuntime, S3FilesystemBucket } from '@beruangai/agentforge/infra';
-import { App, CfnOutput, Stack } from 'aws-cdk-lib';
+import { App, CfnOutput, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
@@ -22,9 +22,12 @@ const stack = new Stack(app, 'agentforge-example-hello-agent', {
     region: required('CDK_DEFAULT_REGION'),
   },
 });
+// A test deployment: `destroy` removes everything, its buckets emptied first
+// (infra/empty-buckets.ts). A consumer's deployment keeps the default, RETAIN.
+const removalPolicy = RemovalPolicy.DESTROY;
 // The bucket the note procedures' notebook mounts from; any other agent
 // could be given it too.
-const notebook = new S3FilesystemBucket(stack, 'Notebook');
+const notebook = new S3FilesystemBucket(stack, 'Notebook', { removalPolicy });
 const agent = new AgentRuntime(stack, 'HelloAgent', {
   agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(
     new URL('..', import.meta.url).pathname,
@@ -36,6 +39,7 @@ const agent = new AgentRuntime(stack, 'HelloAgent', {
     },
   ),
   filesystems: { notebook },
+  removalPolicy,
   // The operator creates this secret and sets its value (README).
   secrets: {
     CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
@@ -48,4 +52,7 @@ const agent = new AgentRuntime(stack, 'HelloAgent', {
 new CfnOutput(stack, 'AgentRuntimeArn', { value: agent.agentRuntimeArn });
 new CfnOutput(stack, 'SessionBucketName', {
   value: agent.sessionBucket.bucketName,
+});
+new CfnOutput(stack, 'NotebookBucketName', {
+  value: notebook.bucket.bucketName,
 });

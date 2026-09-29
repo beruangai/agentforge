@@ -51,8 +51,9 @@ export interface FilesystemOptions {
   };
 }
 
+/** Strict: a misspelt option is refused, never dropped. A kind strips its own before these. */
 const FilesystemOptionsSchema = z
-  .object({
+  .strictObject({
     localPath: z
       .string()
       .refine(isAbsolute, 'a filesystem mounts at an absolute local path')
@@ -148,6 +149,14 @@ export abstract class Filesystem {
     options: { readonly modifiedBefore?: Date },
   ): Promise<void>;
 
+  /** The local directory it mounts at for a task, as `mount` resolves it. */
+  localPathFor(task: {
+    readonly taskId: string;
+    readonly name: string;
+  }): string {
+    return this.#resolveLocalPath(task).replace(/\/+$/, '');
+  }
+
   /** Refuses a mount the kind cannot honour, before anything is fetched. */
   protected validate(_mount: Mount): void {}
 
@@ -200,7 +209,7 @@ export abstract class Filesystem {
     return {
       name: task.name,
       taskId: task.taskId,
-      localPath: this.#resolveLocalPath(task).replace(/\/+$/, ''),
+      localPath: this.localPathFor(task),
       remotePath,
       read: scope.read ?? ['**'],
       write,
@@ -220,6 +229,8 @@ export class MountLifecycle {
   #checkpointTimer: ReturnType<typeof setInterval> | undefined;
   /** Pushes run one at a time: a checkpoint never overlaps the last. */
   #latestPush: Promise<void> = Promise.resolve();
+  /** A tick while a checkpoint is still pushing is skipped, so a slow store builds no backlog for unmount to wait through. */
+  #checkpointInFlight = false;
 
   constructor(
     filesystem: Filesystem,
@@ -242,16 +253,22 @@ export class MountLifecycle {
     const { checkpoints } = filesystem.options;
     if (checkpoints !== undefined) {
       this.#checkpointTimer = setInterval(() => {
+        if (this.#checkpointInFlight) return;
+        this.#checkpointInFlight = true;
         const modifiedBefore = new Date(
           Date.now() - checkpoints.settleSeconds * 1000,
         );
-        this.#queuePush({ modifiedBefore }).catch((error: unknown) => {
-          // The push at the end is the one the outcome waits on.
-          console.error(
-            `filesystem "${this.name}": a checkpoint failed`,
-            error,
-          );
-        });
+        this.#queuePush({ modifiedBefore })
+          .catch((error: unknown) => {
+            // The push at the end is the one the outcome waits on.
+            console.error(
+              `filesystem "${this.name}": a checkpoint failed`,
+              error,
+            );
+          })
+          .finally(() => {
+            this.#checkpointInFlight = false;
+          });
       }, checkpoints.intervalSeconds * 1000);
     }
   }

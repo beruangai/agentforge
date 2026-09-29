@@ -171,6 +171,44 @@ describe('S3Filesystem', () => {
   });
 });
 
+describe('the declared buckets', () => {
+  it.each([
+    ['not JSON', '{vault', /AGENTFORGE_FILESYSTEM_BUCKETS is not JSON/],
+    [
+      'not a map of names to buckets',
+      '["vault"]',
+      /AGENTFORGE_FILESYSTEM_BUCKETS is not a JSON object of bucket names/,
+    ],
+  ])(
+    'refuse a value that is %s, naming the variable',
+    async (_label, value, message) => {
+      const calls: (readonly string[])[] = [];
+      const filesystem = new S3Filesystem(
+        {
+          localPath,
+          bucket: 'vault',
+          scope: () => ({ remotePath: 'topics/a' }),
+        },
+        {
+          s7cmd: async (args) => {
+            calls.push(args);
+            return { exitCode: 0, stderr: '' };
+          },
+          environment: { AGENTFORGE_FILESYSTEM_BUCKETS: value },
+        },
+      );
+      await expect(
+        filesystem.mount({
+          name: 'vault',
+          taskId: 't-1',
+          request: { input: {}, context: {} as TaskContext },
+        }),
+      ).rejects.toThrow(message);
+      expect(calls).toEqual([]);
+    },
+  );
+});
+
 describe('ScratchFilesystem', () => {
   it('mounts an empty directory of the task’s own, removed when the task ends', async () => {
     const scratch = await new ScratchFilesystem().mount({

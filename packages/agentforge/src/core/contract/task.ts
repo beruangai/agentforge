@@ -62,7 +62,7 @@ export const CauseSchema = z.object({
   /** Whether running a new attempt could succeed. */
   retryable: z.boolean(),
   /** ISO time before which a retry is pointless. */
-  retryAfter: z.string().optional(),
+  retryAfter: z.iso.datetime().optional(),
   /** What the agent produced, when it did not conform. */
   payload: z.unknown().optional(),
   /**
@@ -158,6 +158,39 @@ export const OutcomeSchema = z.discriminatedUnion('state', [
   }),
 ]);
 export type Outcome = z.infer<typeof OutcomeSchema>;
+
+/** The artifact a finished task carries its outcome in, as its one data part (ADR 0002). */
+export const OUTCOME_ARTIFACT_ID = 'outcome';
+
+/** Artifacts as A2A 1.0 JSON carries them — absent when there are none. */
+const WireArtifactsSchema = z
+  .array(
+    z.looseObject({
+      artifactId: z.string(),
+      parts: z.array(z.looseObject({ data: z.unknown().optional() })),
+    }),
+  )
+  .optional();
+
+/**
+ * A task's outcome, read from its artifacts in their A2A 1.0 JSON form: the
+ * one data part of the `outcome` artifact, or none while the task runs.
+ * Shared by the server, which writes it, and the client, which reads it.
+ */
+export function outcomeOfArtifacts(artifacts: unknown): Outcome | undefined {
+  const artifact = WireArtifactsSchema.parse(artifacts)?.find(
+    (candidate) => candidate.artifactId === OUTCOME_ARTIFACT_ID,
+  );
+  if (artifact === undefined) return undefined;
+  const dataParts = artifact.parts.filter((part) => 'data' in part);
+  const [part] = dataParts;
+  if (dataParts.length !== 1 || part === undefined) {
+    throw new Error(
+      `the outcome artifact carries ${dataParts.length} data parts, not one`,
+    );
+  }
+  return OutcomeSchema.parse(part.data);
+}
 
 /** What one agent run recorded (§REQ601). */
 export const RunRecordSchema = z.object({

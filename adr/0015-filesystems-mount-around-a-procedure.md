@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 decision-makers: Jeremy Jonas
 ---
@@ -18,16 +18,16 @@ decision-makers: Jeremy Jonas
 
 ## Decision Outcome
 
-* **A `Filesystem` is an abstract kind with two operations, `pull` and `push`.** The base class runs the lifecycle from the options, which have no defaults of AgentForge's:
+* **A `Filesystem` is an abstract kind with two operations, `pull` and `push`.** The base class runs the lifecycle from the options the consumer declares, with the defaults below:
   * mount: resolve the scope, create the local directory, `pull`, start checkpoints. Every mount pulls, so a task works from what is in the store, never blind; a procedure that only adds a file scopes its `remotePath` to it, and pulling again mid-task is an operation, not an option. A mount is AgentForge's copy into a local directory, not a runtime or container mount ([ADR 0011](0011-state-persists-through-apis-not-mounts.md))
-  * unmount: stop checkpoints, push if `pushOn` lists the state the task ended in — `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, or both; a procedure's invocation is its task, so the filesystem uses A2A's task states and no terms of its own. A cancel never pushes, a rejected task never mounts, and without `pushOn` nothing is pushed — then remove the local copy
+  * unmount: stop checkpoints, push if `pushOn` lists the state the task ended in — `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, or both; a procedure's invocation is its task, so the filesystem uses A2A's task states and no terms of its own. A cancel never pushes, nor does a task stopped at its time budget — the harness is stopped the same way for both, so checkpoints are what a timed-out task keeps; a rejected task never mounts, and without `pushOn` nothing is pushed — then remove the local copy
   * checkpoints: a `push` every `intervalSeconds` of only the files unchanged for `settleSeconds`, so writes in progress settle first; only when `pushOn` includes `TASK_STATE_FAILED`, since they publish before the outcome is known
 
   Built in: `S3Filesystem` and `ScratchFilesystem`. A consumer subclasses for its own kind; git comes later.
 * **Registration and lifecycle are separate.** `filesystems({ name: filesystem })` is oRPC middleware that only adds to a registry on the context: a name registered again replaces the entry upstream, and `replaceUpstream: true` drops everything upstream. The harness appends one middleware to the procedure it calls, which oRPC runs innermost — after every registration and before the handler — and mounts the registry. The harness unmounts once the outcome is known, so an output that fails validation counts as a failure.
 * **Scope is per request.** `scope({ input, context })` returns the subtree mounted from the store (`remotePath`) and the `read` and `write` globs within it. `read` is the whole mount by default; `write` is too when the filesystem pushes, and nothing when it does not — so read-only needs no declaration. A push never leaves the write scope.
 * **The handler owns the agent's permissions.** `context.filesystems.<name>` gives each mount's `localPath` and baseline allow rules — `Read(//path/<read>)` and `Edit(//path/<write>)` — and `context.filesystemPermissions` merges them. AgentForge applies none; procedures run in `dontAsk`, so a path without a rule is denied, and Bash is the procedure's own allow list.
-* **A kind decides its `localPath`**: `ScratchFilesystem` defaults to a directory of the task's own; `S3Filesystem` requires one, so prompts can name it.
+* **A kind decides its `localPath`**: `ScratchFilesystem` defaults to a directory of the task's own; `S3Filesystem` requires one, so prompts can name it. Two filesystems of one procedure never share or nest a `localPath`: the task fails before anything is mounted.
 * **The outcome waits for the push.** A completed task whose push fails ends `FAILED` with `FILESYSTEM_UNSYNCED`, retryable; a failed task keeps its own cause with the push's failure added. A failed pull fails the task before the handler runs.
 * **An `S3FilesystemBucket` construct owns its bucket**, so several agents can share one; `AgentRuntime` takes `filesystems: { name: bucket }`, grants read and write, and names the buckets to the harness. The bucket is private, TLS-only, versioned, S3-encrypted and retained by default. No KMS; checkov's KMS and access-logging rules are the consumer's, in its config.
 * **`s7cmd sync` runs S3**, as a child of the task process, so a cancel or a lost container takes it.

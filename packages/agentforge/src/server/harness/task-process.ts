@@ -5,9 +5,12 @@ import {
   call,
   DecoratedProcedure,
   implement,
+  ORPCError,
   type Router,
   unlazy,
+  ValidationError,
 } from '@orpc/server';
+import { z } from 'zod';
 import {
   contractHash,
   inputSchemaOf,
@@ -19,10 +22,10 @@ import {
   type PriorAttempt,
   type RunRecord,
 } from '#core/contract/task.ts';
-import type {
-  ExecutorMessage,
-  TaskInvocation,
-  TaskProcessMessage,
+import {
+  ExecutorMessageSchema,
+  type TaskInvocation,
+  type TaskProcessMessage,
 } from '#core/task-protocol/messages.ts';
 import type {
   MountedFilesystem,
@@ -233,18 +236,37 @@ function outcomeOf(error: unknown, signal: AbortSignal): Outcome {
     return { state: 'TASK_STATE_FAILED', cause: nested.taskCause };
   }
   if (nested instanceof TaskCanceled) return { state: 'TASK_STATE_CANCELED' };
+  // oRPC's own validation: the input, refused before any work, or the
+  // handler's output, which failed the contract.
+  if (error instanceof ORPCError && nested instanceof ValidationError) {
+    const issues = z.prettifyError(
+      new z.ZodError([...nested.issues] as z.core.$ZodIssue[]),
+    );
+    if (error.code === 'BAD_REQUEST') {
+      return {
+        state: 'TASK_STATE_REJECTED',
+        reason: `input does not match the procedure: ${issues}`,
+      };
+    }
+    return {
+      state: 'TASK_STATE_FAILED',
+      cause: cause(
+        'OUTPUT_INVALID',
+        `the procedure's output does not match its contract: ${issues}`,
+        {
+          payload: nested.invalidData,
+          stackTrace: inspect(error, { depth: 8 }),
+        },
+      ),
+    };
+  }
   const message =
     error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  const code =
-    error instanceof Error &&
-    'code' in error &&
-    error.code === 'INTERNAL_SERVER_ERROR' &&
-    /output/i.test(error.message)
-      ? 'OUTPUT_INVALID'
-      : 'EXECUTION_ERROR';
   return {
     state: 'TASK_STATE_FAILED',
-    cause: cause(code, message, { stackTrace: inspect(error, { depth: 8 }) }),
+    cause: cause('EXECUTION_ERROR', message, {
+      stackTrace: inspect(error, { depth: 8 }),
+    }),
   };
 }
 
@@ -286,19 +308,41 @@ export function runTaskProcess(options: {
   const controller = new AbortController();
   const sessionStore = sessionStoreFromEnvironment();
   let started = false;
-  process.on('message', (message: ExecutorMessage) => {
+  process.on('message', (received: unknown) => {
+    const parsed = ExecutorMessageSchema.safeParse(received);
+    if (!parsed.success) {
+      // The executor and this process are one version: anything else is a bug.
+      console.error(
+        `the task process received a message outside the protocol: ${z.prettifyError(parsed.error)}`,
+      );
+      process.exit(1);
+    }
+    const message = parsed.data;
     if (message.type === 'cancel') {
       controller.abort();
       return;
     }
-    if (started) return;
+    if (started) {
+      console.error(
+        `the task process received a second run, for task ${message.invocation.taskId}, and ignored it`,
+      );
+      return;
+    }
     started = true;
+    const { taskId } = message.invocation;
     void executeProcedure({
       contract: options.contract,
       router: options.router,
       invocation: message.invocation,
       signal: controller.signal,
-      onRecord: (record) => void emit({ type: 'record', record }),
+      onRecord: (record) => {
+        emit({ type: 'record', record }).catch((error: unknown) => {
+          console.error(
+            `task ${taskId}: a run record could not be sent to the executor`,
+            error,
+          );
+        });
+      },
       ...(sessionStore === undefined ? {} : { sessionStore }),
     })
       .then((outcome) => emit({ type: 'outcome', outcome }))

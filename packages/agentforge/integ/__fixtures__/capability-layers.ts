@@ -1,5 +1,5 @@
 /**
- * The layered tree `DESIGN_OPTIONS.md` §L composes capabilities from: one
+ * The layered tree `docs/research/capability-composition.md` composes capabilities from: one
  * `.claude/` per image layer, `cwd` at the deepest. Each layer contributes
  * markers whose names carry the layer, so what loaded is read off the
  * session's own listings with no model reasoning.

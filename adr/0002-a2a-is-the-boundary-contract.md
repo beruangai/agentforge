@@ -23,8 +23,8 @@ Chosen option: **A2A**, because the task lifecycle it standardizes — submit, w
 * Start is `SendMessage` with `returnImmediately`; the outcome is read by polling `GetTask`; cancellation is `CancelTask`. **Polling is the only supported way to wait**: streaming caps at 60 minutes and A2A has no replay across a reconnect, and both consumers are long-running workflow steps where latency does not matter. A subscription or a blocking send is added only when a procedure warrants it
 * The caller talks A2A and nothing else — no store credentials, no second endpoint. The client is caller-agnostic; Temporal is supported through an activity factory over it, never baked into the contract
 * AgentForge still owns what A2A leaves open: durable state outside the microVM, the lease and loss, idempotency by a caller-supplied key ([ADR 0009](0009-the-caller-supplies-the-idempotency-key.md)), and the typed failure cause, which rides in a failed task's artifact
-* **The SDK's request handler is wrapped, not used as-is.** It mints the task id and creates the event bus before the executor is reached, so attaching a retry to a running task, refusing an unknown contract hash, and admission control all have to happen in front of it
-* The agent card is generated from the procedures a runtime serves; agent-to-agent discovery is not used, and costs nothing if it ever is
+* **The SDK's request handler is wrapped, not used as-is.** It mints the task id and creates the event bus before the executor is reached, so attaching a retry to a running task and admission control have to happen in front of it; the contract hash is checked in the task process, before any work
+* The agent card is generic — one skill, named after the agent — since callers import the contract rather than discover it; agent-to-agent discovery is not used, and costs nothing if it ever is
 * What holds against the real platform is settled by spike (`docs/research/agentcore-runtime-observed.md`, and the tests in `integ/aws/agentcore/`)
 
 ### Consequences
@@ -32,4 +32,4 @@ Chosen option: **A2A**, because the task lifecycle it standardizes — submit, w
 * Good, because the wire, its states, and its client are not ours to maintain, and an outcome never depends on a connection staying open
 * Good, because the same server runs locally in Docker and on AgentCore
 * Bad, because a short procedure pays a start-and-read round trip
-* Bad, because AgentCore returns real HTTP statuses where A2A expects 200, the SDK mints ids with uuid4 against our uuid7 convention, and its card resolver needs a signing `fetch` to reach a card served through `InvokeAgentRuntime` — each has to be handled in the client
+* Bad, because AgentCore returns real HTTP statuses where A2A expects 200, which the client's transport turns into errors carrying AgentCore's code; and the SDK mints task ids with uuid4, which AgentForge accepts — its uuid7 convention covers the ids it mints itself (§REQ706)

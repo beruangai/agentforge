@@ -1,5 +1,6 @@
 import type { HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it } from 'vitest';
+import type { AgentOptions } from './kernel.ts';
 import { composeOptions } from './options.ts';
 
 const guard = (matcher: string): HookCallbackMatcher => ({
@@ -31,6 +32,24 @@ describe('composeOptions', () => {
       allowedTools: ['Read', 'Bash', 'Write'],
       hooks: { PreToolUse: [house, own], Stop: [expect.anything()] },
       env: { A: '1', B: '2' },
+    });
+  });
+
+  it('keeps a guardrail a later part leaves undefined', () => {
+    const house = guard('Bash');
+    // As a consumer compiled without `exactOptionalPropertyTypes` may pass it.
+    const procedure = {
+      disallowedTools: undefined,
+      hooks: undefined,
+    } as unknown as AgentOptions;
+    expect(
+      composeOptions(
+        { disallowedTools: ['WebFetch'], hooks: { PreToolUse: [house] } },
+        procedure,
+      ),
+    ).toEqual({
+      disallowedTools: ['WebFetch'],
+      hooks: { PreToolUse: [house] },
     });
   });
 

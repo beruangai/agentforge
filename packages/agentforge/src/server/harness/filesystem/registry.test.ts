@@ -160,6 +160,21 @@ describe('filesystems registered on a procedure', () => {
     });
   });
 
+  it('fail the task before anything mounts when two share a directory, or one is inside another', async () => {
+    notes = new ScriptedFilesystem(at('workspace/notes'));
+    expect(await execute('added')).toMatchObject({
+      state: 'TASK_STATE_FAILED',
+      cause: {
+        code: 'EXECUTION_ERROR',
+        message: expect.stringMatching(
+          /filesystems "workspace" .+ and "notes" .+ mount at the same directory or one inside the other/,
+        ),
+      },
+    });
+    expect(ran).toBe(false);
+    expect([...workspace.calls, ...scratch.calls, ...notes.calls]).toEqual([]);
+  });
+
   it('fail the task before the handler when one cannot mount, unmounting those that did', async () => {
     workspace = new ScriptedFilesystem(at('workspace'), {
       pull: () => Promise.reject(new FilesystemUnsynced('refused')),

@@ -1,7 +1,7 @@
 /**
  * With background work ON, a background completion starts a new turn and
  * publishes a second result — the drift detector for the reason the kernel
- * switches background work off (docs/ARCHITECTURE.md §7).
+ * switches background work off (docs/ARCHITECTURE.md §6).
  *
  * The kernel runs in streaming input and output with
  * `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`. This runs the same input mode
@@ -10,7 +10,7 @@
  * SDK stops starting a turn on a background completion — or starts marking it
  * differently — this is what says so, and it feeds the open question of
  * whether background work can be allowed with a deterministic final answer
- * (docs/DESIGN_OPTIONS.md §E).
+ * (docs/DESIGN_OPTIONS.md §ODO006).
  *
  * The assertions are structural and hold whether the model's answers are
  * right or wrong: two results, the second from a task notification. Closed
@@ -25,6 +25,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
+import { structuredOutputJsonSchema } from '../../../src/server/harness/structured-output.ts';
 import {
   CARRIER_TOOL_NAME,
   createSandbox,
@@ -39,7 +40,7 @@ const OutputSchema = z.object({
     .describe('whether a background command was started'),
   note: z.string().describe('one sentence about what was started'),
 });
-const OUTPUT_JSON_SCHEMA = z.toJSONSchema(OutputSchema, { target: 'draft-7' });
+const OUTPUT_JSON_SCHEMA = structuredOutputJsonSchema(OutputSchema);
 
 // The agent must background something that outlives its own submission, so
 // its completion arrives after the first result rather than racing it.

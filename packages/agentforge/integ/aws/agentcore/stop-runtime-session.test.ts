@@ -1,5 +1,5 @@
 /**
- * §C, platform half — what `StopRuntimeSession` does to a container that is
+ * research §C, platform half — what `StopRuntimeSession` does to a container that is
  * mid-task.
  *
  * `ARCHITECTURE.md` treats cancellation as cooperative: the task process is
@@ -42,7 +42,7 @@ import { waitForContainerLogEvents } from './__fixtures__/runtime-logs.ts';
 const SIGTERM_WITHIN_MILLISECONDS_OF_THE_STOP = 5_000;
 const LOG_CLOCK_MARGIN_MILLISECONDS = 60_000;
 
-describe('StopRuntimeSession against a container that is mid-task (§C)', () => {
+describe('StopRuntimeSession against a container that is mid-task (research §C)', () => {
   const resources = createResourceStack();
   let fixture: FixtureRuntime;
   let a2a: A2aOverAgentCore;

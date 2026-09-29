@@ -1,3 +1,4 @@
+import { isAbsolute, relative, resolve } from 'node:path';
 import { os } from '@orpc/server';
 import { FILESYSTEM_NAME_PATTERN } from '#core/filesystem.ts';
 import type { TaskContext } from '../task-process.ts';
@@ -57,10 +58,10 @@ export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
   return os
     .$context<TaskContext & RegistryContext>()
     .middleware(async ({ context, next }, input) => {
+      const registered = Object.entries(context[FILESYSTEM_REGISTRY] ?? {});
+      refuseOverlappingMounts(registered, context.taskId);
       const filesystems: Record<string, MountedFilesystem> = {};
-      for (const [name, filesystem] of Object.entries(
-        context[FILESYSTEM_REGISTRY] ?? {},
-      )) {
+      for (const [name, filesystem] of registered) {
         const lifecycle = await filesystem.mount({
           name,
           taskId: context.taskId,
@@ -79,4 +80,42 @@ export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
         },
       });
     });
+}
+
+/**
+ * Refuses, before anything is mounted, two filesystems at one local
+ * directory or one inside the other: each removes its own at unmount, and
+ * unmounts run concurrently, so one's removal could race the other's push.
+ */
+function refuseOverlappingMounts(
+  registered: readonly (readonly [string, Filesystem])[],
+  taskId: string,
+): void {
+  const localPaths = registered.map(
+    ([name, filesystem]) =>
+      [name, resolve(filesystem.localPathFor({ taskId, name }))] as const,
+  );
+  for (const [index, [name, localPath]] of localPaths.entries()) {
+    for (const [otherName, otherLocalPath] of localPaths.slice(index + 1)) {
+      if (
+        isWithin(localPath, otherLocalPath) ||
+        isWithin(otherLocalPath, localPath)
+      ) {
+        throw new Error(
+          `filesystems "${name}" (${localPath}) and "${otherName}" (${otherLocalPath}) mount at the same directory or one inside the other`,
+        );
+      }
+    }
+  }
+}
+
+/** Whether `path` is `directory` or inside it. */
+function isWithin(directory: string, path: string): boolean {
+  const fromDirectory = relative(directory, path);
+  return (
+    fromDirectory === '' ||
+    (!isAbsolute(fromDirectory) &&
+      fromDirectory !== '..' &&
+      !fromDirectory.startsWith('../'))
+  );
 }

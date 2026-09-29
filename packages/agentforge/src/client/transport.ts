@@ -1,4 +1,5 @@
 import { randomUUIDv7 } from 'node:crypto';
+import { A2A_PROTOCOL_VERSION, A2A_VERSION_HEADER } from '#core/a2a-version.ts';
 import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
 
 export type TaskMethod = 'SendMessage' | 'GetTask' | 'CancelTask';
@@ -80,7 +81,7 @@ export function localTransport(url: string): Transport {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'a2a-version': '1.0',
+          [A2A_VERSION_HEADER]: A2A_PROTOCOL_VERSION,
           [RUNTIME_SESSION_HEADER]: runtimeSessionId,
         },
         body: requestBody(method, params),
@@ -149,10 +150,10 @@ export function agentCoreTransport(options: {
           const request = args.request as { headers?: Record<string, string> };
           if (request.headers === undefined) {
             throw new Error(
-              'InvokeAgentRuntime built no HTTP request to add A2A-Version to',
+              `InvokeAgentRuntime built no HTTP request to add ${A2A_VERSION_HEADER} to`,
             );
           }
-          request.headers['A2A-Version'] = '1.0';
+          request.headers[A2A_VERSION_HEADER] = A2A_PROTOCOL_VERSION;
           return next(args);
         },
         { step: 'build', name: 'agentforgeA2aVersionHeader' },

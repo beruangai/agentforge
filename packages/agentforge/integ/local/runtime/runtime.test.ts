@@ -18,6 +18,7 @@ import {
   type Routed,
 } from '../../../src/client/client.ts';
 import { localTransport } from '../../../src/client/transport.ts';
+import { cause } from '../../../src/core/contract/task.ts';
 import { finishedTask, newTask } from '../../../src/server/runtime/a2a-task.ts';
 import {
   type RunningServer,
@@ -312,6 +313,22 @@ describe('the task store', () => {
         finishedTask(task, { state: 'TASK_STATE_COMPLETED', output: {} }),
       ),
     ).rejects.toThrow(/already ended/);
+    // Not even a failure — the same state — replaces a derived loss.
+    await expect(
+      store.save(
+        finishedTask(task, {
+          state: 'TASK_STATE_FAILED',
+          cause: cause('TIMED_OUT', 'the time budget ran out'),
+        }),
+      ),
+    ).rejects.toThrow(/already ended/);
+    expect(
+      (await store.load(task.id))?.artifacts[0]?.parts[0]?.content,
+    ).toMatchObject({
+      value: { state: 'TASK_STATE_FAILED', cause: { code: 'LOST' } },
+    });
+    // Nor does it renew: the executor stops a task whose lease it cannot renew.
+    expect(await store.renewLease(task.id)).toBe(false);
   });
 });
 

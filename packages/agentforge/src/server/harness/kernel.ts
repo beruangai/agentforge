@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { inspect } from 'node:util';
 import {
   type Options,
+  type SDKAssistantMessageError,
   type SDKMessage,
   type SDKResultMessage,
   type SessionStore,
@@ -71,6 +72,11 @@ export interface KernelContext {
 
 export type QueryFunction = typeof sdkQuery;
 
+/** What the kernel sets in every run's `env`, over the procedure's: background work off. */
+export const BACKGROUND_WORK_DISABLED = {
+  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
+} as const;
+
 /** How long the process may keep running after its input ends. */
 const DRAIN_BOUND_MILLISECONDS = 30_000;
 /** How long an interrupt has to settle before the run is aborted outright. */
@@ -99,6 +105,9 @@ export async function runAgent<Output>(
     spec.prompt,
     spec.options?.cwd ?? process.cwd(),
   );
+  // A cancel while the prompt's documents were read: the listener below
+  // would never hear an abort that already happened.
+  if (context.signal.aborted) throw new TaskCanceled();
   const promptHash = ohash(message.message.content);
   // The prompt as sent, whole, in the container log (§REQ601); the record
   // carries its hash.
@@ -123,7 +132,7 @@ export async function runAgent<Output>(
     env: {
       ...process.env,
       ...spec.options?.env,
-      CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
+      ...BACKGROUND_WORK_DISABLED,
     },
     outputFormat: { type: 'json_schema', schema: wire.schema },
     abortController,
@@ -143,7 +152,10 @@ export async function runAgent<Output>(
   let canceled = false;
   const onAbort = (): void => {
     canceled = true;
-    void session.interrupt().catch(() => undefined);
+    void session.interrupt().catch((error: unknown) => {
+      // The abort after the grace period still ends the run.
+      console.error('the run could not be interrupted', error);
+    });
     setTimeout(
       () => abortController.abort(),
       INTERRUPT_GRACE_MILLISECONDS,
@@ -183,17 +195,31 @@ export async function runAgent<Output>(
           break;
         }
       }
-      if (next.value.type === 'result' && result === undefined) {
-        result = next.value;
-        drainDeadline = Date.now() + DRAIN_BOUND_MILLISECONDS;
-        endInput();
+      if (next.value.type === 'result') {
+        if (result === undefined) {
+          result = next.value;
+          drainDeadline = Date.now() + DRAIN_BOUND_MILLISECONDS;
+          endInput();
+        } else {
+          console.error(
+            'a result after the first is not the outcome, and is ignored',
+            next.value,
+          );
+        }
       }
     }
   } catch (error) {
+    // Whatever threw — the stream, or the kernel's own code — the process may
+    // still be running a turn no one is observing.
+    session.close();
     // The turn and budget limits end with a result and only then throw; an
     // error after the first result changes nothing. One with no result is
     // how a crash, a lost connection or an abort ends.
-    if (result === undefined) streamError = error;
+    if (result === undefined) {
+      streamError = error;
+    } else {
+      console.error('the run threw after its first result', error);
+    }
   } finally {
     endInput();
     context.signal.removeEventListener('abort', onAbort);
@@ -233,6 +259,23 @@ export async function runAgent<Output>(
       ),
     );
   }
+  // Before the mirror's checks: a run that ended without a result did not
+  // mirror whole either, and why it ended is the failure to report.
+  if (result === undefined) {
+    throw new TaskFailure(
+      cause(
+        'EXECUTION_ERROR',
+        `the run ended without a result: ${describe(streamError)}${
+          observed.mirrorError === undefined
+            ? ''
+            : `; and the session transcript could not be mirrored: ${observed.mirrorError}`
+        }`,
+        streamError === undefined
+          ? {}
+          : { stackTrace: inspect(streamError, { depth: 8 }) },
+      ),
+    );
+  }
   if (observed.mirrorError !== undefined) {
     throw new TaskFailure(
       cause(
@@ -254,17 +297,6 @@ export async function runAgent<Output>(
       );
     }
   }
-  if (result === undefined) {
-    throw new TaskFailure(
-      cause(
-        'EXECUTION_ERROR',
-        `the run ended without a result: ${describe(streamError)}`,
-        streamError === undefined
-          ? {}
-          : { stackTrace: inspect(streamError, { depth: 8 }) },
-      ),
-    );
-  }
   const sessionId = observed.sessionId ?? result.session_id;
   const output = settle(result, spec.output, observed, wire.wrapped);
   return { output, sessionId, record };
@@ -273,7 +305,7 @@ export async function runAgent<Output>(
 interface Observed {
   sessionId: string | undefined;
   rateLimitResetsAt: number | undefined;
-  assistantError: string | undefined;
+  assistantError: SDKAssistantMessageError | undefined;
   mirrorError: string | undefined;
   /** Every assistant message's uuid, which the transcript entry for it shares. */
   assistantMessages: string[];
@@ -398,7 +430,7 @@ async function nextBefore(
   }
 }
 
-const CREDENTIAL_ERRORS = new Set([
+const CREDENTIAL_ERRORS = new Set<SDKAssistantMessageError>([
   'authentication_failed',
   'oauth_org_not_allowed',
   'account_on_hold',

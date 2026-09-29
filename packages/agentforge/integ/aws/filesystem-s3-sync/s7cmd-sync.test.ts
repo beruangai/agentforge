@@ -37,7 +37,6 @@ import {
   type S3FilesystemOptions,
   type S7cmdRunner,
 } from '../../../src/server/harness/filesystem/s3-filesystem.ts';
-import { buildAgentForgeBaseImage } from '../__fixtures__/agentforge-base-image.ts';
 import { s7cmdInBaseImage } from './__fixtures__/s7cmd-in-base-image.ts';
 import {
   createScratchBucket,
@@ -96,7 +95,6 @@ function mount(
 }
 
 beforeAll(async () => {
-  await buildAgentForgeBaseImage();
   bucket = await createScratchBucket(s3, randomUUIDv7());
   created.bucket = bucket;
   root = await mkdtemp(join(tmpdir(), 'agentforge-s7cmd-'));

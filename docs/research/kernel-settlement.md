@@ -1,6 +1,6 @@
 # Kernel settlement — spike findings
 
-**Read against the real SDK on 2026-09-22.** `@anthropic-ai/claude-agent-sdk@0.3.278`, Bun 1.4.0, macOS, the operator's Claude Max subscription, model `claude-sonnet-5` unless a case names another. **Re-run 2026-09-24 against `0.3.280`**, and corrected the same day where the recordings and the SDK's documentation disagreed with what was first written (E1, E2, E4). Answers [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §E.
+**Read against the real SDK on 2026-09-22.** `@anthropic-ai/claude-agent-sdk@0.3.278`, Bun 1.4.0, macOS, the operator's Claude Max subscription, model `claude-sonnet-5` unless a case names another. **Re-run 2026-09-24 against `0.3.280`**, and corrected the same day where the recordings and the SDK's documentation disagreed with what was first written (E1, E2, E4). Answers how a run settles, a question since settled; whether background work can be allowed stays open, [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §ODO006.
 
 Source: `spikes/kernel-settlement/`, four runnable spikes, now the integration tests in `packages/agentforge/integ/model/kernel-settlement/` (`nx run @beruangai/agentforge:integ --configuration=model`): E1 `foreground-settlement`, E2 `background-settlement`, E3 `in-turn-correction`, E4 `limits-end-with-a-result`. From 2026-09-24 every one but E2's drift detector runs in the kernel's configuration — streaming input, background work off, the input ended on the first result. Every message of every run is kept as JSONL — then under `spikes/out/`, now under `dist/packages/agentforge/integ/` — so each claim below is evidence rather than recollection. Total model spend: **$1.84**.
 
@@ -23,7 +23,7 @@ With `outputFormat: { type: 'json_schema', schema }`, the final submission is an
 answered by `"Structured output provided successfully"`, and surfaced on the result message as `structured_output`.
 
 - The **tool_use input is the real payload**, not a placeholder. (The SDK's own `resumeDropsTurn` documentation calls the carrier's data a placeholder; that describes the *persisted transcript entry*, where the payload lives in a separate `structured_output` attachment — not the live `tool_use` block.)
-- `StructuredOutput` is listed in the `system/init` message's `tools` array on **every** run observed. **So the kernel can assert the carrier's existence at startup**, from `init.tools`, before any work — which is the mitigation §E asked for.
+- `StructuredOutput` is listed in the `system/init` message's `tools` array on **every** run observed. **So the kernel can assert the carrier's existence at startup**, from `init.tools`, before any work — which is the mitigation the settlement question asked for.
 
 ## Naming: the allowlist name and the emitted name differ
 
@@ -84,7 +84,7 @@ Both results carry `subtype: success`, `is_error: false`. The first is **not** c
 - **Background work is switched off per query**: `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` through the `env` option, which removes `run_in_background` from Bash **and the subagent tool** and turns off auto-backgrounding. This is the predecessor harness's current patch, from recent testing there: with background work on, `StructuredOutput` was called more than once and the SDK's automatic follow-up turn on a background completion dropped the earlier tool calls, so the final structured output was not deterministic. A detected second result is not enough; which answer is final is the objective.
 - **The kernel publishes on the first result, then ends its input and keeps reading to process exit under a bound.** Stopping at the result closes the CLI while a `mirror_error` from the final transcript flush, or the telemetry export, may still be on its way.
 
-**Open: whether background work can be allowed with a deterministic final answer** — a spike of its own, `DESIGN_OPTIONS.md` §E. The streaming-input case above stays tested, because it is what would tell us the SDK changed.
+**Open: whether background work can be allowed with a deterministic final answer** — a spike of its own, `DESIGN_OPTIONS.md` §ODO006. The streaming-input case above stays tested, because it is what would tell us the SDK changed.
 
 ### Background disabled — `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`
 
@@ -141,11 +141,11 @@ After the third refusal the run terminated with:
 subtype: "success",  is_error: false,  structured_output: null
 ```
 
-**A successful-looking result with no output.** `ARCHITECTURE.md` §7 says the settled output is validated before anything else sees it; this is the case that makes that non-negotiable. The kernel must treat *result present, `structured_output` absent* as `OUTPUT_INVALID`, never as success — and must cap its own correction attempts, since the model gave up before the hook's cap was reached.
+**A successful-looking result with no output.** `ARCHITECTURE.md` §6 says the settled output is validated before anything else sees it; this is the case that makes that non-negotiable. The kernel must treat *result present, `structured_output` absent* as `OUTPUT_INVALID`, never as success — and must cap its own correction attempts, since the model gave up before the hook's cap was reached.
 
 ### Edge 3 — a wrong matcher fails silently
 
-`matcher: 'StructuredOutputs'` (plural) fired **zero times** and the run completed normally. No warning, no error. Exactly the failure §E anticipated. Mitigated by asserting `init.tools` contains every tool name the kernel's matchers reference, at startup, before work — see the carrier section above.
+`matcher: 'StructuredOutputs'` (plural) fired **zero times** and the run completed normally. No warning, no error. Exactly the failure the settlement question anticipated. Mitigated by asserting `init.tools` contains every tool name the kernel's matchers reference, at startup, before work — see the carrier section above.
 
 ## E4 — Does every option reach and bind the run?
 
@@ -202,5 +202,5 @@ Every item below is forced by an observation above, not inferred.
 
 ## What remains open
 
-- **Whether background work can be allowed with a deterministic final answer.** Settled for now by switching it off per query (E2); a spike of its own if a procedure asks for background work, `DESIGN_OPTIONS.md` §E.
+- **Whether background work can be allowed with a deterministic final answer.** Settled for now by switching it off per query (E2); a spike of its own if a procedure asks for background work, `DESIGN_OPTIONS.md` §ODO006.
 - **`maxTurns` interaction with a hook denial loop.** The denial scenarios ran under `maxTurns: 25` and stopped for other reasons.

@@ -7,7 +7,7 @@ import {
   type S3FilesystemOptions,
 } from '@beruangai/agentforge/agent';
 import { z } from 'zod';
-import { helloAgent } from './contract.ts';
+import { helloAgent, TopicField } from './contract.ts';
 
 const os = implementAgent(helloAgent);
 
@@ -19,9 +19,9 @@ const NOTE_FILE = join(NOTEBOOK_PATH, 'note.md');
 const NOTEBOOK: S3FilesystemOptions = {
   localPath: NOTEBOOK_PATH,
   bucket: 'notebook',
-  // The contract has validated the input.
+  // A scope receives its input untyped; the contract's own field reads it.
   scope: ({ input }) => ({
-    remotePath: `topics/${(input as { readonly topic: string }).topic}`,
+    remotePath: `topics/${z.object({ topic: TopicField }).parse(input).topic}`,
   }),
 };
 

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PINNED_BUN_BASE_IMAGE_REFERENCE } from '../../../__fixtures__/pinned-base-image.ts';
+import { readPinnedBunBaseImage } from '../../../__fixtures__/pinned-base-image.ts';
 import { runCommand } from '../../../__fixtures__/run-command.ts';
 import type { AwsEnvironment } from './aws-environment.ts';
 
@@ -17,8 +17,8 @@ export interface PushedImage {
 
 /**
  * Bundles the fixture server with `bun build --target=bun`, builds it for
- * `linux/arm64` — AgentCore Runtime takes nothing else — on
- * `oven/bun:1.4.0-alpine` pinned by digest, and pushes it to ECR. Docker's
+ * `linux/arm64` — AgentCore Runtime takes nothing else — on the Bun image
+ * the base image's `Dockerfile` pins by digest, and pushes it to ECR. Docker's
  * layer cache keeps a repeat cheap, so each test file builds its own.
  *
  * The build context and the Docker configuration are temporary directories,
@@ -76,7 +76,7 @@ export async function buildAndPushFixtureImage(
         '--platform',
         'linux/arm64',
         '--build-arg',
-        `BUN_IMAGE=${PINNED_BUN_BASE_IMAGE_REFERENCE}`,
+        `BUN_IMAGE=${await readPinnedBunBaseImage()}`,
         '--tag',
         imageUri,
         '--metadata-file',

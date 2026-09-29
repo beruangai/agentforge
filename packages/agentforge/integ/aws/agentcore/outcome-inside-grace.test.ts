@@ -1,5 +1,5 @@
 /**
- * §C — is the grace period USABLE?
+ * research §C — is the grace period USABLE?
  *
  * Knowing how long a stopped container has — about ten seconds on V2 — is
  * only half an answer. The
@@ -37,7 +37,7 @@ import { waitForContainerLogEvents } from './__fixtures__/runtime-logs.ts';
 const OUTCOME_VISIBLE_WITHIN_MILLISECONDS = 12_000;
 const LOG_CLOCK_MARGIN_MILLISECONDS = 60_000;
 
-describe('an outcome recorded inside the grace period (§C)', () => {
+describe('an outcome recorded inside the grace period (research §C)', () => {
   const resources = createResourceStack();
   let fixture: FixtureRuntime;
   let a2a: A2aOverAgentCore;

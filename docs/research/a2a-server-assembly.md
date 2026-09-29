@@ -1,6 +1,6 @@
 # A2A server assembly — spike findings
 
-**Read against the real packages on 2026-09-22.** `@a2a-js/sdk@1.2.0`, `bedrock-agentcore@0.4.4` (the latest published), Bun 1.4.0, Express 5. Answers the local half of [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §I. The AgentCore half — pass-through of `contextId` and headers, real 409/424 statuses — is answered separately.
+**Read against the real packages on 2026-09-22.** `@a2a-js/sdk@1.2.0`, `bedrock-agentcore@0.4.4` (the latest published), Bun 1.4.0, Express 5. Answers the local half of how AgentForge's A2A server is assembled, a question since settled ([ADR 0012](../../adr/0012-the-server-is-assembled-not-inherited.md)). The AgentCore half — pass-through of `contextId` and headers, real 409/424 statuses — is answered separately.
 
 Source: `spikes/server-assembly/i1-gateway-wrap.ts` (retired at A0; git history `d3f08b7`), a complete working gateway over a real HTTP server and a real client. No model spend.
 
@@ -41,7 +41,7 @@ const requestHandler = new DefaultRequestHandler(
 )
 ```
 
-and passes it straight to `jsonRpcHandler`. There is no seam. A gateway must *replace* that handler, and `serveA2A` never offers the slot — so the §I shape is structurally inexpressible through it. This is not a version problem that goes away when it publishes.
+and passes it straight to `jsonRpcHandler`. There is no seam. A gateway must *replace* that handler, and `serveA2A` never offers the slot — so the gateway's shape is structurally inexpressible through it. This is not a version problem that goes away when it publishes.
 
 ### What it is still worth borrowing
 
@@ -115,9 +115,11 @@ This is a reason to prefer the mapping `ARCHITECTURE.md` §4 already specifies �
 
 ## The decision
 
-**Assemble directly from `@a2a-js/sdk` and Express, and port `serveA2A`'s AgentCore-contract mechanics into AgentForge's own server.** Recorded as [ADR 0012](../../adr/0012-the-server-is-assembled-not-inherited.md), status `proposed`.
+**Assemble directly from `@a2a-js/sdk` and Express, and port `serveA2A`'s AgentCore-contract mechanics into AgentForge's own server.** Recorded as [ADR 0012](../../adr/0012-the-server-is-assembled-not-inherited.md), accepted 2026-09-22.
 
-## What is still open, and needs AgentCore
+## What needed AgentCore
+
+Each was since answered on the real platform — [`agentcore-runtime-observed.md`](agentcore-runtime-observed.md) and [ADR 0014](../../adr/0014-agentforge-speaks-a2a-1-0-only.md).
 
 - Whether `InvokeAgentRuntime` forwards `A2A-Version`, and what happens when it does not.
 - Whether a client-supplied `contextId` survives the pass-through (it survives the SDK; the pass-through is untested).

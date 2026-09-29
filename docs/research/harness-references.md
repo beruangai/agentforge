@@ -23,7 +23,7 @@ Read at `d7a55f8` (v0.4.0, pre-alpha) on 2026-09-20. Python; the whole agent loo
 
 **Worth knowing, from their mistakes:** every event on a wire needs a monotonic per-stream sequence number, because their UI silently drops byte-identical events for lack of one; cap payloads at the producer; and if work ever fans out, each sub-stream needs its own cursor from the start.
 
-**What it buys that we cannot have:** an unbounded pause that costs nothing while parked, because replay rebuilds the conversation and the position in the tool loop. Every human-in-the-loop feature they have rests on it. One task is one process here, and AgentCore caps a job at 8 hours — which is why [`DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §M exists rather than a copy of their design.
+**What it buys that we cannot have:** an unbounded pause that costs nothing while parked, because replay rebuilds the conversation and the position in the tool loop. Every human-in-the-loop feature they have rests on it. One task is one process here, and AgentCore caps a job at 8 hours — which is why [`DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §ODO007 exists rather than a copy of their design.
 
 ---
 
@@ -33,7 +33,7 @@ Read at `a2a-claude@0.4.1` with `@a2a-wrapper/core@2.1.1`, 2026-09-17. An A2A se
 
 **Worth borrowing:**
 
-- **Background-task tracking** (`src/claude/background-tasks.ts`, ~70 lines) — it reads the SDK's `system/background_tasks_changed` message, a level signal carrying the full set of live background tasks with replace semantics, so a missed start or finish cannot wedge a stale "still running". One tracker per query, since the signal is per CLI process. Relevant only if background agent work is ever enabled; §E decides that.
+- **Background-task tracking** (`src/claude/background-tasks.ts`, ~70 lines) — it reads the SDK's `system/background_tasks_changed` message, a level signal carrying the full set of live background tasks with replace semantics, so a missed start or finish cannot wedge a stale "still running". One tracker per query, since the signal is per CLI process. Relevant only if background agent work is ever enabled; §ODO006 decides that.
 - **Cancellation** — abort plus `query.interrupt()`, with exactly one terminal event published, guarding the abort path from publishing a second.
 - **Streaming input keeps the CLI's stdin open** — a plain string prompt makes the SDK close stdin at the first result, ending the process before a late wake-up can fire.
 

@@ -14,9 +14,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   type LocalAgent,
   startLocalAgent,
-} from '../../__fixtures__/local-agent.ts';
-import { fixer } from '../agents/fixer/files/contract.ts';
-import { reviewer } from '../agents/reviewer/files/contract.ts';
+} from '../../../__fixtures__/local-agent.ts';
+import { fixer } from '../../agents/fixer/files/contract.ts';
+import { reviewer } from '../../agents/reviewer/files/contract.ts';
 
 const FILE = {
   filename: 'add.ts',

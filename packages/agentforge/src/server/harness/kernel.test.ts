@@ -3,7 +3,7 @@ import type {
   SessionStore,
   SessionStoreEntry,
 } from '@anthropic-ai/claude-agent-sdk';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { init, result, scriptedQuery } from './__fixtures__/scripted-query.ts';
 import {
@@ -177,14 +177,40 @@ describe('runAgent', () => {
         ),
       ).toBe('EXECUTION_ERROR');
     });
+
+    it('reports why a run with no result ended, not the mirror it cut short', async () => {
+      const context = {
+        signal: new AbortController().signal,
+        onRecord: () => {},
+        sessionStore: storeOf([]),
+      };
+      const crashed = scriptedQuery([ASSISTANT], {
+        crash: new Error('connection lost'),
+      });
+      await expect(
+        runAgent(
+          { prompt: 'q', output: OutputSchema },
+          context,
+          mirroring(crashed, []),
+        ),
+      ).rejects.toThrow(
+        'the run ended without a result: Error: connection lost',
+      );
+    });
   });
 
-  it('takes the first result and ignores a later one', async () => {
+  it('takes the first result and logs a later one it ignores', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const scripted = scriptedQuery([
       result({ structured_output: { answer: 'first' } }),
       result({ structured_output: { answer: 'second' } }),
     ]);
     expect((await run(scripted).promise).output).toEqual({ answer: 'first' });
+    expect(logged).toHaveBeenCalledWith(
+      'a result after the first is not the outcome, and is ignored',
+      expect.objectContaining({ structured_output: { answer: 'second' } }),
+    );
+    logged.mockRestore();
   });
 
   it.each([
@@ -249,6 +275,34 @@ describe('runAgent', () => {
     setTimeout(() => controller.abort(), 20);
     await expect(promise).rejects.toBeInstanceOf(TaskCanceled);
     expect(scripted.interrupted()).toBe(true);
+  });
+
+  it('reports a cancel that arrives while the prompt is read, and never starts the run', async () => {
+    const scripted = scriptedQuery([
+      result({ structured_output: { answer: 'unwanted' } }),
+    ]);
+    const controller = new AbortController();
+    const { promise } = run(scripted, controller.signal);
+    controller.abort();
+    await expect(promise).rejects.toBeInstanceOf(TaskCanceled);
+    expect(scripted.calls).toHaveLength(0);
+  });
+
+  it("ends the session when the kernel's own code throws mid-run", async () => {
+    const scripted = scriptedQuery([init()], { hang: true });
+    const promise = runAgent(
+      {
+        prompt: 'q',
+        output: OutputSchema,
+        options: {
+          hooks: { PreToolUse: [{ matcher: '(', hooks: [async () => ({})] }] },
+        },
+      },
+      { signal: new AbortController().signal, onRecord: () => undefined },
+      scripted.query,
+    );
+    await expect(promise).rejects.toThrow(/Invalid regular expression/);
+    expect(scripted.closed()).toBe(true);
   });
 });
 

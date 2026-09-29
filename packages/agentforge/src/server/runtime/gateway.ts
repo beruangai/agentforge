@@ -18,7 +18,9 @@ import {
 import {
   ADMISSION_METADATA_KEY,
   type Admission,
+  CONTAINER_STOPPING_REASON,
   type TaskProcessExecutor,
+  taskMetadata,
 } from './executor.ts';
 import type { DynamoDBTaskStore } from './task-store.ts';
 
@@ -35,7 +37,7 @@ export interface GatewayConfig {
  * before its executor runs, so everything that decides whether a start is a
  * new task — idempotency, admission, continuity — happens here, before
  * delegating. A cancel always reaches the executor, never only the SDK's
- * default path.
+ * default path. A container that has begun to stop refuses every start.
  */
 export function createGateway(config: GatewayConfig): A2ARequestHandler {
   const pendingByKey = new Map<string, Promise<unknown>>();
@@ -96,7 +98,11 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
         if (!isTerminal(state) || state === 'TASK_STATE_COMPLETED')
           return existing;
         const outcome = outcomeOf(existing);
-        attempt = Number(existing.metadata?.attempt ?? 1) + 1;
+        const existingAttempt = existing.metadata?.attempt;
+        if (typeof existingAttempt !== 'number') {
+          throw new Error(`task ${existing.id} is stored without its attempt`);
+        }
+        attempt = existingAttempt + 1;
         priorAttempt = {
           taskId: existing.id,
           state,
@@ -106,9 +112,19 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
         };
       }
       const contextId = params.message?.contextId || randomUUIDv7();
+      const admission: Admission = {
+        runtimeSessionId,
+        attempt,
+        priorAttempt,
+        startId: randomUUIDv7(),
+      };
+      if (config.executor.stopping) {
+        return await reject(contextId, admission, CONTAINER_STOPPING_REASON);
+      }
       if (config.executor.liveCount >= config.admissionLimit) {
         return await reject(
           contextId,
+          admission,
           `the container is at its admission limit of ${config.admissionLimit} tasks`,
         );
       }
@@ -118,56 +134,67 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
       ) {
         return await reject(
           contextId,
+          admission,
           `a task under continuity key "${envelope.continuityKey}" is already running`,
         );
       }
-      const admission: Admission = { runtimeSessionId, attempt, priorAttempt };
       const message = params.message;
       if (message === undefined)
         throw new RequestMalformedError('the request carries no message');
-      const started = await config.inner.sendMessage(
-        {
-          ...params,
-          message: {
-            ...message,
-            contextId,
-            metadata: {
-              ...message.metadata,
-              [ADMISSION_METADATA_KEY]: admission,
+      try {
+        const started = await config.inner.sendMessage(
+          {
+            ...params,
+            message: {
+              ...message,
+              contextId,
+              metadata: {
+                ...message.metadata,
+                [ADMISSION_METADATA_KEY]: admission,
+              },
+            },
+            configuration: {
+              acceptedOutputModes: [],
+              taskPushNotificationConfig: undefined,
+              ...params.configuration,
+              returnImmediately: true,
             },
           },
-          configuration: {
-            acceptedOutputModes: [],
-            taskPushNotificationConfig: undefined,
-            ...params.configuration,
-            returnImmediately: true,
-          },
-        },
-        context,
-      );
-      if (!('status' in started)) {
-        throw new Error(
-          'the executor answered a start with a message, not a task',
+          context,
         );
+        if (!('status' in started)) {
+          throw new Error(
+            'the executor answered a start with a message, not a task',
+          );
+        }
+        await config.store.bindKey(key, started.id, existingId);
+        return started;
+      } catch (error) {
+        // The task process may already run, and the caller, told the start
+        // failed, holds nothing naming it: a retry would run beside it.
+        await config.executor.stopFailedStart(admission.startId);
+        throw error;
       }
-      await config.store.bindKey(key, started.id, existingId);
-      return started;
     }
-  }
 
-  /** A refusal is a task, so the caller gets a typed reason rather than an error string. */
-  async function reject(contextId: string, reason: string): Promise<Task> {
-    const task = finishedTask(
-      newTask({
-        id: randomUUIDv7(),
-        contextId,
-        state: 'TASK_STATE_SUBMITTED',
-        metadata: {},
-      }),
-      { state: 'TASK_STATE_REJECTED', reason },
-    );
-    await config.store.save(task);
-    return task;
+    /** A refusal is a task, so the caller gets a typed reason rather than an error string. */
+    async function reject(
+      contextId: string,
+      admission: Admission,
+      reason: string,
+    ): Promise<Task> {
+      const task = finishedTask(
+        newTask({
+          id: randomUUIDv7(),
+          contextId,
+          state: 'TASK_STATE_SUBMITTED',
+          metadata: taskMetadata(envelope, admission),
+        }),
+        { state: 'TASK_STATE_REJECTED', reason },
+      );
+      await config.store.save(task);
+      return task;
+    }
   }
 
   const cancelTask: A2ARequestHandler['cancelTask'] = async (
@@ -175,7 +202,7 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
     context,
   ) => {
     if (config.executor.isLive(params.id)) {
-      await config.executor.stop(params.id, 'cancel');
+      await config.executor.stop(params.id, 'CANCEL');
     }
     // Not running here: it is finished, or its container is gone and its
     // lease will say so. Either way the stored task is the answer.

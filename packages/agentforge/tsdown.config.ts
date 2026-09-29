@@ -7,7 +7,7 @@ import { defineConfig } from 'tsdown';
  * `dist/packages/agentforge/bundle/` — named for the task that builds it —, so the source directory stays clean
  * and everything built sits beside everything else produced.
  */
-const bundleDirectory = '../../dist/packages/agentforge/bundle';
+const BUNDLE_DIRECTORY = '../../dist/packages/agentforge/bundle';
 
 /**
  * One package, six entry points. Code shared between entry points is split
@@ -34,7 +34,7 @@ export default defineConfig({
   tsconfig: 'tsconfig.lib.json',
   dts: true,
   sourcemap: true,
-  outDir: bundleDirectory,
+  outDir: BUNDLE_DIRECTORY,
   clean: true,
   fixedExtension: false,
   copy: [
@@ -43,12 +43,12 @@ export default defineConfig({
     // The construct's readiness probe, a Lambda asset beside `infra.js`.
     {
       from: 'src/infra/readiness-probe/index.mjs',
-      to: `${bundleDirectory}/readiness-probe`,
+      to: `${BUNDLE_DIRECTORY}/readiness-probe`,
     },
     // The container's collector configuration, beside `server.js`.
     {
       from: 'src/server/runtime/collector/*.yaml',
-      to: `${bundleDirectory}/collector`,
+      to: `${BUNDLE_DIRECTORY}/collector`,
     },
   ],
   hooks: {
@@ -90,7 +90,7 @@ async function writePublishedManifest(): Promise<void> {
     }
   }
   await writeFile(
-    join(bundleDirectory, 'package.json'),
+    join(BUNDLE_DIRECTORY, 'package.json'),
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
 }

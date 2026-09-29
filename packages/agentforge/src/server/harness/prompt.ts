@@ -25,6 +25,8 @@ export type CacheBreakpoint = boolean | CacheControlEphemeral;
  * but `tag`, `description`, `context` and `cache` is an attribute.
  */
 export interface ContextBlock {
+  /** Never an attribute: a `type` makes the object a content block or a command. */
+  readonly type?: never;
   /** The tag wrapping the block; `context` when omitted. */
   readonly tag?: string;
   readonly description?: string;
@@ -48,7 +50,7 @@ export interface CommandBlock {
   readonly type: 'command';
   /** The command; the leading `/` is added when missing. */
   readonly command: string;
-  /** Each is quoted into the command line, as its `$ARGUMENTS`. */
+  /** Each is quoted into the command line, as its `$ARGUMENTS`; one containing `"` is refused. */
   readonly args?: readonly string[];
   /** Each entry becomes its own text block after the command. */
   readonly context?: string | ContextBlock | readonly (string | ContextBlock)[];
@@ -217,6 +219,13 @@ export async function resolveCommandBlock(
     ? block.command
     : `/${block.command}`;
   if (block.args?.length) {
+    for (const argument of block.args) {
+      if (argument.includes('"')) {
+        throw new Error(
+          `command "${command}": an argument containing '"' would split its arguments differently: ${JSON.stringify(argument)}`,
+        );
+      }
+    }
     command += ` ${block.args.map((argument) => `"${argument}"`).join(' ')}`;
   }
   const context =

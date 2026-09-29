@@ -2,7 +2,7 @@
 
 Run a Claude Agent SDK procedure as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — and call it from anything, Temporal included.
 
-Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1 delivered — the whole path runs locally against a real model on the [example agent](examples/hello-agent). A2 (AgentCore deploy) is next ([roadmap](docs/ROADMAP.md)).
+Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1–A3 delivered — the whole path runs locally and on AgentCore, with filesystems, against a real model on the [example agent](examples/hello-agent). A4 (specs and audit) is in progress ([roadmap](docs/ROADMAP.md)).
 
 ## Define, implement, consume
 

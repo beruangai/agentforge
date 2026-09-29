@@ -131,6 +131,30 @@ describe('Filesystem', () => {
     ]);
   });
 
+  it('skips a checkpoint while the last is still pushing', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    vi.setSystemTime(new Date('2026-09-27T00:00:00Z'));
+    const { promise: slowStore, resolve: answer } =
+      Promise.withResolvers<void>();
+    const filesystem = new ScriptedFilesystem(
+      {
+        localPath: join(root, 'vault'),
+        pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
+        checkpoints: { intervalSeconds: 5, settleSeconds: 0 },
+      },
+      { push: () => slowStore },
+    );
+    const vault = await mount(filesystem);
+    await vi.advanceTimersByTimeAsync(20_000);
+    answer();
+    await vault.unmount('TASK_STATE_COMPLETED');
+    expect(filesystem.calls).toEqual([
+      'pull ',
+      'checkpoint 2026-09-27T00:00:05.000Z',
+      'push ',
+    ]);
+  });
+
   it('refuses what it cannot honour', async () => {
     expect(
       () =>
@@ -146,6 +170,13 @@ describe('Filesystem', () => {
     expect(() => new ScriptedFilesystem({ localPath: 'relative' })).toThrow(
       /absolute local path/,
     );
+    expect(
+      () =>
+        new ScriptedFilesystem({
+          localPath: join(root, 'x'),
+          pushon: ['TASK_STATE_COMPLETED'],
+        } as Partial<FilesystemOptions>),
+    ).toThrow(/Unrecognized key: "pushon"/);
     expect(() => new ScriptedFilesystem({})).toThrow(
       /ScriptedFilesystem needs a localPath/,
     );

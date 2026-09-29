@@ -1,4 +1,5 @@
 import { randomUUIDv7 } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import type {
   AnyProcedureContract,
   InferSchemaInput,
@@ -6,6 +7,7 @@ import type {
   ProcedureContract,
   RouterContract,
 } from '@orpc/contract';
+import { z } from 'zod';
 import type { Envelope } from '#core/contract/envelope.ts';
 import {
   contractHash,
@@ -15,8 +17,9 @@ import {
 } from '#core/contract/procedures.ts';
 import {
   type Cause,
-  OutcomeSchema,
+  outcomeOfArtifacts,
   type RunRecord,
+  RunRecordSchema,
   TaskStateEnum,
 } from '#core/contract/task.ts';
 import type { Transport } from './transport.ts';
@@ -171,40 +174,44 @@ function procedureClient(
   };
 }
 
-interface WireTask {
-  id: string;
-  contextId: string;
-  status?: { state?: string };
-  artifacts?: { artifactId?: string; parts?: { data?: unknown }[] }[];
-  metadata?: { attempt?: number; runs?: RunRecord[] };
-}
+/** A task as A2A 1.0 JSON carries it, to what the client reads of it. */
+const WireTaskSchema = z.object({
+  id: z.string(),
+  contextId: z.string(),
+  status: z.object({ state: TaskStateEnum }),
+  artifacts: z.unknown(),
+  metadata: z.object({
+    attempt: z.number().int().positive(),
+    runs: z.array(RunRecordSchema),
+  }),
+});
 
 /** A wire task as the caller sees it; the output is parsed against the caller's own contract. */
 function taskView<Output>(
   value: unknown,
   parseOutput: ((value: unknown) => Output) | undefined,
 ): TaskView<Output> {
-  const task = value as WireTask;
-  const parsed = TaskStateEnum.safeParse(task.status?.state);
+  const parsed = WireTaskSchema.safeParse(value);
   if (!parsed.success) {
     throw new Error(
-      `the agent answered a task in state ${String(task.status?.state)}`,
+      `the agent answered a task the client cannot read: ${z.prettifyError(parsed.error)}`,
     );
   }
-  const state = parsed.data;
+  const task = parsed.data;
+  const state = task.status.state;
   const base: TaskViewBase = {
     taskId: task.id,
     contextId: task.contextId,
-    attempt: task.metadata?.attempt ?? 1,
-    runs: task.metadata?.runs ?? [],
+    attempt: task.metadata.attempt,
+    runs: task.metadata.runs,
   };
   if (state === 'TASK_STATE_SUBMITTED' || state === 'TASK_STATE_WORKING') {
     return { ...base, state };
   }
-  const data = task.artifacts?.find(
-    (artifact) => artifact.artifactId === 'outcome',
-  )?.parts?.[0]?.data;
-  const outcome = OutcomeSchema.parse(data);
+  const outcome = outcomeOfArtifacts(task.artifacts);
+  if (outcome === undefined) {
+    throw new Error(`task ${task.id} ended ${state} without an outcome`);
+  }
   switch (outcome.state) {
     case 'TASK_STATE_COMPLETED':
       return {
@@ -249,16 +256,14 @@ export async function awaitTask<Output>(
     current.state === 'TASK_STATE_WORKING'
   ) {
     options.signal?.throwIfAborted();
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(resolve, interval);
-      options.signal?.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(timer);
-          reject(options.signal?.reason);
-        },
-        { once: true },
-      );
+    await delay(
+      interval,
+      undefined,
+      options.signal === undefined ? {} : { signal: options.signal },
+    ).catch((error: unknown) => {
+      // Aborted: throw the signal's reason, as before the wait.
+      options.signal?.throwIfAborted();
+      throw error;
     });
     current = await procedure.GetTask(current.taskId, options);
     options.onPoll?.(current);

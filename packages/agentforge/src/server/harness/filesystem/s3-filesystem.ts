@@ -85,6 +85,8 @@ export class S3Filesystem extends Filesystem {
   };
   readonly #s7cmd: S7cmdRunner;
   readonly #environment: NodeJS.ProcessEnv;
+  /** The deployment's declared buckets, parsed on first use. */
+  #declaredBuckets: Readonly<Record<string, string>> | undefined;
 
   constructor(
     options: S3FilesystemOptions,
@@ -146,11 +148,10 @@ export class S3Filesystem extends Filesystem {
   }
 
   #remoteUrl(mount: Mount): string {
-    const declaredBuckets = z
-      .record(z.string(), z.string().min(3))
-      .parse(
-        JSON.parse(this.#environment[FILESYSTEM_BUCKETS_VARIABLE] ?? '{}'),
-      );
+    this.#declaredBuckets ??= parseDeclaredBuckets(
+      this.#environment[FILESYSTEM_BUCKETS_VARIABLE],
+    );
+    const declaredBuckets = this.#declaredBuckets;
     const bucket = declaredBuckets[this.#s3Options.bucket];
     if (bucket === undefined) {
       throw new Error(
@@ -184,6 +185,30 @@ export class S3Filesystem extends Filesystem {
     }
     throw new FilesystemUnsynced(`s7cmd exited ${exitCode}: ${stderr.trim()}`);
   }
+}
+
+const DeclaredBucketsSchema = z.record(z.string(), z.string().min(3));
+
+/** The deployment's `{ name: bucket }`; none when it declares none. A malformed value names the variable. */
+function parseDeclaredBuckets(
+  value: string | undefined,
+): Readonly<Record<string, string>> {
+  if (value === undefined) return {};
+  let json: unknown;
+  try {
+    json = JSON.parse(value);
+  } catch (error) {
+    throw new Error(`${FILESYSTEM_BUCKETS_VARIABLE} is not JSON`, {
+      cause: error,
+    });
+  }
+  const parsed = DeclaredBucketsSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error(
+      `${FILESYSTEM_BUCKETS_VARIABLE} is not a JSON object of bucket names: ${z.prettifyError(parsed.error)}`,
+    );
+  }
+  return parsed.data;
 }
 
 /** A pattern matching every path outside the write scope; none when the scope is everything. */

@@ -10,7 +10,7 @@
  */
 import { z } from 'zod';
 
-/** Every invocation — a POST — so what reached the container is observed (§I). */
+/** Every invocation — a POST — so what reached the container is observed (ADR 0014). */
 const RequestEventSchema = z.object({
   event: z.literal('request'),
   containerId: z.string(),
@@ -26,7 +26,7 @@ const SigtermEventSchema = z.object({
   liveTasks: z.number(),
 });
 
-/** The outcome row written from inside the SIGTERM handler (§C). */
+/** The outcome row written from inside the SIGTERM handler (research §C). */
 const ShutdownOutcomeEventSchema = z.object({
   event: z.literal('shutdown-outcome'),
   containerId: z.string(),
