@@ -94,6 +94,18 @@ describe('GetTask', () => {
     });
   });
 
+  it('reads a live task, which A2A sends without its empty artifacts', async () => {
+    const { artifacts: _artifacts, ...live } = {
+      ...wireTask,
+      status: { state: 'TASK_STATE_WORKING' },
+    };
+    expect(
+      await answering(live).summarise.GetTask('task', {
+        runtimeSessionId: 'session',
+      }),
+    ).toMatchObject({ taskId: 'task', state: 'TASK_STATE_WORKING' });
+  });
+
   it('refuses a task it cannot read rather than assume what is missing', async () => {
     await expect(
       answering({ ...wireTask, metadata: { runs: [] } }).summarise.GetTask(

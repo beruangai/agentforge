@@ -179,7 +179,8 @@ const WireTaskSchema = z.object({
   id: z.string(),
   contextId: z.string(),
   status: z.object({ state: TaskStateEnum }),
-  artifacts: z.unknown(),
+  // A2A's JSON omits an empty list: a live task arrives without artifacts.
+  artifacts: z.unknown().optional(),
   metadata: z.object({
     attempt: z.number().int().positive(),
     runs: z.array(RunRecordSchema),
