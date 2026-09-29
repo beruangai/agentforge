@@ -18,6 +18,7 @@ export {
   timeBudget,
   timeBudgetOf,
 } from './procedures.ts';
+export { type StartRefusal, StartRefusalEnum } from './start-refusal.ts';
 export {
   type Cause,
   type CauseCode,

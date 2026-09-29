@@ -6,10 +6,8 @@ import type {
   DefaultRequestHandler,
   ServerCallContext,
 } from '@a2a-js/sdk/server';
-import {
-  type Envelope,
-  RUNTIME_SESSION_HEADER,
-} from '#core/contract/envelope.ts';
+import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
+import type { StartRefusal } from '#core/contract/start-refusal.ts';
 import {
   type Cause,
   isTerminal,
@@ -30,13 +28,19 @@ import {
   type TaskProcessExecutor,
   taskMetadata,
 } from './executor.ts';
+import { StartRefusalError } from './start-refusal-error.ts';
 import type { DynamoDBTaskStore } from './task-store.ts';
+
+/** The platform routes a stopped session's next call to a fresh container within about half a second. */
+const CONTAINER_STOPPING_RETRY_AFTER_SECONDS = 5;
+/** Fixed until a consumer needs another value. */
+const ADMISSION_LIMIT_RETRY_AFTER_SECONDS = 600;
 
 export interface GatewayConfig {
   readonly inner: DefaultRequestHandler;
   readonly executor: TaskProcessExecutor;
   readonly store: DynamoDBTaskStore;
-  /** Tasks this container runs at once; a start beyond it is rejected, never queued. */
+  /** Tasks this container runs at once; a start beyond it is refused, never queued. */
   readonly admissionLimit: number;
 }
 
@@ -46,6 +50,9 @@ export interface GatewayConfig {
  * new task — idempotency, admission, continuity — happens here, before
  * delegating. A cancel always reaches the executor, never only the SDK's
  * default path. A container that has begun to stop refuses every start.
+ *
+ * A start that could run later is refused in-band with when to retry, and
+ * leaves no task and no key bound; what can never succeed is a rejected task.
  */
 export function createGateway(config: GatewayConfig): A2ARequestHandler {
   const pendingByKey = new Map<string, Promise<unknown>>();
@@ -140,31 +147,49 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
       // the input record, and the task record's metadata and tags.
       const envelopeBytes = Buffer.byteLength(JSON.stringify(envelope));
       if (envelopeBytes > TASK_INPUT_CAP_BYTES) {
-        return await reject(
-          contextId,
-          admission,
-          `the start is ${envelopeBytes} bytes; the cap is ${TASK_INPUT_CAP_BYTES}. Pass a reference to large content, not the content. Its metadata and tags are not recorded`,
-          { ...envelope, metadata: undefined, tags: undefined },
+        const rejected = finishedTask(
+          newTask({
+            id: randomUUIDv7(),
+            contextId,
+            state: 'TASK_STATE_SUBMITTED',
+            metadata: taskMetadata(
+              { ...envelope, metadata: undefined, tags: undefined },
+              admission,
+            ),
+          }),
+          {
+            state: 'TASK_STATE_REJECTED',
+            reason: `the start is ${envelopeBytes} bytes; the cap is ${TASK_INPUT_CAP_BYTES}. Pass a reference to large content, not the content. Its metadata and tags are not recorded`,
+          },
         );
+        await config.store.save(rejected);
+        return rejected;
       }
       if (config.executor.stopping) {
-        return await reject(contextId, admission, CONTAINER_STOPPING_REASON);
+        throw refusal(
+          'CONTAINER_STOPPING',
+          CONTAINER_STOPPING_RETRY_AFTER_SECONDS,
+          CONTAINER_STOPPING_REASON,
+        );
       }
       if (config.executor.liveCount >= config.admissionLimit) {
-        return await reject(
-          contextId,
-          admission,
+        throw refusal(
+          'ADMISSION_LIMIT',
+          ADMISSION_LIMIT_RETRY_AFTER_SECONDS,
           `the container is at its admission limit of ${config.admissionLimit} tasks`,
         );
       }
-      if (
-        envelope.continuityKey !== undefined &&
-        config.executor.hasLiveContinuityKey(envelope.continuityKey)
-      ) {
-        return await reject(
-          contextId,
-          admission,
-          `a task under continuity key "${envelope.continuityKey}" is already running`,
+      const continuityRetryAfterSeconds =
+        envelope.continuityKey === undefined
+          ? undefined
+          : config.executor.continuityKeyRetryAfterSeconds(
+              envelope.continuityKey,
+            );
+      if (continuityRetryAfterSeconds !== undefined) {
+        throw refusal(
+          'CONTINUITY_KEY_RUNNING',
+          continuityRetryAfterSeconds,
+          `a task under continuity key "${envelope.continuityKey}" is running`,
         );
       }
       try {
@@ -186,34 +211,36 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
             'the executor answered a start with a message, not a task',
           );
         }
-        await config.store.bindKey(key, started.id, existingId);
-        return started;
+        if (!config.executor.takeStoppingRefusal(admission.startId)) {
+          await config.store.bindKey(key, started.id, existingId);
+          return started;
+        }
       } catch (error) {
         // The task process may already run, and the caller, told the start
         // failed, holds nothing naming it: a retry would run beside it.
         await config.executor.stopFailedStart(admission.startId);
         throw error;
       }
+      // Admitted as the container began to stop: the executor spawned nothing,
+      // and the task it ended is bound to no key.
+      throw refusal(
+        'CONTAINER_STOPPING',
+        CONTAINER_STOPPING_RETRY_AFTER_SECONDS,
+        CONTAINER_STOPPING_REASON,
+      );
     }
 
-    /** A refusal is a task, so the caller gets a typed reason rather than an error string. */
-    async function reject(
-      contextId: string,
-      admission: Admission,
-      reason: string,
-      recorded: Envelope = envelope,
-    ): Promise<Task> {
-      const task = finishedTask(
-        newTask({
-          id: randomUUIDv7(),
-          contextId,
-          state: 'TASK_STATE_SUBMITTED',
-          metadata: taskMetadata(recorded, admission),
-        }),
-        { state: 'TASK_STATE_REJECTED', reason },
+    /** Refuses the start in-band, logging it so an operator sees a container turning callers away. */
+    function refusal(
+      refused: StartRefusal,
+      retryAfterSeconds: number,
+      message: string,
+    ): StartRefusalError {
+      const error = new StartRefusalError(refused, retryAfterSeconds, message);
+      console.warn(
+        `start under idempotency key "${key}" refused, ${refused}: ${message}; retry after ${retryAfterSeconds}s`,
       );
-      await config.store.save(task);
-      return task;
+      return error;
     }
   }
 

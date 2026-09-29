@@ -22,7 +22,7 @@ Chosen option: **the consumer decides**, because isolation strategy is a use-cas
 
 * Every identifier is explicit in the envelope or the procedure's configuration; AgentForge carries, propagates and records them
 * The invariants it does enforce are mechanical: at most one container at a time per runtime session (the platform's), one process per task, one live task per continuity key, and no concurrency ceiling of its own beyond what the container's memory allows (§REQ306)
-* A task that would take a continuity key a live task holds — in practice a Claude session id — is rejected loudly; forking is available where a branch is wanted
+* A task that would take a continuity key a live task holds — in practice a Claude session id — is refused loudly, retryable once that task ends; forking is available where a branch is wanted
 * The agent card, and how many runtimes a consumer deploys, follow the same rule: configuration, not policy
 
 ### Consequences

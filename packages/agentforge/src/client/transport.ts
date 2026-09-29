@@ -1,6 +1,10 @@
 import { randomUUIDv7 } from 'node:crypto';
 import { A2A_PROTOCOL_VERSION, A2A_VERSION_HEADER } from '#core/a2a-version.ts';
 import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
+import {
+  type StartRefusal,
+  startRefusalOf,
+} from '#core/contract/start-refusal.ts';
 
 export type TaskMethod = 'SendMessage' | 'GetTask' | 'CancelTask';
 
@@ -34,6 +38,31 @@ export class AgentForgeRequestError extends Error {
   }
 }
 
+/**
+ * A start the agent cannot run now and refused in-band, creating no task and
+ * binding no key: the same start, repeated from `retryAfter`, runs as a first
+ * start. The client does not repeat it; the Temporal activity does.
+ */
+export class StartRefusedError extends AgentForgeRequestError {
+  readonly refusal: StartRefusal;
+  readonly retryAfterSeconds: number;
+  /** When a repeat is worth sending, counted from when the refusal arrived. */
+  readonly retryAfter: Date;
+
+  constructor(
+    method: TaskMethod,
+    code: number | undefined,
+    message: string,
+    refused: { refusal: StartRefusal; retryAfterSeconds: number },
+  ) {
+    super(method, code, message);
+    this.refusal = refused.refusal;
+    this.retryAfterSeconds = refused.retryAfterSeconds;
+    this.retryAfter = new Date(Date.now() + refused.retryAfterSeconds * 1_000);
+    this.name = 'StartRefusedError';
+  }
+}
+
 function requestBody(method: TaskMethod, params: unknown): string {
   return JSON.stringify({ jsonrpc: '2.0', id: randomUUIDv7(), method, params });
 }
@@ -54,14 +83,25 @@ function resultOf(method: TaskMethod, text: string): unknown {
   }
   const response = body as {
     result?: unknown;
-    error?: { code?: number; message?: string };
+    error?: { code?: number; message?: string; data?: unknown };
   };
   if (response.error !== undefined) {
-    throw new AgentForgeRequestError(
-      method,
-      response.error.code,
-      response.error.message ?? 'no message',
-    );
+    const { code, message = 'no message', data } = response.error;
+    let refused: ReturnType<typeof startRefusalOf>;
+    try {
+      refused = startRefusalOf(data);
+    } catch (error) {
+      throw new AgentForgeRequestError(
+        method,
+        code,
+        `${message}, with an agentforge error the client cannot read`,
+        { cause: error },
+      );
+    }
+    if (refused !== undefined) {
+      throw new StartRefusedError(method, code, message, refused);
+    }
+    throw new AgentForgeRequestError(method, code, message);
   }
   if (!('result' in response)) {
     throw new AgentForgeRequestError(

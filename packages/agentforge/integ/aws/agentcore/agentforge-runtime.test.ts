@@ -12,7 +12,9 @@
  * generator replays it in every restored instance; calls overlapping a new
  * session's first, which AgentCore refuses while it creates the container,
  * are repeated by the transport until they reach it; a start and its retry attach through the platform; a
- * cancel reaches the container running the task; and a platform stop ends the
+ * cancel reaches the container running the task; a start refused in-band
+ * reaches the caller with its code and ErrorInfo intact, not as AgentCore's
+ * opaque `-32055`; and a platform stop ends the
  * task `LOST` — read by a fresh container from the store — after which a
  * retry runs as the next attempt.
  */
@@ -25,7 +27,11 @@ import {
 } from '@aws-sdk/client-cloudwatch-logs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { awaitTask, createClient } from '../../../src/client/client.ts';
-import { agentCoreTransport } from '../../../src/client/transport.ts';
+import {
+  agentCoreTransport,
+  type Transport,
+} from '../../../src/client/transport.ts';
+import { startRefusalOf } from '../../../src/core/contract/start-refusal.ts';
 import { runtimeContract } from '../../local/runtime/__fixtures__/contract.ts';
 import {
   DEPLOYMENT_TIMEOUT_MILLISECONDS,
@@ -36,6 +42,11 @@ import {
   resolveAwsEnvironment,
   resourceNamesFor,
 } from './__fixtures__/aws-environment.ts';
+import {
+  delivered,
+  type Invocation,
+  invokeJsonRpc,
+} from './__fixtures__/invocation.ts';
 import {
   type AgentCoreClients,
   createAgentCoreClients,
@@ -51,11 +62,23 @@ const RESTORED_CONTAINERS = 8;
 /** Span delivery through X-Ray to the log group lags by minutes. */
 const SPAN_DELIVERY_TIMEOUT_MILLISECONDS = 600_000;
 
+/** An invocation answered with a JSON-RPC error, or refused by the platform, as it came. */
+class InvocationAnswer extends Error {
+  readonly invocation: Invocation;
+
+  constructor(invocation: Invocation) {
+    super('the invocation was answered with an error');
+    this.invocation = invocation;
+  }
+}
+
 describe("AgentForge's server on AgentCore", () => {
   const resources = createResourceStack();
   let clients: AgentCoreClients;
   let agentRuntimeArn: string;
   let client: ReturnType<typeof createClient<typeof runtimeContract>>;
+  /** The client over a transport that throws what AgentCore delivered, unread. */
+  let wire: ReturnType<typeof createClient<typeof runtimeContract>>;
 
   beforeAll(async () => {
     const environment = await resolveAwsEnvironment();
@@ -69,6 +92,22 @@ describe("AgentForge's server on AgentCore", () => {
       runtimeContract,
       agentCoreTransport({ agentRuntimeArn, region: environment.region }),
     );
+    const invocationTransport: Transport = {
+      async call(method, params, runtimeSessionId) {
+        const invocation = await invokeJsonRpc(clients.data, {
+          agentRuntimeArn,
+          runtimeSessionId,
+          method,
+          params,
+          a2aVersionHeader: true,
+        });
+        if (!invocation.delivered || invocation.body.error !== undefined) {
+          throw new InvocationAnswer(invocation);
+        }
+        return invocation.body.result;
+      },
+    };
+    wire = createClient(runtimeContract, invocationTransport);
   }, DEPLOYMENT_TIMEOUT_MILLISECONDS);
 
   afterAll(
@@ -157,6 +196,51 @@ describe("AgentForge's server on AgentCore", () => {
     await delay(2_000);
     const cancelled = await client.CancelTask(started.taskId, context);
     expect(cancelled.state).toBe('TASK_STATE_CANCELED');
+  });
+
+  it('carries a continuity-key refusal to the caller intact', async () => {
+    const runtimeSessionId = newRuntimeSessionId('continuity');
+    const continuityKey = newRuntimeSessionId('thread');
+    const holder = {
+      runtimeSessionId,
+      idempotencyKey: newRuntimeSessionId('key'),
+      continuityKey,
+      timeBudgetSeconds: 120,
+    };
+    const running = await client.wait.SendMessage(
+      { milliseconds: 120_000 },
+      holder,
+    );
+    const answer: unknown = await wire.wait
+      .SendMessage(
+        { milliseconds: 1 },
+        {
+          runtimeSessionId,
+          idempotencyKey: newRuntimeSessionId('key'),
+          continuityKey,
+        },
+      )
+      .then(
+        () => {
+          throw new Error('the start was not refused');
+        },
+        (error: unknown) => error,
+      );
+    if (!(answer instanceof InvocationAnswer)) throw answer;
+    // Delivered: AgentCore passed the container's HTTP 200 through, not a 424.
+    const { error } = delivered(answer.invocation, 'SendMessage').body;
+    expect(error?.code).toBe(-32603);
+    expect(error?.data).toEqual([
+      expect.objectContaining({
+        domain: 'agentforge',
+        reason: 'TOO_MANY_REQUESTS',
+      }),
+    ]);
+    const refused = startRefusalOf(error?.data);
+    expect(refused?.refusal).toBe('CONTINUITY_KEY_RUNNING');
+    expect(refused?.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+    expect(refused?.retryAfterSeconds).toBeLessThanOrEqual(120);
+    await client.CancelTask(running.taskId, holder);
   });
 
   it('ends a task LOST when the platform stops its container, and runs the retry as the next attempt', async () => {

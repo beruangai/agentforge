@@ -236,6 +236,8 @@ export type TerminalTaskView<Output> = Exclude<
   { state: 'TASK_STATE_SUBMITTED' | 'TASK_STATE_WORKING' }
 >;
 
+export const DEFAULT_POLL_INTERVAL_MILLISECONDS = 5_000;
+
 /**
  * Polls `GetTask` until the task ends (§REQ301). Polling is the only way to
  * wait; `onPoll` is where a caller heartbeats.
@@ -250,7 +252,8 @@ export async function awaitTask<Output>(
   },
 ): Promise<TerminalTaskView<Output>> {
   let current = task;
-  const interval = options.pollIntervalMilliseconds ?? 5_000;
+  const interval =
+    options.pollIntervalMilliseconds ?? DEFAULT_POLL_INTERVAL_MILLISECONDS;
   while (
     current.state === 'TASK_STATE_SUBMITTED' ||
     current.state === 'TASK_STATE_WORKING'

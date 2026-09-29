@@ -44,7 +44,7 @@ None.
 - **Client and activity.** A typed refusal error. The activity maps it to a retryable failure with a next-retry delay.
 - **Callers.**
   - Refusals are waited out inside the activity first, so `startToCloseTimeout` must also cover up to 15 minutes of waiting. Past that, each spent budget is an attempt, and each wait between attempts counts toward `scheduleToCloseTimeout`. A caller sets those, and any workflow timeout, wide enough, or leaves them unset.
-  - Temporal can't widen an activity's timeouts once it is scheduled.
+  - Workflow code can't widen an activity's timeouts once it is scheduled.
   - `procedureActivity` and the README say so.
 - **Docs.** ARCHITECTURE's admission paragraph and state table, the glossary's continuity key entry, and ADR 0007's "rejected loudly" (mutated in place: no consumer depends on it yet).
 - No table or construct change.

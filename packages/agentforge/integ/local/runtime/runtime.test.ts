@@ -17,7 +17,16 @@ import {
   createClient,
   type Routed,
 } from '../../../src/client/client.ts';
-import { localTransport } from '../../../src/client/transport.ts';
+import {
+  localTransport,
+  type Transport,
+} from '../../../src/client/transport.ts';
+import {
+  A2A_PROTOCOL_VERSION,
+  A2A_VERSION_HEADER,
+} from '../../../src/core/a2a-version.ts';
+import { RUNTIME_SESSION_HEADER } from '../../../src/core/contract/envelope.ts';
+import { startRefusalOf } from '../../../src/core/contract/start-refusal.ts';
 import { cause } from '../../../src/core/contract/task.ts';
 import { finishedTask, newTask } from '../../../src/server/runtime/a2a-task.ts';
 import {
@@ -35,6 +44,62 @@ let dynamoDB: DynamoDBLocal;
 let tableName: string;
 let server: RunningServer;
 let client: ReturnType<typeof createClient<typeof runtimeContract>>;
+/** The client over a transport that throws the JSON-RPC error as the wire carried it. */
+let wire: ReturnType<typeof createClient<typeof runtimeContract>>;
+
+class JsonRpcErrorAnswer extends Error {
+  readonly httpStatus: number;
+  readonly error: { code: number; message: string; data?: unknown };
+
+  constructor(httpStatus: number, error: JsonRpcErrorAnswer['error']) {
+    super(`HTTP ${httpStatus}, JSON-RPC ${error.code}: ${error.message}`);
+    this.httpStatus = httpStatus;
+    this.error = error;
+  }
+}
+
+function wireTransport(url: string): Transport {
+  return {
+    async call(method, params, runtimeSessionId) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          [A2A_VERSION_HEADER]: A2A_PROTOCOL_VERSION,
+          [RUNTIME_SESSION_HEADER]: runtimeSessionId,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: randomUUIDv7(),
+          method,
+          params,
+        }),
+      });
+      const body = (await response.json()) as {
+        result?: unknown;
+        error?: JsonRpcErrorAnswer['error'];
+      };
+      if (body.error !== undefined) {
+        throw new JsonRpcErrorAnswer(response.status, body.error);
+      }
+      return body.result;
+    },
+  };
+}
+
+/** The refusal a start was answered with, in-band. */
+async function refusalOf(started: Promise<unknown>) {
+  const answer: unknown = await started.then(
+    () => {
+      throw new Error('the start was not refused');
+    },
+    (error: unknown) => error,
+  );
+  if (!(answer instanceof JsonRpcErrorAnswer)) throw answer;
+  expect(answer.httpStatus).toBe(200);
+  expect(answer.error.code).toBe(-32603);
+  return startRefusalOf(answer.error.data);
+}
 
 const routed = (): Routed => ({
   runtimeSessionId: `session-${randomUUIDv7()}`,
@@ -63,6 +128,7 @@ beforeAll(async () => {
     host: '127.0.0.1',
   });
   client = createClient(runtimeContract, localTransport(server.url));
+  wire = createClient(runtimeContract, wireTransport(server.url));
 });
 
 afterAll(async () => {
@@ -240,23 +306,60 @@ describe('the runtime', () => {
     expect(ended.state).toBe('TASK_STATE_REJECTED');
   });
 
-  it('rejects a start beyond the admission limit rather than queueing it', async () => {
+  it('refuses a start beyond the admission limit rather than queueing it, binding nothing', async () => {
     const contexts = [starting(), starting(), starting()];
     const running = await Promise.all(
       contexts.map((context) =>
         client.wait.SendMessage({ milliseconds: 60_000 }, context),
       ),
     );
-    const refused = await client.wait.SendMessage(
-      { milliseconds: 1 },
-      starting(),
-    );
-    expect(refused.state).toBe('TASK_STATE_REJECTED');
+    const refusedContext = starting();
+    expect(
+      await refusalOf(
+        wire.wait.SendMessage({ milliseconds: 1 }, refusedContext),
+      ),
+    ).toEqual({ refusal: 'ADMISSION_LIMIT', retryAfterSeconds: 600 });
     await Promise.all(
       running.map((task, index) =>
         client.CancelTask(task.taskId, contexts[index] as Routed),
       ),
     );
+    // The refusal bound no key: the same start, repeated, runs as a first.
+    const retried = await awaitTask(
+      client.wait,
+      await client.wait.SendMessage({ milliseconds: 1 }, refusedContext),
+      { ...refusedContext, pollIntervalMilliseconds: 100 },
+    );
+    expect(retried).toMatchObject({
+      state: 'TASK_STATE_COMPLETED',
+      attempt: 1,
+    });
+  });
+
+  it('refuses a start under a running continuity key until its time budget has passed', async () => {
+    const continuityKey = randomUUIDv7();
+    const holder = { ...starting(), continuityKey, timeBudgetSeconds: 30 };
+    const running = await client.wait.SendMessage(
+      { milliseconds: 60_000 },
+      holder,
+    );
+    const refusedContext = { ...starting(), continuityKey };
+    const refused = await refusalOf(
+      wire.wait.SendMessage({ milliseconds: 1 }, refusedContext),
+    );
+    expect(refused?.refusal).toBe('CONTINUITY_KEY_RUNNING');
+    expect(refused?.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+    expect(refused?.retryAfterSeconds).toBeLessThanOrEqual(30);
+    await client.CancelTask(running.taskId, holder);
+    const retried = await awaitTask(
+      client.wait,
+      await client.wait.SendMessage({ milliseconds: 1 }, refusedContext),
+      { ...refusedContext, pollIntervalMilliseconds: 100 },
+    );
+    expect(retried).toMatchObject({
+      state: 'TASK_STATE_COMPLETED',
+      attempt: 1,
+    });
   });
 
   it('reports busy on /ping while a task runs', async () => {

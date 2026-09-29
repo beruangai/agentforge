@@ -30,7 +30,7 @@ export interface ServerConfig {
   readonly tableName: string;
   /** A DynamoDB endpoint other than AWS's — DynamoDB Local, in development. */
   readonly dynamoDBEndpoint?: string;
-  /** Tasks run at once before a start is rejected. */
+  /** Tasks run at once before a start is refused. */
   readonly admissionLimit: number;
   /** A task's time budget when its start sets none (§REQ202). */
   readonly defaultTimeBudgetSeconds: number;

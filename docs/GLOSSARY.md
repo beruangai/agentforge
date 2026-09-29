@@ -56,9 +56,11 @@
 
 **Attempt** — One task under an idempotency key. A new one starts only once the last failed, was cancelled, was lost or was rejected by the procedure, and it is told how.
 
-**Continuity key** — Optional and opaque: at most one live task under it per container.
+**Continuity key** — Optional and opaque: at most one live task under it per container. It names different tasks that must not overlap — usually two turns on one Claude session — never the same task, which is the idempotency key's; a start under a running key is **refused**.
 
-**Admission limit** — The most tasks a container runs at once; beyond it a start is rejected, never queued.
+**Refusal** — A start a container cannot run now — stopping, at its admission limit, or running the start's continuity key — answered in-band with when to retry, creating no task and binding no key. Distinct from `TASK_STATE_REJECTED`, a start that can never succeed.
+
+**Admission limit** — The most tasks a container runs at once; beyond it a start is **refused**, never queued.
 
 **Lease** — A time the executor keeps pushing forward while a task process lives. Lapsed on an unfinished task, the task is **`LOST`** — derived when read; its side effects may have happened.
 

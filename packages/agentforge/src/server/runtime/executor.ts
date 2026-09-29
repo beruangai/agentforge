@@ -63,6 +63,9 @@ interface LiveTask {
   readonly child: ChildProcess;
   readonly continuityKey: string | undefined;
   readonly startId: string;
+  /** When it started, in epoch milliseconds, and how long it may run from then. */
+  readonly startedAt: number;
+  readonly budgetSeconds: number;
   readonly finished: Promise<void>;
   readonly records: RunRecord[];
   /** The outcome the task process reported, once it has. */
@@ -82,6 +85,8 @@ const STDERR_TAIL_BYTES = 4_000;
  */
 export class TaskProcessExecutor implements AgentExecutor {
   readonly #live = new Map<string, LiveTask>();
+  /** Starts refused as the container began to stop, until the gateway asks. */
+  readonly #refusedAsStopping = new Set<string>();
   #stopping = false;
 
   readonly #config: ExecutorConfig;
@@ -109,10 +114,22 @@ export class TaskProcessExecutor implements AgentExecutor {
     return this.#live.has(taskId);
   }
 
-  hasLiveContinuityKey(continuityKey: string): boolean {
-    return [...this.#live.values()].some(
-      (task) => task.continuityKey === continuityKey,
-    );
+  /**
+   * Seconds until no task under the continuity key can still run here — the
+   * ceiling of its remaining time budget, at least 1 — or undefined when none
+   * is live.
+   */
+  continuityKeyRetryAfterSeconds(continuityKey: string): number | undefined {
+    const endsAt = [...this.#live.values()]
+      .filter((task) => task.continuityKey === continuityKey)
+      .map((task) => task.startedAt + task.budgetSeconds * 1000);
+    if (endsAt.length === 0) return undefined;
+    return Math.max(1, Math.ceil((Math.max(...endsAt) - Date.now()) / 1000));
+  }
+
+  /** Whether this start was refused as the container began to stop. Answered once. */
+  takeStoppingRefusal(startId: string): boolean {
+    return this.#refusedAsStopping.delete(startId);
   }
 
   async execute(
@@ -138,8 +155,11 @@ export class TaskProcessExecutor implements AgentExecutor {
     eventBus.publish(AgentEvent.task(submitted));
 
     if (this.#stopping) {
-      // Admitted as the container began to stop: refused as the gateway
-      // now refuses a start, and nothing is spawned for the shutdown to miss.
+      // Admitted as the container began to stop: nothing is spawned for the
+      // shutdown to miss. Recorded before the first await, so the gateway,
+      // asking once the SDK answers, refuses the start in-band; the task left
+      // here ends rejected, named by no key.
+      this.#refusedAsStopping.add(admission.startId);
       try {
         await this.#record(
           submitted,
@@ -163,6 +183,8 @@ export class TaskProcessExecutor implements AgentExecutor {
         : { priorAttempt: admission.priorAttempt }),
       envelope,
     };
+    const budgetSeconds =
+      envelope.timeBudgetSeconds ?? this.#config.defaultTimeBudgetSeconds;
     const { promise: finished, resolve: markFinished } =
       Promise.withResolvers<void>();
     let stderrTail = '';
@@ -178,6 +200,8 @@ export class TaskProcessExecutor implements AgentExecutor {
       child,
       continuityKey: envelope.continuityKey,
       startId: admission.startId,
+      startedAt: Date.now(),
+      budgetSeconds,
       finished,
       records: [],
       reported: undefined,
@@ -248,8 +272,6 @@ export class TaskProcessExecutor implements AgentExecutor {
             );
           });
       }, LEASE_RENEWAL_MILLISECONDS);
-      const budgetSeconds =
-        envelope.timeBudgetSeconds ?? this.#config.defaultTimeBudgetSeconds;
       budget = setTimeout(() => {
         void this.stop(taskId, 'TIMEOUT');
       }, budgetSeconds * 1000);
@@ -343,8 +365,13 @@ export class TaskProcessExecutor implements AgentExecutor {
     await live.finished;
   }
 
-  /** Stops the task a start spawned when that start then failed: nothing the caller holds names it. */
+  /**
+   * Stops the task a start spawned when that start then failed: nothing the
+   * caller holds names it. A start refused as the container stopped spawned
+   * nothing, and its refusal is forgotten.
+   */
   async stopFailedStart(startId: string): Promise<void> {
+    this.#refusedAsStopping.delete(startId);
     const started = [...this.#live].find(
       ([, task]) => task.startId === startId,
     );

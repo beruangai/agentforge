@@ -16,6 +16,7 @@ export {
   AgentForgeRequestError,
   agentCoreTransport,
   localTransport,
+  StartRefusedError,
   type TaskMethod,
   type Transport,
 } from './transport.ts';

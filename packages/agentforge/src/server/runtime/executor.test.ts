@@ -210,14 +210,36 @@ describe('TaskProcessExecutor', () => {
     });
   });
 
-  it('refuses a start once the container is stopping, spawning nothing', async () => {
+  it('refuses a start once the container is stopping, spawning nothing, and tells the gateway once', async () => {
     const { executor: target, store } = executor({
       taskCommand: ['/nonexistent/agentforge-task-process'],
     });
     await target.shutdown();
-    await start(target, 'REPORT').done;
+    const task = start(target, 'REPORT');
+    // Recorded before the first await, so before the SDK can answer the start.
+    expect(target.takeStoppingRefusal(task.startId)).toBe(true);
+    expect(target.takeStoppingRefusal(task.startId)).toBe(false);
+    await task.done;
     expect(savedOutcome(store)).toMatchObject({
       state: 'TASK_STATE_REJECTED',
     });
+  });
+
+  it("gives a continuity key the ceiling of its holder's remaining time budget, at least a second", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { executor: target } = executor();
+    const task = start(target, 'WAIT', {
+      continuityKey: 'thread',
+      timeBudgetSeconds: 60,
+    });
+    expect(target.continuityKeyRetryAfterSeconds('thread')).toBe(60);
+    vi.advanceTimersByTime(30_200);
+    expect(target.continuityKeyRetryAfterSeconds('thread')).toBe(30);
+    vi.advanceTimersByTime(40_000);
+    expect(target.continuityKeyRetryAfterSeconds('thread')).toBe(1);
+    expect(target.continuityKeyRetryAfterSeconds('another')).toBeUndefined();
+    await target.stop(task.taskId, 'CANCEL');
+    await task.done;
+    expect(target.continuityKeyRetryAfterSeconds('thread')).toBeUndefined();
   });
 });

@@ -79,10 +79,10 @@ ApplicationFailure.create({ type: refusal, message, nonRetryable: false,
 
 **What `procedureActivity`'s doc comment and the README tell a caller:**
 - `startToCloseTimeout` must cover the task's time budget plus up to 15 minutes of waiting.
-- `maximumAttempts` counts budgets spent, not refusals: an hour of refusals is about 4 attempts.
-- Each wait between attempts counts toward `scheduleToCloseTimeout`, and Temporal fails the activity with a timeout if a delay would pass it.
+- `maximumAttempts` counts budgets spent, not refusals: at the admission limit, one 600 s wait fits the budget and the next fails the attempt, so an attempt takes about 20 minutes, roughly 3 an hour.
+- Each wait between attempts counts toward `scheduleToCloseTimeout`, and a delay that would pass it ends the activity at once, with its own failure (retry state `TIMEOUT`).
 - A workflow's own timeouts must leave room for the waits.
-- Activity options can't be widened once the activity is scheduled.
+- Workflow code can't widen an activity's options once it is scheduled. Only an operator can, with the CLI's experimental `temporal activity update-options`.
 
 Check these Temporal facts against its docs when implementing, and record them in research.
 
