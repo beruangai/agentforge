@@ -2,7 +2,7 @@
 
 **AgentForge** runs a Claude Agent SDK procedure as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — for its consumers, StrategyFoundry and TrendBot, not for public use. One package, `@beruangai/agentforge`: a contract helper, a client and a Temporal activity for callers; the harness and server for an agent's image; a base image `Dockerfile`; CDK constructs from A2.
 
-**A1–A3 are built** — the agent locally, on AgentCore, and with filesystems — and verified end to end on [`examples/hello-agent`](examples/hello-agent) against a real model. A4 (specs and audit) is in progress ([roadmap](docs/ROADMAP.md)).
+**A1–A4 are delivered** — the agent locally, on AgentCore, and with filesystems, verified end to end on [`examples/hello-agent`](examples/hello-agent) against a real model, then specified in `openspec/specs/` and audited. A5 (the Nx plugin) is next ([roadmap](docs/ROADMAP.md)).
 
 ## Simplicity first
 

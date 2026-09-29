@@ -18,7 +18,7 @@ A procedure's filesystems SHALL be registered by middleware, by name. Registerin
 - **THEN** the procedure mounts only `notes`
 
 ### Requirement: Filesystems mount before the handler and unmount after the outcome
-Every registered filesystem SHALL be mounted, pulling its scope from its store, before the procedure's handler runs, and SHALL be unmounted once the task's outcome is known. Unmounting SHALL push only when the filesystem's `pushOn` lists the task's terminal state (`TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`), never on cancellation — and the outcome SHALL be published only after those pushes are verified. A task SHALL never report `TASK_STATE_COMPLETED` over a push that was not verified.
+Every registered filesystem SHALL be mounted, pulling its scope from its store, before the procedure's handler runs, and SHALL be unmounted once the task's outcome is known. Unmounting SHALL push only when the filesystem's `pushOn` lists the task's terminal state (`TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`), never on cancellation or when the task is stopped at its time budget, where only its checkpoints persist — and the outcome SHALL be published only after those pushes are verified. A task SHALL never report `TASK_STATE_COMPLETED` over a push that was not verified.
 
 #### Scenario: The handler reads a pulled filesystem before any agent runs
 - **WHEN** a procedure registers a filesystem
@@ -36,6 +36,10 @@ Every registered filesystem SHALL be mounted, pulling its scope from its store, 
 - **WHEN** a filesystem cannot be mounted or pulled
 - **THEN** the handler does not run, and the task ends `TASK_STATE_FAILED` with cause `FILESYSTEM_UNSYNCED`
 
+#### Scenario: A timed-out task pushes nothing
+- **WHEN** a task whose filesystem pushes on `TASK_STATE_FAILED` runs past its time budget
+- **THEN** the task ends `TIMED_OUT`, and nothing is pushed beyond its checkpoints
+
 ### Requirement: Scope is resolved per request and bounds every push
 A filesystem SHALL resolve, from the request's input and context, the subtree it mounts and the read and write scopes within it; the read scope defaults to the whole mount, and the write scope does too when the filesystem pushes and is empty when it does not. A push SHALL upload and delete only within the write scope.
 
@@ -51,7 +55,7 @@ The handler SHALL receive, for each mounted filesystem and merged across all of 
 - **THEN** its baseline allows `Read(//workspace/vault/**)` and `Edit(//workspace/vault/notes/today.md)`, and nothing else
 
 ### Requirement: A kind decides where it mounts, and what it needs
-Each filesystem kind SHALL either set a default path the consumer may override, or require the consumer to give one, and SHALL refuse options it cannot honour before anything is mounted.
+Each filesystem kind SHALL either set a default path the consumer may override, or require the consumer to give one, and SHALL refuse options it cannot honour before anything is mounted. Two filesystems of one procedure SHALL NOT share a local path or nest one inside the other; the task SHALL fail before anything is mounted.
 
 #### Scenario: A scratch filesystem needs no declaration
 - **WHEN** a procedure registers a scratch filesystem with no options
@@ -60,3 +64,7 @@ Each filesystem kind SHALL either set a default path the consumer may override, 
 #### Scenario: An S3 filesystem refuses an unsafe delete
 - **WHEN** an S3 filesystem enables deletes on its whole bucket
 - **THEN** the task fails `EXECUTION_ERROR` before anything is mounted
+
+#### Scenario: Two filesystems at one directory
+- **WHEN** a procedure registers two filesystems whose local paths are the same, or one inside the other
+- **THEN** the task fails `EXECUTION_ERROR`, naming both, before anything is mounted

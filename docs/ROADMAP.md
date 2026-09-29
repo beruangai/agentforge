@@ -40,8 +40,17 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 ## A4 — Specs and audit
 
+**Delivered 2026-09-29**, verified live on both examples: `integ` local, the AgentCore and S3 slices, both examples' local e2e and `hello-agent`'s `e2e-agentcore`.
+
 - Retroactive OpenSpec specs for what A1 and A2 built, beside `filesystem-lifecycle` in `openspec/specs/` — succinct, significant behaviour only — written with the operator. **Landed 2026-09-28**: eight specs, each at its highest seam, their scenarios mapped to tests and the untested ones flagged in the [archived change](../openspec/changes/archive/2026-09-28-retroactive-specs/design.md)
-- A full audit of the package, the examples and the docs for cohesion, correctness, simplicity and maintainability: layer contracts and ownership, naming and terms, dead or duplicated code, docs that no longer match the code (among them the project-key pinning `docs/research/claude-agent-sdk.md` describes and ADR 0011 does not). What it finds is fixed, or raised with the operator where it is a decision. **Audited 2026-09-28; the operator's chosen fixes applied 2026-09-29**, each verified against the code first, with unit tests, and design options renumbered `§ODO###`. Since, the readiness probe runs on Lambda's Node.js 26 preview for uuid7, and a task is stored as three records — task, input, output — with its input and outcome each capped at 350 KB; a start a container cannot run now is refused in-band and retryably, with no task, and the Temporal activity waits it out ([change](../openspec/changes/temporary-start-refusals/proposal.md)). Verified live 2026-09-29: `integ` local and the AgentCore and S3 slices, both examples' local e2e and `hello-agent`'s `e2e-agentcore`. The operator's last decisions applied the same day: a count of outcomes a stop overrode, ADR 0008's unbuilt version and identity claims moved to §ODO010 and dropped, the held span check deleted. Open: archiving the OpenSpec changes
+- A full audit of the package, the examples and the docs for cohesion, correctness, simplicity and maintainability. **Audited 2026-09-28; the operator's chosen fixes applied 2026-09-29**, each verified against the code first; what the operator left unmarked is skipped by choice. Beyond the line fixes:
+  - a task is stored as three records — task, input, output — with its envelope and outcome each capped at 350 KB
+  - a start a container cannot run now is refused in-band and retryably, with no task, and the Temporal activity waits it out ([change](../openspec/changes/archive/2026-09-29-temporary-start-refusals/proposal.md)); `TASK_STATE_REJECTED` is only what can never succeed
+  - a timed-out task pushes nothing, and overlapping mounts are refused ([change](../openspec/changes/archive/2026-09-29-filesystem-timeout-and-overlap/proposal.md))
+  - the readiness probe runs on Lambda's Node.js 26 preview, for uuid7
+  - a fifth per-agent count, `OutcomesOverriddenByStop`, for the accepted stop-after-handler gap
+  - design options renumbered `§ODO###`; ADR 0008's unbuilt version and identity claims moved to §ODO010 and dropped
+  - the live runs found a regression the unit tier could not: the client refused every live task (zod 4.6), fixed
 
 **Exit:** every built capability has a spec, and the audit's findings are closed or decided.
 
