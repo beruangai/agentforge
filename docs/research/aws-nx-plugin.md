@@ -1,37 +1,50 @@
-# `@aws/nx-plugin` — Conventions Worth Following
+# `@aws/nx-plugin` and Nx — What AgentForge's Plugin Relies On
 
-Read from the [nx-plugin-for-aws guides](https://awslabs.github.io/nx-plugin-for-aws/en/guides/ts-agent/) on 2026-09-20/21. AgentForge extends these conventions rather than inventing its own ([ADR 0010](../../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)). Its own `ts#agent` generator is built for Strands, so the generator is not reusable — the conventions around it are.
+AgentForge extends `@aws/nx-plugin`'s conventions rather than inventing its own ([ADR 0010](../../adr/0010-agentforge-is-consumed-as-an-nx-plugin.md)). Each section is dated; the versions are `@aws/nx-plugin@1.0.3` and `nx@23.2.1`, read from the installed packages unless it says otherwise.
 
-## What it does
+## Nx loading AgentForge's plugin from source
 
-- **`ts#agent` scaffolds** an agent project: entry point, agent definition, a typed client, and a `Dockerfile` when the infrastructure target is `agentcore-ecr`. Protocol options include A2A, which uses the Strands A2A server on port 9000.
-- **Deployment** is either `agentcore` (code packaged as a zip onto a managed runtime) or `agentcore-ecr` (an arm64 image). With ECR, **agents share one workspace-wide asset repository** rather than one repository per agent.
-- **Infrastructure** is generated CDK constructs (or Terraform modules) under a common package, exposing `grantInvokeAccess()` for a caller's role.
-- **Agent runtime names are CDK- or Terraform-generated.** The construct creates them; a developer does not name them.
+**Read and run on 2026-09-30.**
 
-## How a caller finds an agent
+- **Generators resolve through the package, not the project.** `nx g @beruangai/agentforge:<generator>` reads the plugin's `package.json` through `readPluginPackageJson`: first `require.resolve('@beruangai/agentforge/package.json')` from the workspace root, then, on `MODULE_NOT_FOUND`, `resolveLocalNxPlugin`, which matches the import path against the workspace's projects — a tsconfig `paths` alias, or a package whose exports map the bare name. AgentForge's package exports no `.` (every import names its environment), so `resolveLocalNxPlugin` finds nothing (`Unable to find local plugin`), and the lookup fails.
+- **The workspace root depends on the package** (`"@beruangai/agentforge": "workspace:*"` in the root `devDependencies`), as `nx add` makes a consumer's root do. Bun links `node_modules/@beruangai/agentforge` to `libs/agentforge`, the source manifest names `./src/plugin/generators.json`, and Nx imports its `.ts` implementations directly: Nx 23 prefers Node's native type stripping (Node 26), registering swc-node or ts-node only when stripping fails. Verified with `nx g @beruangai/agentforge:init --dry-run`.
+- **The published manifests load the same way.** `nx g <bundle>/plugin/generators.json:init --dry-run` runs the bundled JavaScript the published `package.json` names.
 
-Three mechanisms, in the plugin's own order of preference:
+## The `sdk/*` surface
 
-1. **A construct output** — `agent.agentCoreRuntime.agentRuntimeArn`, and a convenience `agent.invocationUrl`. The ARN has the form `arn:aws:bedrock-agentcore:<region>:<account>:runtime/<agent-runtime-id>`.
-2. **AppConfig runtime configuration** — `RUNTIME_CONFIG_APP_ID` names an AppConfig application from which a caller resolves the agent's runtime ARN. Session persistence settings are registered the same way, with the agent's role granted read access for bucket discovery.
-3. **An explicit ARN** passed to the client factory: `MyAgentClient.withIamAuth({ agentRuntimeArn })`, alongside `.local()` and `.withJwtAuth()` variants.
+**Read on 2026-09-30.** Only `sdk/*` is public; everything under `src/utils/` is internal and may move in any release.
 
-## What AgentForge takes from this
+- `sdk/ts`: `sharedConstructsGenerator(tree, { iac }, declaration)`, `tsProjectGenerator`, `tsInfraGenerator` and the other TypeScript generators. `sharedConstructsGenerator` creates `packages/common/constructs` (the name `common-constructs` and the directory are constants, not options) once, with `src/core/` — `RuntimeConfig`, `checkov`, `app`, `workspace` — and `src/app/index.ts`, and writes nothing when its `project.json` exists. Its `declaration` must declare `constructs`, `aws-cdk-lib` and `@types/node`, which it adds to that project's manifest.
+- `sdk/utils/format`: `formatFilesInSubtree`. `sdk/utils/ast`: `applyGritQL`, `matchGritQL`. `sdk/utils/test`: `createTreeUsingTsSolutionSetup`, a virtual tree laid out as its preset lays out a workspace.
+- Not exported: `addComponentGeneratorMetadata`, `addStarExport`, `addDependencyToTargetIfNotPresent`, `mergeTargetDefault`. AgentForge implements the few lines of each it needs rather than importing an internal path.
 
-- Generated runtime names rather than a name a caller assembles — but not discovery through AppConfig: a caller addresses an agent by the ARN its deployment exports ([ADR 0008](../../adr/0008-code-ships-in-the-image.md)).
-- A client factory with a local variant and an IAM-authenticated variant.
-- One workspace-wide image registry.
-- Constructs granting least-privilege invocation (§REQ708) — AgentForge's is `AgentRuntime.grantInvoke`.
+## Runtime configuration
 
+**Read on 2026-09-30**, from `src/utils/files/common/constructs/src/core/runtime-config.ts.template`.
+
+- `RuntimeConfig.ensure(scope)` is a singleton per stage (or stack). `set(namespace, key, value)` and `get(namespace)` hold plain data; each namespace becomes an AppConfig configuration profile (`AWS.Freeform`, hosted, JSON) in one application with one environment, `default`, deployed with a strategy of zero duration, 100% growth and no bake.
+- The AppConfig resources exist only once something asks for them: `appConfigApplicationId` (a lazy token, with a `RuntimeConfigApplicationId` stack output) or `grantReadAppConfig(grantee)` registers the aspect that creates them. `grantReadAppConfig` grants `appconfig:StartConfigurationSession` and `appconfig:GetLatestConfiguration` on `application/<id>/*` — the whole application, every namespace.
+- Its agents register under namespace `agentcore`: `rc.set('agentcore', 'agentRuntimes', { ...rc.get('agentcore').agentRuntimes, <ClassName>: { arn, session? } })`, keyed by the construct's class name. AgentForge's agent constructs use the same key and shape, so one map serves both plugins' agents.
+- Its generated reader (`agent-connection`'s `runtime-config.ts`) reads the namespace with Powertools' `getAppConfig('agentcore', { application, environment: 'default', transform: 'json' })`.
+
+**Why AgentForge's client reads AppConfig Data directly.** `agentCoreTransportsFromRuntimeConfig` reads the namespace once, when a caller builds its client. Powertools' reader brings a cache, transforms and a provider layer AgentForge does not use, and a second optional peer beside `@aws-sdk/client-appconfigdata`, which it wraps. Two calls — `StartConfigurationSession`, then `GetLatestConfiguration` with its token — are the whole read, and AppConfig's own errors surface unchanged.
+
+## Component metadata, targets and `ts#agent`
+
+**Read on 2026-09-30.**
+
+- A generated project records its generator as `metadata.generator`; each component a generator adds to it is appended to `metadata.components[]` as `{ generator, path, name?, …extra }`, deduped by generator and name, and never rewritten. `ts#agent` records its port the same way and assigns ports against it; AgentForge assigns none (local agents are found by container name).
+- `ts#agent` with `agentcore` infrastructure generates the agent's construct in the shared constructs project (`src/app/agents/<name>/<name>.ts`, star-exported from `src/app/agents/index.ts` and `src/app/index.ts`), adds `<project>:build` and `<project>:assemble` to that project's `build` and `assemble`, and connects the construct to no infra project: the consumer declares it in the stack `ts#infra` generated.
+- Its construct registers itself in the runtime configuration, grants its own runtime `grantReadAppConfig`, and sets `RUNTIME_CONFIG_APP_ID` in the runtime's environment.
+- **Sync generators are attached through `targetDefaults`.** Its `init` adds its sync generators to `targetDefaults.compile.syncGenerators`, filtering its own names out before appending them, so a re-run changes nothing; a `targetDefaults` entry that is an array is merged into its catch-all (unfiltered) entry.
 
 ## The workspace preset and its toolchain
 
 **Read and run on 2026-09-23**, `@aws/nx-plugin@1.0.3` with `create-nx-workspace@23.2.1 --pm=bun`, when A0 scaffolded this workspace.
 
-- **The preset writes Biome, not ESLint and Prettier** — one `biome.json` whose only lint rule is `noUndeclaredDependencies`, and per-project `format` and `lint` targets over it. Workspaces are `packages/*`, and versions live in the package manager's **catalog** (bun's top-level `catalog` field) by default.
-- **The catalog pins TypeScript `~6.0.3`, not 7.** TypeScript 7.0.2 is the latest stable release, but it ships the native compiler with no classic compiler API — its package exports only `./unstable/*` — and **Nx 23.2.1's project graph fails outright on it** ("Failed to process project graph"), because `@nx/js/typescript` reads tsconfig files through that API. Measured by swapping 7.0.2 into a fresh preset workspace. TypeScript 6 is therefore the latest that works, and moving to 7 waits on Nx.
+- **The preset writes Biome, not ESLint and Prettier** — one `biome.json` whose only lint rule is `noUndeclaredDependencies`, and per-project `format` and `lint` targets over it. Workspaces are `packages/*`, and versions live in the package manager's **catalog** (bun's top-level `catalog` field) by default, recorded as `packageManager.catalogs` in `aws-nx-plugin.config.mts`.
+- **The catalog pins TypeScript `~6.0.3`, not 7.** TypeScript 7.0.2 ships the native compiler with no classic compiler API, and **Nx 23.2.1's project graph fails outright on it** ("Failed to process project graph"), because `@nx/js/typescript` reads tsconfig files through that API. Measured by swapping 7.0.2 into a fresh preset workspace.
 - **Vitest is 4.1.11, not 5.** `@nx/vitest@23.2.1` declares `vitest: ^3.0.0 || ^4.0.0`.
 - **`ts#project` generates** a `compile` target (`tsc --build`), `format` and `lint` over Biome, a vitest config with `environment: 'jsdom'` and `passWithNoTests: true`, and adds a `paths` alias plus an `@<scope>/source` custom condition to `tsconfig.base.json`. AgentForge keeps the Biome targets and drops the rest: one project bundled by tsdown needs no `tsc` emit, tests run in `node`, and a `paths` alias would bypass the package's own export map.
-- **Its `ts#sync` generator is not a model for AgentForge's sync generator.** It keeps each project's tsconfig `paths` in step with the base config and declares local workspace dependencies in each `package.json` — workspace hygiene, not keeping a consumer's wiring current with a library version. `ts#agent` was not read at A0: what AgentForge's generators write is §ODO003, deferred until the first agent exists, and reading it now would be reading against no requirement.
+- **Its `ts#sync` generator is not a model for AgentForge's sync generator.** It keeps each project's tsconfig `paths` in step with the base config — workspace hygiene, not keeping a consumer's wiring current with a library version.
 - **It generates no `integ` or `e2e` tier.** Those are this repository's (`.claude/rules/testing.md`).

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "AgentForgeInit",
+  "title": "Adds AgentForge to a workspace",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

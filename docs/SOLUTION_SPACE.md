@@ -34,7 +34,7 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 - The side effects of a consumer's procedures, and their recovery
 - A concurrency ceiling — the caller's
 - Rate limiting, queueing or durability for the tools an agent calls — a consumer-hosted MCP server owns its limits and whatever backs them, and the agent knows nothing about what is behind the tool
-- Agent discovery and agent-to-agent orchestration; the agent card is generated and otherwise unused
+- Agent discovery and agent-to-agent orchestration; the agent card is generated and otherwise unused. Resolving a deployment's own agents by name from the runtime configuration it registers (§REQ707) is resolution, not discovery
 - Streaming a run's progress, and blocking sends — polling is the only way to wait until a procedure's latency warrants more
 - Model providers other than Anthropic
 - Supporting agent frameworks other than the Claude Agent SDK

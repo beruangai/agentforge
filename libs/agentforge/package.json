@@ -47,6 +47,8 @@
     },
     "./package.json": "./package.json"
   },
+  "generators": "./src/plugin/generators.json",
+  "executors": "./src/plugin/executors.json",
   "dependencies": {
     "ohash": "^2.0.12",
     "picomatch": "^4.0.7",
@@ -68,7 +70,10 @@
     "@temporalio/common": "^1.24.0",
     "@anthropic-ai/sdk": "0.128.0",
     "aws-cdk-lib": "^2.270.0",
-    "constructs": "^10.8.1"
+    "constructs": "^10.8.1",
+    "nx": "^23.2.1",
+    "@nx/devkit": "^23.2.1",
+    "@aws/nx-plugin": "^1.0.3"
   },
   "peerDependenciesMeta": {
     "@orpc/server": {
@@ -112,6 +117,15 @@
     },
     "constructs": {
       "optional": true
+    },
+    "nx": {
+      "optional": true
+    },
+    "@nx/devkit": {
+      "optional": true
+    },
+    "@aws/nx-plugin": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -128,6 +142,8 @@
     "@aws-sdk/client-s3": "catalog:",
     "@aws-sdk/client-secrets-manager": "catalog:",
     "@aws-sdk/client-sts": "catalog:",
+    "@aws/nx-plugin": "catalog:",
+    "@nx/devkit": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/contract": "catalog:",
     "@orpc/server": "catalog:",
@@ -145,6 +161,7 @@
     "aws-cdk-lib": "catalog:",
     "constructs": "catalog:",
     "express": "catalog:",
+    "nx": "catalog:",
     "publint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

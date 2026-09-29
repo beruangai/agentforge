@@ -1,16 +1,15 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { defineConfig } from 'tsdown';
+import {
+  BUNDLE_DIRECTORY,
+  pluginEntries,
+  publishedManifest,
+  publishedPluginManifests,
+} from './published-manifest.ts';
 
 /**
- * The published package is assembled under the workspace's one output root,
- * `dist/libs/agentforge/bundle/` — named for the task that builds it —, so the source directory stays clean
- * and everything built sits beside everything else produced.
- */
-const BUNDLE_DIRECTORY = '../../dist/libs/agentforge/bundle';
-
-/**
- * One package, six entry points. Code shared between entry points is split
+ * One package, six entry points and the Nx plugin's implementations. Code shared between entry points is split
  * into common chunks rather than duplicated into each, and every dependency
  * stays external — only this repository's own source is bundled. tsdown
  * externalises only what the manifest declares and inlines anything else with
@@ -27,6 +26,7 @@ export default defineConfig({
     agent: 'src/server/harness/index.ts',
     server: 'src/server/runtime/index.ts',
     infra: 'src/infra/index.ts',
+    ...(await pluginEntries()),
   },
   format: 'esm',
   deps: { onlyBundle: [] },
@@ -50,61 +50,35 @@ export default defineConfig({
       from: 'src/server/runtime/collector/*.yaml',
       to: `${BUNDLE_DIRECTORY}/collector`,
     },
+    // The container workspace's root manifest and lock, which `container-lock` writes.
+    {
+      from: [
+        'container/workspace/package.json',
+        'container/workspace/bun.lock',
+      ],
+      to: `${BUNDLE_DIRECTORY}/container`,
+    },
+    // The plugin's option schemas, beside the implementations its manifests name.
+    {
+      from: 'src/plugin/**/schema.json',
+      to: BUNDLE_DIRECTORY,
+      flatten: false,
+    },
   ],
   hooks: {
-    'build:done': writePublishedManifest,
+    'build:done': writePublishedManifests,
   },
 });
 
-/**
- * The published `package.json` is the source manifest without what only the
- * workspace uses. A dependency a consumer installs must carry a real version,
- * and `catalog:` and `workspace:` resolve only inside this workspace, so one
- * reaching the published manifest fails the build rather than a consumer's
- * install. There is none yet; how they resolve is decided with the first.
- */
-async function writePublishedManifest(): Promise<void> {
-  const {
-    devDependencies: _workspaceOnly,
-    imports: _sourceOnly,
-    ...manifest
-  } = JSON.parse(await readFile('package.json', 'utf8')) as Record<
-    string,
-    unknown
-  >;
-  manifest.exports = withoutSourceCondition(manifest.exports);
-  for (const field of [
-    'dependencies',
-    'peerDependencies',
-    'optionalDependencies',
-  ]) {
-    const unresolved = Object.entries(
-      (manifest[field] ?? {}) as Record<string, string>,
-    ).filter(([, specifier]) => /^(catalog|workspace):/.test(specifier));
-    if (unresolved.length > 0) {
-      throw new Error(
-        `package.json ${field} would publish workspace-only specifiers: ${unresolved
-          .map(([name, specifier]) => `${name}@${specifier}`)
-          .join(', ')}`,
-      );
-    }
+/** The published `package.json` and the plugin's manifests, derived from the source. */
+async function writePublishedManifests(): Promise<void> {
+  const written = {
+    'package.json': await publishedManifest(),
+    ...(await publishedPluginManifests()),
+  };
+  for (const [path, manifest] of Object.entries(written)) {
+    const file = join(BUNDLE_DIRECTORY, path);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, `${JSON.stringify(manifest, null, 2)}\n`);
   }
-  await writeFile(
-    join(BUNDLE_DIRECTORY, 'package.json'),
-    `${JSON.stringify(manifest, null, 2)}\n`,
-  );
-}
-
-/**
- * `@beruangai/source` resolves an entry point to its TypeScript source inside
- * this workspace, where the examples consume AgentForge live. A consumer only
- * ever sees the built files.
- */
-function withoutSourceCondition(value: unknown): unknown {
-  if (typeof value !== 'object' || value === null) return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => key !== '@beruangai/source')
-      .map(([key, child]) => [key, withoutSourceCondition(child)]),
-  );
 }

@@ -38,18 +38,18 @@
       "options": {
         "command": "tsdown && publint run ../../dist/libs/agentforge/bundle --strict --pack npm",
         "cwd": "{projectRoot}"
-      }
+      },
+      "dependsOn": ["container-lock"]
     },
     "container-lock": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["bundle"],
       "inputs": [
         "{projectRoot}/container/*.ts",
+        "{projectRoot}/published-manifest.ts",
+        "{projectRoot}/package.json",
+        "{projectRoot}/src/plugin/*.json",
         "{workspaceRoot}/package.json",
-        {
-          "dependentTasksOutputFiles": "**/package.json"
-        },
         {
           "runtime": "bun --version"
         }
@@ -125,10 +125,10 @@
     "image": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["container-lock"],
+      "dependsOn": ["bundle"],
       "options": {
-        "command": "docker build --platform linux/arm64 -f Dockerfile --build-context container=container/workspace -t agentforge/a2a-claude:local ../../dist/libs/agentforge/bundle",
-        "cwd": "{projectRoot}"
+        "command": "docker build --platform linux/arm64 -f Dockerfile --build-context container=container -t agentforge/a2a-claude:local .",
+        "cwd": "{workspaceRoot}/dist/{projectRoot}/bundle"
       }
     }
   }

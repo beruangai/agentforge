@@ -214,6 +214,6 @@ The examples are the dogfood: AgentForge's own agents, built and verified exactl
 - Queueing, and any concurrency ceiling that is not about the container's memory
 - Recovery of a consumer's side effect
 - Procedures that invoke no agent; frameworks other than the Claude Agent SDK
-- Streaming, blocking sends, push notifications, agent discovery
+- Streaming, blocking sends, push notifications, agent discovery — resolving a deployment's own agents by name from the runtime configuration it registers (§REQ707) is resolution, not discovery
 - A second server in the container
 - Consumer vocabulary

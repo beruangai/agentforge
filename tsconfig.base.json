@@ -1,6 +1,9 @@
 {
   "extends": "@tsconfig/node26/tsconfig.json",
   "compilerOptions": {
+    "customConditions": [
+      "@beruangai/source"
+    ],
     "erasableSyntaxOnly": true,
     "exactOptionalPropertyTypes": true,
     "isolatedModules": true,

@@ -1,0 +1,10 @@
+{
+  "name": "@beruangai/agentforge",
+  "generators": {
+    "init": {
+      "factory": "./generators/init/generator.ts",
+      "schema": "./generators/init/schema.json",
+      "description": "Adds AgentForge to a workspace: its dependencies, and the sync generator attached to its build tasks"
+    }
+  }
+}

@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { access, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { publishedManifest } from '../published-manifest.ts';
 
 /**
  * The `container-lock` task: the container's `/workspace` root as the base
@@ -8,11 +10,11 @@ import { join } from 'node:path';
  * `agentforge/`, an agentic project at `agentic/`, its agent at
  * `agentic/agent/` — and depends on the peers AgentForge's server and harness
  * import, at the workspace catalog's versions. Its lock is seeded with the
- * previous one, so an unchanged manifest keeps every resolved version.
+ * previous one, so an unchanged manifest keeps every resolved version. The
+ * `agentforge` member is the manifest the package publishes, derived from the
+ * source, so the lock needs no bundle and the bundle ships the lock.
  */
-const PACKAGE_ROOT = join(import.meta.dirname, '..');
-const WORKSPACE_ROOT = join(PACKAGE_ROOT, '..', '..');
-const BUNDLE_DIRECTORY = join(WORKSPACE_ROOT, 'dist/libs/agentforge/bundle');
+const WORKSPACE_ROOT = join(import.meta.dirname, '..', '..', '..');
 const ROOT_MANIFEST = join(import.meta.dirname, 'workspace', 'package.json');
 const ROOT_LOCK = join(import.meta.dirname, 'workspace', 'bun.lock');
 
@@ -34,9 +36,10 @@ const RUNTIME_PEERS = [
 const { catalog } = JSON.parse(
   await readFile(join(WORKSPACE_ROOT, 'package.json'), 'utf8'),
 ) as { catalog: Record<string, string> };
-const bundle = JSON.parse(
-  await readFile(join(BUNDLE_DIRECTORY, 'package.json'), 'utf8'),
-) as { name: string; peerDependencies: Record<string, string> };
+const bundle = (await publishedManifest()) as {
+  name: string;
+  peerDependencies: Record<string, string>;
+};
 
 const dependencies = Object.fromEntries(
   RUNTIME_PEERS.map((name) => {
@@ -71,17 +74,26 @@ const seed = await access(ROOT_LOCK).then(
   () => ['--seed', ROOT_LOCK],
   () => [],
 );
-execFileSync(
-  'bun',
-  [
-    join(import.meta.dirname, 'workspace-lock.ts'),
-    '--root',
-    ROOT_MANIFEST,
-    '--member',
-    `agentforge=${BUNDLE_DIRECTORY}`,
-    ...seed,
-    '--out',
-    ROOT_LOCK,
-  ],
-  { stdio: 'inherit' },
-);
+const agentforge = await mkdtemp(join(tmpdir(), 'agentforge-published-'));
+try {
+  await writeFile(
+    join(agentforge, 'package.json'),
+    `${JSON.stringify(bundle, null, 2)}\n`,
+  );
+  execFileSync(
+    'bun',
+    [
+      join(import.meta.dirname, 'workspace-lock.ts'),
+      '--root',
+      ROOT_MANIFEST,
+      '--member',
+      `agentforge=${agentforge}`,
+      ...seed,
+      '--out',
+      ROOT_LOCK,
+    ],
+    { stdio: 'inherit' },
+  );
+} finally {
+  await rm(agentforge, { recursive: true, force: true });
+}

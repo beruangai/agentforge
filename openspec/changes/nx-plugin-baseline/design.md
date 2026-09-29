@@ -13,7 +13,7 @@ See proposal.md for why. Written against `libs/agentforge`, after `move-package-
   - Its agents register as `rc.set('agentcore', 'agentRuntimes', { ...existing, <Key>: { arn } })`; its generated reader uses Powertools' `getAppConfig`.
   - It records generated projects as `metadata.generator` and their parts as `metadata.components[]` (`{ generator, name, path, …extra }`), and assigns ports against `metadata.ports`.
   - `ts#agent` generates an agent's construct in the shared constructs project but never connects it to an infra project; the consumer declares it in the stack `ts#infra` generated.
-- Nx 23 loads a workspace project as a local plugin when the plugin's package does not resolve from the workspace root, registering its TypeScript transpiler (`resolveLocalNxPlugin`). `@beruangai/agentforge` is not in the root `node_modules`, so in this repository the plugin runs from source.
+- Nx 23 resolves a plugin's manifests through its package, from the workspace root; its local-project fallback (`resolveLocalNxPlugin`) cannot match a package exporting no `.`, as AgentForge's does not. The root therefore depends on `@beruangai/agentforge` (`workspace:*`), as `nx add` makes a consumer's do, and Nx imports the source manifests' `.ts` implementations through Node's native type stripping — in this repository the plugin runs from source.
 - `ScratchFilesystem` (ADR 0015) gives a task an empty directory of its own, removed when the task ends; `context.filesystemPermissions` carries its allow rules, which a run applies under `permissionMode: 'dontAsk'`.
 
 ## Goals / Non-Goals
