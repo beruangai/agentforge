@@ -6,8 +6,16 @@ import type {
   DefaultRequestHandler,
   ServerCallContext,
 } from '@a2a-js/sdk/server';
-import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
-import { isTerminal, type PriorAttempt } from '#core/contract/task.ts';
+import {
+  type Envelope,
+  RUNTIME_SESSION_HEADER,
+} from '#core/contract/envelope.ts';
+import {
+  type Cause,
+  isTerminal,
+  type PriorAttempt,
+} from '#core/contract/task.ts';
+import { TASK_INPUT_CAP_BYTES } from '#core/task-table.ts';
 import {
   finishedTask,
   newTask,
@@ -106,8 +114,10 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
         priorAttempt = {
           taskId: existing.id,
           state,
+          // Without its payload, which could take the new task's record past
+          // DynamoDB's item: the prior task's own output record holds it.
           ...(outcome?.state === 'TASK_STATE_FAILED'
-            ? { cause: outcome.cause }
+            ? { cause: withoutPayload(outcome.cause) }
             : {}),
         };
       }
@@ -118,6 +128,25 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
         priorAttempt,
         startId: randomUUIDv7(),
       };
+      const message = params.message;
+      if (message === undefined)
+        throw new RequestMalformedError('the request carries no message');
+      const sent: Message = {
+        ...message,
+        contextId,
+        metadata: { ...message.metadata, [ADMISSION_METADATA_KEY]: admission },
+      };
+      // The whole envelope, so both records it is stored across stay bounded:
+      // the input record, and the task record's metadata and tags.
+      const envelopeBytes = Buffer.byteLength(JSON.stringify(envelope));
+      if (envelopeBytes > TASK_INPUT_CAP_BYTES) {
+        return await reject(
+          contextId,
+          admission,
+          `the start is ${envelopeBytes} bytes; the cap is ${TASK_INPUT_CAP_BYTES}. Pass a reference to large content, not the content. Its metadata and tags are not recorded`,
+          { ...envelope, metadata: undefined, tags: undefined },
+        );
+      }
       if (config.executor.stopping) {
         return await reject(contextId, admission, CONTAINER_STOPPING_REASON);
       }
@@ -138,21 +167,11 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
           `a task under continuity key "${envelope.continuityKey}" is already running`,
         );
       }
-      const message = params.message;
-      if (message === undefined)
-        throw new RequestMalformedError('the request carries no message');
       try {
         const started = await config.inner.sendMessage(
           {
             ...params,
-            message: {
-              ...message,
-              contextId,
-              metadata: {
-                ...message.metadata,
-                [ADMISSION_METADATA_KEY]: admission,
-              },
-            },
+            message: sent,
             configuration: {
               acceptedOutputModes: [],
               taskPushNotificationConfig: undefined,
@@ -182,13 +201,14 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
       contextId: string,
       admission: Admission,
       reason: string,
+      recorded: Envelope = envelope,
     ): Promise<Task> {
       const task = finishedTask(
         newTask({
           id: randomUUIDv7(),
           contextId,
           state: 'TASK_STATE_SUBMITTED',
-          metadata: taskMetadata(envelope, admission),
+          metadata: taskMetadata(recorded, admission),
         }),
         { state: 'TASK_STATE_REJECTED', reason },
       );
@@ -228,4 +248,9 @@ function headerOf(
   const value = (headers as Record<string, unknown>)[name];
   if (Array.isArray(value)) return value.join(',');
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function withoutPayload(cause: Cause): Cause {
+  const { payload: _payload, ...kept } = cause;
+  return kept;
 }

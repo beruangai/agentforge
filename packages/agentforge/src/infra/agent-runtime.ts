@@ -29,6 +29,7 @@ import {
   Code,
   Function as LambdaFunction,
   Runtime as LambdaRuntime,
+  RuntimeFamily,
 } from 'aws-cdk-lib/aws-lambda';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import {
@@ -66,6 +67,12 @@ import type { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
  * ceiling is fifteen.
  */
 const READINESS_TIMEOUT = Duration.minutes(14);
+/**
+ * Lambda's Node.js 26 runtime, in public preview until its GA (targeted for
+ * November 2026), before which the CDK has no member for it
+ * (docs/research/agentcore-runtime.md). Node 26 gives the probe uuid7.
+ */
+const NODEJS_26_X = new LambdaRuntime('nodejs26.x', RuntimeFamily.NODEJS);
 
 /**
  * The L2 `Runtime`'s props, less the protocol, which is A2A, and the
@@ -332,7 +339,7 @@ export class AgentRuntime extends Construct {
       throw new Error('the L2 Runtime exposes no agentRuntimeVersion');
     }
     const probe = new LambdaFunction(this, 'ReadinessProbe', {
-      runtime: LambdaRuntime.NODEJS_24_X,
+      runtime: NODEJS_26_X,
       handler: 'index.handler',
       code: Code.fromAsset(
         fileURLToPath(new URL('./readiness-probe/', import.meta.url)),
@@ -350,6 +357,9 @@ export class AgentRuntime extends Construct {
     const readiness = new CustomResource(this, 'Readiness', {
       serviceToken: probe.functionArn,
       resourceType: 'Custom::AgentForgeReadiness',
+      // A probe that never answers — one that fails to load — fails the
+      // deploy once the probe's own timeout has passed, not after an hour.
+      serviceTimeout: READINESS_TIMEOUT.plus(Duration.minutes(1)),
       properties: {
         AgentRuntimeArn: this.runtime.agentRuntimeArn,
         AgentRuntimeVersion: agentRuntimeVersion,

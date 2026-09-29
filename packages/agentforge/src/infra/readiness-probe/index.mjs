@@ -8,7 +8,7 @@
 // serves. Plain JavaScript on the AWS SDK the Lambda runtime bundles, so the
 // construct ships it as it is; it is its own custom resource handler, so no
 // provider function outlives the stack.
-import { randomUUID } from 'node:crypto';
+import { randomUUIDv7 } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   BedrockAgentCoreClient,
@@ -70,15 +70,15 @@ async function probe(agentRuntimeArn, deadline) {
 async function getUnknownTask(agentRuntimeArn) {
   const command = new InvokeAgentRuntimeCommand({
     agentRuntimeArn,
-    runtimeSessionId: `readiness-probe-${randomUUID()}`,
+    runtimeSessionId: `readiness-probe-${randomUUIDv7()}`,
     contentType: 'application/json',
     accept: 'application/json',
     payload: Buffer.from(
       JSON.stringify({
         jsonrpc: '2.0',
-        id: randomUUID(),
+        id: randomUUIDv7(),
         method: 'GetTask',
-        params: { id: randomUUID() },
+        params: { id: randomUUIDv7() },
       }),
     ),
   });

@@ -1,12 +1,22 @@
-import { type ListTasksResponse, Task } from '@a2a-js/sdk';
+import { setTimeout as delay } from 'node:timers/promises';
+import {
+  Artifact,
+  type ListTasksResponse,
+  type Message,
+  Task,
+} from '@a2a-js/sdk';
 import type { ServerCallContext, TaskStore } from '@a2a-js/sdk/server';
 import {
+  type AttributeValue,
   ConditionalCheckFailedException,
   CreateTableCommand,
   type DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
   ResourceInUseException,
+  TransactionCanceledException,
+  type TransactWriteItem,
+  TransactWriteItemsCommand,
   UpdateItemCommand,
   UpdateTimeToLiveCommand,
   waitUntilTableExists,
@@ -23,19 +33,32 @@ import {
   TASK_TABLE_PARTITION_KEY,
   TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
 } from '#core/task-table.ts';
-import { finishedTask, stateOf } from './a2a-task.ts';
+import { finishedTask, readEnvelope, stateOf } from './a2a-task.ts';
 import type { OperationalMetrics } from './metrics.ts';
 
 /** A task whose lease has not been renewed for this long is lost (§REQ303). */
 export const LEASE_MILLISECONDS = 60_000;
 /** How long a task, and the idempotency key naming it, are kept. */
 const RETENTION_SECONDS = 7 * 24 * 60 * 60;
+/** How many times a transaction cancelled by a concurrent write is tried. */
+const TRANSACTION_ATTEMPTS = 3;
+const TRANSACTION_RETRY_MILLISECONDS = 50;
 
 /**
  * A2A's task store over one DynamoDB table keyed by `pk`, extended with what
  * the protocol has no place for: a lease the executor renews while the task
  * process lives, from which loss is derived at read time, and an index from
  * idempotency key to the latest attempt.
+ *
+ * A task is three records, so a large input or outcome cannot push it past
+ * DynamoDB's 400 KB item: `task#id`, the task without its history or
+ * artifacts, with its state and lease; `input#id`, the message that started
+ * it, less the metadata and tags the task record holds, written once and
+ * kept for the record — nothing reads it back; and
+ * `output#id`, its artifacts, which exist once it has ended and are written
+ * in one transaction with its terminal state. A task loads without history:
+ * the A2A SDK merges and appends to it, but nothing in AgentForge reads it —
+ * the client reads artifacts and metadata only.
  *
  * A terminal state is final. Every write is conditional on the stored task not
  * being terminal, so a container finishing a task that another reader already
@@ -59,10 +82,16 @@ export class DynamoDBTaskStore implements TaskStore {
 
   async save(task: Task, _context?: ServerCallContext): Promise<void> {
     const state = stateOf(task);
+    if (isTerminal(state) !== task.artifacts.length > 0) {
+      throw new Error(
+        `task ${task.id} is saved ${state} with ${task.artifacts.length} artifacts: an ended task carries its outcome, and a live one none`,
+      );
+    }
     const now = Date.now();
-    try {
-      await this.#client.send(
-        new UpdateItemCommand({
+    const expiresAt = expiresAtOf(now);
+    const items: TransactWriteItem[] = [
+      {
+        Update: {
           TableName: this.#tableName,
           Key: { pk: { S: taskKey(task.id) } },
           UpdateExpression: isTerminal(state)
@@ -78,20 +107,43 @@ export class DynamoDBTaskStore implements TaskStore {
             '#derivedLost': DERIVED_LOST_ATTRIBUTE,
           },
           ExpressionAttributeValues: {
-            ':task': { S: JSON.stringify(Task.toJSON(task)) },
+            ':task': { S: taskRecordOf(task) },
             ':state': { S: state },
-            ':expiresAt': {
-              N: String(Math.floor(now / 1000) + RETENTION_SECONDS),
-            },
+            ':expiresAt': expiresAt,
             ...(isTerminal(state)
               ? {}
               : { ':lease': { N: String(now + LEASE_MILLISECONDS) } }),
             ...TERMINAL_VALUES,
           },
-        }),
-      );
+        },
+      },
+    ];
+    // The SDK saves a task SUBMITTED once, first, with the message that started it.
+    if (state === 'TASK_STATE_SUBMITTED') {
+      const [message, ...more] = task.history;
+      if (message === undefined || more.length > 0) {
+        throw new Error(
+          `task ${task.id} is saved SUBMITTED with ${task.history.length} messages, not the one that started it`,
+        );
+      }
+      items.push({
+        Put: {
+          TableName: this.#tableName,
+          Item: {
+            pk: { S: inputKey(task.id) },
+            envelope: { S: taskInput(message) },
+            expiresAt,
+          },
+        },
+      });
+    }
+    if (isTerminal(state)) {
+      items.push(this.#outputPut(task, expiresAt));
+    }
+    try {
+      await this.#transact(items);
     } catch (error) {
-      if (error instanceof ConditionalCheckFailedException) {
+      if (cancelledFor(error, 'ConditionalCheckFailed')) {
         throw new Error(
           `task ${task.id} already ended; the write of ${state} was refused`,
           { cause: error },
@@ -106,7 +158,7 @@ export class DynamoDBTaskStore implements TaskStore {
     taskId: string,
     _context?: ServerCallContext,
   ): Promise<Task | undefined> {
-    const item = await this.readTaskItem(taskId);
+    const item = await this.readTask(taskId);
     if (item === undefined) return undefined;
     if (isTerminal(item.state)) return item.task;
     if (item.leaseExpiresAt === undefined) {
@@ -120,33 +172,35 @@ export class DynamoDBTaskStore implements TaskStore {
         'the task process stopped renewing its lease: its container died or was stopped',
       ),
     });
+    const expiresAt = expiresAtOf(Date.now());
     try {
-      await this.#client.send(
-        new PutItemCommand({
-          TableName: this.#tableName,
-          Item: {
-            pk: { S: taskKey(taskId) },
-            task: { S: JSON.stringify(Task.toJSON(lost)) },
-            state: { S: 'TASK_STATE_FAILED' },
-            [DERIVED_LOST_ATTRIBUTE]: { BOOL: true },
-            expiresAt: {
-              N: String(Math.floor(Date.now() / 1000) + RETENTION_SECONDS),
+      await this.#transact([
+        {
+          Put: {
+            TableName: this.#tableName,
+            Item: {
+              pk: { S: taskKey(taskId) },
+              task: { S: taskRecordOf(lost) },
+              state: { S: 'TASK_STATE_FAILED' },
+              [DERIVED_LOST_ATTRIBUTE]: { BOOL: true },
+              expiresAt,
+            },
+            ConditionExpression: '#state = :state AND leaseExpiresAt = :lease',
+            ExpressionAttributeNames: { '#state': 'state' },
+            ExpressionAttributeValues: {
+              ':state': { S: item.state },
+              ':lease': { N: String(item.leaseExpiresAt) },
             },
           },
-          ConditionExpression: '#state = :state AND leaseExpiresAt = :lease',
-          ExpressionAttributeNames: { '#state': 'state' },
-          ExpressionAttributeValues: {
-            ':state': { S: item.state },
-            ':lease': { N: String(item.leaseExpiresAt) },
-          },
-        }),
-      );
+        },
+        this.#outputPut(lost, expiresAt),
+      ]);
       this.#metrics.count(OPERATIONAL_METRICS.LOST, taskId);
       return lost;
     } catch (error) {
       // Someone wrote first — a renewal or the real outcome. Read what they wrote.
-      if (error instanceof ConditionalCheckFailedException) {
-        return (await this.readTaskItem(taskId))?.task;
+      if (cancelledFor(error, 'ConditionalCheckFailed')) {
+        return (await this.readTask(taskId))?.task;
       }
       throw error;
     }
@@ -227,35 +281,117 @@ export class DynamoDBTaskStore implements TaskStore {
     );
   }
 
-  private async readTaskItem(
+  /** The task record, and for an ended task its output record's artifacts. */
+  private async readTask(
     taskId: string,
   ): Promise<
     | { task: Task; state: TaskState; leaseExpiresAt: number | undefined }
     | undefined
   > {
-    const response = await this.#client.send(
-      new GetItemCommand({
-        TableName: this.#tableName,
-        Key: { pk: { S: taskKey(taskId) } },
-        ConsistentRead: true,
-      }),
-    );
-    const item = response.Item;
+    const item = await this.#get(taskKey(taskId));
     if (item === undefined) return undefined;
     const serialised = item.task?.S;
-    const state = item.state?.S;
-    if (serialised === undefined || state === undefined) {
+    const stateValue = item.state?.S;
+    if (serialised === undefined || stateValue === undefined) {
       throw new Error(`task ${taskId} is stored without its task or state`);
     }
+    const state = TaskStateEnum.parse(stateValue);
+    const task = Task.fromJSON(JSON.parse(serialised));
+    if (isTerminal(state)) {
+      const artifacts = (await this.#get(outputKey(taskId)))?.artifacts?.S;
+      if (artifacts === undefined) {
+        throw new Error(
+          `task ${taskId} ended ${state} without its output record`,
+        );
+      }
+      task.artifacts = (JSON.parse(artifacts) as unknown[]).map((artifact) =>
+        Artifact.fromJSON(artifact),
+      );
+    }
     return {
-      task: Task.fromJSON(JSON.parse(serialised)),
-      state: TaskStateEnum.parse(state),
+      task,
+      state,
       leaseExpiresAt:
         item.leaseExpiresAt?.N === undefined
           ? undefined
           : Number(item.leaseExpiresAt.N),
     };
   }
+
+  async #get(pk: string): Promise<Record<string, AttributeValue> | undefined> {
+    const response = await this.#client.send(
+      new GetItemCommand({
+        TableName: this.#tableName,
+        Key: { pk: { S: pk } },
+        ConsistentRead: true,
+      }),
+    );
+    return response.Item;
+  }
+
+  #outputPut(task: Task, expiresAt: AttributeValue): TransactWriteItem {
+    return {
+      Put: {
+        TableName: this.#tableName,
+        Item: {
+          pk: { S: outputKey(task.id) },
+          artifacts: {
+            S: JSON.stringify(
+              task.artifacts.map((artifact) => Artifact.toJSON(artifact)),
+            ),
+          },
+          expiresAt,
+        },
+      },
+    };
+  }
+
+  /**
+   * Writes the items as one. A transaction that meets a concurrent write to
+   * one of its items — a lease renewal, most often — is cancelled without
+   * effect, and the AWS SDK does not retry it: it is retried here.
+   */
+  async #transact(items: TransactWriteItem[]): Promise<void> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await this.#client.send(
+          new TransactWriteItemsCommand({ TransactItems: items }),
+        );
+        return;
+      } catch (error) {
+        const conflicted =
+          cancelledFor(error, 'TransactionConflict') &&
+          !cancelledFor(error, 'ConditionalCheckFailed');
+        if (!conflicted || attempt >= TRANSACTION_ATTEMPTS) throw error;
+        await delay(TRANSACTION_RETRY_MILLISECONDS * attempt);
+      }
+    }
+  }
+}
+
+/**
+ * The input record's content: the envelope that started a task, less its
+ * metadata and tags, which are the task's and live in the task record.
+ */
+function taskInput(message: Message): string {
+  const { metadata: _metadata, tags: _tags, ...input } = readEnvelope(message);
+  return JSON.stringify(input);
+}
+
+/** The task record's task: its history is the input record's, its artifacts the output record's. */
+function taskRecordOf(task: Task): string {
+  return JSON.stringify(Task.toJSON({ ...task, history: [], artifacts: [] }));
+}
+
+function expiresAtOf(now: number): AttributeValue {
+  return { N: String(Math.floor(now / 1000) + RETENTION_SECONDS) };
+}
+
+function cancelledFor(error: unknown, code: string): boolean {
+  return (
+    error instanceof TransactionCanceledException &&
+    (error.CancellationReasons ?? []).some((reason) => reason.Code === code)
+  );
 }
 
 /** Marks a loss derived by a reader, which no later write replaces. */
@@ -273,6 +409,14 @@ const TERMINAL_VALUES = Object.fromEntries(
 
 function taskKey(taskId: string): string {
   return `task#${taskId}`;
+}
+
+function inputKey(taskId: string): string {
+  return `input#${taskId}`;
+}
+
+function outputKey(taskId: string): string {
+  return `output#${taskId}`;
 }
 
 function idempotencyKeyKey(idempotencyKey: string): string {

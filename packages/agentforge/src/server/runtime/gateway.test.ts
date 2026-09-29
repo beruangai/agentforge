@@ -5,6 +5,8 @@ import type {
 } from '@a2a-js/sdk/server';
 import { describe, expect, it, vi } from 'vitest';
 import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
+import { cause } from '#core/contract/task.ts';
+import { TASK_INPUT_CAP_BYTES } from '#core/task-table.ts';
 import { finishedTask, newTask, outcomeOf } from './a2a-task.ts';
 import {
   ADMISSION_METADATA_KEY,
@@ -129,6 +131,56 @@ describe('the gateway', () => {
       attempt: 1,
       runs: [],
     });
+  });
+
+  it('refuses a start over the input cap before anything runs, recording neither it nor its metadata and tags', async () => {
+    const { handler, inner, store } = gateway();
+    const oversize = structuredClone(request);
+    const [part] = oversize.message?.parts ?? [];
+    if (part?.content?.$case !== 'data') throw new Error('no envelope');
+    part.content.value = {
+      ...part.content.value,
+      metadata: { note: 'x'.repeat(TASK_INPUT_CAP_BYTES) },
+      tags: { kind: 'oversize' },
+    };
+    const refused = (await handler.sendMessage(oversize, context)) as Task;
+    expect(inner.sendMessage).not.toHaveBeenCalled();
+    expect(outcomeOf(refused)).toMatchObject({
+      state: 'TASK_STATE_REJECTED',
+      reason: expect.stringMatching(
+        new RegExp(`is \\d+ bytes; the cap is ${TASK_INPUT_CAP_BYTES}`),
+      ),
+    });
+    const saved = store.save.mock.lastCall as unknown as [Task];
+    expect(saved[0].metadata).toMatchObject({ metadata: {}, tags: {} });
+    expect(saved[0].history).toEqual([]);
+  });
+
+  it('tells a new attempt how the last one failed, without its payload', async () => {
+    const { handler, inner } = gateway({
+      existing: finishedTask(
+        newTask({
+          id: 'earlier',
+          contextId: 'context',
+          state: 'TASK_STATE_SUBMITTED',
+          metadata: { runtimeSessionId: 'session', attempt: 1 },
+        }),
+        {
+          state: 'TASK_STATE_FAILED',
+          cause: {
+            ...cause('OUTPUT_INVALID', 'did not conform'),
+            payload: { answer: 'unconforming' },
+          },
+        },
+      ),
+    });
+    await handler.sendMessage(request, context);
+    const { priorAttempt } = admissionOf(inner);
+    expect(priorAttempt).toMatchObject({
+      taskId: 'earlier',
+      cause: { code: 'OUTPUT_INVALID' },
+    });
+    expect(priorAttempt?.cause).not.toHaveProperty('payload');
   });
 
   it('refuses to guess the attempt of a stored task without one', async () => {

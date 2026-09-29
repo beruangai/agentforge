@@ -1,8 +1,9 @@
 import { oc } from '@orpc/contract';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { contractHash } from '#core/contract/procedures.ts';
 import type { TaskInvocation } from '#core/task-protocol/messages.ts';
+import { TASK_OUTPUT_CAP_BYTES } from '#core/task-table.ts';
 import { result, scriptedQuery } from './__fixtures__/scripted-query.ts';
 import { executeProcedure, implementAgent } from './task-process.ts';
 
@@ -127,6 +128,52 @@ describe('executeProcedure', () => {
         payload: { ok: 'yes' },
       },
     });
+  });
+
+  it('fails an output over the cap', async () => {
+    const outcome = await execute(
+      invocation(),
+      scriptedQuery([
+        result({
+          structured_output: { summary: 'x'.repeat(TASK_OUTPUT_CAP_BYTES) },
+        }),
+      ]),
+    );
+    expect(outcome).toMatchObject({
+      state: 'TASK_STATE_FAILED',
+      cause: {
+        code: 'OUTPUT_TOO_LARGE',
+        message: expect.stringMatching(`the cap is ${TASK_OUTPUT_CAP_BYTES}`),
+      },
+    });
+  });
+
+  it('drops the payload of a cause over the cap, logging it whole', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const padding = 'x'.repeat(TASK_OUTPUT_CAP_BYTES);
+    const outcome = await execute(
+      invocation(),
+      scriptedQuery([result({ structured_output: { summary: 3, padding } })]),
+    );
+    expect(outcome).toMatchObject({
+      state: 'TASK_STATE_FAILED',
+      cause: {
+        code: 'OUTPUT_INVALID',
+        message: expect.stringMatching(
+          new RegExp(
+            `payload was dropped: the cause was \\d+ bytes, and the cap is ${TASK_OUTPUT_CAP_BYTES}`,
+          ),
+        ),
+      },
+    });
+    expect(
+      outcome.state === 'TASK_STATE_FAILED' && outcome.cause,
+    ).not.toHaveProperty('payload');
+    expect(logged).toHaveBeenCalledWith(
+      expect.stringMatching(/payload, dropped/),
+      JSON.stringify({ summary: 3, padding }),
+    );
+    logged.mockRestore();
   });
 
   it('fails with the message of an error the handler throws', async () => {

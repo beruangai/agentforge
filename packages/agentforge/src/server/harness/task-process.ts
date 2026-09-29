@@ -27,6 +27,7 @@ import {
   type TaskInvocation,
   type TaskProcessMessage,
 } from '#core/task-protocol/messages.ts';
+import { TASK_OUTPUT_CAP_BYTES } from '#core/task-table.ts';
 import type {
   MountedFilesystem,
   MountLifecycle,
@@ -70,9 +71,6 @@ export function implementAgent<Contract extends RouterContract>(
   return implement(contract).$context<TaskContext>();
 }
 
-/** An outcome larger than this is refused: return references instead. */
-const OUTCOME_CAP_BYTES = 256 * 1024;
-
 export interface ExecuteOptions {
   readonly contract: RouterContract;
   readonly router: Router<TaskContext>;
@@ -95,7 +93,37 @@ export async function executeProcedure(
 ): Promise<Outcome> {
   const lifecycles: MountLifecycle[] = [];
   const outcome = await runProcedure(options, lifecycles);
-  return unmountAll(outcome, lifecycles);
+  return capCause(
+    options.invocation.taskId,
+    await unmountAll(outcome, lifecycles),
+  );
+}
+
+/**
+ * A failed outcome over the output record's cap loses its cause's payload,
+ * logged whole here, and says so.
+ */
+function capCause(taskId: string, outcome: Outcome): Outcome {
+  if (
+    outcome.state !== 'TASK_STATE_FAILED' ||
+    outcome.cause.payload === undefined
+  ) {
+    return outcome;
+  }
+  const bytes = Buffer.byteLength(JSON.stringify(outcome.cause));
+  if (bytes <= TASK_OUTPUT_CAP_BYTES) return outcome;
+  const { payload, ...kept } = outcome.cause;
+  console.error(
+    `task ${taskId}: the ${kept.code} cause is ${bytes} bytes, over the cap of ${TASK_OUTPUT_CAP_BYTES}; its payload, dropped from the cause:`,
+    JSON.stringify(payload),
+  );
+  return {
+    state: 'TASK_STATE_FAILED',
+    cause: {
+      ...kept,
+      message: `${kept.message}; the payload was dropped: the cause was ${bytes} bytes, and the cap is ${TASK_OUTPUT_CAP_BYTES}. The container log holds it whole`,
+    },
+  };
 }
 
 /**
@@ -200,12 +228,12 @@ async function runProcedure(
       signal: options.signal,
     });
     const bytes = Buffer.byteLength(JSON.stringify(output ?? null));
-    if (bytes > OUTCOME_CAP_BYTES) {
+    if (bytes > TASK_OUTPUT_CAP_BYTES) {
       return {
         state: 'TASK_STATE_FAILED',
         cause: cause(
           'OUTPUT_TOO_LARGE',
-          `the outcome is ${bytes} bytes; the cap is ${OUTCOME_CAP_BYTES}`,
+          `the outcome is ${bytes} bytes; the cap is ${TASK_OUTPUT_CAP_BYTES}`,
         ),
       };
     }

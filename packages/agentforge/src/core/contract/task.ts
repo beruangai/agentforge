@@ -63,7 +63,10 @@ export const CauseSchema = z.object({
   retryable: z.boolean(),
   /** ISO time before which a retry is pointless. */
   retryAfter: z.iso.datetime().optional(),
-  /** What the agent produced, when it did not conform. */
+  /**
+   * What the agent produced, when it did not conform — dropped when it would
+   * take the cause over `TASK_OUTPUT_CAP_BYTES`. The container log holds it whole.
+   */
   payload: z.unknown().optional(),
   /**
    * The error behind it, with its stack and cause chain, cut to
