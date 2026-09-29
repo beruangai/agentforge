@@ -130,12 +130,16 @@ describe('TaskProcessExecutor', () => {
     });
   });
 
-  it('records the stop when it came first, whatever the process then reports', async () => {
-    const { executor: target, store } = executor();
+  it('records the stop when it came first, whatever the process then reports, and counts the outcome it overrode', async () => {
+    const { executor: target, store, metrics } = executor();
     const task = start(target, 'WAIT');
     await target.stop(task.taskId, 'CANCEL');
     await task.done;
     expect(savedOutcome(store)).toEqual({ state: 'TASK_STATE_CANCELED' });
+    expect(metrics.count).toHaveBeenCalledWith(
+      'OutcomesOverriddenByStop',
+      task.taskId,
+    );
   });
 
   it('counts and arms a stop once, however many arrive', async () => {

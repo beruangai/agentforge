@@ -277,6 +277,12 @@ export class TaskProcessExecutor implements AgentExecutor {
       }, budgetSeconds * 1000);
 
       const exit = await exited;
+      if (live.stopReason !== undefined && live.reported !== undefined) {
+        this.#config.metrics.count(
+          OPERATIONAL_METRICS.OUTCOME_OVERRIDDEN_BY_STOP,
+          taskId,
+        );
+      }
       if (live.stopReason === 'LEASE_LOST') {
         // The stored loss is the record; the store refuses any write over it.
         return;

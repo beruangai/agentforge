@@ -284,7 +284,7 @@ The measurement above uses **one clock and one network**: the container writes a
 
 **Runtime tracing needs Transaction Search first.** With it off, CloudFormation refused the runtime's `AWS::Logs::Delivery` to X-Ray: "X-Ray Delivery Destination is supported with CloudWatch Logs as a Trace Segment Destination". Enabled in the console, the same deploy succeeded. But after the construct's integ run served its calls with tracing on, **no `spans` stream appeared in the runtime's own log group within ten minutes**. Whether the service spans went to the shared `aws/spans` group instead, or need ADOT in the agent's code to appear at all, the test role cannot see; checked by hand in the console.
 
-**The service spans do arrive.** Five `GetTask` calls to hello-agent with tracing on appeared in CloudWatch GenAI Observability as five OTEL sessions, named by their runtime session ids, one trace each, no tokens (checked in the console by the operator). Where the spans land — the shared `aws/spans` group, presumably — is still unread; the held integ check waits on it.
+**The service spans do arrive.** Five `GetTask` calls to hello-agent with tracing on appeared in CloudWatch GenAI Observability as five OTEL sessions, named by their runtime session ids, one trace each, no tokens (checked in the console by the operator). Where the spans land — the shared `aws/spans` group, presumably — is still unread. The held integ check was deleted on 2026-09-29: nothing AgentForge does depends on where they land.
 
 **The first model run on AgentCore**, hello-agent's `summarise` through the public client and `agentCoreTransport`, with the subscription token read from its declared secret at server start: completed with a typed output in about 22 s end to end, $0.0036.
 

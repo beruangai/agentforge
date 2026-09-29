@@ -19,6 +19,12 @@ export const OPERATIONAL_METRICS = {
   LOST: 'TasksLost',
   /** An outcome the task store refused or failed to write. */
   OUTCOME_UNRECORDED: 'OutcomesUnrecorded',
+  /**
+   * An outcome the task process reported after it was stopped, so the stop
+   * was recorded instead — a push may have landed. A lower bound: a process
+   * killed before it reports is not seen.
+   */
+  OUTCOME_OVERRIDDEN_BY_STOP: 'OutcomesOverriddenByStop',
 } as const;
 
 export type OperationalMetric =

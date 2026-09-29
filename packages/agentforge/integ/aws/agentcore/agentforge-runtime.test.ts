@@ -21,11 +21,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
 import { GetAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore-control';
-import {
-  paginateDescribeLogGroups,
-  paginateFilterLogEvents,
-} from '@aws-sdk/client-cloudwatch-logs';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { awaitTask, createClient } from '../../../src/client/client.ts';
 import {
   agentCoreTransport,
@@ -55,12 +51,9 @@ import {
   createResourceStack,
   releaseResources,
 } from './__fixtures__/resources.ts';
-import { runtimeLogGroupNamePrefix } from './__fixtures__/runtime-logs.ts';
 
 /** Fresh sessions at once, each a container restored from the one snapshot. */
 const RESTORED_CONTAINERS = 8;
-/** Span delivery through X-Ray to the log group lags by minutes. */
-const SPAN_DELIVERY_TIMEOUT_MILLISECONDS = 600_000;
 
 /** An invocation answered with a JSON-RPC error, or refused by the platform, as it came. */
 class InvocationAnswer extends Error {
@@ -280,40 +273,4 @@ describe("AgentForge's server on AgentCore", () => {
       attempt: 2,
     });
   }, 300_000);
-
-  // Held: on 2026-09-26 no span reached the runtime's own log group within
-  // ten minutes; they land in the shared `aws/spans` group instead. Rewritten
-  // to read there, and enabled, once it is decided the check earns its place.
-  it.skip(
-    "delivers the runtime's service spans to its own log group",
-    async () => {
-      // The invocations of the tests above are what the spans record.
-      const agentRuntimeId = agentRuntimeArn.split('/').at(-1);
-      if (agentRuntimeId === undefined) {
-        throw new Error(`no runtime id in ${agentRuntimeArn}`);
-      }
-      await vi.waitUntil(
-        async () => {
-          for await (const groupPage of paginateDescribeLogGroups(
-            { client: clients.logs },
-            { logGroupNamePrefix: runtimeLogGroupNamePrefix(agentRuntimeId) },
-          )) {
-            for (const { logGroupName } of groupPage.logGroups ?? []) {
-              for await (const page of paginateFilterLogEvents(
-                { client: clients.logs },
-                { logGroupName, logStreamNamePrefix: 'spans', limit: 1 },
-              )) {
-                if ((page.events ?? []).length > 0) {
-                  return true;
-                }
-              }
-            }
-          }
-          return false;
-        },
-        { timeout: SPAN_DELIVERY_TIMEOUT_MILLISECONDS, interval: 15_000 },
-      );
-    },
-    SPAN_DELIVERY_TIMEOUT_MILLISECONDS + 60_000,
-  );
 });
