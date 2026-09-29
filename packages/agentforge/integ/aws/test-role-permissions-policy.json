@@ -178,6 +178,15 @@
       "Resource": "arn:aws:iam::913756569129:role/cdk-hnb659fds-*-913756569129-us-east-2"
     },
     {
+      "Sid": "ResolveTheExamplesAgentsFromRuntimeConfig",
+      "Effect": "Allow",
+      "Action": [
+        "appconfig:StartConfigurationSession",
+        "appconfig:GetLatestConfiguration"
+      ],
+      "Resource": "arn:aws:appconfig:us-east-2:913756569129:application/*"
+    },
+    {
       "Sid": "ListTheExamplesSessionTranscripts",
       "Effect": "Allow",
       "Action": ["s3:ListBucket"],

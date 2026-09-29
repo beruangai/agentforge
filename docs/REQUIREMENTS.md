@@ -93,6 +93,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ706** | Identifiers AgentForge mints itself are uuid7; an id a platform or SDK mints — an A2A task id — is carried as it comes |
 | **REQ707** | Each deployed agent is resolvable by name, serves the image it was deployed with, and reports liveness without running an agent — and nothing a procedure does delays that report |
 | **REQ708** | A caller invokes remotely with least privilege — exactly its own agents, and nothing else |
+| **REQ709** | A consumer adopts AgentForge, and takes each new version of it, without wiring its agents, images, clients or infrastructure by hand; what the consumer wrote is never overwritten, and anything AgentForge keeps current the consumer can take over |
 
 ---
 
