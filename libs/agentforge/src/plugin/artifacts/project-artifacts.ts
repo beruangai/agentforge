@@ -13,6 +13,7 @@ import {
   agentConstruct,
   constructExports,
   projectConstruct,
+  projectConstructsIndex,
   SHARED_CONSTRUCTS_DIRECTORY,
   sharedConstructsKeys,
 } from './constructs.ts';
@@ -70,6 +71,7 @@ export function projectArtifacts(context: RenderContext): ProjectArtifacts {
         agentConstruct(context, agent),
       ]),
       projectConstruct(context),
+      projectConstructsIndex(context),
       ...constructExports(context),
       ...sharedConstructsKeys(context),
     ],

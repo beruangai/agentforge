@@ -5,7 +5,6 @@ import {
   baseDirectory,
   basePackageName,
   baseSecretsFile,
-  contractName,
 } from './layers.ts';
 import type { ScaffoldedFile } from './maintained.ts';
 
@@ -89,7 +88,6 @@ export function agentScaffolds(
   procedure: string,
 ): ScaffoldedFile[] {
   const directory = `${agentDirectory(project, agent)}/agent`;
-  const contract = contractName(agent);
   return [
     {
       path: `${directory}/contract.ts`,
@@ -98,7 +96,7 @@ import { oc } from '@orpc/contract';
 import { z } from 'zod';
 
 /** What callers import to call the ${agent.name} agent. */
-export const ${contract} = {
+export const contract = {
   ${procedure}: oc
     .meta(timeBudget(300))
     .input(z.object({}))
@@ -109,9 +107,9 @@ export const ${contract} = {
     {
       path: `${directory}/procedures.ts`,
       content: `import { implementAgent } from '@beruangai/agentforge/agent';
-import { ${contract} } from './contract.ts';
+import { contract } from './contract.ts';
 
-const os = implementAgent(${contract});
+const os = implementAgent(contract);
 
 /**
  * The ${agent.name} agent's procedures. A handler runs the agent with

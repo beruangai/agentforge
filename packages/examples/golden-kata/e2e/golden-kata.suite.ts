@@ -26,7 +26,7 @@ import {
   GradeSchema,
   RUBRIC_CRITERIA,
 } from '../agents/grader/agent/contract.ts';
-import type { GoldenKataClient } from '../client.ts';
+import type { Client as GoldenKataClient } from '../client.ts';
 
 const RUNTIME_SESSION_ID = `e2e-${randomUUIDv7()}`;
 const POLL_OPTIONS = {

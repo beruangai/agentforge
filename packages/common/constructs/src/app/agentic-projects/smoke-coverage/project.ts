@@ -5,14 +5,14 @@ import type { IGrantable } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { RuntimeConfig } from '../../../core/runtime-config.js';
 import {
-  SmokeCoverageHelloAgent,
-  type SmokeCoverageHelloAgentProps,
-} from './agents/hello-agent/hello-agent.js';
+  Agent as HelloAgentAgent,
+  type AgentProps as HelloAgentAgentProps,
+} from './agents/hello-agent/agent.js';
 
-export interface SmokeCoverageProps {
+export interface AgenticProjectProps {
   /** Each agent's runtime options, with the secrets it requires. */
   readonly agents: {
-    readonly helloAgent: SmokeCoverageHelloAgentProps;
+    readonly helloAgent: HelloAgentAgentProps;
   };
 }
 
@@ -20,17 +20,17 @@ export interface SmokeCoverageProps {
  * smoke-coverage's agents, each its own AgentCore runtime registered in the stage's
  * runtime configuration, and the grant a caller of the project needs.
  */
-export class SmokeCoverage extends Construct {
+export class AgenticProject extends Construct {
   readonly agents: {
-    readonly helloAgent: SmokeCoverageHelloAgent;
+    readonly helloAgent: HelloAgentAgent;
   };
   /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
   readonly runtimeConfigApplicationId: string;
 
-  constructor(scope: Construct, id: string, props: SmokeCoverageProps) {
+  constructor(scope: Construct, id: string, props: AgenticProjectProps) {
     super(scope, id);
     this.agents = {
-      helloAgent: new SmokeCoverageHelloAgent(
+      helloAgent: new HelloAgentAgent(
         this,
         'HelloAgent',
         props.agents.helloAgent,

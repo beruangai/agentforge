@@ -37,7 +37,7 @@ export const GradeSchema = z.object({
 export const RUBRIC_CRITERIA = GradeSchema.shape.scores.keyof().options;
 
 /** What callers import to call the grader agent. */
-export const grader = {
+export const contract = {
   Grade: oc
     .meta(timeBudget(180))
     .input(z.object({ kata: WrittenKataSchema }))

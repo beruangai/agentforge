@@ -51,7 +51,7 @@ Mechanical invariants only: one live task per continuity key; an idempotency key
 **A procedure is an oRPC contract** ([ADR 0013](../adr/0013-a-procedure-is-an-orpc-contract.md)), declared in a module a caller imports without the Agent SDK:
 
 ```ts
-export const helloAgent = {
+export const contract = {
   summarise: oc.input(z.object({ text: z.string() })).output(z.object({ summary: z.string(), words: z.number() })),
   sleepThenAnswer: oc.meta(timeBudget(300)).input(…).output(…),
 };
@@ -60,7 +60,7 @@ export const helloAgent = {
 **The implementation** registers against it with oRPC's own implementer. A handler is ordinary code: whatever runs before the agent, `context.runAgent(…)` once or more, whatever runs after. So `before` and `after` side effects are just code (§REQ205), and the outer output — computed fields and identifiers included — is built from the agent's structured output, which asks the model only for what it should fill in (§REQ102).
 
 ```ts
-const os = implementAgent(helloAgent);
+const os = implementAgent(contract);
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
     const run = await context.runAgent({
@@ -175,7 +175,7 @@ Every layer is a workspace member with its own `package.json` (the root lists th
 
 Nx starts a continuous task's dependents once it has started, not once it serves: whatever depends on `serve-<agent>` waits for the agent's `/ping` itself.
 
-**Connection**: each agent's construct, in the workspace's shared constructs beside `@aws/nx-plugin`'s under its project's (`app/agentic-projects/<project>/agents/<agent>/`), is an `AgentRuntime` whose `secrets` must map what AgentForge, the base layer and the agent require — typed from the layers' `secrets.ts` through the host package, which the shared constructs depend on — registering its ARN in the stage's **runtime configuration** under `agentcore.agentRuntimes.<key>`, as `@aws/nx-plugin`'s agents do; the project construct wraps them, and its `grantInvoke` grants a caller exactly its agents and the configuration's read. The **project client**, `@<scope>/<project>/client`, is one client over the project's agents, typed by their contracts: `local()` finds each container by name, resolving its published port on every call; `fromRuntimeConfig({ applicationId })` resolves each AgentCore runtime from the deployment's runtime configuration through AppConfig Data; `withTransports` takes the caller's own. An agent imports the base layer as `@<scope>/<project>-base/*`, which the container workspace links in the image and the project's `tsconfig.lib.json` maps in the host; a caller outside the project that imports the client needs the same mapping.
+**Connection**: each agent's construct, in the workspace's shared constructs beside `@aws/nx-plugin`'s under its project's (`app/agentic-projects/<project>/agents/<agent>/agent.ts`, the project's `project.ts`, exported under the project's names by its `index.ts`), is an `AgentRuntime` whose `secrets` must map what AgentForge, the base layer and the agent require — typed from the layers' `secrets.ts` through the host package, which the shared constructs depend on — registering its ARN in the stage's **runtime configuration** under `agentcore.agentRuntimes.<key>`, as `@aws/nx-plugin`'s agents do; the project construct wraps them, and its `grantInvoke` grants a caller exactly its agents and the configuration's read. The **project client**, `@<scope>/<project>/client`, is one client over the project's agents, typed by their contracts: `local()` finds each container by name, resolving its published port on every call; `fromRuntimeConfig({ applicationId })` resolves each AgentCore runtime from the deployment's runtime configuration through AppConfig Data; `withTransports` takes the caller's own. An agent imports the base layer as `@<scope>/<project>-base/*`, which the container workspace links in the image and the project's `tsconfig.lib.json` maps in the host; a caller outside the project that imports the client needs the same mapping.
 
 **The workspace** is `@aws/nx-plugin`'s shape: the plugin runs `@aws/nx-plugin`'s shared constructs generator, whose projects assume a composite base tsconfig emitting declarations only and its inferred `typecheck` and `test` targets. An agentic project's TypeScript follows it — a solution `tsconfig.json` over a `tsconfig.lib.json` emitting under `dist/`. In this repository `packages/` has that shape and `libs/agentforge` keeps its own stricter options and explicit targets.
 

@@ -58,13 +58,14 @@ describe('agent', () => {
     expect(read(`${ROOT}/client.ts`)).toMatchSnapshot('client.ts');
     expect(read(`${ROOT}/package.json`)).toMatchSnapshot('package.json');
     expect(
-      read(
-        `${CONSTRUCTS}/agentic-projects/golden-kata/agents/writer/writer.ts`,
-      ),
+      read(`${CONSTRUCTS}/agentic-projects/golden-kata/agents/writer/agent.ts`),
     ).toMatchSnapshot('agent construct');
     expect(
-      read(`${CONSTRUCTS}/agentic-projects/golden-kata/golden-kata.ts`),
+      read(`${CONSTRUCTS}/agentic-projects/golden-kata/project.ts`),
     ).toMatchSnapshot('project construct');
+    expect(
+      read(`${CONSTRUCTS}/agentic-projects/golden-kata/index.ts`),
+    ).toMatchSnapshot('project index');
     expect(read(`${CONSTRUCTS}/index.ts`)).toMatchSnapshot('app index');
     expect(
       readProjectConfiguration(tree, '@proj/golden-kata').targets,
@@ -111,10 +112,13 @@ describe('agent', () => {
     ).toEqual(['image-writer', 'image-grader']);
     expect(read(`${ROOT}/client.ts`)).toMatchSnapshot('client of two');
     expect(
-      read(`${CONSTRUCTS}/agentic-projects/golden-kata/golden-kata.ts`),
+      read(`${CONSTRUCTS}/agentic-projects/golden-kata/project.ts`),
     ).toMatchSnapshot('project construct of two');
+    expect(
+      read(`${CONSTRUCTS}/agentic-projects/golden-kata/index.ts`),
+    ).toMatchSnapshot('project index of two');
     expect(read(`${CONSTRUCTS}/agentic-projects/index.ts`)).toBe(
-      "export * from './golden-kata/golden-kata.js';\nexport * from './golden-kata/agents/writer/writer.js';\nexport * from './golden-kata/agents/grader/grader.js';\n",
+      "export * from './golden-kata/index.js';\n",
     );
   });
 
@@ -135,7 +139,10 @@ describe('agent', () => {
     expect(targetsOf().filter((name) => name.includes('grader'))).toEqual([]);
     expect(read(`${ROOT}/client.ts`)).not.toContain('grader');
     expect(
-      read(`${CONSTRUCTS}/agentic-projects/golden-kata/golden-kata.ts`),
+      read(`${CONSTRUCTS}/agentic-projects/golden-kata/project.ts`),
+    ).not.toContain('Grader');
+    expect(
+      read(`${CONSTRUCTS}/agentic-projects/golden-kata/index.ts`),
     ).not.toContain('Grader');
     expect(tree.exists(`${ROOT}/agents/grader/agent/contract.ts`)).toBe(true);
   });

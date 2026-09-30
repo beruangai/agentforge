@@ -7,7 +7,10 @@
 import { randomUUIDv7 } from 'node:crypto';
 import { awaitTask } from '@beruangai/agentforge/client';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { type SmokeCoverageClient, smokeCoverageClient } from '../../client.ts';
+import {
+  type Client as SmokeCoverageClient,
+  client as smokeCoverageClient,
+} from '../../client.ts';
 import { logs, servedUrl, untilServing } from './__fixtures__/served-agent.ts';
 
 let helloAgent: SmokeCoverageClient['helloAgent'];

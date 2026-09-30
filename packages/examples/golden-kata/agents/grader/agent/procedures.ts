@@ -13,9 +13,9 @@ import {
 } from '@beruangai/golden-kata-base/kata';
 import { baseOptions } from '@beruangai/golden-kata-base/options';
 import { runCases } from '@beruangai/golden-kata-base/run-cases';
-import { GradeSchema, grader } from './contract.ts';
+import { contract, GradeSchema } from './contract.ts';
 
-const os = implementAgent(grader);
+const os = implementAgent(contract);
 
 export const router = os.router({
   Grade: os.Grade.use(filesystems({ kata: new ScratchFilesystem() })).handler(

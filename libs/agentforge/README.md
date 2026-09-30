@@ -26,12 +26,14 @@ Every artifact spanning a project's agents is rendered from `metadata.components
 
 ### What AgentForge owns
 
+**Generic names at the seams.** What AgentForge generates exports the same names in every agent and project — an agent's `contract.ts` exports `contract`; `client.ts` exports `client`, `Client`, `Agent`, `CONTRACTS`, `RUNTIME_CONFIG_KEYS` and `CONTAINER_NAMES`; `project.ts` exports `AgenticProject` and `AgenticProjectProps`; an agent's `agent.ts` exports `Agent`, `AgentProps` and `Secrets` — and whoever imports one names it for its context: `import { client as goldenKataClient } from '@<scope>/golden-kata/client'`. The shared constructs package is the exception a flat `export *` forces: each project's `index.ts` aliases its constructs to the project's names (`GoldenKata`, `GoldenKataWriter`).
+
 **Maintained** — `nx sync` rewrites these to what the installed version renders, and `nx sync:check` fails while any differs:
 
 - `base/Dockerfile`, `agents/<agent>/Dockerfile`
 - `agents/<agent>/agent/server.ts`, `agents/<agent>/agent/task.ts`
 - `client.ts`
-- in the shared constructs, `src/app/agentic-projects/<project>/<project>.ts` and `src/app/agentic-projects/<project>/agents/<agent>/<agent>.ts`
+- in the shared constructs, `src/app/agentic-projects/<project>/project.ts`, `src/app/agentic-projects/<project>/agents/<agent>/agent.ts`, and `src/app/agentic-projects/<project>/index.ts`, which exports them under the project's names
 - the project's targets: `image-agentforge`, `lock`, `image`, `lock-<agent>`, `image-<agent>`, `serve-<agent>`, `assemble`
 
 **Maintained keys** — only these are rewritten; every other key in the file is yours:
@@ -43,7 +45,7 @@ Every artifact spanning a project's agents is rendered from `metadata.components
 | `base/agentic/package.json`, `agents/<agent>/agent/package.json` | `name`, `type`; the `workspace:*` layers in `dependencies`; the runtime peers in `peerDependencies` |
 | shared constructs `package.json` | `dependencies["@beruangai/agentforge"]`; the project's package, `workspace:*` |
 | shared constructs `project.json` | `<project>:assemble` in `targets.assemble.dependsOn` |
-| shared constructs `src/app/index.ts`, `agentic-projects/index.ts` | the `export *` line for each construct |
+| shared constructs `src/app/index.ts`, `agentic-projects/index.ts` | the `export *` line for each project's index |
 
 **Scaffolded** — written once when absent, then never touched: `base/agentic/options.ts` and `secrets.ts`, `agents/<agent>/agent/contract.ts`, `procedures.ts` and `secrets.ts`, every `$claude/` file, the project's `tsconfig.json` and the rest of its `tsconfig.lib.json`, and the host `package.json`'s other dependencies.
 

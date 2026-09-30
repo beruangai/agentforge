@@ -6,7 +6,10 @@
 import { readFile } from 'node:fs/promises';
 import { beforeAll } from 'vitest';
 import { z } from 'zod';
-import { type GoldenKataClient, goldenKataClient } from '../../client.ts';
+import {
+  type Client as GoldenKataClient,
+  client as goldenKataClient,
+} from '../../client.ts';
 import { goldenKataSuite } from '../golden-kata.suite.ts';
 
 const OUTPUTS_FILE = new URL(

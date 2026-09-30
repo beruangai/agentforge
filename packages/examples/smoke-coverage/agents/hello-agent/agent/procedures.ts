@@ -9,9 +9,9 @@ import {
 } from '@beruangai/agentforge/agent';
 import { baseOptions } from '@beruangai/smoke-coverage-base/options';
 import { z } from 'zod';
-import { helloAgent, TopicField } from './contract.ts';
+import { contract, TopicField } from './contract.ts';
 
-const os = implementAgent(helloAgent);
+const os = implementAgent(contract);
 
 /** Where the notebook mounts, so prompts can name it. */
 const NOTEBOOK_PATH = '/workspace/notebook';

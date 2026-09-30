@@ -9,7 +9,7 @@ export const TopicField = z.string().regex(/^[a-z0-9-]{1,64}$/);
  * What callers import to call the hello-agent agent: one procedure per
  * behaviour the smoke suites exercise.
  */
-export const helloAgent = {
+export const contract = {
   /** Summarises a text — and continues a session when given one to resume. */
   Summarise: oc
     .input(

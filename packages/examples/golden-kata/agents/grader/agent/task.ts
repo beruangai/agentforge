@@ -4,7 +4,7 @@
 //
 // The task entry: the one place the harness and this agent's procedures meet.
 import { runTaskProcess } from '@beruangai/agentforge/agent';
-import { grader } from './contract.ts';
+import { contract } from './contract.ts';
 import { router } from './procedures.ts';
 
-runTaskProcess({ contract: grader, router });
+runTaskProcess({ contract, router });

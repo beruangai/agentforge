@@ -18,7 +18,10 @@ import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { awaitTask } from '@beruangai/agentforge/client';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { type SmokeCoverageClient, smokeCoverageClient } from '../../client.ts';
+import {
+  type Client as SmokeCoverageClient,
+  client as smokeCoverageClient,
+} from '../../client.ts';
 
 const OUTPUTS_FILE = new URL(
   '../../../../../dist/packages/examples/smoke-coverage-infra/deploy/outputs.json',

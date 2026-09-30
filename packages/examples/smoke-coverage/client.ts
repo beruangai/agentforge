@@ -12,59 +12,49 @@ import {
   type RuntimeConfigSource,
   type Transport,
 } from '@beruangai/agentforge/client';
-import { helloAgent } from './agents/hello-agent/agent/contract.ts';
+import { contract as helloAgent } from './agents/hello-agent/agent/contract.ts';
 
-export const SMOKE_COVERAGE_CONTRACTS = {
+/** Each agent's contract. */
+export const CONTRACTS = {
   helloAgent,
 };
 
 /** Each agent's key in the runtime configuration its construct registers it under. */
-export const SMOKE_COVERAGE_RUNTIME_CONFIG_KEYS = {
+export const RUNTIME_CONFIG_KEYS = {
   helloAgent: 'SmokeCoverageHelloAgent',
 } as const;
 
 /** Each agent's local container, as `serve-<agent>` runs it. */
-export const SMOKE_COVERAGE_CONTAINER_NAMES = {
+export const CONTAINER_NAMES = {
   helloAgent: 'beruangai-smoke-coverage-hello-agent',
 } as const;
 
-export type SmokeCoverageAgent = keyof typeof SMOKE_COVERAGE_CONTRACTS;
+export type Agent = keyof typeof CONTRACTS;
 
-export type SmokeCoverageClient = {
-  readonly [Agent in SmokeCoverageAgent]: AgentForgeClient<
-    (typeof SMOKE_COVERAGE_CONTRACTS)[Agent]
-  >;
+export type Client = {
+  readonly [Name in Agent]: AgentForgeClient<(typeof CONTRACTS)[Name]>;
 };
 
 function withTransports(
-  transports: Readonly<Record<SmokeCoverageAgent, Transport>>,
-): SmokeCoverageClient {
+  transports: Readonly<Record<Agent, Transport>>,
+): Client {
   return {
-    helloAgent: createClient(
-      SMOKE_COVERAGE_CONTRACTS.helloAgent,
-      transports.helloAgent,
-    ),
+    helloAgent: createClient(CONTRACTS.helloAgent, transports.helloAgent),
   };
 }
 
-export const smokeCoverageClient = {
+/** The smoke-coverage client, built from how each agent is reached. */
+export const client = {
   /** Each agent through the transport given for it. */
   withTransports,
   /** Each agent in its local container, found by name. */
-  local: (): SmokeCoverageClient =>
+  local: (): Client =>
     withTransports({
-      helloAgent: localContainerTransport(
-        SMOKE_COVERAGE_CONTAINER_NAMES.helloAgent,
-      ),
+      helloAgent: localContainerTransport(CONTAINER_NAMES.helloAgent),
     }),
   /** Each agent on AgentCore, resolved from the deployment's runtime configuration. */
-  fromRuntimeConfig: async (
-    source: RuntimeConfigSource,
-  ): Promise<SmokeCoverageClient> =>
+  fromRuntimeConfig: async (source: RuntimeConfigSource): Promise<Client> =>
     withTransports(
-      await agentCoreTransportsFromRuntimeConfig(
-        SMOKE_COVERAGE_RUNTIME_CONFIG_KEYS,
-        source,
-      ),
+      await agentCoreTransportsFromRuntimeConfig(RUNTIME_CONFIG_KEYS, source),
     ),
 };

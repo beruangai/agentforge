@@ -1,5 +1,4 @@
-import { pascalCase, upperSnakeCase } from '../names.ts';
-import { contractName, type RenderContext } from './layers.ts';
+import { agentKey, type RenderContext } from './layers.ts';
 import { type MaintainedFile, maintainedHeader } from './maintained.ts';
 
 /**
@@ -7,15 +6,15 @@ import { type MaintainedFile, maintainedHeader } from './maintained.ts';
  * typed by each agent's contract, composing `createClient` per agent over a
  * transport for each — given, a local container found by name, or an
  * AgentCore runtime resolved from the deployment's runtime configuration.
+ * Its exports are generic — `client`, `Client`, `CONTRACTS` — and a caller
+ * aliases them to the project on import, as this file aliases each agent's
+ * `contract`.
  */
 export function projectClient(context: RenderContext): MaintainedFile {
   const { project } = context;
-  const constant = upperSnakeCase(project.projectName);
-  const type = pascalCase(project.projectName);
-  const client = `${type.charAt(0).toLowerCase()}${type.slice(1)}Client`;
   const { agents } = project;
   const entries = (value: (agent: (typeof agents)[number]) => string) =>
-    agents.map((agent) => `  ${contractName(agent)}: ${value(agent)},`);
+    agents.map((agent) => `  ${agentKey(agent)}: ${value(agent)},`);
   const clientImports = [
     'type AgentForgeClient',
     'agentCoreTransportsFromRuntimeConfig',
@@ -27,7 +26,7 @@ export function projectClient(context: RenderContext): MaintainedFile {
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(
       (agent) =>
-        `import { ${contractName(agent)} } from './agents/${agent.name}/agent/contract.ts';`,
+        `import { contract as ${agentKey(agent)} } from './agents/${agent.name}/agent/contract.ts';`,
     );
   return {
     path: `${project.root}/client.ts`,
@@ -42,56 +41,56 @@ export function projectClient(context: RenderContext): MaintainedFile {
         "} from '@beruangai/agentforge/client';",
         ...contractImports,
         '',
-        `export const ${constant}_CONTRACTS = {`,
-        ...agents.map((agent) => `  ${contractName(agent)},`),
+        `/** Each agent's contract. */`,
+        'export const CONTRACTS = {',
+        ...agents.map((agent) => `  ${agentKey(agent)},`),
         '};',
         '',
         `/** Each agent's key in the runtime configuration its construct registers it under. */`,
-        `export const ${constant}_RUNTIME_CONFIG_KEYS = {`,
+        'export const RUNTIME_CONFIG_KEYS = {',
         ...entries((agent) => `'${agent.runtimeConfigKey}'`),
         '} as const;',
         '',
         `/** Each agent's local container, as \`serve-<agent>\` runs it. */`,
-        `export const ${constant}_CONTAINER_NAMES = {`,
+        'export const CONTAINER_NAMES = {',
         ...entries((agent) => `'${agent.containerName}'`),
         '} as const;',
         '',
-        `export type ${type}Agent = keyof typeof ${constant}_CONTRACTS;`,
+        'export type Agent = keyof typeof CONTRACTS;',
         '',
-        `export type ${type}Client = {`,
-        `  readonly [Agent in ${type}Agent]: AgentForgeClient<`,
-        `    (typeof ${constant}_CONTRACTS)[Agent]`,
-        '  >;',
+        'export type Client = {',
+        '  readonly [Name in Agent]: AgentForgeClient<(typeof CONTRACTS)[Name]>;',
         '};',
         '',
         `function withTransports(`,
-        `  ${agents.length > 0 ? '' : '_'}transports: Readonly<Record<${type}Agent, Transport>>,`,
-        `): ${type}Client {`,
+        `  ${agents.length > 0 ? '' : '_'}transports: Readonly<Record<Agent, Transport>>,`,
+        '): Client {',
         '  return {',
         ...entries(
           (agent) =>
-            `createClient(${constant}_CONTRACTS.${contractName(agent)}, transports.${contractName(agent)})`,
+            `createClient(CONTRACTS.${agentKey(agent)}, transports.${agentKey(agent)})`,
         ).map((line) => `  ${line}`),
         '  };',
         '}',
         '',
-        `export const ${client} = {`,
+        `/** The ${project.projectName} client, built from how each agent is reached. */`,
+        'export const client = {',
         '  /** Each agent through the transport given for it. */',
         '  withTransports,',
         '  /** Each agent in its local container, found by name. */',
-        `  local: (): ${type}Client =>`,
+        '  local: (): Client =>',
         '    withTransports({',
         ...entries(
           (agent) =>
-            `localContainerTransport(${constant}_CONTAINER_NAMES.${contractName(agent)})`,
+            `localContainerTransport(CONTAINER_NAMES.${agentKey(agent)})`,
         ).map((line) => `    ${line}`),
         '    }),',
         `  /** Each agent on AgentCore, resolved from the deployment's runtime configuration. */`,
         '  fromRuntimeConfig: async (',
         '    source: RuntimeConfigSource,',
-        `  ): Promise<${type}Client> =>`,
+        '  ): Promise<Client> =>',
         '    withTransports(',
-        `      await agentCoreTransportsFromRuntimeConfig(${constant}_RUNTIME_CONFIG_KEYS, source),`,
+        '      await agentCoreTransportsFromRuntimeConfig(RUNTIME_CONFIG_KEYS, source),',
         '    ),',
         '};',
         '',

@@ -1,7 +1,7 @@
 import { agenticImage, imageIdFile } from '../container/images.ts';
 import { pascalCase } from '../names.ts';
 import type { AgentComponent, AgenticProject } from '../project-record.ts';
-import { agentDirectory, contractName, type RenderContext } from './layers.ts';
+import { agentDirectory, agentKey, type RenderContext } from './layers.ts';
 import {
   type MaintainedFile,
   maintainedHeader,
@@ -19,10 +19,13 @@ function projectConstructsDirectory(project: AgenticProject): string {
   return `${APP}/agentic-projects/${project.projectName}`;
 }
 
-/** `agents/writer/writer`: an agent's construct module, from its project's directory. */
+/** `agents/writer/agent`: an agent's construct module, from its project's directory. */
 function agentModule(agent: AgentComponent): string {
-  return `agents/${agent.name}/${agent.name}`;
+  return `agents/${agent.name}/agent`;
 }
+
+/** The project construct's module, from its project's directory. */
+const PROJECT_MODULE = 'project';
 
 /** An object type of `members`, or an empty record for none. */
 function objectType(members: readonly string[], indent: string): string {
@@ -41,7 +44,8 @@ function specifier(context: RenderContext, module: string): string {
  * its layer on the agentic image and redeployed when the image below it
  * changes, registered in the runtime configuration under its key. Its props
  * require exactly the secrets AgentForge, the base layer and the agent
- * declare, typed from the layers' own `secrets.ts`.
+ * declare, typed from the layers' own `secrets.ts`. It exports generic names
+ * — `Agent`, `AgentProps`, `Secrets` — which the project's index aliases.
  */
 export function agentConstruct(
   context: RenderContext,
@@ -90,23 +94,23 @@ function parentImageId(): string {
  * The ${agent.name} agent's secrets, by the environment variable each becomes:
  * AgentForge's own, the base layer's and the agent's \`REQUIRED_SECRETS\`.
  */
-export type ${name}Secrets = AgentSecrets<
+export type Secrets = AgentSecrets<
   (typeof PROJECT_SECRETS)[number] | (typeof AGENT_SECRETS)[number]
 >;
 
-export type ${name}Props = Omit<
+export type AgentProps = Omit<
   AgentRuntimeProps,
   'agentRuntimeArtifact' | 'secrets'
 > & {
-  readonly secrets: ${name}Secrets;
+  readonly secrets: Secrets;
 };
 
 /**
  * ${project.projectName}'s ${agent.name} agent as its own AgentCore runtime, registered in the
  * runtime configuration as ${name}.
  */
-export class ${name} extends AgentRuntime {
-  constructor(scope: Construct, id: string, props: ${name}Props) {
+export class Agent extends AgentRuntime {
+  constructor(scope: Construct, id: string, props: AgentProps) {
     super(scope, id, {
       ...props,
       agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
@@ -128,38 +132,43 @@ export class ${name} extends AgentRuntime {
   };
 }
 
+/** How the project construct imports an agent's construct: `writer` → `WriterAgent`. */
+function agentAlias(agent: AgentComponent): string {
+  return `${pascalCase(agent.name)}Agent`;
+}
+
 /**
  * The project construct: every agent's construct, each agent's runtime
  * options, and the grant a caller of the project needs — invocation of
- * exactly its agents, and read of the stage's runtime configuration.
+ * exactly its agents, and read of the stage's runtime configuration. It
+ * exports `AgenticProject` and `AgenticProjectProps`, which the project's
+ * index aliases.
  */
 export function projectConstruct(context: RenderContext): MaintainedFile {
   const { project } = context;
-  const name = pascalCase(project.projectName);
   const agents = [...project.agents].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
   const imports = agents.map(
     (agent) => `import {
-  ${agent.runtimeConfigKey},
-  type ${agent.runtimeConfigKey}Props,
+  Agent as ${agentAlias(agent)},
+  type AgentProps as ${agentAlias(agent)}Props,
 } from '${specifier(context, `./${agentModule(agent)}`)}';`,
   );
   const hasAgents = project.agents.length > 0;
   return {
-    path: `${projectConstructsDirectory(project)}/${project.projectName}.ts`,
+    path: `${projectConstructsDirectory(project)}/${PROJECT_MODULE}.ts`,
     render: () => `${maintainedHeader('//')}
 import type { IGrantable } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { RuntimeConfig } from '${specifier(context, '../../../core/runtime-config')}';
 ${imports.join('\n')}
 
-export interface ${name}Props {
+export interface AgenticProjectProps {
   /** Each agent's runtime options, with the secrets it requires. */
   readonly agents${hasAgents ? '' : '?'}: ${objectType(
     project.agents.map(
-      (agent) =>
-        `readonly ${contractName(agent)}: ${agent.runtimeConfigKey}Props;`,
+      (agent) => `readonly ${agentKey(agent)}: ${agentAlias(agent)}Props;`,
     ),
     '  ',
   )};
@@ -169,23 +178,23 @@ export interface ${name}Props {
  * ${project.projectName}'s agents, each its own AgentCore runtime registered in the stage's
  * runtime configuration, and the grant a caller of the project needs.
  */
-export class ${name} extends Construct {
+export class AgenticProject extends Construct {
   readonly agents: ${objectType(
     project.agents.map(
-      (agent) => `readonly ${contractName(agent)}: ${agent.runtimeConfigKey};`,
+      (agent) => `readonly ${agentKey(agent)}: ${agentAlias(agent)};`,
     ),
     '  ',
   )};
   /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
   readonly runtimeConfigApplicationId: string;
 
-  constructor(scope: Construct, id: string, ${hasAgents ? `props: ${name}Props` : `_props: ${name}Props = {}`}) {
+  constructor(scope: Construct, id: string, ${hasAgents ? 'props: AgenticProjectProps' : '_props: AgenticProjectProps = {}'}) {
     super(scope, id);
     this.agents = {
 ${project.agents
   .map(
     (agent) =>
-      `      ${contractName(agent)}: new ${agent.runtimeConfigKey}(this, '${pascalCase(agent.name)}', props.agents.${contractName(agent)}),`,
+      `      ${agentKey(agent)}: new ${agentAlias(agent)}(this, '${pascalCase(agent.name)}', props.agents.${agentKey(agent)}),`,
   )
   .join('\n')}
     };
@@ -195,7 +204,7 @@ ${project.agents
 
   /** Invocation of exactly this project's agents, and read of the stage's runtime configuration. */
   grantInvoke(grantee: IGrantable): void {
-${project.agents.map((agent) => `    this.agents.${contractName(agent)}.grantInvoke(grantee);`).join('\n')}
+${project.agents.map((agent) => `    this.agents.${agentKey(agent)}.grantInvoke(grantee);`).join('\n')}
     RuntimeConfig.ensure(this).grantReadAppConfig(grantee);
   }
 }
@@ -203,7 +212,40 @@ ${project.agents.map((agent) => `    this.agents.${contractName(agent)}.grantInv
   };
 }
 
-/** The star exports that make every construct importable from the shared constructs package. */
+/**
+ * The project's index: its constructs under the names the shared constructs
+ * package exports them by — the project's (`GoldenKata`) and each agent's
+ * runtime-configuration key (`GoldenKataWriter`) — so two projects' generic
+ * modules never collide in the package's star exports.
+ */
+export function projectConstructsIndex(context: RenderContext): MaintainedFile {
+  const { project } = context;
+  const name = pascalCase(project.projectName);
+  const agents = [...project.agents].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+  return {
+    path: `${projectConstructsDirectory(project)}/index.ts`,
+    render: () =>
+      [
+        maintainedHeader('//'),
+        'export {',
+        `  AgenticProject as ${name},`,
+        `  type AgenticProjectProps as ${name}Props,`,
+        `} from '${specifier(context, `./${PROJECT_MODULE}`)}';`,
+        ...agents.flatMap((agent) => [
+          'export {',
+          `  Agent as ${agent.runtimeConfigKey},`,
+          `  type AgentProps as ${agent.runtimeConfigKey}Props,`,
+          `  type Secrets as ${agent.runtimeConfigKey}Secrets,`,
+          `} from '${specifier(context, `./${agentModule(agent)}`)}';`,
+        ]),
+        '',
+      ].join('\n'),
+  };
+}
+
+/** The star exports that make every project's constructs importable from the shared constructs package. */
 export function constructExports(context: RenderContext): MaintainedFile[] {
   const { project } = context;
   return [
@@ -213,13 +255,7 @@ export function constructExports(context: RenderContext): MaintainedFile[] {
     ),
     maintainedStarExport(
       `${APP}/agentic-projects/index.ts`,
-      specifier(context, `./${project.projectName}/${project.projectName}`),
-    ),
-    ...project.agents.map((agent) =>
-      maintainedStarExport(
-        `${APP}/agentic-projects/index.ts`,
-        specifier(context, `./${project.projectName}/${agentModule(agent)}`),
-      ),
+      specifier(context, `./${project.projectName}/index`),
     ),
   ];
 }

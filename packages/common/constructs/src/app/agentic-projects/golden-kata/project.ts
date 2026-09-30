@@ -5,19 +5,19 @@ import type { IGrantable } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { RuntimeConfig } from '../../../core/runtime-config.js';
 import {
-  GoldenKataGrader,
-  type GoldenKataGraderProps,
-} from './agents/grader/grader.js';
+  Agent as GraderAgent,
+  type AgentProps as GraderAgentProps,
+} from './agents/grader/agent.js';
 import {
-  GoldenKataWriter,
-  type GoldenKataWriterProps,
-} from './agents/writer/writer.js';
+  Agent as WriterAgent,
+  type AgentProps as WriterAgentProps,
+} from './agents/writer/agent.js';
 
-export interface GoldenKataProps {
+export interface AgenticProjectProps {
   /** Each agent's runtime options, with the secrets it requires. */
   readonly agents: {
-    readonly writer: GoldenKataWriterProps;
-    readonly grader: GoldenKataGraderProps;
+    readonly writer: WriterAgentProps;
+    readonly grader: GraderAgentProps;
   };
 }
 
@@ -25,19 +25,19 @@ export interface GoldenKataProps {
  * golden-kata's agents, each its own AgentCore runtime registered in the stage's
  * runtime configuration, and the grant a caller of the project needs.
  */
-export class GoldenKata extends Construct {
+export class AgenticProject extends Construct {
   readonly agents: {
-    readonly writer: GoldenKataWriter;
-    readonly grader: GoldenKataGrader;
+    readonly writer: WriterAgent;
+    readonly grader: GraderAgent;
   };
   /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
   readonly runtimeConfigApplicationId: string;
 
-  constructor(scope: Construct, id: string, props: GoldenKataProps) {
+  constructor(scope: Construct, id: string, props: AgenticProjectProps) {
     super(scope, id);
     this.agents = {
-      writer: new GoldenKataWriter(this, 'Writer', props.agents.writer),
-      grader: new GoldenKataGrader(this, 'Grader', props.agents.grader),
+      writer: new WriterAgent(this, 'Writer', props.agents.writer),
+      grader: new GraderAgent(this, 'Grader', props.agents.grader),
     };
     this.runtimeConfigApplicationId =
       RuntimeConfig.ensure(this).appConfigApplicationId;

@@ -8,7 +8,7 @@ import { oc } from '@orpc/contract';
 import { z } from 'zod';
 
 /** What callers import to call the writer agent. */
-export const writer = {
+export const contract = {
   Write: oc
     .meta(timeBudget(180))
     .input(

@@ -105,42 +105,37 @@ import {
   type Transport,
 } from '@beruangai/agentforge/client';
 
-export const GOLDEN_KATA_CONTRACTS = {};
+/** Each agent's contract. */
+export const CONTRACTS = {};
 
 /** Each agent's key in the runtime configuration its construct registers it under. */
-export const GOLDEN_KATA_RUNTIME_CONFIG_KEYS = {} as const;
+export const RUNTIME_CONFIG_KEYS = {} as const;
 
 /** Each agent's local container, as \`serve-<agent>\` runs it. */
-export const GOLDEN_KATA_CONTAINER_NAMES = {} as const;
+export const CONTAINER_NAMES = {} as const;
 
-export type GoldenKataAgent = keyof typeof GOLDEN_KATA_CONTRACTS;
+export type Agent = keyof typeof CONTRACTS;
 
-export type GoldenKataClient = {
-  readonly [Agent in GoldenKataAgent]: AgentForgeClient<
-    (typeof GOLDEN_KATA_CONTRACTS)[Agent]
-  >;
+export type Client = {
+  readonly [Name in Agent]: AgentForgeClient<(typeof CONTRACTS)[Name]>;
 };
 
 function withTransports(
-  _transports: Readonly<Record<GoldenKataAgent, Transport>>,
-): GoldenKataClient {
+  _transports: Readonly<Record<Agent, Transport>>,
+): Client {
   return {};
 }
 
-export const goldenKataClient = {
+/** The golden-kata client, built from how each agent is reached. */
+export const client = {
   /** Each agent through the transport given for it. */
   withTransports,
   /** Each agent in its local container, found by name. */
-  local: (): GoldenKataClient => withTransports({}),
+  local: (): Client => withTransports({}),
   /** Each agent on AgentCore, resolved from the deployment's runtime configuration. */
-  fromRuntimeConfig: async (
-    source: RuntimeConfigSource,
-  ): Promise<GoldenKataClient> =>
+  fromRuntimeConfig: async (source: RuntimeConfigSource): Promise<Client> =>
     withTransports(
-      await agentCoreTransportsFromRuntimeConfig(
-        GOLDEN_KATA_RUNTIME_CONFIG_KEYS,
-        source,
-      ),
+      await agentCoreTransportsFromRuntimeConfig(RUNTIME_CONFIG_KEYS, source),
     ),
 };
 "
@@ -288,7 +283,7 @@ import type { IGrantable } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { RuntimeConfig } from '../../../core/runtime-config.js';
 
-export interface GoldenKataProps {
+export interface AgenticProjectProps {
   /** Each agent's runtime options, with the secrets it requires. */
   readonly agents?: Record<string, never>;
 }
@@ -297,12 +292,12 @@ export interface GoldenKataProps {
  * golden-kata's agents, each its own AgentCore runtime registered in the stage's
  * runtime configuration, and the grant a caller of the project needs.
  */
-export class GoldenKata extends Construct {
+export class AgenticProject extends Construct {
   readonly agents: Record<string, never>;
   /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
   readonly runtimeConfigApplicationId: string;
 
-  constructor(scope: Construct, id: string, _props: GoldenKataProps = {}) {
+  constructor(scope: Construct, id: string, _props: AgenticProjectProps = {}) {
     super(scope, id);
     this.agents = {};
     this.runtimeConfigApplicationId =

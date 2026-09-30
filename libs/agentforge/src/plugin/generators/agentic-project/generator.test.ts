@@ -27,7 +27,7 @@ describe('agentic-project', () => {
     }
     expect(
       tree.read(
-        'packages/common/constructs/src/app/agentic-projects/golden-kata/golden-kata.ts',
+        'packages/common/constructs/src/app/agentic-projects/golden-kata/project.ts',
         'utf8',
       ),
     ).toMatchSnapshot('project construct');

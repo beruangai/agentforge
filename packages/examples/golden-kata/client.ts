@@ -12,60 +12,55 @@ import {
   type RuntimeConfigSource,
   type Transport,
 } from '@beruangai/agentforge/client';
-import { grader } from './agents/grader/agent/contract.ts';
-import { writer } from './agents/writer/agent/contract.ts';
+import { contract as grader } from './agents/grader/agent/contract.ts';
+import { contract as writer } from './agents/writer/agent/contract.ts';
 
-export const GOLDEN_KATA_CONTRACTS = {
+/** Each agent's contract. */
+export const CONTRACTS = {
   writer,
   grader,
 };
 
 /** Each agent's key in the runtime configuration its construct registers it under. */
-export const GOLDEN_KATA_RUNTIME_CONFIG_KEYS = {
+export const RUNTIME_CONFIG_KEYS = {
   writer: 'GoldenKataWriter',
   grader: 'GoldenKataGrader',
 } as const;
 
 /** Each agent's local container, as `serve-<agent>` runs it. */
-export const GOLDEN_KATA_CONTAINER_NAMES = {
+export const CONTAINER_NAMES = {
   writer: 'beruangai-golden-kata-writer',
   grader: 'beruangai-golden-kata-grader',
 } as const;
 
-export type GoldenKataAgent = keyof typeof GOLDEN_KATA_CONTRACTS;
+export type Agent = keyof typeof CONTRACTS;
 
-export type GoldenKataClient = {
-  readonly [Agent in GoldenKataAgent]: AgentForgeClient<
-    (typeof GOLDEN_KATA_CONTRACTS)[Agent]
-  >;
+export type Client = {
+  readonly [Name in Agent]: AgentForgeClient<(typeof CONTRACTS)[Name]>;
 };
 
 function withTransports(
-  transports: Readonly<Record<GoldenKataAgent, Transport>>,
-): GoldenKataClient {
+  transports: Readonly<Record<Agent, Transport>>,
+): Client {
   return {
-    writer: createClient(GOLDEN_KATA_CONTRACTS.writer, transports.writer),
-    grader: createClient(GOLDEN_KATA_CONTRACTS.grader, transports.grader),
+    writer: createClient(CONTRACTS.writer, transports.writer),
+    grader: createClient(CONTRACTS.grader, transports.grader),
   };
 }
 
-export const goldenKataClient = {
+/** The golden-kata client, built from how each agent is reached. */
+export const client = {
   /** Each agent through the transport given for it. */
   withTransports,
   /** Each agent in its local container, found by name. */
-  local: (): GoldenKataClient =>
+  local: (): Client =>
     withTransports({
-      writer: localContainerTransport(GOLDEN_KATA_CONTAINER_NAMES.writer),
-      grader: localContainerTransport(GOLDEN_KATA_CONTAINER_NAMES.grader),
+      writer: localContainerTransport(CONTAINER_NAMES.writer),
+      grader: localContainerTransport(CONTAINER_NAMES.grader),
     }),
   /** Each agent on AgentCore, resolved from the deployment's runtime configuration. */
-  fromRuntimeConfig: async (
-    source: RuntimeConfigSource,
-  ): Promise<GoldenKataClient> =>
+  fromRuntimeConfig: async (source: RuntimeConfigSource): Promise<Client> =>
     withTransports(
-      await agentCoreTransportsFromRuntimeConfig(
-        GOLDEN_KATA_RUNTIME_CONFIG_KEYS,
-        source,
-      ),
+      await agentCoreTransportsFromRuntimeConfig(RUNTIME_CONFIG_KEYS, source),
     ),
 };

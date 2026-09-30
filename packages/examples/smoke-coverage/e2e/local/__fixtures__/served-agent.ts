@@ -1,13 +1,13 @@
 import { execFile, spawnSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { promisify } from 'node:util';
-import { SMOKE_COVERAGE_CONTAINER_NAMES } from '../../../client.ts';
+import { CONTAINER_NAMES } from '../../../client.ts';
 
 const run = promisify(execFile);
 const SERVING_TIMEOUT_MILLISECONDS = 120_000;
 
 /** hello-agent's container, as `serve-hello-agent` runs it. */
-export const CONTAINER = SMOKE_COVERAGE_CONTAINER_NAMES.helloAgent;
+export const CONTAINER = CONTAINER_NAMES.helloAgent;
 
 /** The container's published contract port, as the host reaches it. */
 export async function servedUrl(): Promise<URL> {

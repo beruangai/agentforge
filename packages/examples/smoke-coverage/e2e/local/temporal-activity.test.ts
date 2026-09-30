@@ -8,7 +8,10 @@ import { procedureActivity } from '@beruangai/agentforge/temporal';
 import { CancelledFailure } from '@temporalio/common';
 import { MockActivityEnvironment } from '@temporalio/testing';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { type SmokeCoverageClient, smokeCoverageClient } from '../../client.ts';
+import {
+  type Client as SmokeCoverageClient,
+  client as smokeCoverageClient,
+} from '../../client.ts';
 import { untilServing } from './__fixtures__/served-agent.ts';
 
 let helloAgent: SmokeCoverageClient['helloAgent'];

@@ -13,7 +13,7 @@ Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Sta
 import { timeBudget } from '@beruangai/agentforge/contract';
 import { oc } from '@orpc/contract';
 
-export const helloAgent = {
+export const contract = {
   summarise: oc
     .input(z.object({ text: z.string(), resumeSessionId: z.string().optional() }))
     .output(z.object({ summary: z.string(), words: z.number(), sessionId: z.string() })),
@@ -27,7 +27,7 @@ export const helloAgent = {
 // procedures.ts
 import { implementAgent } from '@beruangai/agentforge/agent';
 
-const os = implementAgent(helloAgent);
+const os = implementAgent(contract);
 export const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
     const run = await context.runAgent({
@@ -45,7 +45,7 @@ export const router = os.router({
 
 ```ts
 // task.ts — run by the server, once per task
-runTaskProcess({ contract: helloAgent, router });
+runTaskProcess({ contract, router });
 // server.ts — the container's entry; names the task entry and the secrets its layers require, the rest from the environment
 await startServer({ taskEntry: new URL('./task.ts', import.meta.url), requiredSecrets });
 ```
@@ -53,6 +53,7 @@ await startServer({ taskEntry: new URL('./task.ts', import.meta.url), requiredSe
 **4. Consume it** — from any process, or as a Temporal activity.
 
 ```ts
+import { contract as helloAgent } from '@beruangai/smoke-coverage/hello-agent';   // generic at the seam, named by the importer
 const client = createClient(helloAgent, localTransport('http://localhost:9000/'));   // or agentCoreTransport({ agentRuntimeArn })
 const started = await client.summarise.SendMessage({ text }, { runtimeSessionId, idempotencyKey });
 const ended = await awaitTask(client.summarise, started, { runtimeSessionId });

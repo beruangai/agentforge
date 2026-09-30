@@ -56,8 +56,13 @@ export function agentSecretsFile(
   return `${agentDirectory(project, agent)}/agent/secrets.ts`;
 }
 
-/** The name of an agent's contract, as its module exports it: `code-reviewer` → `codeReviewer`. */
-export function contractName(agent: Pick<AgentComponent, 'name'>): string {
+/**
+ * An agent's key in every record spanning the project's agents — the
+ * project client, its contracts, the project construct's props:
+ * `code-reviewer` → `codeReviewer`. Its modules export generic names
+ * (`contract`, `Agent`), and each importer aliases them to this key.
+ */
+export function agentKey(agent: Pick<AgentComponent, 'name'>): string {
   return camelCase(agent.name);
 }
 
@@ -146,17 +151,16 @@ export function taskEntry(
   project: AgenticProject,
   agent: AgentComponent,
 ): MaintainedFile {
-  const contract = contractName(agent);
   return {
     path: `${agentDirectory(project, agent)}/agent/task.ts`,
     render: () => `${maintainedHeader('//')}
 //
 // The task entry: the one place the harness and this agent's procedures meet.
 import { runTaskProcess } from '@beruangai/agentforge/agent';
-import { ${contract} } from './contract.ts';
+import { contract } from './contract.ts';
 import { router } from './procedures.ts';
 
-runTaskProcess({ contract: ${contract}, router });
+runTaskProcess({ contract, router });
 `,
   };
 }

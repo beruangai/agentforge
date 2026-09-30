@@ -13,9 +13,9 @@ import {
 } from '@beruangai/golden-kata-base/kata';
 import { baseOptions } from '@beruangai/golden-kata-base/options';
 import { runCases } from '@beruangai/golden-kata-base/run-cases';
-import { writer } from './contract.ts';
+import { contract } from './contract.ts';
 
-const os = implementAgent(writer);
+const os = implementAgent(contract);
 
 export const router = os.router({
   Write: os.Write.use(filesystems({ kata: new ScratchFilesystem() })).handler(

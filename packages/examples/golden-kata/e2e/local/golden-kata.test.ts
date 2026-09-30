@@ -3,7 +3,10 @@ import { execFile } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { beforeAll } from 'vitest';
-import { GOLDEN_KATA_CONTAINER_NAMES, goldenKataClient } from '../../client.ts';
+import {
+  CONTAINER_NAMES as GOLDEN_KATA_CONTAINER_NAMES,
+  client as goldenKataClient,
+} from '../../client.ts';
 import { goldenKataSuite } from '../golden-kata.suite.ts';
 
 const run = promisify(execFile);
