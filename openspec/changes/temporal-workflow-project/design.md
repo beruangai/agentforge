@@ -83,8 +83,11 @@ export type ActivityStart = /* re-exported as a type */;
 /** A contract's procedures as workflow calls. */
 export type WorkflowCalls<Contract> =
   Contract extends ProcedureContract<infer Input, infer Output, infer _Errors>
-    ? (input: InferSchemaInput<Input>, start: ActivityStart) => Promise<InferSchemaOutput<Output>>
+    ? (input: InferSchemaInput<Input>, start: ActivityStart, options?: AgentActivityOptions) => Promise<InferSchemaOutput<Output>>
     : { readonly [Key in keyof Contract]: WorkflowCalls<Contract[Key]> };
+
+/** Every activity option but `activityId` and `taskQueue`, which either level refuses. */
+export type AgentActivityOptions = Omit<ActivityOptions, 'activityId' | 'taskQueue'>;
 
 /** Merged under the caller's options. */
 export const DEFAULT_ACTIVITY_OPTIONS: ActivityOptions; // { heartbeatTimeout: '1 minute', startToCloseTimeout: '1 day', cancellationType: 'WAIT_CANCELLATION_COMPLETED' }
@@ -92,7 +95,7 @@ export const DEFAULT_ACTIVITY_OPTIONS: ActivityOptions; // { heartbeatTimeout: '
 /** Nested proxies whose leaf call is `proxyActivities(options)['<project>.<agent>.….<Procedure>']`. */
 export function proxyAgenticProject<Contracts extends Readonly<Record<string, RouterContract>>>(
   project: string,
-  options?: ActivityOptions,
+  options?: AgentActivityOptions,
 ): { readonly [Agent in keyof Contracts]: WorkflowCalls<Contracts[Agent]> };
 ```
 
@@ -251,7 +254,7 @@ The generated construct renders `agenticProjects` from the connections — a mis
 
 ### The workflow side
 
-`proxyAgenticProject` builds one `proxyActivities({ ...DEFAULT_ACTIVITY_OPTIONS, ...options })` and returns nested proxies that accumulate the path and call `activities[path](input, start)` at the leaf. `heartbeatTimeout` of a minute sits above the activity's 5 s poll heartbeat with room for a slow `GetTask`; `startToCloseTimeout` of a day is only a backstop, since the agent's time budget bounds the task and a longer attempt merely attaches again. `cancellationType` is `WAIT_CANCELLATION_COMPLETED`: under the SDK's own default (`TRY_CANCEL` in 1.24.0, though documented otherwise — found by task 4.1) a cancelled workflow closes before its activity hears of the cancel, the activity's heartbeat finds it gone (`notFound`, not `cancelRequested`), and the task runs on; waiting keeps the workflow open until the activity has cancelled the task. Retries follow Temporal's default policy; `procedureActivity` makes non-retryable causes non-retryable. The type imports are erased by swc in `bundleWorkflowCode`, so the bundle holds none of the contracts; a runtime import of a contract there would pull its modules into the sandbox and is the mistake to avoid — the maintained file makes it once, correctly.
+`proxyAgenticProject` builds one `proxyActivities({ ...DEFAULT_ACTIVITY_OPTIONS, ...options })` — the set's options — and returns nested proxies that accumulate the path and call `activities[path](input, start)` at the leaf; a call's own options, its third argument, are merged over the set's through a proxy of their own, for that call alone (the operator's choice, after task 8.3: a leaf always defines its own options). Both levels refuse `activityId` — the activity keys its task by the workflow run and the activity id, so a shared id would attach a later call to an earlier call's task and return its output — and `taskQueue`, since only the project's own queue has a worker for the agents' activities; the type omits both, and a `TypeError` names either when a cast gets it past the type. `heartbeatTimeout` of a minute sits above the activity's 5 s poll heartbeat with room for a slow `GetTask`; `startToCloseTimeout` of a day is only a backstop, since the agent's time budget bounds the task and a longer attempt merely attaches again. `cancellationType` is `WAIT_CANCELLATION_COMPLETED`: under the SDK's own default (`TRY_CANCEL` in 1.24.0, though documented otherwise — found by task 4.1) a cancelled workflow closes before its activity hears of the cancel, the activity's heartbeat finds it gone (`notFound`, not `cancelRequested`), and the task runs on; waiting keeps the workflow open until the activity has cancelled the task. Retries follow Temporal's default policy; `procedureActivity` makes non-retryable causes non-retryable. The type imports are erased by swc in `bundleWorkflowCode`, so the bundle holds none of the contracts; a runtime import of a contract there would pull its modules into the sandbox and is the mistake to avoid — the maintained file makes it once, correctly.
 
 ### `golden-kata-workflows`
 

@@ -3,6 +3,7 @@ import { bundleWorkflowCode } from '@temporalio/worker';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CONTRACTS } from './__fixtures__/contract.ts';
 import {
+  type AgentActivityOptions,
   DEFAULT_ACTIVITY_OPTIONS,
   proxyAgenticProject,
 } from './proxy-agentic-project.ts';
@@ -62,6 +63,58 @@ describe('proxyAgenticProject', () => {
         },
       ],
     ]);
+  });
+
+  it("merges a call's options over the set's for that call alone", async () => {
+    const goldenKata = proxyAgenticProject<typeof CONTRACTS>('goldenKata', {
+      startToCloseTimeout: '2 hours',
+    });
+    await goldenKata.writer.Write({ topic: 'recursion' }, START, {
+      startToCloseTimeout: '3 hours',
+      summary: 'the long one',
+    });
+    await goldenKata.writer.Write({ topic: 'sums' }, START);
+    expect(proxyActivities.mock.calls).toEqual([
+      [{ ...DEFAULT_ACTIVITY_OPTIONS, startToCloseTimeout: '2 hours' }],
+      [
+        {
+          ...DEFAULT_ACTIVITY_OPTIONS,
+          startToCloseTimeout: '3 hours',
+          summary: 'the long one',
+        },
+      ],
+    ]);
+    expect(scheduled.mock.calls).toEqual([
+      ['goldenKata.writer.Write', { topic: 'recursion' }, START],
+      ['goldenKata.writer.Write', { topic: 'sums' }, START],
+    ]);
+  });
+
+  it('refuses an activity id or a task queue, for the set or a call', () => {
+    for (const refused of [
+      { activityId: 'write' },
+      { taskQueue: 'elsewhere' },
+    ]) {
+      expect(() =>
+        proxyAgenticProject<typeof CONTRACTS>(
+          'goldenKata',
+          refused as AgentActivityOptions,
+        ),
+      ).toThrow(/the goldenKata agents' options sets (activityId|taskQueue)/);
+      const goldenKata = proxyAgenticProject<typeof CONTRACTS>('goldenKata');
+      expect(() =>
+        goldenKata.writer.Write(
+          { topic: 'recursion' },
+          START,
+          refused as AgentActivityOptions,
+        ),
+      ).toThrow(/the call to goldenKata\.writer\.Write sets/);
+    }
+    expect(scheduled).not.toHaveBeenCalled();
+    // Checked, never run.
+    void (() =>
+      // @ts-expect-error — the activity id keys the agent's task
+      proxyAgenticProject<typeof CONTRACTS>('goldenKata', { activityId: 'x' }));
   });
 
   it('is not thenable at any level, so a namespace can be awaited or returned', () => {

@@ -324,18 +324,12 @@ function agentWorkflowModule(context: WorkflowRenderContext): MaintainedFile {
   const connected = sorted(context);
   // By source, as Biome organizes them.
   const imports = [
-    ...(connected.length === 0
-      ? []
-      : [
-          {
-            source: '@beruangai/agentforge/temporal/workflow',
-            statement:
-              "import { proxyAgenticProject } from '@beruangai/agentforge/temporal/workflow';",
-          },
-        ]),
     {
-      source: '@temporalio/workflow',
-      statement: "import type { ActivityOptions } from '@temporalio/workflow';",
+      source: '@beruangai/agentforge/temporal/workflow',
+      statement:
+        connected.length === 0
+          ? "import type { AgentActivityOptions } from '@beruangai/agentforge/temporal/workflow';"
+          : "import {\n  type AgentActivityOptions,\n  proxyAgenticProject,\n} from '@beruangai/agentforge/temporal/workflow';",
     },
     ...connected.map(({ connection }) => ({
       source: `${connection.packageName}/client`,
@@ -357,9 +351,11 @@ ${imports.join('\n')}
 
 /**
  * Each connected project's agents, \`agents().<project>.<agent>.<Procedure>(input,
- * { runtimeSessionId })\`; \`options\` merge over AgentForge's defaults.
+ * { runtimeSessionId }, options?)\`. \`options\` here are the set's, over
+ * AgentForge's defaults; a call's own \`options\` are merged over them for that
+ * call alone. Neither may set \`activityId\` or \`taskQueue\`.
  */
-export const agents = (${connected.length === 0 ? '_options' : 'options'}?: ActivityOptions) => ({
+export const agents = (${connected.length === 0 ? '_options' : 'options'}?: AgentActivityOptions) => ({
 ${connected
   .map(
     ({ connection }) =>

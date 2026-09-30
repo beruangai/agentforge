@@ -6,6 +6,7 @@
  */
 export type { ActivityStart } from '../activity.ts';
 export {
+  type AgentActivityOptions,
   DEFAULT_ACTIVITY_OPTIONS,
   proxyAgenticProject,
   type WorkflowCalls,
