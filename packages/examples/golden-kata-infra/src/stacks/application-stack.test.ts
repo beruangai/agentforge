@@ -12,16 +12,18 @@ function template(): Template {
 }
 
 describe('golden-kata-infra', () => {
-  it('lets the caller invoke exactly the two agents and read the runtime configuration', () => {
+  it("grants the worker's task role exactly the two agents and the runtime configuration read", () => {
     const stack = template();
-    const [caller, ...otherCallers] = Object.keys(
-      stack.findResources('AWS::IAM::Role'),
-    ).filter((logicalId) => logicalId.startsWith('Caller'));
-    expect(caller).toBeDefined();
-    expect(otherCallers).toEqual([]);
+    const taskDefinitions = Object.values(
+      stack.findResources('AWS::ECS::TaskDefinition'),
+    );
+    expect(taskDefinitions).toHaveLength(1);
+    const taskRole: unknown =
+      taskDefinitions[0]?.Properties.TaskRoleArn['Fn::GetAtt']?.[0];
+    expect(taskRole).toEqual(expect.any(String));
     const policies = Object.values(
       stack.findResources('AWS::IAM::Policy', {
-        Properties: { Roles: [{ Ref: caller }] },
+        Properties: { Roles: [{ Ref: taskRole }] },
       }),
     );
     expect(policies).toHaveLength(1);
@@ -60,6 +62,26 @@ describe('golden-kata-infra', () => {
         },
       },
     ]);
+  });
+
+  it("polls the operator's Temporal Cloud namespace with the API key the operator stores", () => {
+    const stack = template();
+    const [container, ...others] = Object.values(
+      stack.findResources('AWS::ECS::TaskDefinition'),
+    ).flatMap((definition) => definition.Properties.ContainerDefinitions);
+    expect(others).toEqual([]);
+    expect(container.Environment).toEqual(
+      expect.arrayContaining([
+        {
+          Name: 'TEMPORAL_ADDRESS',
+          Value: 'beruangai-agentforge.vwhld.tmprl.cloud:7233',
+        },
+        { Name: 'TEMPORAL_NAMESPACE', Value: 'beruangai-agentforge.vwhld' },
+      ]),
+    );
+    expect(JSON.stringify(container.Secrets)).toContain(
+      'secret:agentforge/temporal-api-key',
+    );
   });
 
   it('registers both agents in the runtime configuration and names its application', () => {
