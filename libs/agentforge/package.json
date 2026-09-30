@@ -70,6 +70,10 @@
     "@aws-sdk/client-appconfigdata": "^3.1138.0",
     "@temporalio/activity": "^1.24.0",
     "@temporalio/common": "^1.24.0",
+    "@temporalio/client": "^1.24.0",
+    "@temporalio/envconfig": "^1.24.0",
+    "@temporalio/worker": "^1.24.0",
+    "@temporalio/workflow": "^1.24.0",
     "@anthropic-ai/sdk": "0.128.0",
     "aws-cdk-lib": "^2.270.0",
     "constructs": "^10.8.1",
@@ -112,6 +116,18 @@
       "optional": true
     },
     "@temporalio/common": {
+      "optional": true
+    },
+    "@temporalio/client": {
+      "optional": true
+    },
+    "@temporalio/envconfig": {
+      "optional": true
+    },
+    "@temporalio/worker": {
+      "optional": true
+    },
+    "@temporalio/workflow": {
       "optional": true
     },
     "@anthropic-ai/sdk": {
@@ -157,6 +173,7 @@
     "@temporalio/activity": "catalog:",
     "@temporalio/client": "catalog:",
     "@temporalio/common": "catalog:",
+    "@temporalio/envconfig": "catalog:",
     "@temporalio/testing": "catalog:",
     "@temporalio/worker": "catalog:",
     "@temporalio/workflow": "catalog:",
