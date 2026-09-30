@@ -27,7 +27,7 @@ Group 1 is done with the change's artifacts. Groups 2–5 build the package's si
 
 ## 5. `/infra`
 
-- [ ] 5.1 `TemporalWorker`: Fargate ARM64 task definition, the image from `directory`, `stopTimeout` 120 s, the Temporal and agents environment, each secret through ECS secrets, its own log group, a service with the circuit breaker and rollback, `minHealthyPercent` 100, a security group with no ingress; refusals at synth for an owned environment key, a secret also as a plain value, a missing `directory`; checkov reasons recorded on resources where it chooses against a rule — verified by template tests of each property, grant and refusal
+- [x] 5.1 `TemporalWorker`: Fargate ARM64 task definition, the image from `directory`, `stopTimeout` 120 s, the Temporal and agents environment, each secret through ECS secrets, its own log group, a service with the circuit breaker and rollback, `minHealthyPercent` 100, a security group with no ingress; refusals at synth for an owned environment key, a secret also as a plain value, a missing `directory`; checkov reasons recorded on resources where it chooses against a rule — verified by template tests of each property, grant and refusal
 
 ## 6. The plugin
 

@@ -11,3 +11,8 @@ export {
   S3FilesystemBucket,
   type S3FilesystemBucketProps,
 } from './s3-filesystem-bucket.ts';
+export {
+  TemporalWorker,
+  type TemporalWorkerProps,
+  type WorkerSecrets,
+} from './temporal-worker.ts';
