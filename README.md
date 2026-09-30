@@ -60,11 +60,12 @@ const ended = await awaitTask(client.summarise, started, { runtimeSessionId });
 if (ended.state === 'TASK_STATE_COMPLETED') ended.output.summary;  // typed
 else if (ended.state === 'TASK_STATE_FAILED') ended.cause.code;    // OUTPUT_INVALID, TIMED_OUT, LOST, USAGE_LIMITED, …
 
-// In a Temporal worker: start-or-attach keyed by the workflow run and activity, heartbeats, cancellation, retry guidance
+// In a Temporal worker: start-or-attach keyed by the workflow run and activity, heartbeats, a cancel the workflow requests, retry guidance
 export const summarise = procedureActivity(client.summarise, {
-  runtimeSessionId: (input) => sessionFor(input),
   cancelTask: client.CancelTask,
 });
+// …which a workflow calls with the input and that call's routing
+await summarise(input, { runtimeSessionId: sessionFor(input) });
 ```
 
 A start the container cannot run now — stopping, full, or already running the start's continuity key — is **refused** with when to retry, leaving no task: the client throws `StartRefusedError`; the activity waits it out, up to 15 minutes per attempt, then fails retryable after the refusal's time. So give the activity a `startToCloseTimeout` covering the procedure's time budget plus those 15 minutes, and leave `maximumAttempts`, `scheduleToCloseTimeout` and the workflow's timeouts unset or wide enough for several attempts: workflow code cannot widen them once the activity is scheduled ([research](docs/research/temporal.md)).

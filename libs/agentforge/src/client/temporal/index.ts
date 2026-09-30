@@ -3,6 +3,7 @@
  * Nothing below the client knows a caller exists.
  */
 export {
+  type ActivityStart,
   type ProcedureActivityOptions,
   procedureActivity,
 } from './activity.ts';

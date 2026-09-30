@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   activityInfo,
+  cancellationDetails,
   cancellationSignal,
   heartbeat,
 } from '@temporalio/activity';
@@ -23,24 +24,27 @@ import { StartRefusedError } from '../transport.ts';
  */
 const REFUSAL_WAIT_BUDGET_SECONDS = 900;
 
-export interface ProcedureActivityOptions<Input> {
-  /** The runtime session to route to — the consumer's isolation choice (ADR 0007). */
-  readonly runtimeSessionId: (input: Input) => string;
-  /** Extra start fields: a continuity key, a time budget, metadata. */
-  readonly start?: (
-    input: Input,
-  ) => Omit<Starting, 'runtimeSessionId' | 'idempotencyKey'>;
+/** What a workflow passes with each call: a start's fields but the idempotency key, which the activity derives. */
+export type ActivityStart = Omit<Starting, 'idempotencyKey'>;
+
+export interface ProcedureActivityOptions {
+  /** For the cancel after the workflow cancels the activity. */
+  readonly cancelTask: (taskId: string, context: Routed) => Promise<unknown>;
   /** How often a running task is polled, and a refused start's wait heartbeats. */
   readonly pollIntervalMilliseconds?: number;
-  /** For the cancel after the activity is cancelled. */
-  readonly cancelTask: (taskId: string, context: Routed) => Promise<unknown>;
 }
 
 /**
  * A Temporal activity that runs a procedure to its outcome: start (or attach),
  * poll with a heartbeat, and map the outcome onto Temporal's failures. The
  * idempotency key is the workflow run and activity id, so every retry of this
- * activity attaches to the same logical execution (ADR 0009).
+ * activity attaches to the same logical execution (ADR 0009). The workflow
+ * passes each call's routing — its runtime session, the consumer's isolation
+ * choice (ADR 0007), and any continuity key, time budget or metadata.
+ *
+ * Only a cancel the workflow requested cancels the task. Any other end of an
+ * attempt — the worker shutting down, a heartbeat timeout, a pause, a reset —
+ * leaves the task running for the next attempt to attach to (ADR 0016).
  *
  * A start the agent refuses for now is waited out and started again, for up
  * to 15 minutes of waiting per attempt; past that, the attempt fails
@@ -59,9 +63,9 @@ export interface ProcedureActivityOptions<Input> {
  */
 export function procedureActivity<Input, Output>(
   procedure: ProcedureClient<Input, Output>,
-  options: ProcedureActivityOptions<Input>,
-): (input: Input) => Promise<Output> {
-  return async (input) => {
+  options: ProcedureActivityOptions,
+): (input: Input, start: ActivityStart) => Promise<Output> {
+  return async (input, start) => {
     const info = activityInfo();
     const workflow = info.workflowExecution;
     if (workflow === undefined) {
@@ -69,12 +73,9 @@ export function procedureActivity<Input, Output>(
         'a procedure activity runs only inside a workflow: its idempotency key is the workflow run',
       );
     }
-    const routed: Routed = {
-      runtimeSessionId: options.runtimeSessionId(input),
-    };
+    const routed: Routed = { runtimeSessionId: start.runtimeSessionId };
     const starting: Starting = {
-      ...options.start?.(input),
-      ...routed,
+      ...start,
       idempotencyKey: `${workflow.workflowId}/${workflow.runId}/${info.activityId}`,
     };
     const signal = cancellationSignal();
@@ -95,13 +96,19 @@ export function procedureActivity<Input, Output>(
         onPoll: (task) => heartbeat({ taskId: task.taskId, state: task.state }),
       });
     } catch (error) {
-      if (signal.aborted) {
-        await options.cancelTask(started.taskId, routed);
-        throw new CancelledFailure(
-          'the activity was cancelled, and so was its task',
-        );
+      if (!signal.aborted) throw error;
+      if (cancellationDetails()?.cancelRequested !== true) {
+        // A shutdown, heartbeat timeout, pause or reset: the next attempt attaches.
+        throw error instanceof CancelledFailure
+          ? error
+          : new CancelledFailure(
+              `the activity's attempt ended; task ${started.taskId} keeps running for the next attempt`,
+            );
       }
-      throw error;
+      await options.cancelTask(started.taskId, routed);
+      throw new CancelledFailure(
+        'the workflow cancelled the activity, and so its task',
+      );
     }
     switch (ended.state) {
       case 'TASK_STATE_COMPLETED':

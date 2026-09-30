@@ -1,4 +1,8 @@
-import { ApplicationFailure, CancelledFailure } from '@temporalio/common';
+import {
+  ActivityCancellationDetails,
+  ApplicationFailure,
+  CancelledFailure,
+} from '@temporalio/common';
 import { MockActivityEnvironment } from '@temporalio/testing';
 import { DefaultLogger } from '@temporalio/worker';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,18 +34,17 @@ vi.mock('node:timers/promises', () => ({
 }));
 
 const sendMessage = vi.fn<ProcedureClient<string, string>['SendMessage']>();
+const getTask = vi.fn<ProcedureClient<string, string>['GetTask']>();
 const cancelTask = vi.fn();
 const procedure: ProcedureClient<string, string> = {
   SendMessage: sendMessage,
-  GetTask: vi.fn(),
+  GetTask: getTask,
 };
-const activity = procedureActivity(procedure, {
-  runtimeSessionId: () => 'session',
-  start: () => ({ continuityKey: 'continuity' }),
-  cancelTask,
-});
+const activity = procedureActivity(procedure, { cancelTask });
+const START = { runtimeSessionId: 'session', continuityKey: 'continuity' };
 
 const TASK = { taskId: 'task', contextId: 'context', attempt: 1, runs: [] };
+const WORKING: TaskView<string> = { ...TASK, state: 'TASK_STATE_WORKING' };
 const COMPLETED: TaskView<string> = {
   ...TASK,
   state: 'TASK_STATE_COMPLETED',
@@ -75,6 +78,7 @@ function environment() {
 describe('procedureActivity', () => {
   beforeEach(() => {
     sendMessage.mockReset();
+    getTask.mockReset();
     cancelTask.mockReset();
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
   });
@@ -87,16 +91,17 @@ describe('procedureActivity', () => {
       .mockImplementationOnce(refused('ADMISSION_LIMIT', 600))
       .mockResolvedValueOnce(COMPLETED);
     const { env, heartbeats } = environment();
-    const running = env.run(activity, 'input');
+    const running = env.run(activity, 'input', START);
     await vi.advanceTimersByTimeAsync(599_000);
     expect(sendMessage).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1_000);
     await expect(running).resolves.toBe('done');
     expect(sendMessage).toHaveBeenCalledTimes(2);
     expect(sendMessage.mock.calls[1]).toEqual(sendMessage.mock.calls[0]);
-    expect(sendMessage.mock.calls[0]?.[1]).toMatchObject({
-      idempotencyKey: 'workflow/run/1',
+    expect(sendMessage.mock.calls[0]?.[1]).toEqual({
+      runtimeSessionId: 'session',
       continuityKey: 'continuity',
+      idempotencyKey: 'workflow/run/1',
     });
     const waiting = heartbeats.filter(
       (details) =>
@@ -108,7 +113,7 @@ describe('procedureActivity', () => {
   it('ends the wait at once when the activity is cancelled, with nothing to cancel', async () => {
     sendMessage.mockImplementationOnce(refused('CONTAINER_STOPPING', 5));
     const { env } = environment();
-    const running = env.run(activity, 'input');
+    const running = env.run(activity, 'input', START);
     const settled = expect(running).rejects.toBeInstanceOf(CancelledFailure);
     await vi.advanceTimersByTimeAsync(1_000);
     env.cancel();
@@ -122,7 +127,7 @@ describe('procedureActivity', () => {
       .mockImplementationOnce(refused('ADMISSION_LIMIT', 600))
       .mockImplementationOnce(refused('ADMISSION_LIMIT', 600));
     const { env } = environment();
-    const running = env.run(activity, 'input');
+    const running = env.run(activity, 'input', START);
     const settled = expect(running).rejects.toMatchObject({
       type: 'ADMISSION_LIMIT',
       nonRetryable: false,
@@ -141,9 +146,60 @@ describe('procedureActivity', () => {
       reason: 'contract hash mismatch',
     });
     const { env } = environment();
-    await expect(env.run(activity, 'input')).rejects.toMatchObject({
+    await expect(env.run(activity, 'input', START)).rejects.toMatchObject({
       type: 'TASK_STATE_REJECTED',
       nonRetryable: true,
     });
+  });
+
+  describe('cancelled while its task runs', () => {
+    async function cancelledWhileRunning(
+      cancel: (env: MockActivityEnvironment) => void,
+    ) {
+      sendMessage.mockResolvedValueOnce(WORKING);
+      getTask.mockResolvedValue(WORKING);
+      const { env } = environment();
+      const running = env.run(activity, 'input', START);
+      const settled = expect(running).rejects.toBeInstanceOf(CancelledFailure);
+      await vi.advanceTimersByTimeAsync(12_500);
+      expect(getTask).toHaveBeenCalledWith(
+        'task',
+        expect.objectContaining({ runtimeSessionId: 'session' }),
+      );
+      cancel(env);
+      await settled;
+    }
+
+    it('cancels the task on a cancel the workflow requested', async () => {
+      await cancelledWhileRunning((env) =>
+        env.cancel(
+          'CANCELLED',
+          new ActivityCancellationDetails({ cancelRequested: true }),
+        ),
+      );
+      expect(cancelTask).toHaveBeenCalledExactlyOnceWith('task', {
+        runtimeSessionId: 'session',
+      });
+    });
+
+    it.each([
+      [
+        'the worker shutting down',
+        'WORKER_SHUTDOWN',
+        new ActivityCancellationDetails({ workerShutdown: true }),
+      ],
+      [
+        'a heartbeat timeout',
+        'TIMED_OUT',
+        new ActivityCancellationDetails({ timedOut: true }),
+      ],
+      ['no details', 'CANCELLED', new ActivityCancellationDetails()],
+    ] as const)(
+      'leaves the task running on %s',
+      async (_name, reason, details) => {
+        await cancelledWhileRunning((env) => env.cancel(reason, details));
+        expect(cancelTask).not.toHaveBeenCalled();
+      },
+    );
   });
 });

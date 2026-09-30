@@ -35,7 +35,6 @@ function environment() {
 describe('the Temporal activity, locally', () => {
   it('returns the typed output, heartbeating the task as it runs', async () => {
     const activity = procedureActivity(helloAgent.Summarise, {
-      runtimeSessionId: () => RUNTIME_SESSION_ID,
       cancelTask: helloAgent.CancelTask,
       pollIntervalMilliseconds: 1_000,
     });
@@ -48,6 +47,7 @@ describe('the Temporal activity, locally', () => {
       {
         text: 'Temporal retries an activity; AgentForge attaches the retry to the same task.',
       },
+      { runtimeSessionId: RUNTIME_SESSION_ID },
     );
     expect(output.words).toBe(
       output.summary.split(/\s+/).filter(Boolean).length,
@@ -55,9 +55,8 @@ describe('the Temporal activity, locally', () => {
     expect(heartbeats.length).toBeGreaterThan(0);
   });
 
-  it('cancels its task when the activity is cancelled', async () => {
+  it('cancels its task when the workflow cancels the activity', async () => {
     const activity = procedureActivity(helloAgent.SleepThenAnswer, {
-      runtimeSessionId: () => RUNTIME_SESSION_ID,
       cancelTask: helloAgent.CancelTask,
       pollIntervalMilliseconds: 1_000,
     });
@@ -66,7 +65,11 @@ describe('the Temporal activity, locally', () => {
     env.on('heartbeat', (details: { taskId: string }) => {
       taskId = details.taskId;
     });
-    const running = env.run(activity, { seconds: 120 });
+    const running = env.run(
+      activity,
+      { seconds: 120 },
+      { runtimeSessionId: RUNTIME_SESSION_ID },
+    );
     await new Promise((resolve) => setTimeout(resolve, 10_000));
     env.cancel();
     await expect(running).rejects.toBeInstanceOf(CancelledFailure);
