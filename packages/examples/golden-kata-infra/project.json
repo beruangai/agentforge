@@ -39,26 +39,28 @@
       "outputs": ["{workspaceRoot}/dist/{projectRoot}/deploy"],
       "options": {
         "cwd": "{projectRoot}",
-        "command": "export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk deploy \"agentforge-example-golden-kata/**\" --app ../../../dist/{projectRoot}/cdk.out --require-approval never --no-notices --outputs-file ../../../dist/{projectRoot}/deploy/outputs.json",
-        "envFile": "{workspaceRoot}/.env.integ",
+        "command": "cdk deploy \"agentforge-example-golden-kata/**\" --app ../../../dist/{projectRoot}/cdk.out --require-approval never --no-notices --outputs-file ../../../dist/{projectRoot}/deploy/outputs.json",
         "env": {
           "CDK_DISABLE_CLI_TELEMETRY": "true",
           "NODE_OPTIONS": "--conditions=@beruangai/source"
         }
-      }
+      },
+      "defaultConfiguration": "cdk",
+      "configurations": { "cdk": {} }
     },
     "destroy": {
       "executor": "nx:run-commands",
       "cache": false,
       "options": {
         "cwd": "{projectRoot}",
-        "command": "bun scripts/empty-buckets.ts ../../../dist/{projectRoot}/deploy/outputs.json && cdk destroy \"agentforge-example-golden-kata/**\" --app ../../../dist/{projectRoot}/cdk.out --force --no-notices",
-        "envFile": "{workspaceRoot}/.env.integ",
+        "command": "bun scripts/confirm-destroy.ts agentforge-example-golden-kata && bun scripts/empty-buckets.ts ../../../dist/{projectRoot}/deploy/outputs.json && cdk destroy \"agentforge-example-golden-kata/**\" --app ../../../dist/{projectRoot}/cdk.out --force --no-notices",
         "env": {
           "CDK_DISABLE_CLI_TELEMETRY": "true",
           "NODE_OPTIONS": "--conditions=@beruangai/source"
         }
-      }
+      },
+      "defaultConfiguration": "cdk",
+      "configurations": { "cdk": {} }
     },
     "format": {
       "executor": "nx:run-commands",
@@ -100,13 +102,14 @@
       "dependsOn": ["^assemble", "compile"],
       "options": {
         "cwd": "{projectRoot}",
-        "command": "export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk synth --quiet --no-notices",
-        "envFile": "{workspaceRoot}/.env.integ",
+        "command": "cdk synth --quiet --no-notices",
         "env": {
           "CDK_DISABLE_CLI_TELEMETRY": "true",
           "NODE_OPTIONS": "--conditions=@beruangai/source"
         }
-      }
+      },
+      "defaultConfiguration": "cdk",
+      "configurations": { "cdk": {} }
     },
     "test": {
       "executor": "@nx/vitest:test",

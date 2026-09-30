@@ -55,9 +55,9 @@ Lands after `move-package-to-libs`. Groups 1–6 build the plugin and its client
 
 ## 8. `golden-kata`, on AgentCore
 
-- [x] 8.1 `ts#infra` in `packages/examples/golden-kata-infra`, adapted: stage `agentforge-example-golden-kata`, `synth`/`deploy` as the test role from `.env.integ` with a throwaway Docker configuration, a bespoke `destroy` emptying the buckets first, `DESTROY` removal, `checkov.yml` from `hello-agent`'s; how its synth resolves AgentForge in this repository settled here; its stack declaring `GoldenKata` with the subscription secret and granting a caller role — verified by `synth` and `checkov` passing
+- [x] 8.1 `ts#infra` in `packages/examples/golden-kata-infra`, adapted: stage `agentforge-example-golden-kata`, `synth`/`deploy` with the operator's credentials from `.env.cdk` and the stage pinned to its account and `us-east-2`, a bespoke `destroy` asking for the stage's name and emptying the buckets first, `DESTROY` removal, `checkov.yml` from `hello-agent`'s; how its synth resolves AgentForge in this repository settled here; its stack declaring `GoldenKata` with the subscription secret and granting a caller role — verified by `synth` and `checkov` passing
 - [x] 8.2 A template assertion that the caller role may invoke exactly the two runtimes and read the stage's runtime configuration — verified by the test passing
-- [x] 8.3 Deploy to `us-east-2` as the test role, after the operator applies the updated test-role policy — verified by `deploy` returning once both runtimes serve; whether the configuration is readable at once recorded in the research note
+- [x] 8.3 Deploy to `us-east-2`, after the operator applies the updated test-role policy — verified by `deploy` returning once both runtimes serve; whether the configuration is readable at once recorded in the research note
 - [x] 8.4 The suite's `agentcore` project, building `goldenKataClient.fromRuntimeConfig` from the deployment's `RuntimeConfigApplicationId` — verified by it passing against the deployed runtimes
 
 ## 9. Integration
