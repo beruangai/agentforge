@@ -178,6 +178,15 @@
         "command": "vitest run --config vitest.unit.mts",
         "cwd": "{projectRoot}"
       }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["serve-writer", "serve-grader"],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project local",
+        "cwd": "{projectRoot}"
+      }
     }
   }
 }
