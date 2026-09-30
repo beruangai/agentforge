@@ -2,7 +2,7 @@
 
 What is not decided. Everything built or decided is in [ARCHITECTURE.md](ARCHITECTURE.md). A question here is settled by the cheapest thing that answers it — a sentence of design, or a spike against the real platform where AgentForge relies on behaviour the documentation does not guarantee — and its outcome then moves to ARCHITECTURE.md. Don't build against an open question, and don't resolve one silently; raise it with the operator.
 
-**An id names one option for good.** Ids are `ODO###` — an *open design option* — cited in prose as `§ODO004`, like `§REQ304`. A new option takes the next id; an id is never reused, and a settled or dropped option's id is spent. **Next id: `ODO011`.** Letter ids (`§A`–`§T`) were used until 2026-09-29: the open ones were renumbered below, and a closed letter in a dated note names a question since settled.
+**An id names one option for good.** Ids are `ODO###` — an *open design option* — cited in prose as `§ODO004`, like `§REQ304`. A new option takes the next id; an id is never reused, and a settled or dropped option's id is spent. **Next id: `ODO012`.** Letter ids (`§A`–`§T`) were used until 2026-09-29: the open ones were renumbered below, and a closed letter in a dated note names a question since settled.
 
 | | Question | Settled by | Blocks |
 |---|---|---|---|
@@ -13,6 +13,7 @@ What is not decided. Everything built or decided is in [ARCHITECTURE.md](ARCHITE
 | **ODO007** | Pausing a task for a human (`TASK_STATE_INPUT_REQUIRED`) | When a consumer asks | Nothing — no consumer asks |
 | **ODO008** | The Claude config directory beyond the transcript: resuming a session from the store runs the CLI with a fresh `CLAUDE_CONFIG_DIR` holding only credentials, `.claude.json` and the user `settings.json` ([research](research/claude-agent-sdk.md)). The transcript persists (§REQ402); whether a resumed run misses anything else the config directory held — nothing is put at user scope in the base image today — is not measured | A spike, when a procedure resuming in another container finds something missing | Nothing yet |
 | **ODO010** | The artifact version on a task's record: a deploy leaves running sessions on the old version while new ones start on the new (ADR 0008), so which version ran a task is not on its record. Buildable small — the construct names the image's asset hash to the server, which stamps it on every task | When a failure needs telling one version's runs from another's | Nothing |
+| **ODO011** | Worker Versioning (§REQ710): Temporal's Worker Deployments are GA, but the controller that keeps an old version polling until its workflows drain runs only on Kubernetes; on ECS it means a service per version. Until then a deploy replaces the worker, and a workflow changed while runs are in flight is the consumer's to guard with `patched()` | The operator, when a workflow change must reach runs already in flight | Nothing — a worker is replaced on deploy |
 
 ## Tabled
 

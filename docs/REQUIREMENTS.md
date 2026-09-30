@@ -94,6 +94,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ707** | Each deployed agent is resolvable by name, serves the image it was deployed with, and reports liveness without running an agent — and nothing a procedure does delays that report |
 | **REQ708** | A caller invokes remotely with least privilege — exactly its own agents, and nothing else |
 | **REQ709** | A consumer adopts AgentForge, and takes each new version of it, without wiring its agents, images, clients or infrastructure by hand; what the consumer wrote is never overwritten, and anything AgentForge keeps current the consumer can take over |
+| **REQ710** | A consumer's Temporal workflows call its agents' procedures as activities typed by their contracts, and its workers are generated, built, run locally and deployed without wiring by hand |
 
 ---
 
