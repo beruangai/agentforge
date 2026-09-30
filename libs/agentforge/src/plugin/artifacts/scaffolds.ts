@@ -1,8 +1,10 @@
 import type { AgentComponent, AgenticProject } from '../project-record.ts';
 import {
   agentDirectory,
+  agentSecretsFile,
   baseDirectory,
   basePackageName,
+  baseSecretsFile,
   contractName,
 } from './layers.ts';
 import type { ScaffoldedFile } from './maintained.ts';
@@ -22,7 +24,27 @@ function claudePlaceholders(directory: string): ScaffoldedFile[] {
   ];
 }
 
-/** The base layer's scaffolds: its shared options and its Claude configuration. */
+/**
+ * A layer's `secrets.ts`: the secrets it requires, by the environment
+ * variable each becomes. The agent's construct requires a secret for each,
+ * `serve` passes each by name, and the agent's server fails a request while
+ * one is unset.
+ */
+function secretsScaffold(path: string, requiredBy: string): ScaffoldedFile {
+  return {
+    path,
+    content: `/**
+ * The secrets ${requiredBy} requires, by the environment variable each
+ * becomes — beside AgentForge's own, CLAUDE_CODE_OAUTH_TOKEN. The agent's
+ * construct requires a secret for each, \`serve\` passes each from
+ * .env.serve.local, and the agent's server fails a request while one is unset.
+ */
+export const REQUIRED_SECRETS = [] as const satisfies readonly string[];
+`,
+  };
+}
+
+/** The base layer's scaffolds: its shared options, its secrets and its Claude configuration. */
 export function baseScaffolds(project: AgenticProject): ScaffoldedFile[] {
   const agentic = `${baseDirectory(project)}/agentic`;
   return [
@@ -48,14 +70,18 @@ export function baseOptions(): AgentOptions {
 What every agent in this project is told. Replace this placeholder.
 `,
     },
+    secretsScaffold(
+      baseSecretsFile(project),
+      `every agent in ${project.projectName}`,
+    ),
     ...claudePlaceholders(agentic),
   ];
 }
 
 /**
  * An agent's scaffolds: its contract with one stub procedure, the
- * procedure's handler failing its task until implemented, and its Claude
- * configuration.
+ * procedure's handler failing its task until implemented, its secrets and
+ * its Claude configuration.
  */
 export function agentScaffolds(
   project: AgenticProject,
@@ -100,6 +126,10 @@ export const router = os.router({
 });
 `,
     },
+    secretsScaffold(
+      agentSecretsFile(project, agent),
+      `the ${agent.name} agent`,
+    ),
     ...claudePlaceholders(directory),
   ];
 }

@@ -1,7 +1,12 @@
 /**
  * `@beruangai/agentforge/infra` — the CDK constructs.
  */
-export { AgentRuntime, type AgentRuntimeProps } from './agent-runtime.ts';
+export {
+  AgentRuntime,
+  type AgentRuntimeProps,
+  type AgentSecret,
+  type AgentSecrets,
+} from './agent-runtime.ts';
 export {
   S3FilesystemBucket,
   type S3FilesystemBucketProps,

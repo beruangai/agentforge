@@ -25,7 +25,8 @@ const stack = new Stack(app, required('AGENTFORGE_INTEG_STACK_NAME'), {
   },
   tags: { [INTEG_TAG.Key]: INTEG_TAG.Value },
 });
-// The stack's own, so it goes with the stack; nothing reads its value.
+// The stack's own, so it goes with the stack: declared as the subscription
+// token AgentForge requires, though no procedure here reaches a model.
 const secret = new Secret(stack, 'DeclaredSecret', {
   removalPolicy: RemovalPolicy.DESTROY,
 });
@@ -40,6 +41,6 @@ const agent = new AgentRuntime(stack, 'Agent', {
     },
   ),
   removalPolicy: RemovalPolicy.DESTROY,
-  secrets: { AGENTFORGE_INTEG_SECRET: secret },
+  secrets: { CLAUDE_CODE_OAUTH_TOKEN: secret },
 });
 new CfnOutput(stack, 'AgentRuntimeArn', { value: agent.agentRuntimeArn });

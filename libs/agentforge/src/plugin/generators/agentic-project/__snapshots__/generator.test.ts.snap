@@ -80,6 +80,17 @@ exports[`agentic-project > generates a base layer, its targets, client and const
 "
 `;
 
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/secrets.ts 1`] = `
+"/**
+ * The secrets every agent in golden-kata requires, by the environment variable each
+ * becomes — beside AgentForge's own, CLAUDE_CODE_OAUTH_TOKEN. The agent's
+ * construct requires a secret for each, \`serve\` passes each from
+ * .env.serve.local, and the agent's server fails a request while one is unset.
+ */
+export const REQUIRED_SECRETS = [] as const satisfies readonly string[];
+"
+`;
+
 exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/client.ts 1`] = `
 "// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
 // installed version generates. To own it, name it in the project's
@@ -278,7 +289,7 @@ import { Construct } from 'constructs';
 import { RuntimeConfig } from '../../../core/runtime-config.js';
 
 export interface GoldenKataProps {
-  /** Each agent's runtime options. */
+  /** Each agent's runtime options, with the secrets it requires. */
   readonly agents?: Record<string, never>;
 }
 
@@ -315,6 +326,7 @@ exports[`agentic-project > generates a base layer, its targets, client and const
   "packages/examples/golden-kata/base/agentic/$claude/skills/.gitkeep",
   "packages/examples/golden-kata/base/agentic/options.ts",
   "packages/examples/golden-kata/base/agentic/package.json",
+  "packages/examples/golden-kata/base/agentic/secrets.ts",
   "packages/examples/golden-kata/client.ts",
   "packages/examples/golden-kata/package.json",
   "packages/examples/golden-kata/project.json",

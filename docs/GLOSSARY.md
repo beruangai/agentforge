@@ -102,6 +102,8 @@
 
 **Project construct** — The CDK construct wrapping an agentic project's agent constructs; its `grantInvoke` grants a caller exactly those agents and the runtime configuration's read.
 
+**Required secrets** — The secrets an agent must be given, by the environment variable each becomes: AgentForge's own (`CLAUDE_CODE_OAUTH_TOKEN`), then `REQUIRED_SECRETS` in the base layer's `secrets.ts` and in the agent's. The agent's construct requires exactly these in `secrets`, `serve` passes each by name, and the server fails a request while one is unset.
+
 **Maintained** — A generated file, key or target that `nx sync` keeps to what the installed AgentForge renders.
 
 **Scaffolded** — Written by a generator once, when absent, and never touched again.

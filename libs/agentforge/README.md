@@ -31,7 +31,7 @@ Every artifact spanning a project's agents is rendered from `metadata.components
 - `base/Dockerfile`, `agents/<agent>/Dockerfile`
 - `agents/<agent>/agent/server.ts`, `agents/<agent>/agent/task.ts`
 - `client.ts`
-- in the shared constructs, `src/app/agents/<project>-<agent>/<project>-<agent>.ts` and `src/app/agentic-projects/<project>/<project>.ts`
+- in the shared constructs, `src/app/agentic-projects/<project>/<project>.ts` and `src/app/agentic-projects/<project>/agents/<agent>/<agent>.ts`
 - the project's targets: `image-agentforge`, `lock`, `image`, `lock-<agent>`, `image-<agent>`, `serve-<agent>`, `assemble`
 
 **Maintained keys** — only these are rewritten; every other key in the file is yours:
@@ -41,11 +41,11 @@ Every artifact spanning a project's agents is rendered from `metadata.components
 | `package.json` | `exports`; `dependencies["@beruangai/agentforge"]` |
 | `tsconfig.lib.json` | `agentforge-agent` in `compilerOptions.customConditions`; `compilerOptions.paths["@<scope>/<project>-base/*"]` |
 | `base/agentic/package.json`, `agents/<agent>/agent/package.json` | `name`, `type`; the `workspace:*` layers in `dependencies`; the runtime peers in `peerDependencies` |
-| shared constructs `package.json` | `dependencies["@beruangai/agentforge"]` |
+| shared constructs `package.json` | `dependencies["@beruangai/agentforge"]`; the project's package, `workspace:*` |
 | shared constructs `project.json` | `<project>:assemble` in `targets.assemble.dependsOn` |
-| shared constructs `src/app/index.ts`, `agents/index.ts`, `agentic-projects/index.ts` | the `export *` line for each construct |
+| shared constructs `src/app/index.ts`, `agentic-projects/index.ts` | the `export *` line for each construct |
 
-**Scaffolded** — written once when absent, then never touched: `base/agentic/options.ts`, `agents/<agent>/agent/contract.ts` and `procedures.ts`, every `$claude/` file, the project's `tsconfig.json` and the rest of its `tsconfig.lib.json`, and the host `package.json`'s other dependencies.
+**Scaffolded** — written once when absent, then never touched: `base/agentic/options.ts` and `secrets.ts`, `agents/<agent>/agent/contract.ts`, `procedures.ts` and `secrets.ts`, every `$claude/` file, the project's `tsconfig.json` and the rest of its `tsconfig.lib.json`, and the host `package.json`'s other dependencies.
 
 ### Detaching
 

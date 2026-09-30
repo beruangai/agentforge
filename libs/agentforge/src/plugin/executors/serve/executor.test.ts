@@ -3,14 +3,13 @@ import { GOLDEN_KATA } from '../../__fixtures__/golden-kata.ts';
 import {
   type ContainerState,
   cleanupCommands,
-  SUBSCRIPTION_TOKEN,
   servePlan,
   serveRefusal,
   startCommands,
 } from './executor.ts';
 
-const PLAN = servePlan(GOLDEN_KATA, 'writer');
-const TOKEN = { [SUBSCRIPTION_TOKEN]: 'token' };
+const PLAN = servePlan(GOLDEN_KATA, 'writer', []);
+const TOKEN = { CLAUDE_CODE_OAUTH_TOKEN: 'token' };
 const stateIs = (state: ContainerState) => () => state;
 
 describe('servePlan', () => {
@@ -20,20 +19,36 @@ describe('servePlan', () => {
       dynamoDB: 'proj-golden-kata-writer-dynamodb',
       agent: 'proj-golden-kata-writer',
       image: 'proj/golden-kata-writer:local',
+      secrets: ['CLAUDE_CODE_OAUTH_TOKEN'],
     });
   });
 
+  it("requires AgentForge's secrets, then its layers', once each", () => {
+    expect(
+      servePlan(GOLDEN_KATA, 'writer', [
+        'KATA_API_KEY',
+        'CLAUDE_CODE_OAUTH_TOKEN',
+      ]).secrets,
+    ).toEqual(['CLAUDE_CODE_OAUTH_TOKEN', 'KATA_API_KEY']);
+  });
+
   it('refuses an agent the project does not record', () => {
-    expect(() => servePlan(GOLDEN_KATA, 'fixer')).toThrow(
+    expect(() => servePlan(GOLDEN_KATA, 'fixer', [])).toThrow(
       '@proj/golden-kata records no agent fixer: it records writer, grader',
     );
   });
 });
 
 describe('serveRefusal', () => {
-  it('refuses without the subscription token, naming it', () => {
-    expect(serveRefusal(PLAN, {}, stateIs('absent'))).toBe(
-      'CLAUDE_CODE_OAUTH_TOKEN is not set; the serve configuration loads it from .env.serve.local',
+  it('refuses without every secret the agent requires, naming each', () => {
+    expect(
+      serveRefusal(
+        servePlan(GOLDEN_KATA, 'writer', ['KATA_API_KEY']),
+        {},
+        stateIs('absent'),
+      ),
+    ).toBe(
+      "CLAUDE_CODE_OAUTH_TOKEN, KATA_API_KEY not set; the serve configuration loads the agent's secrets from .env.serve.local",
     );
   });
 
@@ -55,9 +70,13 @@ describe('serveRefusal', () => {
 });
 
 describe('the docker commands', () => {
-  it('passes the token by name, never its value, on a host-assigned port', () => {
-    const { agent } = startCommands(PLAN);
-    expect(agent).toContain(SUBSCRIPTION_TOKEN);
+  it('passes each secret by name, never its value, on a host-assigned port', () => {
+    const { agent } = startCommands(
+      servePlan(GOLDEN_KATA, 'writer', ['KATA_API_KEY']),
+    );
+    expect(agent.join(' ')).toContain(
+      '--env CLAUDE_CODE_OAUTH_TOKEN --env KATA_API_KEY',
+    );
     expect(agent).toContain('127.0.0.1::9000');
     expect(agent.join(' ')).not.toContain('token=');
     expect(agent).toContain(

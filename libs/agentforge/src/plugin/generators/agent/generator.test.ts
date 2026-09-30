@@ -58,7 +58,9 @@ describe('agent', () => {
     expect(read(`${ROOT}/client.ts`)).toMatchSnapshot('client.ts');
     expect(read(`${ROOT}/package.json`)).toMatchSnapshot('package.json');
     expect(
-      read(`${CONSTRUCTS}/agents/golden-kata-writer/golden-kata-writer.ts`),
+      read(
+        `${CONSTRUCTS}/agentic-projects/golden-kata/agents/writer/writer.ts`,
+      ),
     ).toMatchSnapshot('agent construct');
     expect(
       read(`${CONSTRUCTS}/agentic-projects/golden-kata/golden-kata.ts`),
@@ -111,8 +113,8 @@ describe('agent', () => {
     expect(
       read(`${CONSTRUCTS}/agentic-projects/golden-kata/golden-kata.ts`),
     ).toMatchSnapshot('project construct of two');
-    expect(read(`${CONSTRUCTS}/agents/index.ts`)).toBe(
-      "export * from './golden-kata-writer/golden-kata-writer.js';\nexport * from './golden-kata-grader/golden-kata-grader.js';\n",
+    expect(read(`${CONSTRUCTS}/agentic-projects/index.ts`)).toBe(
+      "export * from './golden-kata/golden-kata.js';\nexport * from './golden-kata/agents/writer/writer.js';\nexport * from './golden-kata/agents/grader/grader.js';\n",
     );
   });
 

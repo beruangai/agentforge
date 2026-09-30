@@ -1,7 +1,7 @@
 import type { GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 import { describe, expect, it, vi } from 'vitest';
 import { SECRETS_VARIABLE } from '#core/secrets.ts';
-import { resolveDeclaredSecrets } from './secrets.ts';
+import { requireSecrets, resolveDeclaredSecrets } from './secrets.ts';
 
 const TOKEN_ARN = 'arn:aws:secretsmanager:us-east-2:123456789012:secret:token';
 
@@ -58,5 +58,24 @@ describe('resolveDeclaredSecrets', () => {
         readerOf({}) as never,
       ),
     ).rejects.toThrow(/no string value/);
+  });
+});
+
+describe('requireSecrets', () => {
+  it("passes when AgentForge's and every declared secret are set", () => {
+    expect(() =>
+      requireSecrets(['KATA_API_KEY'], {
+        CLAUDE_CODE_OAUTH_TOKEN: 'the-token',
+        KATA_API_KEY: 'the-key',
+      }),
+    ).not.toThrow();
+  });
+
+  it("names every secret that is unset or empty, AgentForge's included", () => {
+    expect(() =>
+      requireSecrets(['KATA_API_KEY', 'KATA_API_KEY'], { KATA_API_KEY: '' }),
+    ).toThrow(
+      'the agent requires secrets that are not set: CLAUDE_CODE_OAUTH_TOKEN, KATA_API_KEY',
+    );
   });
 });

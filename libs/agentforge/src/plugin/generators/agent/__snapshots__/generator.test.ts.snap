@@ -85,17 +85,17 @@ import { RuntimeConfig } from '../../../core/runtime-config.js';
 import {
   GoldenKataGrader,
   type GoldenKataGraderProps,
-} from '../../agents/golden-kata-grader/golden-kata-grader.js';
+} from './agents/grader/grader.js';
 import {
   GoldenKataWriter,
   type GoldenKataWriterProps,
-} from '../../agents/golden-kata-writer/golden-kata-writer.js';
+} from './agents/writer/writer.js';
 
 export interface GoldenKataProps {
-  /** Each agent's runtime options. */
-  readonly agents?: {
-    readonly writer?: GoldenKataWriterProps;
-    readonly grader?: GoldenKataGraderProps;
+  /** Each agent's runtime options, with the secrets it requires. */
+  readonly agents: {
+    readonly writer: GoldenKataWriterProps;
+    readonly grader: GoldenKataGraderProps;
   };
 }
 
@@ -111,11 +111,11 @@ export class GoldenKata extends Construct {
   /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
   readonly runtimeConfigApplicationId: string;
 
-  constructor(scope: Construct, id: string, props: GoldenKataProps = {}) {
+  constructor(scope: Construct, id: string, props: GoldenKataProps) {
     super(scope, id);
     this.agents = {
-      writer: new GoldenKataWriter(this, 'Writer', props.agents?.writer),
-      grader: new GoldenKataGrader(this, 'Grader', props.agents?.grader),
+      writer: new GoldenKataWriter(this, 'Writer', props.agents.writer),
+      grader: new GoldenKataGrader(this, 'Grader', props.agents.grader),
     };
     this.runtimeConfigApplicationId =
       RuntimeConfig.ensure(this).appConfigApplicationId;
@@ -141,12 +141,15 @@ import { fileURLToPath } from 'node:url';
 import {
   AgentRuntime,
   type AgentRuntimeProps,
+  type AgentSecrets,
 } from '@beruangai/agentforge/infra';
+import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/golden-kata/secrets';
+import type { REQUIRED_SECRETS as AGENT_SECRETS } from '@proj/golden-kata/writer/secrets';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
 import type { Construct } from 'constructs';
-import { RuntimeConfig } from '../../../core/runtime-config.js';
-import { findWorkspaceRoot } from '../../../core/workspace.js';
+import { RuntimeConfig } from '../../../../../core/runtime-config.js';
+import { findWorkspaceRoot } from '../../../../../core/workspace.js';
 
 const WORKSPACE_ROOT = findWorkspaceRoot(fileURLToPath(import.meta.url));
 /** The agent's layer: its image's build context. */
@@ -171,17 +174,27 @@ function parentImageId(): string {
   }
 }
 
+/**
+ * The writer agent's secrets, by the environment variable each becomes:
+ * AgentForge's own, the base layer's and the agent's \`REQUIRED_SECRETS\`.
+ */
+export type GoldenKataWriterSecrets = AgentSecrets<
+  (typeof PROJECT_SECRETS)[number] | (typeof AGENT_SECRETS)[number]
+>;
+
 export type GoldenKataWriterProps = Omit<
   AgentRuntimeProps,
-  'agentRuntimeArtifact'
->;
+  'agentRuntimeArtifact' | 'secrets'
+> & {
+  readonly secrets: GoldenKataWriterSecrets;
+};
 
 /**
  * golden-kata's writer agent as its own AgentCore runtime, registered in the
  * runtime configuration as GoldenKataWriter.
  */
 export class GoldenKataWriter extends AgentRuntime {
-  constructor(scope: Construct, id: string, props: GoldenKataWriterProps = {}) {
+  constructor(scope: Construct, id: string, props: GoldenKataWriterProps) {
     super(scope, id, {
       ...props,
       agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
@@ -204,7 +217,6 @@ export class GoldenKataWriter extends AgentRuntime {
 
 exports[`agent > generates the agent's folder, record, image, entries and construct > app index 1`] = `
 "export * from './agentic-projects/index.js';
-export * from './agents/index.js';
 "
 `;
 
@@ -302,6 +314,7 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
   "exports": {
     "./client": "./client.ts",
     "./writer": "./agents/writer/agent/contract.ts",
+    "./writer/secrets": "./agents/writer/agent/secrets.ts",
     "./*": "./base/agentic/*.ts"
   }
 }
@@ -397,16 +410,33 @@ export const router = os.router({
 "
 `;
 
+exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/secrets.ts 1`] = `
+"/**
+ * The secrets the writer agent requires, by the environment variable each
+ * becomes — beside AgentForge's own, CLAUDE_CODE_OAUTH_TOKEN. The agent's
+ * construct requires a secret for each, \`serve\` passes each from
+ * .env.serve.local, and the agent's server fails a request while one is unset.
+ */
+export const REQUIRED_SECRETS = [] as const satisfies readonly string[];
+"
+`;
+
 exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/server.ts 1`] = `
 "// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
 // installed version generates. To own it, name it in the project's
 // project.json metadata.agentforge.detached.files.
 //
-// The container's entry: AgentForge's server, running \`task.ts\` once per task.
-// Everything else comes from the environment.
+// The container's entry: AgentForge's server, running \`task.ts\` once per task
+// and requiring the secrets this project's layers declare. Everything else
+// comes from the environment.
 import { startServer } from '@beruangai/agentforge/server';
+import { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/golden-kata-base/secrets';
+import { REQUIRED_SECRETS as AGENT_SECRETS } from './secrets.ts';
 
-await startServer({ taskEntry: new URL('./task.ts', import.meta.url) });
+await startServer({
+  taskEntry: new URL('./task.ts', import.meta.url),
+  requiredSecrets: [...PROJECT_SECRETS, ...AGENT_SECRETS],
+});
 "
 `;
 
@@ -434,12 +464,12 @@ import { RuntimeConfig } from '../../../core/runtime-config.js';
 import {
   GoldenKataWriter,
   type GoldenKataWriterProps,
-} from '../../agents/golden-kata-writer/golden-kata-writer.js';
+} from './agents/writer/writer.js';
 
 export interface GoldenKataProps {
-  /** Each agent's runtime options. */
-  readonly agents?: {
-    readonly writer?: GoldenKataWriterProps;
+  /** Each agent's runtime options, with the secrets it requires. */
+  readonly agents: {
+    readonly writer: GoldenKataWriterProps;
   };
 }
 
@@ -454,10 +484,10 @@ export class GoldenKata extends Construct {
   /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
   readonly runtimeConfigApplicationId: string;
 
-  constructor(scope: Construct, id: string, props: GoldenKataProps = {}) {
+  constructor(scope: Construct, id: string, props: GoldenKataProps) {
     super(scope, id);
     this.agents = {
-      writer: new GoldenKataWriter(this, 'Writer', props.agents?.writer),
+      writer: new GoldenKataWriter(this, 'Writer', props.agents.writer),
     };
     this.runtimeConfigApplicationId =
       RuntimeConfig.ensure(this).appConfigApplicationId;
@@ -593,6 +623,7 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
   "packages/examples/golden-kata/agents/writer/agent/contract.ts",
   "packages/examples/golden-kata/agents/writer/agent/package.json",
   "packages/examples/golden-kata/agents/writer/agent/procedures.ts",
+  "packages/examples/golden-kata/agents/writer/agent/secrets.ts",
   "packages/examples/golden-kata/agents/writer/agent/server.ts",
   "packages/examples/golden-kata/agents/writer/agent/task.ts",
 ]

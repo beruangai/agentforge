@@ -24,6 +24,13 @@ function synthesize(
   });
   new AgentRuntime(stack, 'Agent', {
     agentRuntimeArtifact: IMAGE,
+    secrets: {
+      CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
+        stack,
+        'Token',
+        'agentforge/claude-code-oauth-token',
+      ),
+    },
     ...(typeof props === 'function' ? props(stack) : props),
   });
   return Template.fromStack(stack);
@@ -212,15 +219,7 @@ describe('AgentRuntime', () => {
   });
 
   it('names its declared secrets to the server, and may read those alone', () => {
-    const template = synthesize((stack) => ({
-      secrets: {
-        CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
-          stack,
-          'Token',
-          'agentforge/claude-code-oauth-token',
-        ),
-      },
-    }));
+    const template = synthesize();
     // The ARN joins in the partition, so the JSON is an Fn::Join.
     const [runtime] = Object.values(
       template.findResources('AWS::BedrockAgentCore::Runtime'),
@@ -257,17 +256,16 @@ describe('AgentRuntime', () => {
 
   it('refuses a secret also set as a plain variable', () => {
     expect(() =>
-      synthesize((stack) => ({
+      synthesize({
         environmentVariables: { CLAUDE_CODE_OAUTH_TOKEN: 'plain' },
-        secrets: {
-          CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
-            stack,
-            'Token',
-            'token',
-          ),
-        },
-      })),
+      }),
     ).toThrow(/both as a secret/);
+  });
+
+  it('refuses secrets without the subscription token AgentForge requires', () => {
+    expect(() => synthesize({ secrets: {} as never })).toThrow(
+      'CLAUDE_CODE_OAUTH_TOKEN is required: declare it in secrets',
+    );
   });
 
   it('refuses a table name the consumer set, which the construct owns', () => {

@@ -31,7 +31,7 @@ When a consumer removes an agent's component record, sync SHALL remove the agent
 - **THEN** the project's targets, client and construct no longer include it, and its folder remains
 
 ### Requirement: An agent's image and its local serving
-An agent's image SHALL be built on its project's agentic image, installing only what the agent adds, and SHALL be rebuilt whenever a layer below it changes. Serving an agent locally SHALL run its image under the agent's container name, with the task store it needs, on a port the host assigns, until stopped; stopping it SHALL remove everything it started. It SHALL fail before starting anything when the subscription credential is absent from its environment or the agent is already being served.
+An agent's image SHALL be built on its project's agentic image, installing only what the agent adds, and SHALL be rebuilt whenever a layer below it changes. Serving an agent locally SHALL run its image under the agent's container name, with the task store it needs, on a port the host assigns, until stopped; stopping it SHALL remove everything it started. It SHALL pass the agent each secret it requires by name from its environment (see [plugin-agentic-connection](../plugin-agentic-connection/spec.md)), and SHALL fail before starting anything when one is absent or the agent is already being served.
 
 #### Scenario: A change in the base layer
 - **WHEN** the base layer changes and an agent's image is built
@@ -41,9 +41,9 @@ An agent's image SHALL be built on its project's agentic image, installing only 
 - **WHEN** a consumer serves an agent locally
 - **THEN** the agent answers under its container name, and stopping it leaves no container behind
 
-#### Scenario: No credential
-- **WHEN** a consumer serves an agent without the subscription credential in its environment
-- **THEN** serving fails before starting anything, naming the credential
+#### Scenario: A required secret absent
+- **WHEN** a consumer serves an agent without the subscription credential, or another secret its layers require, in its environment
+- **THEN** serving fails before starting anything, naming each absent secret
 
 #### Scenario: Already served
 - **WHEN** a consumer serves an agent that is already being served

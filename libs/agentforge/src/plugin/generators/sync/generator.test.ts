@@ -81,6 +81,7 @@ describe('sync', () => {
     expect(manifest.exports).toEqual({
       './client': './client.ts',
       './writer': './agents/writer/agent/contract.ts',
+      './writer/secrets': './agents/writer/agent/secrets.ts',
       './*': './base/agentic/*.ts',
     });
   });

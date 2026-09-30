@@ -43,6 +43,19 @@ export function basePackageName(project: AgenticProject): string {
   return `${project.packageName}-base`;
 }
 
+/** The base layer's `secrets.ts`: the secrets every agent in the project requires. */
+export function baseSecretsFile(project: AgenticProject): string {
+  return `${baseDirectory(project)}/agentic/secrets.ts`;
+}
+
+/** An agent's `secrets.ts`: the secrets it alone requires. */
+export function agentSecretsFile(
+  project: AgenticProject,
+  agent: Pick<AgentComponent, 'name'>,
+): string {
+  return `${agentDirectory(project, agent)}/agent/secrets.ts`;
+}
+
 /** The name of an agent's contract, as its module exports it: `code-reviewer` → `codeReviewer`. */
 export function contractName(agent: Pick<AgentComponent, 'name'>): string {
   return camelCase(agent.name);
@@ -101,7 +114,10 @@ CMD ["bun", "--conditions=${AGENT_CONDITION}", "server.ts"]
   };
 }
 
-/** The container's entry: AgentForge's server, running `task.ts` once per task. */
+/**
+ * The container's entry: AgentForge's server, running `task.ts` once per
+ * task and requiring the secrets the base layer and the agent declare.
+ */
 export function serverEntry(
   project: AgenticProject,
   agent: AgentComponent,
@@ -110,11 +126,17 @@ export function serverEntry(
     path: `${agentDirectory(project, agent)}/agent/server.ts`,
     render: () => `${maintainedHeader('//')}
 //
-// The container's entry: AgentForge's server, running \`task.ts\` once per task.
-// Everything else comes from the environment.
+// The container's entry: AgentForge's server, running \`task.ts\` once per task
+// and requiring the secrets this project's layers declare. Everything else
+// comes from the environment.
 import { startServer } from '@beruangai/agentforge/server';
+import { REQUIRED_SECRETS as PROJECT_SECRETS } from '${basePackageName(project)}/secrets';
+import { REQUIRED_SECRETS as AGENT_SECRETS } from './secrets.ts';
 
-await startServer({ taskEntry: new URL('./task.ts', import.meta.url) });
+await startServer({
+  taskEntry: new URL('./task.ts', import.meta.url),
+  requiredSecrets: [...PROJECT_SECRETS, ...AGENT_SECRETS],
+});
 `,
   };
 }
@@ -199,8 +221,8 @@ export function agentManifest(
 
 /**
  * The host manifest's maintained keys: its dependency on AgentForge, and its
- * exports — the project client, each agent's contract, and the base layer's
- * modules, by the project's package name.
+ * exports — the project client, each agent's contract and secrets, and the
+ * base layer's modules, by the project's package name.
  */
 export function hostManifest(context: RenderContext): MaintainedFile {
   const { project } = context;
@@ -211,9 +233,12 @@ export function hostManifest(context: RenderContext): MaintainedFile {
         exports: {
           './client': './client.ts',
           ...Object.fromEntries(
-            project.agents.map((agent) => [
-              `./${agent.name}`,
-              `./agents/${agent.name}/agent/contract.ts`,
+            project.agents.flatMap((agent) => [
+              [`./${agent.name}`, `./agents/${agent.name}/agent/contract.ts`],
+              [
+                `./${agent.name}/secrets`,
+                `./agents/${agent.name}/agent/secrets.ts`,
+              ],
             ]),
           ),
           './*': './base/agentic/*.ts',

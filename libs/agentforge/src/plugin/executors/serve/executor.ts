@@ -1,5 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { ExecutorContext } from '@nx/devkit';
+import { z } from 'zod';
+import { REQUIRED_SECRETS, SecretNameSchema } from '#core/secrets.ts';
+import { agentSecretsFile, baseSecretsFile } from '../../artifacts/layers.ts';
 import { agentImage } from '../../container/images.ts';
 import type { AgenticProject } from '../../project-record.ts';
 import { executorProject } from '../executor-project.ts';
@@ -7,9 +12,6 @@ import { executorProject } from '../executor-project.ts';
 export interface ServeExecutorOptions {
   readonly agent: string;
 }
-
-/** The subscription token, passed to the container by name from the executor's environment. */
-export const SUBSCRIPTION_TOKEN = 'CLAUDE_CODE_OAUTH_TOKEN';
 const DYNAMODB_LOCAL_IMAGE =
   'amazon/dynamodb-local:3.1.0@sha256:7ef4a2c45b58c2901e70a4f28e0953a422c2c631baaaf5e2c15e0805740c7752';
 /** The agent's contract port inside its container. */
@@ -17,17 +19,24 @@ const AGENT_PORT = 9000;
 const DYNAMODB_PORT = 8000;
 const TABLE_NAME = 'agentforge-tasks';
 
-/** What serving one agent starts: a private network, DynamoDB Local, and the agent under its container name. */
+/**
+ * What serving one agent starts: a private network, DynamoDB Local, and the
+ * agent under its container name, with each secret it requires passed by name
+ * from the executor's environment.
+ */
 export interface ServePlan {
   readonly network: string;
   readonly dynamoDB: string;
   readonly agent: string;
   readonly image: string;
+  readonly secrets: readonly string[];
 }
 
+/** The agent's secrets: AgentForge's own, then `declared` — its layers' `REQUIRED_SECRETS`. */
 export function servePlan(
   project: AgenticProject,
   agentName: string,
+  declared: readonly string[],
 ): ServePlan {
   const agent = project.agents.find((recorded) => recorded.name === agentName);
   if (agent === undefined) {
@@ -42,7 +51,38 @@ export function servePlan(
     dynamoDB: `${agent.containerName}-dynamodb`,
     agent: agent.containerName,
     image: agentImage(project, agentName),
+    secrets: [...new Set([...REQUIRED_SECRETS, ...declared])],
   };
+}
+
+const RequiredSecretsSchema = z.array(SecretNameSchema).readonly();
+
+/** A layer's `REQUIRED_SECRETS`, imported from its `secrets.ts`. */
+async function requiredSecretsOf(file: string): Promise<readonly string[]> {
+  const module = (await import(pathToFileURL(file).href)) as {
+    REQUIRED_SECRETS?: unknown;
+  };
+  const parsed = RequiredSecretsSchema.safeParse(module.REQUIRED_SECRETS);
+  if (!parsed.success) {
+    throw new Error(
+      `${file} must export REQUIRED_SECRETS, an array of environment variable names: ${parsed.error.message}`,
+    );
+  }
+  return parsed.data;
+}
+
+/** What the agent's layers require: the base layer's secrets, then the agent's own. */
+export async function declaredSecrets(
+  workspaceRoot: string,
+  project: AgenticProject,
+  agentName: string,
+): Promise<readonly string[]> {
+  return [
+    ...(await requiredSecretsOf(join(workspaceRoot, baseSecretsFile(project)))),
+    ...(await requiredSecretsOf(
+      join(workspaceRoot, agentSecretsFile(project, { name: agentName })),
+    )),
+  ];
 }
 
 /** A container's state, as `docker container inspect` finds it. */
@@ -54,8 +94,9 @@ export function serveRefusal(
   environment: NodeJS.ProcessEnv,
   stateOf: (container: string) => ContainerState,
 ): string | undefined {
-  if (!environment[SUBSCRIPTION_TOKEN]) {
-    return `${SUBSCRIPTION_TOKEN} is not set; the serve configuration loads it from .env.serve.local`;
+  const missing = plan.secrets.filter((name) => !environment[name]);
+  if (missing.length > 0) {
+    return `${missing.join(', ')} not set; the serve configuration loads the agent's secrets from .env.serve.local`;
   }
   const state = stateOf(plan.agent);
   if (state === 'running') {
@@ -99,8 +140,7 @@ export function startCommands(plan: ServePlan): {
       plan.network,
       '--publish',
       `127.0.0.1::${AGENT_PORT}`,
-      '--env',
-      SUBSCRIPTION_TOKEN,
+      ...plan.secrets.flatMap((name) => ['--env', name]),
       '--env',
       `AGENTFORGE_TABLE_NAME=${TABLE_NAME}`,
       '--env',
@@ -182,7 +222,12 @@ export default async function* serveExecutor(
   options: ServeExecutorOptions,
   context: ExecutorContext,
 ): AsyncGenerator<{ success: boolean }> {
-  const plan = servePlan(executorProject(context), options.agent);
+  const project = executorProject(context);
+  const plan = servePlan(
+    project,
+    options.agent,
+    await declaredSecrets(context.root, project, options.agent),
+  );
   const refusal = serveRefusal(plan, process.env, containerState);
   if (refusal !== undefined) throw new Error(refusal);
   const cleanup = () => {

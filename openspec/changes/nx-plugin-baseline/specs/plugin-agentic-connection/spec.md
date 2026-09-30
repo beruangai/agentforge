@@ -34,6 +34,21 @@ Each agent SHALL have a construct deploying it as its own AgentCore runtime (see
 - **WHEN** an agent's construct is synthesised before the image it builds on exists
 - **THEN** synthesis fails, naming the build that produces it
 
+### Requirement: An agent's construct requires exactly the secrets its layers declare
+Each layer SHALL declare the secrets it requires, by the environment variable each becomes: AgentForge its subscription token, the project's base layer what every agent requires, and each agent what it alone requires, in a declaration the consumer edits. An agent's construct SHALL fail to compile unless it is given a secret for each secret AgentForge, its base layer and the agent require. A secret one agent declares SHALL NOT be required of another.
+
+#### Scenario: A secret the agent declares
+- **WHEN** an agent declares a secret and its construct is given only AgentForge's
+- **THEN** the consumer's infrastructure fails to compile, naming the missing secret
+
+#### Scenario: A secret the base layer declares
+- **WHEN** the base layer declares a secret
+- **THEN** every agent's construct requires it
+
+#### Scenario: A secret another agent declares
+- **WHEN** one agent declares a secret
+- **THEN** no other agent's construct requires it
+
 ### Requirement: A project construct grants a caller exactly the project's agents
 Each agentic project SHALL have a construct wrapping its agents' constructs, through which a consumer sets each agent's runtime options, and which grants a caller invocation of exactly the project's agents — no other runtime — and read of the stage's runtime configuration that resolves them. The plugin SHALL NOT place any construct in the consumer's infrastructure; the consumer declares them.
 

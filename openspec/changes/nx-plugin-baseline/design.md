@@ -85,19 +85,25 @@ export const goldenKataClient: {
   fromRuntimeConfig(source: RuntimeConfigSource): Promise<GoldenKataClient>;
 };
 
-// packages/common/constructs/src/app/agents/golden-kata-writer/golden-kata-writer.ts
+// packages/common/constructs/src/app/agentic-projects/golden-kata/agents/writer/writer.ts
+export type GoldenKataWriterSecrets = AgentSecrets<                   // AgentForge's, the base layer's and the agent's
+  (typeof PROJECT_SECRETS)[number] | (typeof AGENT_SECRETS)[number]   // REQUIRED_SECRETS, imported as types
+>;
+export type GoldenKataWriterProps = Omit<AgentRuntimeProps, 'agentRuntimeArtifact' | 'secrets'> & {
+  readonly secrets: GoldenKataWriterSecrets;
+};
 export class GoldenKataWriter extends AgentRuntime {                  // registers itself in the runtime configuration
-  constructor(scope: Construct, id: string, props?: Omit<AgentRuntimeProps, 'agentRuntimeArtifact'>);
+  constructor(scope: Construct, id: string, props: GoldenKataWriterProps);
 }
 
 // packages/common/constructs/src/app/agentic-projects/golden-kata/golden-kata.ts
 export interface GoldenKataProps {
-  readonly agents?: { readonly [Agent in GoldenKataAgent]?: Omit<AgentRuntimeProps, 'agentRuntimeArtifact'> };
+  readonly agents: { readonly writer: GoldenKataWriterProps; readonly grader: GoldenKataGraderProps };
 }
 export class GoldenKata extends Construct {
   readonly agents: { readonly writer: GoldenKataWriter; readonly grader: GoldenKataGrader };
   readonly runtimeConfigApplicationId: string;
-  constructor(scope: Construct, id: string, props?: GoldenKataProps);
+  constructor(scope: Construct, id: string, props: GoldenKataProps);
   /** Invocation of exactly this project's agents, and read of the stage's runtime configuration. */
   grantInvoke(grantee: IGrantable): void;
 }
@@ -125,6 +131,16 @@ Each agent's construct registers its ARN under namespace `agentcore`, key `agent
 
 `agentCoreTransportsFromRuntimeConfig` uses AppConfig Data (`StartConfigurationSession`, `GetLatestConfiguration`) directly — one small optional peer, imported lazily as `agentCoreTransport` imports its SDK — rather than Powertools' reader, whose cache and transforms AgentForge does not need. The project client composes `createClient` per agent in generated code, where a consumer can read how it works; `/client` gains only what finds a runtime.
 
+### Each layer declares the secrets it requires
+
+A secret reaches an agent as `AgentRuntime` already delivers it — a Secrets Manager secret mapped to the environment variable it becomes (§REQ705); what changes is who says which are required. AgentForge requires `CLAUDE_CODE_OAUTH_TOKEN` (`REQUIRED_SECRETS` in `core/secrets.ts`; an API key is not supported until a consumer needs one). The base layer's scaffolded `secrets.ts` declares what every agent in the project requires, and each agent's what it alone does, each as `export const REQUIRED_SECRETS = [...] as const`. Three places enforce them, each from the declaration itself, not a copy:
+
+- **The construct**, at compile time: the agent's construct imports both tuples as types through the host package's exports (`./secrets`, `./<agent>/secrets`) and requires `secrets` to map those names and AgentForge's (an object literal naming any other fails too) — so the shared constructs depend on the project, `workspace:*`, a maintained key. `AgentRuntime` itself requires AgentForge's at synth.
+- **The server**, on the first request: the maintained `server.ts` passes both tuples to `startServer` as `requiredSecrets`, and once the declared secrets are resolved a request fails while one is unset.
+- **`serve`**, before starting: it imports both files, passes each name to the container by name, and refuses, naming each, while one is absent from its environment.
+
+AgentCore Identity is not needed: a secret per environment variable is the mechanism, not a stopgap (§ODO004 closed).
+
 ### Generated layout, and who owns each artifact
 
 ```
@@ -134,12 +150,13 @@ Each agent's construct registers its ARN under namespace `agentcore`, key `agent
   base/agentic/package.json                           → /workspace/agentic, @<scope>/<project>-base
   base/agentic/$claude/{CLAUDE.md, settings.json, skills/, agents/}
   base/agentic/options.ts                             baseOptions(), composed by every agent
+  base/agentic/secrets.ts                             REQUIRED_SECRETS of every agent
   agents/<agent>/Dockerfile
   agents/<agent>/agent/package.json                   → /workspace/agentic/agent
-  agents/<agent>/agent/{server.ts, task.ts, contract.ts, procedures.ts}
+  agents/<agent>/agent/{server.ts, task.ts, contract.ts, procedures.ts, secrets.ts}
   agents/<agent>/agent/$claude/{settings.json, skills/, agents/}
-packages/common/constructs/src/app/agents/<name>-<agent>/<name>-<agent>.ts
 packages/common/constructs/src/app/agentic-projects/<name>/<name>.ts
+packages/common/constructs/src/app/agentic-projects/<name>/agents/<agent>/<agent>.ts
 ```
 
 The contract is only what a generator creates. Files the consumer or a build creates afterwards — the layers' `bun.lock` files, which the `lock` tasks write — are neither; the project record is the consumer's to edit, and generators only append to it.
@@ -147,8 +164,8 @@ The contract is only what a generator creates. Files the consumer or a build cre
 | Ownership | Artifacts | On sync or regeneration |
 |---|---|---|
 | **Maintained** | Dockerfiles, `server.ts`, `task.ts`, `client.ts`, the agent and project constructs and their star exports, the project's targets | Rewritten to what the installed version renders from the components |
-| **Maintained keys** | A container member's `name`, `type`, `exports` (base layer), its `workspace:*` layers and the peers AgentForge's root provides; the host manifest's AgentForge dependency and its `exports`; `agentforge-agent` in `tsconfig.lib.json`'s `customConditions` and the base layer's `paths` entry; the shared constructs project's `assemble` edge and its dependency on AgentForge | Those keys rewritten; every other key kept |
-| **Scaffolded** | Contracts, procedures, `options.ts`, `$claude/` | Written once when absent; never touched again by anything |
+| **Maintained keys** | A container member's `name`, `type`, `exports` (base layer), its `workspace:*` layers and the peers AgentForge's root provides; the host manifest's AgentForge dependency and its `exports`; `agentforge-agent` in `tsconfig.lib.json`'s `customConditions` and the base layer's `paths` entry; the shared constructs project's `assemble` edge and its dependencies on AgentForge and the project | Those keys rewritten; every other key kept |
+| **Scaffolded** | Contracts, procedures, `options.ts`, `secrets.ts`, `$claude/` | Written once when absent; never touched again by anything |
 | **Detached** | A maintained file or target named in `metadata.agentforge.detached` | Never touched; the consumer owns its updates |
 
 Dockerfiles stay maintained, though `ARG BASE_IMAGE` means an upgrade rarely changes them, because a layout change in a new AgentForge version must still reach an existing project; scaffolding them would make §REQ704 extension free of a detach at the cost of that. A consumer extends an image in the base layer's manifest first, and detaches a `Dockerfile` only for what a manifest cannot say.

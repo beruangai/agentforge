@@ -22,7 +22,9 @@
   "exports": {
     "./client": "./client.ts",
     "./writer": "./agents/writer/agent/contract.ts",
+    "./writer/secrets": "./agents/writer/agent/secrets.ts",
     "./grader": "./agents/grader/agent/contract.ts",
+    "./grader/secrets": "./agents/grader/agent/secrets.ts",
     "./*": "./base/agentic/*.ts"
   },
   "devDependencies": {

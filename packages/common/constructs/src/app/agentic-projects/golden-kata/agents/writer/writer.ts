@@ -7,18 +7,21 @@ import { fileURLToPath } from 'node:url';
 import {
   AgentRuntime,
   type AgentRuntimeProps,
+  type AgentSecrets,
 } from '@beruangai/agentforge/infra';
+import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '@beruangai/golden-kata/secrets';
+import type { REQUIRED_SECRETS as AGENT_SECRETS } from '@beruangai/golden-kata/writer/secrets';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
 import type { Construct } from 'constructs';
-import { RuntimeConfig } from '../../../core/runtime-config.js';
-import { findWorkspaceRoot } from '../../../core/workspace.js';
+import { RuntimeConfig } from '../../../../../core/runtime-config.js';
+import { findWorkspaceRoot } from '../../../../../core/workspace.js';
 
 const WORKSPACE_ROOT = findWorkspaceRoot(fileURLToPath(import.meta.url));
 /** The agent's layer: its image's build context. */
 const LAYER_DIRECTORY = join(
   WORKSPACE_ROOT,
-  'packages/examples/golden-kata/agents/grader',
+  'packages/examples/golden-kata/agents/writer',
 );
 /** The id of the agentic image the agent's image builds on. */
 const PARENT_IMAGE_ID_FILE = join(
@@ -37,17 +40,27 @@ function parentImageId(): string {
   }
 }
 
-export type GoldenKataGraderProps = Omit<
-  AgentRuntimeProps,
-  'agentRuntimeArtifact'
+/**
+ * The writer agent's secrets, by the environment variable each becomes:
+ * AgentForge's own, the base layer's and the agent's `REQUIRED_SECRETS`.
+ */
+export type GoldenKataWriterSecrets = AgentSecrets<
+  (typeof PROJECT_SECRETS)[number] | (typeof AGENT_SECRETS)[number]
 >;
 
+export type GoldenKataWriterProps = Omit<
+  AgentRuntimeProps,
+  'agentRuntimeArtifact' | 'secrets'
+> & {
+  readonly secrets: GoldenKataWriterSecrets;
+};
+
 /**
- * golden-kata's grader agent as its own AgentCore runtime, registered in the
- * runtime configuration as GoldenKataGrader.
+ * golden-kata's writer agent as its own AgentCore runtime, registered in the
+ * runtime configuration as GoldenKataWriter.
  */
-export class GoldenKataGrader extends AgentRuntime {
-  constructor(scope: Construct, id: string, props: GoldenKataGraderProps = {}) {
+export class GoldenKataWriter extends AgentRuntime {
+  constructor(scope: Construct, id: string, props: GoldenKataWriterProps) {
     super(scope, id, {
       ...props,
       agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
@@ -61,7 +74,7 @@ export class GoldenKataGrader extends AgentRuntime {
     const runtimeConfig = RuntimeConfig.ensure(this);
     runtimeConfig.set('agentcore', 'agentRuntimes', {
       ...runtimeConfig.get('agentcore').agentRuntimes,
-      GoldenKataGrader: { arn: this.agentRuntimeArn },
+      GoldenKataWriter: { arn: this.agentRuntimeArn },
     });
   }
 }

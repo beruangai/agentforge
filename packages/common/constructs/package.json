@@ -9,7 +9,8 @@
     "aws-cdk-lib": "catalog:",
     "constructs": "catalog:",
     "tslib": "^2.3.0",
-    "@beruangai/agentforge": "workspace:*"
+    "@beruangai/agentforge": "workspace:*",
+    "@beruangai/golden-kata": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"

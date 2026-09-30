@@ -6,14 +6,16 @@ import { DefaultRequestHandler } from '@a2a-js/sdk/server';
 import { jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import express from 'express';
+import { z } from 'zod';
 import { A2A_PROTOCOL_VERSION } from '#core/a2a-version.ts';
 import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
 import { TimeBudgetSecondsField } from '#core/contract/procedures.ts';
+import { SecretNameSchema } from '#core/secrets.ts';
 import { TASK_TABLE_NAME_VARIABLE } from '#core/task-table.ts';
 import { TaskProcessExecutor } from './executor.ts';
 import { createGateway } from './gateway.ts';
 import { createOperationalMetrics } from './metrics.ts';
-import { resolveDeclaredSecrets } from './secrets.ts';
+import { requireSecrets, resolveDeclaredSecrets } from './secrets.ts';
 import { createTaskTable, DynamoDBTaskStore } from './task-store.ts';
 import { startTelemetry, type Telemetry } from './telemetry.ts';
 
@@ -26,6 +28,12 @@ export interface ServerConfig {
    * conditions carry over. `new URL('./task.ts', import.meta.url)`.
    */
   readonly taskEntry: string | URL;
+  /**
+   * The secrets the agent's layers require, by the environment variable each
+   * becomes, beside AgentForge's own: the base layer's and the agent's
+   * `REQUIRED_SECRETS`. A request fails while one is unset.
+   */
+  readonly requiredSecrets: readonly string[];
   /** The DynamoDB table holding task state. */
   readonly tableName: string;
   /** A DynamoDB endpoint other than AWS's — DynamoDB Local, in development. */
@@ -39,8 +47,11 @@ export interface ServerConfig {
   readonly host: string;
 }
 
-/** The task entry, and anything else the environment should not decide. */
-export type ServerOptions = Pick<ServerConfig, 'taskEntry'> &
+/** The task entry, the required secrets, and anything else the environment should not decide. */
+export type ServerOptions = Pick<
+  ServerConfig,
+  'taskEntry' | 'requiredSecrets'
+> &
   Partial<ServerConfig>;
 
 /**
@@ -72,6 +83,7 @@ function serverConfig(
     options.dynamoDBEndpoint ?? environment.AGENTFORGE_DYNAMODB_ENDPOINT;
   return {
     taskEntry: options.taskEntry,
+    requiredSecrets: z.array(SecretNameSchema).parse(options.requiredSecrets),
     agentName: options.agentName ?? required('AGENTFORGE_AGENT_NAME'),
     tableName: options.tableName ?? required(TASK_TABLE_NAME_VARIABLE),
     ...(endpoint === undefined || endpoint === ''
@@ -172,6 +184,7 @@ export async function startServer(
         ...(runtimeSessionId === undefined ? {} : { runtimeSessionId }),
       });
       await resolveDeclaredSecrets();
+      requireSecrets(config.requiredSecrets);
     })();
     return prepared;
   };

@@ -115,11 +115,14 @@ beforeAll(async () => {
   process.env.AWS_ACCESS_KEY_ID = 'local';
   process.env.AWS_SECRET_ACCESS_KEY = 'local';
   process.env.AWS_REGION = 'us-east-2';
+  // The server requires the subscription token; no procedure here reaches a model.
+  process.env.CLAUDE_CODE_OAUTH_TOKEN = 'unused';
   dynamoDB = await startDynamoDBLocal();
   tableName = await dynamoDB.createTable();
   server = await startServer({
     agentName: 'runtime-integ',
     taskEntry: join(import.meta.dirname, '__fixtures__', 'task-entry.ts'),
+    requiredSecrets: [],
     tableName,
     dynamoDBEndpoint: dynamoDB.endpoint,
     admissionLimit: 3,

@@ -7,17 +7,17 @@ import { RuntimeConfig } from '../../../core/runtime-config.js';
 import {
   GoldenKataGrader,
   type GoldenKataGraderProps,
-} from '../../agents/golden-kata-grader/golden-kata-grader.js';
+} from './agents/grader/grader.js';
 import {
   GoldenKataWriter,
   type GoldenKataWriterProps,
-} from '../../agents/golden-kata-writer/golden-kata-writer.js';
+} from './agents/writer/writer.js';
 
 export interface GoldenKataProps {
-  /** Each agent's runtime options. */
-  readonly agents?: {
-    readonly writer?: GoldenKataWriterProps;
-    readonly grader?: GoldenKataGraderProps;
+  /** Each agent's runtime options, with the secrets it requires. */
+  readonly agents: {
+    readonly writer: GoldenKataWriterProps;
+    readonly grader: GoldenKataGraderProps;
   };
 }
 
@@ -33,11 +33,11 @@ export class GoldenKata extends Construct {
   /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
   readonly runtimeConfigApplicationId: string;
 
-  constructor(scope: Construct, id: string, props: GoldenKataProps = {}) {
+  constructor(scope: Construct, id: string, props: GoldenKataProps) {
     super(scope, id);
     this.agents = {
-      writer: new GoldenKataWriter(this, 'Writer', props.agents?.writer),
-      grader: new GoldenKataGrader(this, 'Grader', props.agents?.grader),
+      writer: new GoldenKataWriter(this, 'Writer', props.agents.writer),
+      grader: new GoldenKataGrader(this, 'Grader', props.agents.grader),
     };
     this.runtimeConfigApplicationId =
       RuntimeConfig.ensure(this).appConfigApplicationId;

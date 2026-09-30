@@ -7,4 +7,5 @@ await startServer({
     '../../../local/runtime/__fixtures__/task-entry.ts',
     import.meta.url,
   ),
+  requiredSecrets: [],
 });

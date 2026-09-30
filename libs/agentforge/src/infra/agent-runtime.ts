@@ -50,7 +50,11 @@ import {
   METRICS_VARIABLE,
   OPERATIONAL_METRICS,
 } from '#core/metrics.ts';
-import { SECRETS_VARIABLE } from '#core/secrets.ts';
+import {
+  REQUIRED_SECRETS,
+  type RequiredSecret,
+  SECRETS_VARIABLE,
+} from '#core/secrets.ts';
 import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
 import {
   TASK_TABLE_NAME_VARIABLE,
@@ -73,6 +77,18 @@ const READINESS_TIMEOUT = Duration.minutes(14);
  * (docs/research/agentcore-runtime.md). Node 26 gives the probe uuid7.
  */
 const NODEJS_26_X = new LambdaRuntime('nodejs26.x', RuntimeFamily.NODEJS);
+
+/** A secret as `AgentRuntime` reads it: its ARN, and read granted to the runtime's role. */
+export type AgentSecret = Pick<ISecret, 'secretArn' | 'grantRead'>;
+
+/**
+ * An agent's secrets, by the environment variable each becomes: AgentForge's
+ * own, the subscription token, and each of `Declared`. An agent's generated
+ * construct declares its project's and its own.
+ */
+export type AgentSecrets<Declared extends string = never> = Readonly<
+  Record<RequiredSecret | Declared, AgentSecret>
+>;
 
 /**
  * The L2 `Runtime`'s props, less the protocol, which is A2A, and the
@@ -104,14 +120,12 @@ export interface AgentRuntimeProps
    */
   readonly tracingEnabled?: boolean;
   /**
-   * Secrets the agent reads, by the environment variable each becomes — the
-   * subscription token as `CLAUDE_CODE_OAUTH_TOKEN`. The runtime may read
-   * these and no others (§REQ705); the server reads them at startup. A
-   * stopgap until AgentCore Identity holds them.
+   * Secrets the agent reads, by the environment variable each becomes: the
+   * subscription token as `CLAUDE_CODE_OAUTH_TOKEN`, and any the agent's
+   * layers require. The runtime may read these and no others (§REQ705); the
+   * server reads them on its first request.
    */
-  readonly secrets?: Readonly<
-    Record<string, Pick<ISecret, 'secretArn' | 'grantRead'>>
-  >;
+  readonly secrets: AgentSecrets & Readonly<Record<string, AgentSecret>>;
   /**
    * How much of the Claude CLI's telemetry the agent exports to CloudWatch,
    * as a log level: `WARN`, metrics and error events; `INFO`, every event
@@ -154,7 +168,7 @@ export class AgentRuntime extends Construct {
       removalPolicy = RemovalPolicy.RETAIN,
       sessionRetention = Duration.days(30),
       tracingEnabled = true,
-      secrets = {},
+      secrets,
       telemetry = 'INFO',
       filesystems = {},
       environmentVariables = {},
@@ -180,6 +194,11 @@ export class AgentRuntime extends Construct {
         throw new Error(
           `filesystem bucket name "${name}" must match ${FILESYSTEM_NAME_PATTERN}`,
         );
+      }
+    }
+    for (const name of REQUIRED_SECRETS) {
+      if (secrets[name] === undefined) {
+        throw new Error(`${name} is required: declare it in secrets`);
       }
     }
     for (const name of Object.keys(secrets)) {
@@ -240,18 +259,14 @@ export class AgentRuntime extends Construct {
         [TASK_TABLE_NAME_VARIABLE]: this.taskTable.tableName,
         [SESSION_BUCKET_VARIABLE]: this.sessionBucket.bucketName,
         [TELEMETRY_VARIABLE]: telemetry,
-        ...(Object.keys(secrets).length === 0
-          ? {}
-          : {
-              [SECRETS_VARIABLE]: Stack.of(this).toJsonString(
-                Object.fromEntries(
-                  Object.entries(secrets).map(([name, secret]) => [
-                    name,
-                    secret.secretArn,
-                  ]),
-                ),
-              ),
-            }),
+        [SECRETS_VARIABLE]: Stack.of(this).toJsonString(
+          Object.fromEntries(
+            Object.entries(secrets).map(([name, secret]) => [
+              name,
+              secret.secretArn,
+            ]),
+          ),
+        ),
         ...(Object.keys(filesystems).length === 0
           ? {}
           : {

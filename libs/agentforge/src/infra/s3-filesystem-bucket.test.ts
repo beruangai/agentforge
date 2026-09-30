@@ -2,6 +2,7 @@ import { App, Stack } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { BucketEncryption } from 'aws-cdk-lib/aws-s3';
+import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import { describe, expect, it } from 'vitest';
 import { AgentRuntime } from './agent-runtime.ts';
 import { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
@@ -17,6 +18,13 @@ describe('S3FilesystemBucket', () => {
         agentRuntimeArtifact: AgentRuntimeArtifact.fromImageUri(
           '123456789012.dkr.ecr.us-east-2.amazonaws.com/agent:latest',
         ),
+        secrets: {
+          CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
+            stack,
+            `${name}Token`,
+            'agentforge/claude-code-oauth-token',
+          ),
+        },
         filesystems: { vault },
       });
     }
