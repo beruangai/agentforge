@@ -28,6 +28,9 @@
   ],
   "references": [
     {
+      "path": "../../examples/smoke-coverage/tsconfig.lib.json"
+    },
+    {
       "path": "../../examples/golden-kata/tsconfig.lib.json"
     }
   ]

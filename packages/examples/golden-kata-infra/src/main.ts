@@ -3,9 +3,9 @@ import { ApplicationStage } from './stages/application-stage.js';
 
 const app = new App();
 
-// AgentForge's test deployment of golden-kata: `deploy` runs it as the test
-// role in us-east-2 (.env.integ), and its name falls under the role's
-// `agentforge-example-*` patterns.
+// AgentForge's test deployment of golden-kata, pinned to its account and
+// us-east-2; its name falls under the test role's `agentforge-example-*`
+// patterns, which the e2e suite reads it through.
 new ApplicationStage(app, 'agentforge-example-golden-kata', {
   env: {
     account: '913756569129', // AgentForge account

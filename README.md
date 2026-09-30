@@ -2,7 +2,7 @@
 
 Run a Claude Agent SDK procedure as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — and call it from anything, Temporal included.
 
-Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1–A4 delivered — the whole path runs locally and on AgentCore, with filesystems, against a real model on the [example agent](examples/hello-agent), specified and audited. A5 (the Nx plugin) is next ([roadmap](docs/ROADMAP.md)).
+Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1–A4 delivered — the whole path runs locally and on AgentCore, with filesystems, against a real model, specified and audited — and A5's baseline: the Nx plugin generates, syncs and deploys agentic projects, AgentForge's own [examples](packages/examples) among them ([roadmap](docs/ROADMAP.md)).
 
 ## Define, implement, consume
 
@@ -46,8 +46,8 @@ export const router = os.router({
 ```ts
 // task.ts — run by the server, once per task
 runTaskProcess({ contract: helloAgent, router });
-// server.ts — the container's entry; names the task entry, the rest from the environment
-await startServer({ taskEntry: new URL('./task.ts', import.meta.url) });
+// server.ts — the container's entry; names the task entry and the secrets its layers require, the rest from the environment
+await startServer({ taskEntry: new URL('./task.ts', import.meta.url), requiredSecrets });
 ```
 
 **4. Consume it** — from any process, or as a Temporal activity.
@@ -68,7 +68,7 @@ export const summarise = procedureActivity(client.summarise, {
 
 A start the container cannot run now — stopping, full, or already running the start's continuity key — is **refused** with when to retry, leaving no task: the client throws `StartRefusedError`; the activity waits it out, up to 15 minutes per attempt, then fails retryable after the refusal's time. So give the activity a `startToCloseTimeout` covering the procedure's time budget plus those 15 minutes, and leave `maximumAttempts`, `scheduleToCloseTimeout` and the workflow's timeouts unset or wide enough for several attempts: workflow code cannot widen them once the activity is scheduled ([research](docs/research/temporal.md)).
 
-[`examples/hello-agent`](examples/hello-agent) is all of this, complete, with its e2e.
+The Nx plugin generates and maintains all of this (the [package README](libs/agentforge/README.md#the-nx-plugin)); [`packages/examples/smoke-coverage`](packages/examples/smoke-coverage) is this agent, generated, with its e2e.
 
 ## Known limits
 
@@ -93,10 +93,10 @@ bunx nx run @beruangai/agentforge:integ --configuration=local
 ```
 
 ```bash
-bunx nx run @beruangai/example-hello-agent:e2e
+bunx nx run @beruangai/smoke-coverage:e2e
 ```
 
-The e2e builds both images and runs the agent in Docker against a real model; it reads `CLAUDE_CODE_OAUTH_TOKEN` from `.env.integ.local`. `e2e-agentcore` deploys it and runs the same path on AgentCore.
+The e2e builds the image chain and serves the agent in Docker against a real model, with `CLAUDE_CODE_OAUTH_TOKEN` from `.env.serve.local`. `e2e-agentcore` deploys it with the operator's credentials from `.env.cdk` and runs the same path on AgentCore; `golden-kata` has both targets too.
 
 ## Read
 

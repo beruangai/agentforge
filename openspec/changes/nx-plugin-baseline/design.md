@@ -139,7 +139,7 @@ A secret reaches an agent as `AgentRuntime` already delivers it — a Secrets Ma
 - **The server**, on the first request: the maintained `server.ts` passes both tuples to `startServer` as `requiredSecrets`, and once the declared secrets are resolved a request fails while one is unset.
 - **`serve`**, before starting: it imports both files, passes each name to the container by name, and refuses, naming each, while one is absent from its environment.
 
-AgentCore Identity is not needed: a secret per environment variable is the mechanism, not a stopgap (§ODO004 closed).
+Secrets Manager, a secret per environment variable, is the default provider and sufficient for consumer readiness (§ODO004 closed); AgentCore Identity may be supported as a second provider later.
 
 ### Generated layout, and who owns each artifact
 

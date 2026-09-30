@@ -16,6 +16,9 @@
       ],
       "@beruangai/golden-kata-infra": [
         "./packages/examples/golden-kata-infra/src/index.ts"
+      ],
+      "@beruangai/smoke-coverage-infra": [
+        "./packages/examples/smoke-coverage-infra/src/index.ts"
       ]
     },
     "rootDir": ".",

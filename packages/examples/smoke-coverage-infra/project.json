@@ -1,0 +1,121 @@
+{
+  "name": "@beruangai/smoke-coverage-infra",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/smoke-coverage-infra/src",
+  "projectType": "application",
+  "tags": [],
+  "metadata": {
+    "generator": "ts#infra",
+    "iac": "cdk"
+  },
+  "targets": {
+    "assemble": {
+      "dependsOn": ["compile", "synth"]
+    },
+    "build": {
+      "dependsOn": ["lint", "compile", "synth", "checkov"]
+    },
+    "checkov": {
+      "cache": false,
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/checkov"],
+      "dependsOn": ["synth"],
+      "options": {
+        "command": "uvx --from checkov==3.3.19 checkov --config-file {projectRoot}/checkov.yml --directory dist/{projectRoot}/cdk.out --framework cloudformation"
+      }
+    },
+    "compile": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/tsc"],
+      "options": {
+        "command": "tsc --build tsconfig.lib.json",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["checkov"],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/deploy"],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "cdk deploy \"agentforge-example-smoke-coverage/**\" --app ../../../dist/{projectRoot}/cdk.out --require-approval never --no-notices --outputs-file ../../../dist/{projectRoot}/deploy/outputs.json",
+        "env": {
+          "CDK_DISABLE_CLI_TELEMETRY": "true",
+          "NODE_OPTIONS": "--conditions=@beruangai/source"
+        }
+      },
+      "defaultConfiguration": "cdk",
+      "configurations": {
+        "cdk": {}
+      }
+    },
+    "destroy": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "bun scripts/confirm-destroy.ts agentforge-example-smoke-coverage && bun scripts/empty-buckets.ts ../../../dist/{projectRoot}/deploy/outputs.json && cdk destroy \"agentforge-example-smoke-coverage/**\" --app ../../../dist/{projectRoot}/cdk.out --force --no-notices",
+        "env": {
+          "CDK_DISABLE_CLI_TELEMETRY": "true",
+          "NODE_OPTIONS": "--conditions=@beruangai/source"
+        }
+      },
+      "defaultConfiguration": "cdk",
+      "configurations": {
+        "cdk": {}
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["biome"],
+      "options": {
+        "command": "biome format {projectRoot}"
+      },
+      "configurations": {
+        "fix": {
+          "command": "biome format --write {projectRoot}"
+        },
+        "skip-lint": {
+          "command": "node -e \"\""
+        }
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["biome"],
+      "dependsOn": ["format"],
+      "options": {
+        "command": "biome lint {projectRoot}"
+      },
+      "configurations": {
+        "fix": {
+          "command": "biome check --write {projectRoot}"
+        },
+        "skip-lint": {
+          "command": "node -e \"\""
+        }
+      }
+    },
+    "synth": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/cdk.out"],
+      "dependsOn": ["^assemble", "compile"],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "cdk synth --quiet --no-notices",
+        "env": {
+          "CDK_DISABLE_CLI_TELEMETRY": "true",
+          "NODE_OPTIONS": "--conditions=@beruangai/source"
+        }
+      },
+      "defaultConfiguration": "cdk",
+      "configurations": {
+        "cdk": {}
+      }
+    }
+  }
+}

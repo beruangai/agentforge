@@ -1,0 +1,48 @@
+import { S3FilesystemBucket } from '@beruangai/agentforge/infra';
+import { SmokeCoverage } from '@beruangai/common-constructs';
+import { CfnOutput, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
+import type { Construct } from 'constructs';
+
+export class ApplicationStack extends Stack {
+  readonly smokeCoverage: SmokeCoverage;
+
+  constructor(scope: Construct, id: string, props?: StackProps) {
+    super(scope, id, props);
+    // A test deployment: `destroy` removes everything, its buckets emptied
+    // first (scripts/empty-buckets.ts). A consumer's keeps the default, RETAIN.
+    const removalPolicy = RemovalPolicy.DESTROY;
+    // The bucket hello-agent's notebook filesystem mounts from.
+    const notebook = new S3FilesystemBucket(this, 'Notebook', {
+      removalPolicy,
+    });
+    this.smokeCoverage = new SmokeCoverage(this, 'SmokeCoverage', {
+      agents: {
+        helloAgent: {
+          removalPolicy,
+          filesystems: { notebook },
+          // The operator creates this secret and sets its value.
+          secrets: {
+            CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
+              this,
+              'SubscriptionToken',
+              'agentforge/claude-code-oauth-token',
+            ),
+          },
+        },
+      },
+    });
+
+    const { helloAgent } = this.smokeCoverage.agents;
+    // What the smoke suite stops a container through, and lists transcripts in.
+    new CfnOutput(this, 'HelloAgentRuntimeArn', {
+      value: helloAgent.agentRuntimeArn,
+    });
+    new CfnOutput(this, 'HelloAgentSessionBucketName', {
+      value: helloAgent.sessionBucket.bucketName,
+    });
+    new CfnOutput(this, 'NotebookBucketName', {
+      value: notebook.bucket.bucketName,
+    });
+  }
+}

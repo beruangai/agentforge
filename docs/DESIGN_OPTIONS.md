@@ -18,4 +18,5 @@ What is not decided. Everything built or decided is in [ARCHITECTURE.md](ARCHITE
 
 - **A local S3-compatible server** (§ODO009). Local runs name no session bucket and keep transcripts in their container; a server is chosen when a local test needs the store.
 - **Mounts** (S3 Files, EFS). A mount means VPC network mode and everything it drags in; state persists through APIs ([ADR 0011](../adr/0011-state-persists-through-apis-not-mounts.md)). A consumer that needs one configures it in its own CDK.
+- **AgentCore Identity as a secret provider** (§ODO004 closed). Secrets Manager is the default and sufficient for consumers; Identity is added beside it when a consumer needs what it offers.
 - **Streaming and blocking sends.** Polling serves long-running workflow steps; added when a procedure's latency warrants it.

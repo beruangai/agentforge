@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../dist/packages/examples/smoke-coverage/tsc",
+    "tsBuildInfoFile": "../../../dist/packages/examples/smoke-coverage/tsc/tsconfig.lib.tsbuildinfo",
+    "allowImportingTsExtensions": true,
+    "customConditions": [
+      "@beruangai/source",
+      "agentforge-agent"
+    ],
+    "paths": {
+      "@beruangai/smoke-coverage-base/*": [
+        "./base/agentic/*.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}

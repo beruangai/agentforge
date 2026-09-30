@@ -9,7 +9,11 @@
   },
   "targets": {
     "assemble": {
-      "dependsOn": ["compile", "@beruangai/golden-kata:assemble"]
+      "dependsOn": [
+        "compile",
+        "@beruangai/golden-kata:assemble",
+        "@beruangai/smoke-coverage:assemble"
+      ]
     },
     "build": {
       "executor": "@nx/js:tsc",

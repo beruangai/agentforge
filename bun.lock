@@ -130,6 +130,7 @@
       "dependencies": {
         "@beruangai/agentforge": "workspace:*",
         "@beruangai/golden-kata": "workspace:*",
+        "@beruangai/smoke-coverage": "workspace:*",
         "aws-cdk-lib": "catalog:",
         "constructs": "catalog:",
         "tslib": "^2.3.0",
@@ -176,6 +177,49 @@
       "devDependencies": {
         "@types/node": "catalog:",
         "vitest": "catalog:",
+      },
+    },
+    "packages/examples/smoke-coverage": {
+      "name": "@beruangai/smoke-coverage",
+      "version": "0.0.0",
+      "dependencies": {
+        "@a2a-js/sdk": "catalog:",
+        "@anthropic-ai/claude-agent-sdk": "catalog:",
+        "@anthropic-ai/sdk": "catalog:",
+        "@aws-sdk/client-appconfigdata": "catalog:",
+        "@aws-sdk/client-bedrock-agentcore": "catalog:",
+        "@aws-sdk/client-cloudwatch": "catalog:",
+        "@aws-sdk/client-dynamodb": "catalog:",
+        "@aws-sdk/client-s3": "catalog:",
+        "@aws-sdk/client-secrets-manager": "catalog:",
+        "@beruangai/agentforge": "workspace:*",
+        "@orpc/contract": "catalog:",
+        "@orpc/server": "catalog:",
+        "express": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@temporalio/activity": "catalog:",
+        "@temporalio/common": "catalog:",
+        "@temporalio/testing": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/examples/smoke-coverage-infra": {
+      "name": "@beruangai/smoke-coverage-infra",
+      "version": "0.0.1",
+      "dependencies": {
+        "@aws-sdk/client-s3": "catalog:",
+        "@beruangai/agentforge": "workspace:*",
+        "@beruangai/common-constructs": "workspace:*",
+        "aws-cdk-lib": "catalog:",
+        "constructs": "catalog:",
+        "source-map-support": "catalog:",
+        "tslib": "^2.3.0",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
       },
     },
   },
@@ -567,6 +611,10 @@
     "@beruangai/golden-kata": ["@beruangai/golden-kata@workspace:packages/examples/golden-kata"],
 
     "@beruangai/golden-kata-infra": ["@beruangai/golden-kata-infra@workspace:packages/examples/golden-kata-infra"],
+
+    "@beruangai/smoke-coverage": ["@beruangai/smoke-coverage@workspace:packages/examples/smoke-coverage"],
+
+    "@beruangai/smoke-coverage-infra": ["@beruangai/smoke-coverage-infra@workspace:packages/examples/smoke-coverage-infra"],
 
     "@biomejs/biome": ["@biomejs/biome@2.5.14", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.5.14", "@biomejs/cli-darwin-x64": "2.5.14", "@biomejs/cli-linux-arm64": "2.5.14", "@biomejs/cli-linux-arm64-musl": "2.5.14", "@biomejs/cli-linux-x64": "2.5.14", "@biomejs/cli-linux-x64-musl": "2.5.14", "@biomejs/cli-win32-arm64": "2.5.14", "@biomejs/cli-win32-x64": "2.5.14" }, "bin": { "biome": "bin/biome" } }, "sha512-0FabLIjd4M/dm8VFI86RMaLLdgepzbdfiAL2R8cr7V81OYYrP1w7Z73KfAwPK5h9SrEBXTzNG2y+mBwPo9xRnw=="],
 

@@ -3,6 +3,4 @@
 !package.json
 !bun.lock
 !libs/*/package.json
-!examples/*/package.json
-!examples/*/src
 !dist/libs/agentforge/bundle

@@ -10,7 +10,8 @@
     "constructs": "catalog:",
     "tslib": "^2.3.0",
     "@beruangai/agentforge": "workspace:*",
-    "@beruangai/golden-kata": "workspace:*"
+    "@beruangai/golden-kata": "workspace:*",
+    "@beruangai/smoke-coverage": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"

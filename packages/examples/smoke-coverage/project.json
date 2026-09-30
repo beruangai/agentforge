@@ -1,0 +1,137 @@
+{
+  "name": "@beruangai/smoke-coverage",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/smoke-coverage",
+  "projectType": "library",
+  "metadata": {
+    "generator": "@beruangai/agentforge:agentic-project",
+    "components": [
+      {
+        "generator": "@beruangai/agentforge:agent",
+        "name": "hello-agent",
+        "path": "agents/hello-agent",
+        "runtimeConfigKey": "SmokeCoverageHelloAgent",
+        "containerName": "beruangai-smoke-coverage-hello-agent"
+      }
+    ],
+    "agentforge": {
+      "detached": {
+        "files": [],
+        "targets": []
+      }
+    }
+  },
+  "targets": {
+    "image-agentforge": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["^bundle"],
+      "options": {
+        "layer": "agentforge"
+      }
+    },
+    "lock": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["^bundle"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/base/agentic/bun.lock"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "image": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock", "image-agentforge"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "assemble": {
+      "executor": "nx:noop",
+      "dependsOn": ["image-hello-agent"]
+    },
+    "lock-hello-agent": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["lock"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        "{projectRoot}/agents/hello-agent/agent/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/agents/hello-agent/agent/bun.lock"],
+      "options": {
+        "layer": "agents/hello-agent"
+      }
+    },
+    "image-hello-agent": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock-hello-agent", "image"],
+      "options": {
+        "layer": "agents/hello-agent"
+      }
+    },
+    "serve-hello-agent": {
+      "executor": "@beruangai/agentforge:serve",
+      "continuous": true,
+      "dependsOn": ["image-hello-agent"],
+      "defaultConfiguration": "serve",
+      "options": {
+        "agent": "hello-agent"
+      },
+      "configurations": {
+        "serve": {}
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["serve-hello-agent"],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project local",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "e2e-agentcore": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        {
+          "projects": ["@beruangai/smoke-coverage-infra"],
+          "target": "deploy"
+        }
+      ],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project agentcore",
+        "cwd": "{projectRoot}",
+        "envFile": "{workspaceRoot}/.env.integ"
+      }
+    }
+  }
+}

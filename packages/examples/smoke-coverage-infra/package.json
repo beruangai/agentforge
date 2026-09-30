@@ -1,0 +1,19 @@
+{
+  "name": "@beruangai/smoke-coverage-infra",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@beruangai/agentforge": "workspace:*",
+    "@beruangai/common-constructs": "workspace:*",
+    "aws-cdk-lib": "catalog:",
+    "constructs": "catalog:",
+    "source-map-support": "catalog:",
+    "tslib": "^2.3.0",
+    "@aws-sdk/client-s3": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

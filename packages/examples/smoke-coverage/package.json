@@ -1,0 +1,34 @@
+{
+  "name": "@beruangai/smoke-coverage",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@anthropic-ai/sdk": "catalog:",
+    "@a2a-js/sdk": "catalog:",
+    "@aws-sdk/client-cloudwatch": "catalog:",
+    "@aws-sdk/client-dynamodb": "catalog:",
+    "@aws-sdk/client-secrets-manager": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/server": "catalog:",
+    "express": "catalog:",
+    "zod": "catalog:",
+    "@aws-sdk/client-bedrock-agentcore": "catalog:",
+    "@aws-sdk/client-appconfigdata": "catalog:",
+    "@beruangai/agentforge": "workspace:*"
+  },
+  "exports": {
+    "./client": "./client.ts",
+    "./hello-agent": "./agents/hello-agent/agent/contract.ts",
+    "./hello-agent/secrets": "./agents/hello-agent/agent/secrets.ts",
+    "./*": "./base/agentic/*.ts"
+  },
+  "devDependencies": {
+    "@temporalio/activity": "catalog:",
+    "@temporalio/common": "catalog:",
+    "@temporalio/testing": "catalog:",
+    "vitest": "catalog:"
+  }
+}
