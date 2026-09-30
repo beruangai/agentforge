@@ -224,7 +224,7 @@ function workerEntry(project: WorkflowProject): MaintainedFile {
 // environment.
 import { runWorker } from '@beruangai/agentforge/temporal';
 import { activities } from './activities/index.ts';
-import { agentActivities } from './agents/activities.ts';
+import { resolveAgentActivities } from './agents/activities.ts';
 import { TASK_QUEUE } from './client.ts';
 import { REQUIRED_SECRETS } from './secrets.ts';
 
@@ -232,7 +232,7 @@ await runWorker({
   taskQueue: TASK_QUEUE,
   workflowBundle: new URL('./workflows.js', import.meta.url),
   activities,
-  agentActivities: await agentActivities(),
+  agentActivities: await resolveAgentActivities(),
   requiredSecrets: REQUIRED_SECRETS,
 });
 `,
@@ -305,8 +305,11 @@ import {
 ${connected.length === 0 ? '' : '  projectActivities,\n'}} from '@beruangai/agentforge/temporal';
 ${imports.join('\n')}
 
-/** Every connected agent's procedures, as the worker registers them. */
-export ${connected.length === 0 ? '' : 'async '}function agentActivities(): Promise<
+/**
+ * Every connected agent's procedures, as the worker registers them, each
+ * over its project's client for where AGENTFORGE_AGENTS says the agents are.
+ */
+export ${connected.length === 0 ? '' : 'async '}function resolveAgentActivities(): Promise<
   Readonly<Record<string, ProjectActivity>>
 > {
 ${body}
@@ -350,12 +353,13 @@ function agentWorkflowModule(context: WorkflowRenderContext): MaintainedFile {
 ${imports.join('\n')}
 
 /**
- * Each connected project's agents, \`agents().<project>.<agent>.<Procedure>(input,
- * { runtimeSessionId }, options?)\`. \`options\` here are the set's, over
- * AgentForge's defaults; a call's own \`options\` are merged over them for that
- * call alone. Neither may set \`activityId\` or \`taskQueue\`.
+ * Each connected project's agents as workflow calls: \`const agents =
+ * resolveAgents(options?)\`, then \`agents.<project>.<agent>.<Procedure>(input,
+ * { runtimeSessionId }, options?)\`. The \`options\` resolved with are the set's,
+ * over AgentForge's defaults; a call's own are merged over them for that call
+ * alone. Neither may set \`activityId\` or \`taskQueue\`.
  */
-export const agents = (${connected.length === 0 ? '_options' : 'options'}?: AgentActivityOptions) => ({
+export const resolveAgents = (${connected.length === 0 ? '_options' : 'options'}?: AgentActivityOptions) => ({
 ${connected
   .map(
     ({ connection }) =>

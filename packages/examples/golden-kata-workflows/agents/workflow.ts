@@ -12,12 +12,13 @@ import {
 import type { CONTRACTS as GOLDEN_KATA_CONTRACTS } from '@beruangai/golden-kata/client';
 
 /**
- * Each connected project's agents, `agents().<project>.<agent>.<Procedure>(input,
- * { runtimeSessionId }, options?)`. `options` here are the set's, over
- * AgentForge's defaults; a call's own `options` are merged over them for that
- * call alone. Neither may set `activityId` or `taskQueue`.
+ * Each connected project's agents as workflow calls: `const agents =
+ * resolveAgents(options?)`, then `agents.<project>.<agent>.<Procedure>(input,
+ * { runtimeSessionId }, options?)`. The `options` resolved with are the set's,
+ * over AgentForge's defaults; a call's own are merged over them for that call
+ * alone. Neither may set `activityId` or `taskQueue`.
  */
-export const agents = (options?: AgentActivityOptions) => ({
+export const resolveAgents = (options?: AgentActivityOptions) => ({
   goldenKata: proxyAgenticProject<typeof GOLDEN_KATA_CONTRACTS>(
     'goldenKata',
     options,

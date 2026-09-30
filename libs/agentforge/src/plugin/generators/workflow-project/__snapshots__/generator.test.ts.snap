@@ -28,8 +28,11 @@ import {
   type ProjectActivity,
 } from '@beruangai/agentforge/temporal';
 
-/** Every connected agent's procedures, as the worker registers them. */
-export function agentActivities(): Promise<
+/**
+ * Every connected agent's procedures, as the worker registers them, each
+ * over its project's client for where AGENTFORGE_AGENTS says the agents are.
+ */
+export function resolveAgentActivities(): Promise<
   Readonly<Record<string, ProjectActivity>>
 > {
   // No connections yet: the setting is checked all the same.
@@ -50,12 +53,13 @@ exports[`workflow-project > generates the project, its worker, a placeholder wor
 import type { AgentActivityOptions } from '@beruangai/agentforge/temporal/workflow';
 
 /**
- * Each connected project's agents, \`agents().<project>.<agent>.<Procedure>(input,
- * { runtimeSessionId }, options?)\`. \`options\` here are the set's, over
- * AgentForge's defaults; a call's own \`options\` are merged over them for that
- * call alone. Neither may set \`activityId\` or \`taskQueue\`.
+ * Each connected project's agents as workflow calls: \`const agents =
+ * resolveAgents(options?)\`, then \`agents.<project>.<agent>.<Procedure>(input,
+ * { runtimeSessionId }, options?)\`. The \`options\` resolved with are the set's,
+ * over AgentForge's defaults; a call's own are merged over them for that call
+ * alone. Neither may set \`activityId\` or \`taskQueue\`.
  */
-export const agents = (_options?: AgentActivityOptions) => ({});
+export const resolveAgents = (_options?: AgentActivityOptions) => ({});
 "
 `;
 
@@ -345,7 +349,7 @@ exports[`workflow-project > generates the project, its worker, a placeholder wor
 // environment.
 import { runWorker } from '@beruangai/agentforge/temporal';
 import { activities } from './activities/index.ts';
-import { agentActivities } from './agents/activities.ts';
+import { resolveAgentActivities } from './agents/activities.ts';
 import { TASK_QUEUE } from './client.ts';
 import { REQUIRED_SECRETS } from './secrets.ts';
 
@@ -353,7 +357,7 @@ await runWorker({
   taskQueue: TASK_QUEUE,
   workflowBundle: new URL('./workflows.js', import.meta.url),
   activities,
-  agentActivities: await agentActivities(),
+  agentActivities: await resolveAgentActivities(),
   requiredSecrets: REQUIRED_SECRETS,
 });
 "
@@ -419,7 +423,7 @@ const { greet } = proxyActivities<typeof activities>({
 
 /**
  * A placeholder: replace it with the project's workflows, which call the
- * connected agents through \`agents()\` from \`../agents/workflow.ts\`.
+ * connected agents through \`resolveAgents()\` from \`../agents/workflow.ts\`.
  */
 export async function example(name: string): Promise<string> {
   return greet(name);

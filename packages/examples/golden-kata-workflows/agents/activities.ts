@@ -16,8 +16,11 @@ import {
   client as goldenKataClient,
 } from '@beruangai/golden-kata/client';
 
-/** Every connected agent's procedures, as the worker registers them. */
-export async function agentActivities(): Promise<
+/**
+ * Every connected agent's procedures, as the worker registers them, each
+ * over its project's client for where AGENTFORGE_AGENTS says the agents are.
+ */
+export async function resolveAgentActivities(): Promise<
   Readonly<Record<string, ProjectActivity>>
 > {
   const agents = agentsFromEnvironment();

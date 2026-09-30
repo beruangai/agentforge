@@ -23,8 +23,11 @@ import {
   client as smokeCoverageClient,
 } from '@proj/smoke-coverage/client';
 
-/** Every connected agent's procedures, as the worker registers them. */
-export async function agentActivities(): Promise<
+/**
+ * Every connected agent's procedures, as the worker registers them, each
+ * over its project's client for where AGENTFORGE_AGENTS says the agents are.
+ */
+export async function resolveAgentActivities(): Promise<
   Readonly<Record<string, ProjectActivity>>
 > {
   const agents = agentsFromEnvironment();
@@ -136,12 +139,13 @@ import type { CONTRACTS as GOLDEN_KATA_CONTRACTS } from '@proj/golden-kata/clien
 import type { CONTRACTS as SMOKE_COVERAGE_CONTRACTS } from '@proj/smoke-coverage/client';
 
 /**
- * Each connected project's agents, \`agents().<project>.<agent>.<Procedure>(input,
- * { runtimeSessionId }, options?)\`. \`options\` here are the set's, over
- * AgentForge's defaults; a call's own \`options\` are merged over them for that
- * call alone. Neither may set \`activityId\` or \`taskQueue\`.
+ * Each connected project's agents as workflow calls: \`const agents =
+ * resolveAgents(options?)\`, then \`agents.<project>.<agent>.<Procedure>(input,
+ * { runtimeSessionId }, options?)\`. The \`options\` resolved with are the set's,
+ * over AgentForge's defaults; a call's own are merged over them for that call
+ * alone. Neither may set \`activityId\` or \`taskQueue\`.
  */
-export const agents = (options?: AgentActivityOptions) => ({
+export const resolveAgents = (options?: AgentActivityOptions) => ({
   goldenKata: proxyAgenticProject<typeof GOLDEN_KATA_CONTRACTS>(
     'goldenKata',
     options,
@@ -173,8 +177,11 @@ import {
   client as goldenKataClient,
 } from '@proj/golden-kata/client';
 
-/** Every connected agent's procedures, as the worker registers them. */
-export async function agentActivities(): Promise<
+/**
+ * Every connected agent's procedures, as the worker registers them, each
+ * over its project's client for where AGENTFORGE_AGENTS says the agents are.
+ */
+export async function resolveAgentActivities(): Promise<
   Readonly<Record<string, ProjectActivity>>
 > {
   const agents = agentsFromEnvironment();
@@ -275,12 +282,13 @@ import {
 import type { CONTRACTS as GOLDEN_KATA_CONTRACTS } from '@proj/golden-kata/client';
 
 /**
- * Each connected project's agents, \`agents().<project>.<agent>.<Procedure>(input,
- * { runtimeSessionId }, options?)\`. \`options\` here are the set's, over
- * AgentForge's defaults; a call's own \`options\` are merged over them for that
- * call alone. Neither may set \`activityId\` or \`taskQueue\`.
+ * Each connected project's agents as workflow calls: \`const agents =
+ * resolveAgents(options?)\`, then \`agents.<project>.<agent>.<Procedure>(input,
+ * { runtimeSessionId }, options?)\`. The \`options\` resolved with are the set's,
+ * over AgentForge's defaults; a call's own are merged over them for that call
+ * alone. Neither may set \`activityId\` or \`taskQueue\`.
  */
-export const agents = (options?: AgentActivityOptions) => ({
+export const resolveAgents = (options?: AgentActivityOptions) => ({
   goldenKata: proxyAgenticProject<typeof GOLDEN_KATA_CONTRACTS>(
     'goldenKata',
     options,

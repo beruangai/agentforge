@@ -34,7 +34,7 @@ const { greet } = proxyActivities<typeof activities>({
 
 /**
  * A placeholder: replace it with the project's workflows, which call the
- * connected agents through \`agents()\` from \`../agents/workflow.ts\`.
+ * connected agents through \`resolveAgents()\` from \`../agents/workflow.ts\`.
  */
 export async function example(name: string): Promise<string> {
   return greet(name);

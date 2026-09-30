@@ -153,7 +153,7 @@ import {
   CONTRACTS as GOLDEN_KATA_CONTRACTS,
   client as goldenKataClient,
 } from '@beruangai/golden-kata/client';
-export async function agentActivities() {
+export async function resolveAgentActivities() {
   const agents = agentsFromEnvironment();
   const goldenKata = agents.kind === 'local' ? goldenKataClient.local() : await goldenKataClient.fromRuntimeConfig(agents);
   return { ...projectActivities('goldenKata', GOLDEN_KATA_CONTRACTS, goldenKata) };
@@ -161,7 +161,7 @@ export async function agentActivities() {
 
 // agents/workflow.ts (maintained) — the workflow side; contracts imported as types only
 import type { CONTRACTS as GOLDEN_KATA_CONTRACTS } from '@beruangai/golden-kata/client';
-export const agents = (options?: ActivityOptions) => ({
+export const resolveAgents = (options?: AgentActivityOptions) => ({
   goldenKata: proxyAgenticProject<typeof GOLDEN_KATA_CONTRACTS>('goldenKata', options),
 });
 
@@ -187,11 +187,11 @@ export {
 A workflow, as the example writes it:
 
 ```ts
-const { goldenKata } = agents();
+const agents = resolveAgents();
 export async function writeAndGrade(input: WriteInput): Promise<WrittenAndGraded> {
   const runtimeSessionId = workflowInfo().workflowId;
-  const written = await goldenKata.writer.Write(input, { runtimeSessionId });
-  const grade = await goldenKata.grader.Grade({ kata: written.kata }, { runtimeSessionId });
+  const written = await agents.goldenKata.writer.Write(input, { runtimeSessionId });
+  const grade = await agents.goldenKata.grader.Grade({ kata: written.kata }, { runtimeSessionId });
   return { written, grade };
 }
 ```
@@ -220,7 +220,7 @@ What a connection renders: the host `package.json`'s dependency on the agentic p
 | `activities/index.ts` (the consumer's own activities, a placeholder) | scaffolded |
 | `secrets.ts` (`REQUIRED_SECRETS = []`) | scaffolded |
 
-Scaffolds are written when the project is created, so a placeholder the consumer removed stays removed when `workflow-project` runs again. The placeholder workflow calls the placeholder activity only, since a new project has no connections; its test runs it with `TestWorkflowEnvironment.createLocal({ server: { executable: { type: 'existing-path', path: <temporal on PATH> } } })` and `Worker.create({ workflowsPath })`, the activity stubbed. `worker.ts` is `runWorker({ taskQueue: TASK_QUEUE, workflowBundle: new URL('./workflows.js', import.meta.url), activities, agentActivities: await agentActivities(), requiredSecrets: REQUIRED_SECRETS })`.
+Scaffolds are written when the project is created, so a placeholder the consumer removed stays removed when `workflow-project` runs again. The placeholder workflow calls the placeholder activity only, since a new project has no connections; its test runs it with `TestWorkflowEnvironment.createLocal({ server: { executable: { type: 'existing-path', path: <temporal on PATH> } } })` and `Worker.create({ workflowsPath })`, the activity stubbed. `worker.ts` is `runWorker({ taskQueue: TASK_QUEUE, workflowBundle: new URL('./workflows.js', import.meta.url), activities, agentActivities: await resolveAgentActivities(), requiredSecrets: REQUIRED_SECRETS })`.
 
 ### Targets
 

@@ -3,9 +3,9 @@ import type {
   Outputs as GoldenKataOutputs,
 } from '@beruangai/golden-kata/client';
 import { workflowInfo } from '@temporalio/workflow';
-import { agents } from '../agents/workflow.ts';
+import { resolveAgents } from '../agents/workflow.ts';
 
-const { goldenKata } = agents();
+const agents = resolveAgents();
 
 export interface WrittenAndGraded {
   readonly written: GoldenKataOutputs['writer']['Write'];
@@ -20,8 +20,10 @@ export async function writeAndGrade(
   input: GoldenKataInputs['writer']['Write'],
 ): Promise<WrittenAndGraded> {
   const runtimeSessionId = workflowInfo().workflowId;
-  const written = await goldenKata.writer.Write(input, { runtimeSessionId });
-  const grade = await goldenKata.grader.Grade(
+  const written = await agents.goldenKata.writer.Write(input, {
+    runtimeSessionId,
+  });
+  const grade = await agents.goldenKata.grader.Grade(
     { kata: written.kata },
     { runtimeSessionId },
   );
