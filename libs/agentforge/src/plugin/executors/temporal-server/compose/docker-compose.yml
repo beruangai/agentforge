@@ -42,7 +42,7 @@ services:
       start_period: 30s
 
   temporal-admin-tools:
-    image: temporalio/admin-tools:1.31.0
+    image: temporalio/admin-tools:1.32.0
     restart: on-failure:6
     depends_on:
       postgresql:
@@ -67,7 +67,7 @@ services:
     command: /scripts/setup-postgres-es.sh
 
   temporal:
-    image: temporalio/server:1.31.0
+    image: temporalio/server:1.32.0
     depends_on:
       temporal-admin-tools:
         condition: service_completed_successfully
@@ -94,7 +94,7 @@ services:
       retries: 60
 
   temporal-ui:
-    image: temporalio/ui:2.49.1
+    image: temporalio/ui:2.54.1
     depends_on:
       temporal:
         condition: service_healthy
@@ -106,7 +106,7 @@ services:
 
   # Run per project, never by `up`: registers the project's namespace.
   temporal-create-namespace:
-    image: temporalio/admin-tools:1.31.0
+    image: temporalio/admin-tools:1.32.0
     profiles: [namespace]
     depends_on:
       temporal:

@@ -395,6 +395,11 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
 FROM \${NODE_IMAGE}
+# The SDK's core verifies Temporal Cloud's TLS against the system store,
+# which the slim image lacks; Node's bundled roots do not reach it.
+RUN apt-get update \\
+  && apt-get install --yes --no-install-recommends ca-certificates \\
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /worker
 COPY --from=dependencies /worker/node_modules ./node_modules
 COPY package.json worker.mjs workflows.js ./
