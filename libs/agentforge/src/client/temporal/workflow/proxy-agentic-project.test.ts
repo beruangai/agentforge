@@ -2,7 +2,10 @@ import { fileURLToPath } from 'node:url';
 import { bundleWorkflowCode } from '@temporalio/worker';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CONTRACTS } from './__fixtures__/contract.ts';
-import { DEFAULT_ACTIVITY_OPTIONS, proxyProject } from './proxy-project.ts';
+import {
+  DEFAULT_ACTIVITY_OPTIONS,
+  proxyAgenticProject,
+} from './proxy-agentic-project.ts';
 
 const { proxyActivities, scheduled } = vi.hoisted(() => {
   const scheduled = vi.fn(async (..._args: unknown[]) => 'output');
@@ -24,14 +27,14 @@ vi.mock('@temporalio/workflow', () => ({ proxyActivities }));
 
 const START = { runtimeSessionId: 'session' };
 
-describe('proxyProject', () => {
+describe('proxyAgenticProject', () => {
   beforeEach(() => {
     proxyActivities.mockClear();
     scheduled.mockClear();
   });
 
   it('schedules the activity named by the project, agent and procedure path', async () => {
-    const goldenKata = proxyProject<typeof CONTRACTS>('goldenKata');
+    const goldenKata = proxyAgenticProject<typeof CONTRACTS>('goldenKata');
     await expect(
       goldenKata.grader.rubric.Grade({ kata: 'a kata' }, START),
     ).resolves.toBe('output');
@@ -43,8 +46,8 @@ describe('proxyProject', () => {
   });
 
   it("merges the defaults under the caller's options", () => {
-    proxyProject<typeof CONTRACTS>('goldenKata');
-    proxyProject<typeof CONTRACTS>('goldenKata', {
+    proxyAgenticProject<typeof CONTRACTS>('goldenKata');
+    proxyAgenticProject<typeof CONTRACTS>('goldenKata', {
       startToCloseTimeout: '2 hours',
       retry: { maximumAttempts: 3 },
     });
@@ -62,13 +65,13 @@ describe('proxyProject', () => {
   });
 
   it('is not thenable at any level, so a namespace can be awaited or returned', () => {
-    const goldenKata = proxyProject<typeof CONTRACTS>('goldenKata');
+    const goldenKata = proxyAgenticProject<typeof CONTRACTS>('goldenKata');
     expect((goldenKata as { then?: unknown }).then).toBeUndefined();
     expect((goldenKata.writer as { then?: unknown }).then).toBeUndefined();
   });
 
   it('refuses a procedure the contracts lack, or a wrong input, at compile time', () => {
-    const goldenKata = proxyProject<typeof CONTRACTS>('goldenKata');
+    const goldenKata = proxyAgenticProject<typeof CONTRACTS>('goldenKata');
     // @ts-expect-error — no such procedure
     void goldenKata.writer.Rewrite;
     // @ts-expect-error — the input's field is `topic`
@@ -100,7 +103,7 @@ describe('a workflow bundle', () => {
       [...modules].filter((module) => module?.startsWith('./src/')).sort(),
     ).toEqual([
       './src/client/temporal/workflow/__fixtures__/workflow.ts',
-      './src/client/temporal/workflow/proxy-project.ts',
+      './src/client/temporal/workflow/proxy-agentic-project.ts',
     ]);
     expect(
       [...modules].filter((module) => /\/(zod|@orpc)\//.test(module ?? '')),

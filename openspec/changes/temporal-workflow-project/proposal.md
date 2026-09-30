@@ -42,7 +42,7 @@ Reading `procedureActivity` against the SDK also found a defect that a generated
 ## Interfaces
 
 - **`/temporal` grows and changes.** `procedureActivity` becomes `(input, start)` and cancels only on a requested cancel; added `projectActivities`, `runWorker`, `temporalConnectConfig`, `connectTemporalClient` and `agentsFromEnvironment`. They sit in `/temporal` because they are the caller's side of the boundary, over the client.
-- **A new entry point, `/temporal/workflow`**, safe inside the workflow sandbox: `proxyProject` and the default activity options. Separate because workflow code may not import activity or worker code.
+- **A new entry point, `/temporal/workflow`**, safe inside the workflow sandbox: `proxyAgenticProject` and the default activity options. Separate because workflow code may not import activity or worker code.
 - **`/infra` gains `TemporalWorker`.**
 - **The plugin gains** the `workflow-project` and `connection` generators, and executors for the workflow bundle and the worker bundle; `lock` learns the worker's layer; sync renders workflow projects beside agentic ones.
 - **Optional peers** grow by `@temporalio/worker`, `@temporalio/client`, `@temporalio/workflow` and `@temporalio/envconfig`, caret like the Temporal peers already there; ECS comes with `aws-cdk-lib`, already a peer.

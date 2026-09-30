@@ -1,9 +1,9 @@
 import { proxyActivities, workflowInfo } from '@temporalio/workflow';
-import { proxyProject } from '../../../../src/client/temporal/workflow/index.ts';
+import { proxyAgenticProject } from '../../../../src/client/temporal/workflow/index.ts';
 import type { CONTRACTS } from './contract.ts';
 
 /** A lost worker's attempt is retried within seconds, not the minute the default allows. */
-const fixture = proxyProject<typeof CONTRACTS>('fixture', {
+const fixture = proxyAgenticProject<typeof CONTRACTS>('fixture', {
   heartbeatTimeout: '10 seconds',
   retry: { initialInterval: '1 second', backoffCoefficient: 1 },
 });

@@ -1,8 +1,8 @@
 import { workflowInfo } from '@temporalio/workflow';
-import { proxyProject } from '../index.ts';
+import { proxyAgenticProject } from '../index.ts';
 import type { CONTRACTS } from './contract.ts';
 
-const goldenKata = proxyProject<typeof CONTRACTS>('goldenKata');
+const goldenKata = proxyAgenticProject<typeof CONTRACTS>('goldenKata');
 
 export async function writeAndGrade(topic: string): Promise<number> {
   const runtimeSessionId = workflowInfo().workflowId;

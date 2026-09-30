@@ -330,7 +330,7 @@ function agentWorkflowModule(context: WorkflowRenderContext): MaintainedFile {
           {
             source: '@beruangai/agentforge/temporal/workflow',
             statement:
-              "import { proxyProject } from '@beruangai/agentforge/temporal/workflow';",
+              "import { proxyAgenticProject } from '@beruangai/agentforge/temporal/workflow';",
           },
         ]),
     {
@@ -363,7 +363,7 @@ export const agents = (${connected.length === 0 ? '_options' : 'options'}?: Acti
 ${connected
   .map(
     ({ connection }) =>
-      `  ${connection.key}: proxyProject<typeof ${upperSnake(connection)}_CONTRACTS>(
+      `  ${connection.key}: proxyAgenticProject<typeof ${upperSnake(connection)}_CONTRACTS>(
     '${connection.key}',
     options,
   ),`,

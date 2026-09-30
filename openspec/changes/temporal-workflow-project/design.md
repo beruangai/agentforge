@@ -90,7 +90,7 @@ export type WorkflowCalls<Contract> =
 export const DEFAULT_ACTIVITY_OPTIONS: ActivityOptions; // { heartbeatTimeout: '1 minute', startToCloseTimeout: '1 day', cancellationType: 'WAIT_CANCELLATION_COMPLETED' }
 
 /** Nested proxies whose leaf call is `proxyActivities(options)['<project>.<agent>.….<Procedure>']`. */
-export function proxyProject<Contracts extends Readonly<Record<string, RouterContract>>>(
+export function proxyAgenticProject<Contracts extends Readonly<Record<string, RouterContract>>>(
   project: string,
   options?: ActivityOptions,
 ): { readonly [Agent in keyof Contracts]: WorkflowCalls<Contracts[Agent]> };
@@ -159,7 +159,7 @@ export async function agentActivities() {
 // agents/workflow.ts (maintained) — the workflow side; contracts imported as types only
 import type { CONTRACTS as GOLDEN_KATA_CONTRACTS } from '@beruangai/golden-kata/client';
 export const agents = (options?: ActivityOptions) => ({
-  goldenKata: proxyProject<typeof GOLDEN_KATA_CONTRACTS>('goldenKata', options),
+  goldenKata: proxyAgenticProject<typeof GOLDEN_KATA_CONTRACTS>('goldenKata', options),
 });
 
 // packages/common/constructs/src/app/workflow-projects/golden-kata-workflows/project.ts (maintained)
@@ -251,7 +251,7 @@ The generated construct renders `agenticProjects` from the connections — a mis
 
 ### The workflow side
 
-`proxyProject` builds one `proxyActivities({ ...DEFAULT_ACTIVITY_OPTIONS, ...options })` and returns nested proxies that accumulate the path and call `activities[path](input, start)` at the leaf. `heartbeatTimeout` of a minute sits above the activity's 5 s poll heartbeat with room for a slow `GetTask`; `startToCloseTimeout` of a day is only a backstop, since the agent's time budget bounds the task and a longer attempt merely attaches again. `cancellationType` is `WAIT_CANCELLATION_COMPLETED`: under the SDK's own default (`TRY_CANCEL` in 1.24.0, though documented otherwise — found by task 4.1) a cancelled workflow closes before its activity hears of the cancel, the activity's heartbeat finds it gone (`notFound`, not `cancelRequested`), and the task runs on; waiting keeps the workflow open until the activity has cancelled the task. Retries follow Temporal's default policy; `procedureActivity` makes non-retryable causes non-retryable. The type imports are erased by swc in `bundleWorkflowCode`, so the bundle holds none of the contracts; a runtime import of a contract there would pull its modules into the sandbox and is the mistake to avoid — the maintained file makes it once, correctly.
+`proxyAgenticProject` builds one `proxyActivities({ ...DEFAULT_ACTIVITY_OPTIONS, ...options })` and returns nested proxies that accumulate the path and call `activities[path](input, start)` at the leaf. `heartbeatTimeout` of a minute sits above the activity's 5 s poll heartbeat with room for a slow `GetTask`; `startToCloseTimeout` of a day is only a backstop, since the agent's time budget bounds the task and a longer attempt merely attaches again. `cancellationType` is `WAIT_CANCELLATION_COMPLETED`: under the SDK's own default (`TRY_CANCEL` in 1.24.0, though documented otherwise — found by task 4.1) a cancelled workflow closes before its activity hears of the cancel, the activity's heartbeat finds it gone (`notFound`, not `cancelRequested`), and the task runs on; waiting keeps the workflow open until the activity has cancelled the task. Retries follow Temporal's default policy; `procedureActivity` makes non-retryable causes non-retryable. The type imports are erased by swc in `bundleWorkflowCode`, so the bundle holds none of the contracts; a runtime import of a contract there would pull its modules into the sandbox and is the mistake to avoid — the maintained file makes it once, correctly.
 
 ### `golden-kata-workflows`
 
@@ -286,7 +286,7 @@ Each waits for a poller on the task queue (`DescribeTaskQueue`) before starting,
 
 ## Testing
 
-- **`test` (libs)**: `procedureActivity` in `MockActivityEnvironment` — `cancel('CANCELLED', { cancelRequested: true })` cancels the task; `cancel('WORKER_SHUTDOWN')`, a heartbeat-timeout cancel and one with no details do not; the start fields come from the call. `projectActivities` names nested procedures and routes each to its client. `temporalConnectConfig`'s refusals, with no file read. `agentsFromEnvironment`. `proxyProject`'s paths, and a type test that a wrong procedure or input fails. The generators and sync by snapshot; `TemporalWorker` and a generated construct on a synthesised template — the grants, the refusals, `stopTimeout` above the grace.
+- **`test` (libs)**: `procedureActivity` in `MockActivityEnvironment` — `cancel('CANCELLED', { cancelRequested: true })` cancels the task; `cancel('WORKER_SHUTDOWN')`, a heartbeat-timeout cancel and one with no details do not; the start fields come from the call. `projectActivities` names nested procedures and routes each to its client. `temporalConnectConfig`'s refusals, with no file read. `agentsFromEnvironment`. `proxyAgenticProject`'s paths, and a type test that a wrong procedure or input fails. The generators and sync by snapshot; `TemporalWorker` and a generated construct on a synthesised template — the grants, the refusals, `stopTimeout` above the grace.
 - **`test` (a workflow project)**: its workflows against the dev server, the CLI on `PATH`; `temporal --version` is a runtime input. `golden-kata-workflows`' unit test runs `writeAndGrade` with the agents' activities stubbed.
 - **`integ` local, `integ/local/temporal-worker/`** — earns its place because the design relies on it and the SDK documents it thinly: a real `Worker` against the dev server over a scripted `ProcedureClient`; the worker shut down mid-activity, a second worker taking the retry: `CancelTask` never called, the retry's `SendMessage` carrying the same idempotency key; and a workflow's cancel reaching `CancelTask`. Also that `runWorker` exits on `SIGTERM` within its grace.
 - **`e2e`**: the three places above.

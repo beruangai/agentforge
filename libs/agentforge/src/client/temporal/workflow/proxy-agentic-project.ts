@@ -40,11 +40,11 @@ type Activity = (input: unknown, start: ActivityStart) => Promise<unknown>;
 
 /**
  * An agentic project's agents as workflow calls, typed by their contracts:
- * `proxyProject<typeof CONTRACTS>('goldenKata').writer.Write(input, start)`
+ * `proxyAgenticProject<typeof CONTRACTS>('goldenKata').writer.Write(input, start)`
  * schedules the activity `goldenKata.writer.Write`. Import the contracts as
  * types only, so the workflow bundle carries none of their code.
  */
-export function proxyProject<
+export function proxyAgenticProject<
   Contracts extends Readonly<Record<string, RouterContract>>,
 >(
   project: string,

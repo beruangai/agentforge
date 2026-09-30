@@ -18,7 +18,7 @@ Group 1 is done with the change's artifacts. Groups 2–5 build the package's si
 
 ## 3. `/temporal/workflow`
 
-- [x] 3.1 The entry point (source condition, `types`, `default`; a tsdown entry), importing only `@temporalio/workflow` at run time: `proxyProject`, `DEFAULT_ACTIVITY_OPTIONS`, `WorkflowCalls`, `ActivityStart` — verified by unit tests of the paths the proxies call and the options merged, a type test that a wrong procedure or input fails to compile, and `bundleWorkflowCode` bundling a workflow that uses it with no module outside `@temporalio/workflow` in the bundle
+- [x] 3.1 The entry point (source condition, `types`, `default`; a tsdown entry), importing only `@temporalio/workflow` at run time: `proxyAgenticProject`, `DEFAULT_ACTIVITY_OPTIONS`, `WorkflowCalls`, `ActivityStart` — verified by unit tests of the paths the proxies call and the options merged, a type test that a wrong procedure or input fails to compile, and `bundleWorkflowCode` bundling a workflow that uses it with no module outside `@temporalio/workflow` in the bundle
 
 ## 4. `integ` local
 

@@ -5,7 +5,7 @@
 // The workflow side of the connections: each connected agentic project's
 // agents as calls typed by their contracts — imported as types only, so the
 // workflow bundle carries none of their code.
-import { proxyProject } from '@beruangai/agentforge/temporal/workflow';
+import { proxyAgenticProject } from '@beruangai/agentforge/temporal/workflow';
 import type { CONTRACTS as GOLDEN_KATA_CONTRACTS } from '@beruangai/golden-kata/client';
 import type { ActivityOptions } from '@temporalio/workflow';
 
@@ -14,5 +14,8 @@ import type { ActivityOptions } from '@temporalio/workflow';
  * { runtimeSessionId })`; `options` merge over AgentForge's defaults.
  */
 export const agents = (options?: ActivityOptions) => ({
-  goldenKata: proxyProject<typeof GOLDEN_KATA_CONTRACTS>('goldenKata', options),
+  goldenKata: proxyAgenticProject<typeof GOLDEN_KATA_CONTRACTS>(
+    'goldenKata',
+    options,
+  ),
 });
