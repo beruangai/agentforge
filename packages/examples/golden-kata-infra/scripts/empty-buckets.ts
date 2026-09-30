@@ -1,11 +1,13 @@
 // Empties golden-kata's versioned buckets — every version and delete marker —
 // so `destroy` can delete them: CloudFormation deletes only an empty bucket.
-// Reads the bucket names from the outputs the last `deploy` wrote.
+// Reads the bucket names from the outputs the last `deploy` wrote. A bucket an
+// earlier, interrupted `destroy` already deleted is reported and passed over.
 
 import { readFile } from 'node:fs/promises';
 import {
   DeleteObjectsCommand,
   ListObjectVersionsCommand,
+  NoSuchBucket,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { z } from 'zod';
@@ -42,39 +44,47 @@ for (const output of BUCKET_OUTPUTS) {
   let deleted = 0;
   let keyMarker: string | undefined;
   let versionIdMarker: string | undefined;
-  do {
-    const page = await s3.send(
-      new ListObjectVersionsCommand({
-        Bucket: bucket,
-        KeyMarker: keyMarker,
-        VersionIdMarker: versionIdMarker,
-      }),
-    );
-    const objects = [
-      ...(page.Versions ?? []),
-      ...(page.DeleteMarkers ?? []),
-    ].map(({ Key, VersionId }) => {
-      if (Key === undefined || VersionId === undefined) {
-        throw new Error(`${bucket} listed a version with no key or id`);
-      }
-      return { Key, VersionId };
-    });
-    if (objects.length > 0) {
-      const result = await s3.send(
-        new DeleteObjectsCommand({
+  try {
+    do {
+      const page = await s3.send(
+        new ListObjectVersionsCommand({
           Bucket: bucket,
-          Delete: { Objects: objects, Quiet: true },
+          KeyMarker: keyMarker,
+          VersionIdMarker: versionIdMarker,
         }),
       );
-      if (result.Errors !== undefined && result.Errors.length > 0) {
-        throw new Error(
-          `${bucket}: ${result.Errors.length} versions were not deleted, the first ${result.Errors[0]?.Key}: ${result.Errors[0]?.Message}`,
+      const objects = [
+        ...(page.Versions ?? []),
+        ...(page.DeleteMarkers ?? []),
+      ].map(({ Key, VersionId }) => {
+        if (Key === undefined || VersionId === undefined) {
+          throw new Error(`${bucket} listed a version with no key or id`);
+        }
+        return { Key, VersionId };
+      });
+      if (objects.length > 0) {
+        const result = await s3.send(
+          new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: { Objects: objects, Quiet: true },
+          }),
         );
+        if (result.Errors !== undefined && result.Errors.length > 0) {
+          throw new Error(
+            `${bucket}: ${result.Errors.length} versions were not deleted, the first ${result.Errors[0]?.Key}: ${result.Errors[0]?.Message}`,
+          );
+        }
+        deleted += objects.length;
       }
-      deleted += objects.length;
+      keyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
+      versionIdMarker = page.IsTruncated ? page.NextVersionIdMarker : undefined;
+    } while (keyMarker !== undefined);
+  } catch (error) {
+    if (error instanceof NoSuchBucket && deleted === 0) {
+      console.log(`${bucket}: already deleted`);
+      continue;
     }
-    keyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
-    versionIdMarker = page.IsTruncated ? page.NextVersionIdMarker : undefined;
-  } while (keyMarker !== undefined);
+    throw error;
+  }
   console.log(`${bucket}: ${deleted} versions and delete markers deleted`);
 }

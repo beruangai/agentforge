@@ -84,6 +84,20 @@ describe('golden-kata-infra', () => {
     );
   });
 
+  it("bypasses AppConfig's deletion protection, so destroy follows an e2e at once", () => {
+    const stack = template();
+    for (const type of [
+      'AWS::AppConfig::Environment',
+      'AWS::AppConfig::ConfigurationProfile',
+    ]) {
+      const resources = Object.values(stack.findResources(type));
+      expect(resources.length).toBeGreaterThan(0);
+      for (const resource of resources) {
+        expect(resource.Properties.DeletionProtectionCheck).toBe('BYPASS');
+      }
+    }
+  });
+
   it('registers both agents in the runtime configuration and names its application', () => {
     const stack = template();
     stack.hasResourceProperties('AWS::AppConfig::ConfigurationProfile', {

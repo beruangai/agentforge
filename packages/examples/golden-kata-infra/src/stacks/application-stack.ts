@@ -1,9 +1,19 @@
 import { GoldenKata, GoldenKataWorkflows } from '@beruangai/common-constructs';
-import { CfnOutput, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import {
+  Aspects,
+  CfnOutput,
+  RemovalPolicy,
+  Stack,
+  type StackProps,
+} from 'aws-cdk-lib';
+import {
+  CfnConfigurationProfile,
+  CfnEnvironment,
+} from 'aws-cdk-lib/aws-appconfig';
 import { SubnetType, Vpc } from 'aws-cdk-lib/aws-ec2';
 import { Cluster, ContainerInsights } from 'aws-cdk-lib/aws-ecs';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
-import type { Construct } from 'constructs';
+import type { Construct, IConstruct } from 'constructs';
 
 /** The operator's Temporal Cloud namespace, and its endpoint. */
 const TEMPORAL = {
@@ -21,6 +31,21 @@ export class ApplicationStack extends Stack {
     // A test deployment: `destroy` removes everything, its buckets emptied
     // first (scripts/empty-buckets.ts). A consumer's keeps the default, RETAIN.
     const removalPolicy = RemovalPolicy.DESTROY;
+    // And `destroy` runs right after an e2e has read the runtime
+    // configuration, which AppConfig's deletion protection would refuse for
+    // an hour. The runtime configuration's resources are created by an aspect
+    // at synthesis, so another aspect reaches them. A consumer's keeps the
+    // account's protection.
+    Aspects.of(this).add({
+      visit(node: IConstruct) {
+        if (
+          node instanceof CfnEnvironment ||
+          node instanceof CfnConfigurationProfile
+        ) {
+          node.deletionProtectionCheck = 'BYPASS';
+        }
+      },
+    });
     // The operator creates these secrets and sets their values.
     const subscriptionToken = Secret.fromSecretNameV2(
       this,
