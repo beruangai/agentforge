@@ -23,6 +23,10 @@ export default defineConfig({
         extends: true,
         test: { name: 'local', include: ['e2e/local/**/*.test.ts'] },
       },
+      {
+        extends: true,
+        test: { name: 'agentcore', include: ['e2e/agentcore/**/*.test.ts'] },
+      },
     ],
   },
 });
