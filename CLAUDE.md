@@ -2,7 +2,7 @@
 
 **AgentForge** runs a Claude Agent SDK procedure as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — for its consumers, StrategyFoundry and TrendBot, not for public use. One package, `@beruangai/agentforge`: a contract helper, a client and a Temporal activity for callers; the harness and server for an agent's image; the AgentForge image's `Dockerfile`; CDK constructs from A2; an Nx plugin that generates and maintains agentic projects.
 
-**A1–A4 are delivered** — the agent locally, on AgentCore, and with filesystems, verified end to end on the hand-built `hello-agent` (since regenerated as [`packages/examples/smoke-coverage`](packages/examples/smoke-coverage)) against a real model, then specified in `openspec/specs/` and audited. A5's baseline is delivered — the Nx plugin generating and syncing [`packages/examples/golden-kata`](packages/examples/golden-kata), verified locally and on AgentCore; its Temporal and filesystem changes are next ([roadmap](docs/ROADMAP.md)).
+**A1–A4 are delivered** — the agent locally, on AgentCore, and with filesystems, verified end to end on the hand-built `hello-agent` (since regenerated as [`packages/examples/smoke-coverage`](packages/examples/smoke-coverage)) against a real model, then specified in `openspec/specs/` and audited. A5's baseline and Temporal layer are delivered — the Nx plugin generating and syncing [`packages/examples/golden-kata`](packages/examples/golden-kata) and the workflow project [`packages/examples/golden-kata-workflows`](packages/examples/golden-kata-workflows) that calls it, verified locally, hybrid and on AgentCore with Temporal Cloud; its filesystem change is next ([roadmap](docs/ROADMAP.md)).
 
 ## Simplicity first
 
