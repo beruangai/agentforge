@@ -62,9 +62,9 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - Each agent's construct and the project construct in `@aws/nx-plugin`'s shared constructs, registered in its runtime configuration; the project client, local or resolved from a deployment (§REQ701, §REQ707, §REQ708)
 - Each layer declares the secrets it requires, enforced by the agent's construct at compile time, by `serve`, and by the server (§REQ705)
 - Dropped from §ODO003: the procedure generator — a contract and its procedures are the consumer's once stubbed — and a generated infra project; the consumer's own, from `ts#infra`, declares the constructs
-- **Pending**, each a later change of A5: generating the Temporal worker and workflow layer and connecting a caller project to an agentic project; S3 filesystems in `golden-kata`. [`examples/agentic-project`](../examples/agentic-project), which `golden-kata` supersedes, stays detached reference until the operator retires it; `hello-agent` stays flat, the minimal consumer
+- **Pending**, each a later change of A5: generating the Temporal worker and workflow layer and connecting a caller project to an agentic project; S3 filesystems in `golden-kata`. The hand-built `agentic-project` is retired, superseded by `golden-kata`
 
-**Exit:** a generated agentic project, synced by the plugin, runs end to end as `agentic-project` does today.
+**Exit:** a generated agentic project, synced by the plugin, runs end to end.
 
 ## A6 — Before the first live consumer
 
