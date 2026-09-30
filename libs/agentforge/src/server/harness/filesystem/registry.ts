@@ -8,14 +8,17 @@ import type {
   MountLifecycle,
 } from './filesystem.ts';
 
-/** Where registrations accumulate on the context, until the lifecycle mounts them. */
-const FILESYSTEM_REGISTRY = Symbol('agentforge.filesystems');
+/**
+ * Where registrations accumulate on the context, until the lifecycle mounts
+ * them. A string key and a type alias, not a symbol and an interface: a
+ * consumer that emits declarations for a router using `filesystems()` must be
+ * able to write its context's type, and neither is exported.
+ */
+const FILESYSTEM_REGISTRY = 'agentforge.filesystems';
 
 type Registry = Readonly<Record<string, Filesystem>>;
 
-interface RegistryContext {
-  readonly [FILESYSTEM_REGISTRY]?: Registry;
-}
+type RegistryContext = { readonly [FILESYSTEM_REGISTRY]?: Registry };
 
 /**
  * Registers filesystems for the procedures under it, by name: added to what

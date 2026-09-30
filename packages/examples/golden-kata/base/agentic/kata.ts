@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'] as const;
+export const DifficultyEnum = z.enum(DIFFICULTIES);
+
 /** The files a kata is worked on in: the kata itself, and a solution to it. */
 export const KATA_FILE = 'kata.json';
 export const SOLUTION_FILE = 'solution.ts';
@@ -35,8 +38,9 @@ export const KataSchema = z.object({
 });
 export type Kata = z.infer<typeof KataSchema>;
 
-/** A kata with the solution its writer checked it against. */
+/** A kata as its writer returns it: at the difficulty asked, with the solution it was checked against. */
 export const WrittenKataSchema = KataSchema.extend({
+  difficulty: DifficultyEnum,
   referenceSolution: z
     .string()
     .describe(`The writer's ${SOLUTION_FILE}, exporting the function`),

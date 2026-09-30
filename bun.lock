@@ -153,6 +153,9 @@
         "express": "catalog:",
         "zod": "catalog:",
       },
+      "devDependencies": {
+        "vitest": "catalog:",
+      },
     },
   },
   "catalog": {

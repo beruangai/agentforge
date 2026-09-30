@@ -46,8 +46,8 @@ Lands after `move-package-to-libs`. Groups 1–6 build the plugin and its client
 
 - [x] 7.1 Generate it: `init`, `agentic-project golden-kata --directory packages/examples`, `agent writer --procedure Write`, `agent grader --procedure Grade`; the commands recorded in its README — verified by `nx sync:check` passing and re-running every command leaving no diff
 - [x] 7.2 Fetch the current Agent SDK docs for MCP servers, skills and permissions and record what was verified, dated, in `docs/research/claude-agent-sdk.md`; then the base layer: `KataSchema`, `CaseResultsSchema`, `runCases`, the `kata` MCP server's `run_cases`, `baseOptions`, `CLAUDE.md`, the `kata-style` skill — verified by a bespoke unit test of `runCases` passing, failing, an unparsable case, a throwing solution and a timeout
-- [ ] 7.3 `writer.Write` and `grader.Grade` as designed, each on a `ScratchFilesystem` with its permissions under `dontAsk`, `results` computed after each run, 180-second budgets — verified by typecheck and lint
-- [ ] 7.4 Build the chain — verified by `nx run golden-kata:assemble` building the AgentForge, agentic and both agent images, and no target naming a path in `libs/agentforge` or `dist/`
+- [x] 7.3 `writer.Write` and `grader.Grade` as designed, each on a `ScratchFilesystem` with its permissions under `dontAsk`, `results` computed after each run, 180-second budgets — verified by typecheck and lint
+- [x] 7.4 Build the chain — verified by `nx run golden-kata:assemble` building the AgentForge, agentic and both agent images, and no target naming a path in `libs/agentforge` or `dist/`
 - [ ] 7.5 The bespoke e2e suite and its `local` project: depends on `serve-writer` and `serve-grader`, builds `goldenKataClient.local()`, the token from `.env.serve.local`; asserts each output parses, one score per rubric criterion, and each `results` equal to an independent `runCases` of the returned kata — verified by it passing against a real model (A5's exit)
 - [ ] 7.6 ARCHITECTURE §7–§9 on the plugin, the agentic project, its connection and the examples' place; `golden-kata`'s README — verified by reading them against what was built
 

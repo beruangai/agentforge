@@ -24,5 +24,8 @@
     "./writer": "./agents/writer/agent/contract.ts",
     "./grader": "./agents/grader/agent/contract.ts",
     "./*": "./base/agentic/*.ts"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
   }
 }
