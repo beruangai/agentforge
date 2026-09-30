@@ -39,7 +39,7 @@
       "outputs": ["{workspaceRoot}/dist/{projectRoot}/deploy"],
       "options": {
         "cwd": "{projectRoot}",
-        "command": "export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk deploy --all --app ../../../dist/{projectRoot}/cdk.out --require-approval never --no-notices --outputs-file ../../../dist/{projectRoot}/deploy/outputs.json",
+        "command": "export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk deploy \"agentforge-example-golden-kata/**\" --app ../../../dist/{projectRoot}/cdk.out --require-approval never --no-notices --outputs-file ../../../dist/{projectRoot}/deploy/outputs.json",
         "envFile": "{workspaceRoot}/.env.integ",
         "env": {
           "CDK_DISABLE_CLI_TELEMETRY": "true",
@@ -52,7 +52,7 @@
       "cache": false,
       "options": {
         "cwd": "{projectRoot}",
-        "command": "bun scripts/empty-buckets.ts ../../../dist/{projectRoot}/deploy/outputs.json && cdk destroy --all --app ../../../dist/{projectRoot}/cdk.out --force --no-notices",
+        "command": "bun scripts/empty-buckets.ts ../../../dist/{projectRoot}/deploy/outputs.json && cdk destroy \"agentforge-example-golden-kata/**\" --app ../../../dist/{projectRoot}/cdk.out --force --no-notices",
         "envFile": "{workspaceRoot}/.env.integ",
         "env": {
           "CDK_DISABLE_CLI_TELEMETRY": "true",
