@@ -9,7 +9,10 @@ import {
   type Tree,
   writeJson,
 } from '@nx/devkit';
-import { applyAndFormat } from '../../artifacts/project-artifacts.ts';
+import {
+  agenticProjectRendering,
+  applyAndFormat,
+} from '../../artifacts/project-artifacts.ts';
 import { baseScaffolds } from '../../artifacts/scaffolds.ts';
 import { CONTAINER_ROOT_DEPENDENCIES } from '../../container/container-workspace.ts';
 import { KebabNameField, parseName, scopeOf } from '../../names.ts';
@@ -149,6 +152,6 @@ export default async function agenticProjectGenerator(
     { iac: 'cdk' },
     SHARED_CONSTRUCTS_DECLARATION,
   );
-  await applyAndFormat(tree, [project]);
+  await applyAndFormat(tree, [agenticProjectRendering(tree, project)]);
   return () => installPackagesTask(tree);
 }

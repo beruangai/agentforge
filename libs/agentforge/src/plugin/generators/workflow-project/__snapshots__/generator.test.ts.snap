@@ -1,0 +1,644 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/activities/index.ts 1`] = `
+"/**
+ * The project's own activities, registered by name beside the connected
+ * agents' (\`<project>.<agent>.<Procedure>\`); a workflow calls them through
+ * \`proxyActivities<typeof activities>\`. A placeholder: replace it.
+ */
+export const activities = {
+  async greet(name: string): Promise<string> {
+    return \`Hello, \${name}\`;
+  },
+};
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/agents/activities.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The worker's side of the connections: every procedure of every connected
+// agentic project's agents as an activity, \`<project>.<agent>.<Procedure>\`,
+// over that project's client — each agent in its local container or on
+// AgentCore, as AGENTFORGE_AGENTS names.
+import {
+  agentsFromEnvironment,
+  type ProjectActivity,
+} from '@beruangai/agentforge/temporal';
+
+/** Every connected agent's procedures, as the worker registers them. */
+export function agentActivities(): Promise<
+  Readonly<Record<string, ProjectActivity>>
+> {
+  // No connections yet: the setting is checked all the same.
+  agentsFromEnvironment();
+  return Promise.resolve({});
+}
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/agents/workflow.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The workflow side of the connections: each connected agentic project's
+// agents as calls typed by their contracts — imported as types only, so the
+// workflow bundle carries none of their code.
+import type { ActivityOptions } from '@temporalio/workflow';
+
+/**
+ * Each connected project's agents, \`agents().<project>.<agent>.<Procedure>(input,
+ * { runtimeSessionId })\`; \`options\` merge over AgentForge's defaults.
+ */
+export const agents = (_options?: ActivityOptions) => ({});
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/client.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// How a caller starts golden-kata-workflows's workflows: the task queue its worker
+// polls, and a Temporal client connected as the environment names it.
+import { connectTemporalClient } from '@beruangai/agentforge/temporal';
+import type { Client } from '@temporalio/client';
+
+/** The one task queue the project's worker polls. */
+export const TASK_QUEUE = 'proj-golden-kata-workflows';
+
+/** A client from TEMPORAL_ADDRESS, TEMPORAL_NAMESPACE and, for Temporal Cloud, TEMPORAL_API_KEY. */
+export const connectClient = (): Promise<Client> => connectTemporalClient();
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/container/Dockerfile 1`] = `
+"# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+# installed version generates. To own it, name it in the project's
+# project.json metadata.agentforge.detached.files.
+#
+# The worker's image. Its build context is the project's \`bundle\` output:
+# worker.mjs, workflows.js, and this directory's package.json and bun.lock.
+# Bun installs the Temporal packages the bundle leaves external; Node runs it.
+ARG BUN_IMAGE=docker.io/oven/bun:1.4.0-alpine@sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb
+ARG NODE_IMAGE=docker.io/library/node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1
+
+FROM \${BUN_IMAGE} AS dependencies
+WORKDIR /worker
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+FROM \${NODE_IMAGE}
+WORKDIR /worker
+COPY --from=dependencies /worker/node_modules ./node_modules
+COPY package.json worker.mjs workflows.js ./
+USER node
+CMD ["node", "worker.mjs"]
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/container/package.json 1`] = `
+"{
+  "name": "@proj/golden-kata-workflows-worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@temporalio/activity": "^1.24.0",
+    "@temporalio/client": "^1.24.0",
+    "@temporalio/common": "^1.24.0",
+    "@temporalio/envconfig": "^1.24.0",
+    "@temporalio/worker": "^1.24.0"
+  }
+}
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/package.json 1`] = `
+"{
+  "name": "@proj/golden-kata-workflows",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@temporalio/testing": "catalog:"
+  },
+  "exports": {
+    "./client": "./client.ts",
+    "./secrets": "./secrets.ts"
+  },
+  "dependencies": {
+    "@beruangai/agentforge": "^1.0.0",
+    "@temporalio/activity": "catalog:",
+    "@temporalio/client": "catalog:",
+    "@temporalio/common": "catalog:",
+    "@temporalio/envconfig": "catalog:",
+    "@temporalio/worker": "catalog:",
+    "@temporalio/workflow": "catalog:"
+  }
+}
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/project.json 1`] = `
+"{
+  "name": "@proj/golden-kata-workflows",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/golden-kata-workflows",
+  "projectType": "library",
+  "metadata": {
+    "generator": "@beruangai/agentforge:workflow-project",
+    "components": [],
+    "agentforge": {
+      "detached": {
+        "files": [],
+        "targets": []
+      }
+    }
+  },
+  "targets": {
+    "bundle-workflows": {
+      "executor": "@beruangai/agentforge:bundle-workflows",
+      "cache": true,
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "externalDependencies": ["@temporalio/worker"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/bundle/workflows.js"]
+    },
+    "lock": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["^bundle"],
+      "inputs": [
+        "{projectRoot}/container/package.json",
+        "{workspaceRoot}/bun.lock",
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/container/bun.lock"],
+      "options": {
+        "layer": "worker"
+      }
+    },
+    "bundle": {
+      "executor": "@beruangai/agentforge:bundle-worker",
+      "cache": true,
+      "dependsOn": ["bundle-workflows", "lock", "^bundle"],
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": [
+        "{workspaceRoot}/dist/{projectRoot}/bundle/worker.mjs",
+        "{workspaceRoot}/dist/{projectRoot}/bundle/Dockerfile",
+        "{workspaceRoot}/dist/{projectRoot}/bundle/package.json",
+        "{workspaceRoot}/dist/{projectRoot}/bundle/bun.lock"
+      ]
+    },
+    "assemble": {
+      "executor": "nx:noop",
+      "dependsOn": ["bundle"]
+    },
+    "temporal-server": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": {
+        "command": "mkdir -p dist/{projectRoot}/temporal-server && temporal server start-dev --db-filename dist/{projectRoot}/temporal-server/temporal.db --namespace \\"\${TEMPORAL_NAMESPACE:?TEMPORAL_NAMESPACE is unset}\\""
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["bundle", "temporal-server"],
+      "options": {
+        "command": "rm -rf dist/{projectRoot}/serve && cp -R dist/{projectRoot}/bundle dist/{projectRoot}/serve && bun install --cwd dist/{projectRoot}/serve --frozen-lockfile --production && node dist/{projectRoot}/serve/worker.mjs",
+        "env": {
+          "TEMPORAL_ADDRESS": "localhost:7233"
+        }
+      },
+      "defaultConfiguration": "local",
+      "configurations": {
+        "local": {
+          "env": {
+            "TEMPORAL_ADDRESS": "localhost:7233",
+            "AGENTFORGE_AGENTS": "local"
+          }
+        },
+        "hybrid": {}
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        {
+          "runtime": "node --version"
+        },
+        {
+          "runtime": "temporal --version"
+        }
+      ],
+      "options": {
+        "command": "vitest run --config vitest.unit.mts",
+        "cwd": "{projectRoot}"
+      }
+    }
+  }
+}
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/secrets.ts 1`] = `
+"/**
+ * The secrets the worker requires, by the environment variable each becomes —
+ * beside AgentForge's own, TEMPORAL_API_KEY. The project's construct requires
+ * a secret for each, \`serve\` passes each from .env.serve.local (and
+ * .env.hybrid.local), and the worker fails at start while one is unset.
+ */
+export const REQUIRED_SECRETS = [] as const satisfies readonly string[];
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/tsconfig.json 1`] = `
+"{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {},
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.lib.json"
+    }
+  ]
+}
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/tsconfig.lib.json 1`] = `
+"{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../dist/packages/examples/golden-kata-workflows/tsc",
+    "tsBuildInfoFile": "../../../dist/packages/examples/golden-kata-workflows/tsc/tsconfig.lib.tsbuildinfo",
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/vitest.unit.mts 1`] = `
+"import { defineConfig } from 'vitest/config';
+
+/** Unit tier: the workflows against the Temporal CLI's dev server, their activities stubbed. */
+export default defineConfig({
+  root: import.meta.dirname,
+  test: {
+    name: '@proj/golden-kata-workflows',
+    watch: false,
+    environment: 'node',
+    include: ['**/*.test.ts'],
+    exclude: ['node_modules/**'],
+    passWithNoTests: false,
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
+  },
+});
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/worker.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The worker's entry: AgentForge's worker polling the project's task queue
+// with its workflows, bundled before it starts, its own activities and every
+// connected agentic project's, requiring the secrets secrets.ts declares.
+// The Temporal connection, and how agents are reached, come from the
+// environment.
+import { runWorker } from '@beruangai/agentforge/temporal';
+import { activities } from './activities/index.ts';
+import { agentActivities } from './agents/activities.ts';
+import { TASK_QUEUE } from './client.ts';
+import { REQUIRED_SECRETS } from './secrets.ts';
+
+await runWorker({
+  taskQueue: TASK_QUEUE,
+  workflowBundle: new URL('./workflows.js', import.meta.url),
+  activities,
+  agentActivities: await agentActivities(),
+  requiredSecrets: REQUIRED_SECRETS,
+});
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/workflows/example.test.ts 1`] = `
+"import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { TestWorkflowEnvironment } from '@temporalio/testing';
+import { Worker } from '@temporalio/worker';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { example } from './example.ts';
+
+let environment: TestWorkflowEnvironment;
+
+/** The Temporal CLI's dev server, started for the run from the CLI on PATH. */
+beforeAll(async () => {
+  environment = await TestWorkflowEnvironment.createLocal({
+    server: {
+      executable: {
+        type: 'existing-path',
+        path: execFileSync('which', ['temporal'], { encoding: 'utf8' }).trim(),
+      },
+    },
+  });
+});
+
+afterAll(async () => {
+  await environment?.teardown();
+});
+
+describe('example', () => {
+  it('greets through its activity', async () => {
+    const taskQueue = randomUUID();
+    const worker = await Worker.create({
+      connection: environment.nativeConnection,
+      taskQueue,
+      workflowsPath: fileURLToPath(new URL('./index.ts', import.meta.url)),
+      activities: { greet: async (name: string) => \`Hello, \${name}\` },
+    });
+    await expect(
+      worker.runUntil(
+        environment.client.workflow.execute<typeof example>('example', {
+          taskQueue,
+          workflowId: randomUUID(),
+          args: ['Temporal'],
+        }),
+      ),
+    ).resolves.toBe('Hello, Temporal');
+  });
+});
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/workflows/example.ts 1`] = `
+"import { proxyActivities } from '@temporalio/workflow';
+import type { activities } from '../activities/index.ts';
+
+const { greet } = proxyActivities<typeof activities>({
+  startToCloseTimeout: '1 minute',
+});
+
+/**
+ * A placeholder: replace it with the project's workflows, which call the
+ * connected agents through \`agents()\` from \`../agents/workflow.ts\`.
+ */
+export async function example(name: string): Promise<string> {
+  return greet(name);
+}
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > packages/examples/golden-kata-workflows/workflows/index.ts 1`] = `
+"/**
+ * The workflow bundle's entry: every workflow the worker runs, exported by
+ * the name a caller starts it by. Bundled by \`bundle-workflows\`; code here
+ * runs in Temporal's sandbox, so it imports agents' contracts as types only,
+ * through \`../agents/workflow.ts\`.
+ */
+export * from './example.ts';
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > project construct 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  TemporalWorker,
+  type TemporalWorkerProps,
+  type WorkerSecrets,
+} from '@beruangai/agentforge/infra';
+import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/golden-kata-workflows/secrets';
+import type { Construct } from 'constructs';
+import { RuntimeConfig } from '../../../core/runtime-config.js';
+import { findWorkspaceRoot } from '../../../core/workspace.js';
+
+const WORKSPACE_ROOT = findWorkspaceRoot(fileURLToPath(import.meta.url));
+/** The worker's image build context: the project's \`bundle\` output. */
+const BUNDLE_DIRECTORY = join(
+  WORKSPACE_ROOT,
+  'dist/packages/examples/golden-kata-workflows/bundle',
+);
+
+function bundleDirectory(): string {
+  if (!existsSync(join(BUNDLE_DIRECTORY, 'worker.mjs'))) {
+    throw new Error(
+      \`\${BUNDLE_DIRECTORY}/worker.mjs is missing: bundle the worker first, with nx run @proj/golden-kata-workflows:bundle\`,
+    );
+  }
+  return BUNDLE_DIRECTORY;
+}
+
+/**
+ * The worker's secrets, by the environment variable each becomes: the
+ * Temporal Cloud API key, and the project's \`REQUIRED_SECRETS\`.
+ */
+export type Secrets = WorkerSecrets<(typeof PROJECT_SECRETS)[number]>;
+
+export type WorkflowProjectProps = Omit<
+  TemporalWorkerProps,
+  'directory' | 'secrets' | 'agents'
+> & {
+  readonly secrets: Secrets;
+  /** Each connected agentic project's construct: the worker may invoke its agents. */
+  readonly agenticProjects?: Record<string, never>;
+};
+
+/**
+ * golden-kata-workflows's worker on ECS, polling its task queue on Temporal Cloud,
+ * granted invocation of exactly its connected projects' agents.
+ */
+export class WorkflowProject extends TemporalWorker {
+  constructor(scope: Construct, id: string, props: WorkflowProjectProps) {
+    const { agenticProjects: _agenticProjects, ...worker } = props;
+    super(scope, id, {
+      ...worker,
+      directory: bundleDirectory(),
+      agents: \`runtime-config:\${RuntimeConfig.ensure(scope).appConfigApplicationId}\`,
+    });
+  }
+}
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > project index 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+export {
+  WorkflowProject as GoldenKataWorkflows,
+  type WorkflowProjectProps as GoldenKataWorkflowsProps,
+  type Secrets as GoldenKataWorkflowsSecrets,
+} from './project.js';
+"
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections > targets 1`] = `
+{
+  "assemble": {
+    "dependsOn": [
+      "bundle",
+    ],
+    "executor": "nx:noop",
+  },
+  "bundle": {
+    "cache": true,
+    "dependsOn": [
+      "bundle-workflows",
+      "lock",
+      "^bundle",
+    ],
+    "executor": "@beruangai/agentforge:bundle-worker",
+    "inputs": [
+      "production",
+      "^production",
+      {
+        "runtime": "bun --version",
+      },
+    ],
+    "outputs": [
+      "{workspaceRoot}/dist/{projectRoot}/bundle/worker.mjs",
+      "{workspaceRoot}/dist/{projectRoot}/bundle/Dockerfile",
+      "{workspaceRoot}/dist/{projectRoot}/bundle/package.json",
+      "{workspaceRoot}/dist/{projectRoot}/bundle/bun.lock",
+    ],
+  },
+  "bundle-workflows": {
+    "cache": true,
+    "executor": "@beruangai/agentforge:bundle-workflows",
+    "inputs": [
+      "production",
+      "^production",
+      {
+        "externalDependencies": [
+          "@temporalio/worker",
+        ],
+      },
+    ],
+    "outputs": [
+      "{workspaceRoot}/dist/{projectRoot}/bundle/workflows.js",
+    ],
+  },
+  "lock": {
+    "cache": true,
+    "dependsOn": [
+      "^bundle",
+    ],
+    "executor": "@beruangai/agentforge:lock",
+    "inputs": [
+      "{projectRoot}/container/package.json",
+      "{workspaceRoot}/bun.lock",
+      {
+        "runtime": "bun --version",
+      },
+    ],
+    "options": {
+      "layer": "worker",
+    },
+    "outputs": [
+      "{projectRoot}/container/bun.lock",
+    ],
+  },
+  "serve": {
+    "configurations": {
+      "hybrid": {},
+      "local": {
+        "env": {
+          "AGENTFORGE_AGENTS": "local",
+          "TEMPORAL_ADDRESS": "localhost:7233",
+        },
+      },
+    },
+    "continuous": true,
+    "defaultConfiguration": "local",
+    "dependsOn": [
+      "bundle",
+      "temporal-server",
+    ],
+    "executor": "nx:run-commands",
+    "options": {
+      "command": "rm -rf dist/{projectRoot}/serve && cp -R dist/{projectRoot}/bundle dist/{projectRoot}/serve && bun install --cwd dist/{projectRoot}/serve --frozen-lockfile --production && node dist/{projectRoot}/serve/worker.mjs",
+      "env": {
+        "TEMPORAL_ADDRESS": "localhost:7233",
+      },
+    },
+  },
+  "temporal-server": {
+    "continuous": true,
+    "executor": "nx:run-commands",
+    "options": {
+      "command": "mkdir -p dist/{projectRoot}/temporal-server && temporal server start-dev --db-filename dist/{projectRoot}/temporal-server/temporal.db --namespace "\${TEMPORAL_NAMESPACE:?TEMPORAL_NAMESPACE is unset}"",
+    },
+  },
+  "test": {
+    "cache": true,
+    "executor": "nx:run-commands",
+    "inputs": [
+      "default",
+      "^production",
+      {
+        "runtime": "node --version",
+      },
+      {
+        "runtime": "temporal --version",
+      },
+    ],
+    "options": {
+      "command": "vitest run --config vitest.unit.mts",
+      "cwd": "{projectRoot}",
+    },
+  },
+}
+`;
+
+exports[`workflow-project > generates the project, its worker, a placeholder workflow and its test, and no connections 1`] = `
+[
+  "packages/examples/golden-kata-workflows/activities/index.ts",
+  "packages/examples/golden-kata-workflows/agents/activities.ts",
+  "packages/examples/golden-kata-workflows/agents/workflow.ts",
+  "packages/examples/golden-kata-workflows/client.ts",
+  "packages/examples/golden-kata-workflows/container/Dockerfile",
+  "packages/examples/golden-kata-workflows/container/package.json",
+  "packages/examples/golden-kata-workflows/package.json",
+  "packages/examples/golden-kata-workflows/project.json",
+  "packages/examples/golden-kata-workflows/secrets.ts",
+  "packages/examples/golden-kata-workflows/tsconfig.json",
+  "packages/examples/golden-kata-workflows/tsconfig.lib.json",
+  "packages/examples/golden-kata-workflows/vitest.unit.mts",
+  "packages/examples/golden-kata-workflows/worker.ts",
+  "packages/examples/golden-kata-workflows/workflows/example.test.ts",
+  "packages/examples/golden-kata-workflows/workflows/example.ts",
+  "packages/examples/golden-kata-workflows/workflows/index.ts",
+]
+`;

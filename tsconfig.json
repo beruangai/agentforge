@@ -20,6 +20,9 @@
     },
     {
       "path": "./packages/examples/smoke-coverage"
+    },
+    {
+      "path": "./packages/examples/golden-kata-workflows"
     }
   ]
 }

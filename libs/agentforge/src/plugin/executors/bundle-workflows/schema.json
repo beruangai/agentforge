@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Bundles a workflow project's workflows, for its worker",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

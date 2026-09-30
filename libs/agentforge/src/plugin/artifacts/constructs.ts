@@ -1,6 +1,10 @@
 import { agenticImage, imageIdFile } from '../container/images.ts';
 import { pascalCase } from '../names.ts';
-import type { AgentComponent, AgenticProject } from '../project-record.ts';
+import type {
+  AgentComponent,
+  AgenticProject,
+  WorkflowProject,
+} from '../project-record.ts';
 import { agentDirectory, agentKey, type RenderContext } from './layers.ts';
 import {
   type MaintainedFile,
@@ -9,6 +13,7 @@ import {
   maintainedStarExport,
   withEntries,
 } from './maintained.ts';
+import type { WorkflowRenderContext } from './workflow-project.ts';
 
 /** `@aws/nx-plugin`'s shared constructs project, where every construct is generated. */
 export const SHARED_CONSTRUCTS_DIRECTORY = 'packages/common/constructs';
@@ -35,7 +40,10 @@ function objectType(members: readonly string[], indent: string): string {
 }
 
 /** A relative module specifier, `.js`-suffixed in an ES-module workspace. */
-function specifier(context: RenderContext, module: string): string {
+function specifier(
+  context: Pick<RenderContext, 'esm'>,
+  module: string,
+): string {
   return context.esm ? `${module}.js` : module;
 }
 
@@ -262,11 +270,18 @@ export function constructExports(context: RenderContext): MaintainedFile[] {
 
 /**
  * The shared constructs project's maintained keys: its dependencies on
- * AgentForge and on the project, whose layers' secrets its agents' constructs
- * are typed from, and its `assemble` building the project's images, so an
- * infra project's synth builds what an asset builds `FROM`.
+ * AgentForge and on the project, whose secrets its constructs are typed
+ * from, and its `assemble` building what the project's assets are built
+ * from — an agentic project's images, a workflow project's worker bundle —
+ * so an infra project's synth finds them.
  */
-export function sharedConstructsKeys(context: RenderContext): MaintainedFile[] {
+export function sharedConstructsKeys(context: {
+  readonly agentforgeSpecifier: string;
+  readonly project: Pick<
+    AgenticProject | WorkflowProject,
+    'name' | 'packageName'
+  >;
+}): MaintainedFile[] {
   return [
     maintainedJson(`${SHARED_CONSTRUCTS_DIRECTORY}/package.json`, (current) =>
       withEntries(current, 'dependencies', {
@@ -295,5 +310,140 @@ export function sharedConstructsKeys(context: RenderContext): MaintainedFile[] {
         },
       };
     }),
+  ];
+}
+
+/** A workflow project's constructs directory. */
+function workflowProjectConstructsDirectory(project: WorkflowProject): string {
+  return `${APP}/workflow-projects/${project.projectName}`;
+}
+
+/**
+ * A workflow project's construct: its worker on ECS, from the project's
+ * `bundle` output, requiring each connected agentic project's construct and
+ * granted invocation of exactly their agents and read of the runtime
+ * configuration that resolves them. Its secrets are typed from the
+ * project's `secrets.ts`, beside the Temporal API key. It exports
+ * `WorkflowProject`, `WorkflowProjectProps` and `Secrets`, which the
+ * project's index aliases.
+ */
+export function workflowProjectConstruct(
+  context: WorkflowRenderContext,
+): MaintainedFile {
+  const { project } = context;
+  const connected = [...context.connected].sort((a, b) =>
+    a.connection.key.localeCompare(b.connection.key),
+  );
+  const alias = (projectName: string) => pascalCase(projectName);
+  const imports = connected.map(
+    ({ agenticProject }) =>
+      `import { AgenticProject as ${alias(agenticProject.projectName)} } from '${specifier(context, `../../agentic-projects/${agenticProject.projectName}/${PROJECT_MODULE}`)}';`,
+  );
+  const hasConnections = connected.length > 0;
+  const fileUrl = context.esm ? 'fileURLToPath(import.meta.url)' : '__filename';
+  return {
+    path: `${workflowProjectConstructsDirectory(project)}/${PROJECT_MODULE}.ts`,
+    render: () => `${maintainedHeader('//')}
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+${context.esm ? "import { fileURLToPath } from 'node:url';\n" : ''}import {
+  TemporalWorker,
+  type TemporalWorkerProps,
+  type WorkerSecrets,
+} from '@beruangai/agentforge/infra';
+import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '${project.packageName}/secrets';
+import type { Construct } from 'constructs';
+import { RuntimeConfig } from '${specifier(context, '../../../core/runtime-config')}';
+import { findWorkspaceRoot } from '${specifier(context, '../../../core/workspace')}';
+${imports.join('\n')}
+
+const WORKSPACE_ROOT = findWorkspaceRoot(${fileUrl});
+/** The worker's image build context: the project's \`bundle\` output. */
+const BUNDLE_DIRECTORY = join(WORKSPACE_ROOT, 'dist/${project.root}/bundle');
+
+function bundleDirectory(): string {
+  if (!existsSync(join(BUNDLE_DIRECTORY, 'worker.mjs'))) {
+    throw new Error(
+      \`\${BUNDLE_DIRECTORY}/worker.mjs is missing: bundle the worker first, with nx run ${project.name}:bundle\`,
+    );
+  }
+  return BUNDLE_DIRECTORY;
+}
+
+/**
+ * The worker's secrets, by the environment variable each becomes: the
+ * Temporal Cloud API key, and the project's \`REQUIRED_SECRETS\`.
+ */
+export type Secrets = WorkerSecrets<(typeof PROJECT_SECRETS)[number]>;
+
+export type WorkflowProjectProps = Omit<
+  TemporalWorkerProps,
+  'directory' | 'secrets' | 'agents'
+> & {
+  readonly secrets: Secrets;
+  /** Each connected agentic project's construct: the worker may invoke its agents. */
+  readonly agenticProjects${hasConnections ? '' : '?'}: ${objectType(
+    connected.map(
+      ({ connection, agenticProject }) =>
+        `readonly ${connection.key}: ${alias(agenticProject.projectName)};`,
+    ),
+    '  ',
+  )};
+};
+
+/**
+ * ${project.projectName}'s worker on ECS, polling its task queue on Temporal Cloud,
+ * granted invocation of exactly its connected projects' agents.
+ */
+export class WorkflowProject extends TemporalWorker {
+  constructor(scope: Construct, id: string, props: WorkflowProjectProps) {
+    const { agenticProjects${hasConnections ? '' : ': _agenticProjects'}, ...worker } = props;
+    super(scope, id, {
+      ...worker,
+      directory: bundleDirectory(),
+      agents: \`runtime-config:\${RuntimeConfig.ensure(scope).appConfigApplicationId}\`,
+    });
+${connected.map(({ connection }) => `    agenticProjects.${connection.key}.grantInvoke(this);`).join('\n')}
+  }
+}
+`,
+  };
+}
+
+/** A workflow project's index: its construct under the project's names. */
+export function workflowProjectConstructsIndex(
+  context: WorkflowRenderContext,
+): MaintainedFile {
+  const { project } = context;
+  const name = pascalCase(project.projectName);
+  return {
+    path: `${workflowProjectConstructsDirectory(project)}/index.ts`,
+    render: () =>
+      [
+        maintainedHeader('//'),
+        'export {',
+        `  WorkflowProject as ${name},`,
+        `  type WorkflowProjectProps as ${name}Props,`,
+        `  type Secrets as ${name}Secrets,`,
+        `} from '${specifier(context, `./${PROJECT_MODULE}`)}';`,
+        '',
+      ].join('\n'),
+  };
+}
+
+/** The star exports that make a workflow project's construct importable from the shared constructs package. */
+export function workflowConstructExports(
+  context: WorkflowRenderContext,
+): MaintainedFile[] {
+  const { project } = context;
+  return [
+    maintainedStarExport(
+      `${APP}/index.ts`,
+      specifier(context, './workflow-projects/index'),
+    ),
+    maintainedStarExport(
+      `${APP}/workflow-projects/index.ts`,
+      specifier(context, `./${project.projectName}/index`),
+    ),
   ];
 }

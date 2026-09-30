@@ -68,20 +68,34 @@ export async function catalogsEnabled(tree: Tree): Promise<boolean> {
 
 /**
  * Declares the dependencies an agentic project needs at AgentForge's peer
- * ranges: in the root catalog when the workspace keeps one, else in the root
- * manifest. One already declared is kept when it is within AgentForge's
- * range, and refused when it is not.
+ * ranges (`declareDependencies`).
  */
 export async function declareAgenticProjectDependencies(
   tree: Tree,
+): Promise<void> {
+  await declareDependencies(
+    tree,
+    Object.fromEntries(
+      AGENTIC_PROJECT_DEPENDENCIES.map((name) => [name, peerRange(name)]),
+    ),
+  );
+}
+
+/**
+ * Declares dependencies at the given ranges: in the root catalog when the
+ * workspace keeps one, else in the root manifest. One already declared is
+ * kept when it is within the range, and refused when it is not.
+ */
+export async function declareDependencies(
+  tree: Tree,
+  ranges: Readonly<Record<string, string>>,
 ): Promise<void> {
   const catalogs = await catalogsEnabled(tree);
   updateJson<Record<string, unknown>>(tree, 'package.json', (manifest) => {
     const field = catalogs ? 'catalog' : 'dependencies';
     const declared = { ...((manifest[field] ?? {}) as Record<string, string>) };
     const outOfRange: string[] = [];
-    for (const name of AGENTIC_PROJECT_DEPENDENCIES) {
-      const range = peerRange(name);
+    for (const [name, range] of Object.entries(ranges)) {
       const existing = declared[name];
       if (existing === undefined) {
         declared[name] = range;
@@ -96,6 +110,26 @@ export async function declareAgenticProjectDependencies(
     }
     return { ...manifest, [field]: declared };
   });
+}
+
+/**
+ * The version a dependency is declared at for the whole workspace: the root
+ * catalog's entry when the workspace keeps one, else the root manifest's.
+ * Throws when it is not declared.
+ */
+export async function declaredVersion(
+  tree: Tree,
+  name: string,
+): Promise<string> {
+  const field = (await catalogsEnabled(tree)) ? 'catalog' : 'dependencies';
+  const version = readJson<Record<string, Record<string, string> | undefined>>(
+    tree,
+    'package.json',
+  )[field]?.[name];
+  if (version === undefined) {
+    throw new Error(`the root package.json ${field} does not declare ${name}`);
+  }
+  return version;
 }
 
 /** Whether a declared version or range stays within AgentForge's range. */

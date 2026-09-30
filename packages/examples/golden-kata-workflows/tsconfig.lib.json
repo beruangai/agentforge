@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../dist/packages/examples/golden-kata-workflows/tsc",
+    "tsBuildInfoFile": "../../../dist/packages/examples/golden-kata-workflows/tsc/tsconfig.lib.tsbuildinfo",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@beruangai/golden-kata-base/*": [
+        "../golden-kata/base/agentic/*.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../golden-kata/tsconfig.lib.json"
+    }
+  ]
+}

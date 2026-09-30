@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GOLDEN_KATA } from '../../__fixtures__/golden-kata.ts';
 import { assembleContainerWorkspace } from '../../container/container-workspace.ts';
-import { layerLock } from './executor.ts';
+import { layerLock, workerLock } from './executor.ts';
 
 const INPUTS = {
   packageDirectory: '/installed/agentforge',
@@ -135,5 +135,28 @@ describe('assembleContainerWorkspace', () => {
       '@proj/golden-kata-writer',
     );
     expect(readFileSync(join(workspace, 'bun.lock'), 'utf8')).toBe('seed');
+  });
+});
+
+describe('workerLock', () => {
+  const PROJECT = {
+    name: '@proj/golden-kata-workflows',
+    root: 'packages/golden-kata-workflows',
+  };
+
+  it("locks the worker image's manifest alone, seeded with the workspace's lock", () => {
+    expect(workerLock(PROJECT, 'worker', '/workspace')).toEqual({
+      rootManifest:
+        '/workspace/packages/golden-kata-workflows/container/package.json',
+      members: [],
+      seed: '/workspace/bun.lock',
+      out: '/workspace/packages/golden-kata-workflows/container/bun.lock',
+    });
+  });
+
+  it("refuses an agentic project's layer", () => {
+    expect(() => workerLock(PROJECT, 'base', '/workspace')).toThrow(
+      'layer "base" is not a workflow project\'s: @proj/golden-kata-workflows locks only its worker',
+    );
   });
 });

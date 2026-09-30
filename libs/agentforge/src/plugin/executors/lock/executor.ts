@@ -9,12 +9,41 @@ import {
   lockContainerWorkspace,
 } from '../../container/container-workspace.ts';
 import { agentOfLayer } from '../../container/images.ts';
-import type { AgenticProject } from '../../project-record.ts';
-import { executorProject } from '../executor-project.ts';
+import type { AgenticProject, WorkflowProject } from '../../project-record.ts';
+import {
+  executorProject,
+  executorWorkflowProject,
+  runsForWorkflowProject,
+} from '../executor-project.ts';
 
 export interface LockExecutorOptions {
-  /** `base`, or `agents/<agent>`. */
+  /** `base`, or `agents/<agent>`; `worker`, for a workflow project. */
   readonly layer: string;
+}
+
+/**
+ * A workflow project's worker lock: the image's manifest, the Temporal
+ * packages alone, locked seeded with the workspace's own lock, so every
+ * version the workspace installed stays pinned — the worker bundle and the
+ * workflow bundle were built with those.
+ */
+export function workerLock(
+  project: Pick<WorkflowProject, 'name' | 'root'>,
+  layer: string,
+  workspaceRoot: string,
+): ContainerWorkspaceLock {
+  if (layer !== 'worker') {
+    throw new Error(
+      `layer "${layer}" is not a workflow project's: ${project.name} locks only its worker`,
+    );
+  }
+  const container = join(workspaceRoot, project.root, 'container');
+  return {
+    rootManifest: join(container, 'package.json'),
+    members: [],
+    seed: join(workspaceRoot, 'bun.lock'),
+    out: join(container, 'bun.lock'),
+  };
 }
 
 /**
@@ -70,12 +99,18 @@ export default async function lockExecutor(
   context: ExecutorContext,
 ): Promise<{ success: boolean }> {
   await lockContainerWorkspace(
-    layerLock(
-      executorProject(context),
-      options.layer,
-      agentforgeContainerInputs(),
-      context.root,
-    ),
+    runsForWorkflowProject(context)
+      ? workerLock(
+          executorWorkflowProject(context),
+          options.layer,
+          context.root,
+        )
+      : layerLock(
+          executorProject(context),
+          options.layer,
+          agentforgeContainerInputs(),
+          context.root,
+        ),
   );
   return { success: true };
 }

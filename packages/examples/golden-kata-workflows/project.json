@@ -1,0 +1,122 @@
+{
+  "name": "@beruangai/golden-kata-workflows",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/golden-kata-workflows",
+  "projectType": "library",
+  "metadata": {
+    "generator": "@beruangai/agentforge:workflow-project",
+    "components": [
+      {
+        "generator": "@beruangai/agentforge:connection",
+        "name": "golden-kata",
+        "path": "../golden-kata",
+        "packageName": "@beruangai/golden-kata",
+        "key": "goldenKata"
+      }
+    ],
+    "agentforge": {
+      "detached": {
+        "files": [],
+        "targets": []
+      }
+    }
+  },
+  "targets": {
+    "bundle-workflows": {
+      "executor": "@beruangai/agentforge:bundle-workflows",
+      "cache": true,
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "externalDependencies": ["@temporalio/worker"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/bundle/workflows.js"]
+    },
+    "lock": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["^bundle"],
+      "inputs": [
+        "{projectRoot}/container/package.json",
+        "{workspaceRoot}/bun.lock",
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/container/bun.lock"],
+      "options": {
+        "layer": "worker"
+      }
+    },
+    "bundle": {
+      "executor": "@beruangai/agentforge:bundle-worker",
+      "cache": true,
+      "dependsOn": ["bundle-workflows", "lock", "^bundle"],
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": [
+        "{workspaceRoot}/dist/{projectRoot}/bundle/worker.mjs",
+        "{workspaceRoot}/dist/{projectRoot}/bundle/Dockerfile",
+        "{workspaceRoot}/dist/{projectRoot}/bundle/package.json",
+        "{workspaceRoot}/dist/{projectRoot}/bundle/bun.lock"
+      ]
+    },
+    "assemble": {
+      "executor": "nx:noop",
+      "dependsOn": ["bundle"]
+    },
+    "temporal-server": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": {
+        "command": "mkdir -p dist/{projectRoot}/temporal-server && temporal server start-dev --db-filename dist/{projectRoot}/temporal-server/temporal.db --namespace \"${TEMPORAL_NAMESPACE:?TEMPORAL_NAMESPACE is unset}\""
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["bundle", "temporal-server"],
+      "options": {
+        "command": "rm -rf dist/{projectRoot}/serve && cp -R dist/{projectRoot}/bundle dist/{projectRoot}/serve && bun install --cwd dist/{projectRoot}/serve --frozen-lockfile --production && node dist/{projectRoot}/serve/worker.mjs",
+        "env": {
+          "TEMPORAL_ADDRESS": "localhost:7233"
+        }
+      },
+      "defaultConfiguration": "local",
+      "configurations": {
+        "local": {
+          "env": {
+            "TEMPORAL_ADDRESS": "localhost:7233",
+            "AGENTFORGE_AGENTS": "local"
+          }
+        },
+        "hybrid": {}
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        {
+          "runtime": "node --version"
+        },
+        {
+          "runtime": "temporal --version"
+        }
+      ],
+      "options": {
+        "command": "vitest run --config vitest.unit.mts",
+        "cwd": "{projectRoot}"
+      }
+    }
+  }
+}

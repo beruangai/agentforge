@@ -1,0 +1,276 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`connection > adds a second agentic project everywhere > activities of two 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The worker's side of the connections: every procedure of every connected
+// agentic project's agents as an activity, \`<project>.<agent>.<Procedure>\`,
+// over that project's client — each agent in its local container or on
+// AgentCore, as AGENTFORGE_AGENTS names.
+import {
+  agentsFromEnvironment,
+  type ProjectActivity,
+  projectActivities,
+} from '@beruangai/agentforge/temporal';
+import {
+  CONTRACTS as GOLDEN_KATA_CONTRACTS,
+  client as goldenKataClient,
+} from '@proj/golden-kata/client';
+import {
+  CONTRACTS as SMOKE_COVERAGE_CONTRACTS,
+  client as smokeCoverageClient,
+} from '@proj/smoke-coverage/client';
+
+/** Every connected agent's procedures, as the worker registers them. */
+export async function agentActivities(): Promise<
+  Readonly<Record<string, ProjectActivity>>
+> {
+  const agents = agentsFromEnvironment();
+  return {
+    ...projectActivities(
+      'goldenKata',
+      GOLDEN_KATA_CONTRACTS,
+      agents.kind === 'local'
+        ? goldenKataClient.local()
+        : await goldenKataClient.fromRuntimeConfig(agents),
+    ),
+    ...projectActivities(
+      'smokeCoverage',
+      SMOKE_COVERAGE_CONTRACTS,
+      agents.kind === 'local'
+        ? smokeCoverageClient.local()
+        : await smokeCoverageClient.fromRuntimeConfig(agents),
+    ),
+  };
+}
+"
+`;
+
+exports[`connection > adds a second agentic project everywhere > construct of two 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  TemporalWorker,
+  type TemporalWorkerProps,
+  type WorkerSecrets,
+} from '@beruangai/agentforge/infra';
+import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/golden-kata-workflows/secrets';
+import type { Construct } from 'constructs';
+import { RuntimeConfig } from '../../../core/runtime-config.js';
+import { findWorkspaceRoot } from '../../../core/workspace.js';
+import { AgenticProject as GoldenKata } from '../../agentic-projects/golden-kata/project.js';
+import { AgenticProject as SmokeCoverage } from '../../agentic-projects/smoke-coverage/project.js';
+
+const WORKSPACE_ROOT = findWorkspaceRoot(fileURLToPath(import.meta.url));
+/** The worker's image build context: the project's \`bundle\` output. */
+const BUNDLE_DIRECTORY = join(
+  WORKSPACE_ROOT,
+  'dist/packages/examples/golden-kata-workflows/bundle',
+);
+
+function bundleDirectory(): string {
+  if (!existsSync(join(BUNDLE_DIRECTORY, 'worker.mjs'))) {
+    throw new Error(
+      \`\${BUNDLE_DIRECTORY}/worker.mjs is missing: bundle the worker first, with nx run @proj/golden-kata-workflows:bundle\`,
+    );
+  }
+  return BUNDLE_DIRECTORY;
+}
+
+/**
+ * The worker's secrets, by the environment variable each becomes: the
+ * Temporal Cloud API key, and the project's \`REQUIRED_SECRETS\`.
+ */
+export type Secrets = WorkerSecrets<(typeof PROJECT_SECRETS)[number]>;
+
+export type WorkflowProjectProps = Omit<
+  TemporalWorkerProps,
+  'directory' | 'secrets' | 'agents'
+> & {
+  readonly secrets: Secrets;
+  /** Each connected agentic project's construct: the worker may invoke its agents. */
+  readonly agenticProjects: {
+    readonly goldenKata: GoldenKata;
+    readonly smokeCoverage: SmokeCoverage;
+  };
+};
+
+/**
+ * golden-kata-workflows's worker on ECS, polling its task queue on Temporal Cloud,
+ * granted invocation of exactly its connected projects' agents.
+ */
+export class WorkflowProject extends TemporalWorker {
+  constructor(scope: Construct, id: string, props: WorkflowProjectProps) {
+    const { agenticProjects, ...worker } = props;
+    super(scope, id, {
+      ...worker,
+      directory: bundleDirectory(),
+      agents: \`runtime-config:\${RuntimeConfig.ensure(scope).appConfigApplicationId}\`,
+    });
+    agenticProjects.goldenKata.grantInvoke(this);
+    agenticProjects.smokeCoverage.grantInvoke(this);
+  }
+}
+"
+`;
+
+exports[`connection > adds a second agentic project everywhere > workflow of two 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The workflow side of the connections: each connected agentic project's
+// agents as calls typed by their contracts — imported as types only, so the
+// workflow bundle carries none of their code.
+import { proxyProject } from '@beruangai/agentforge/temporal/workflow';
+import type { ActivityOptions } from '@temporalio/workflow';
+import type { CONTRACTS as GOLDEN_KATA_CONTRACTS } from '@proj/golden-kata/client';
+import type { CONTRACTS as SMOKE_COVERAGE_CONTRACTS } from '@proj/smoke-coverage/client';
+
+/**
+ * Each connected project's agents, \`agents().<project>.<agent>.<Procedure>(input,
+ * { runtimeSessionId })\`; \`options\` merge over AgentForge's defaults.
+ */
+export const agents = (options?: ActivityOptions) => ({
+  goldenKata: proxyProject<typeof GOLDEN_KATA_CONTRACTS>('goldenKata', options),
+  smokeCoverage: proxyProject<typeof SMOKE_COVERAGE_CONTRACTS>(
+    'smokeCoverage',
+    options,
+  ),
+});
+"
+`;
+
+exports[`connection > records the connection and renders what spans it > activities of one 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The worker's side of the connections: every procedure of every connected
+// agentic project's agents as an activity, \`<project>.<agent>.<Procedure>\`,
+// over that project's client — each agent in its local container or on
+// AgentCore, as AGENTFORGE_AGENTS names.
+import {
+  agentsFromEnvironment,
+  type ProjectActivity,
+  projectActivities,
+} from '@beruangai/agentforge/temporal';
+import {
+  CONTRACTS as GOLDEN_KATA_CONTRACTS,
+  client as goldenKataClient,
+} from '@proj/golden-kata/client';
+
+/** Every connected agent's procedures, as the worker registers them. */
+export async function agentActivities(): Promise<
+  Readonly<Record<string, ProjectActivity>>
+> {
+  const agents = agentsFromEnvironment();
+  return {
+    ...projectActivities(
+      'goldenKata',
+      GOLDEN_KATA_CONTRACTS,
+      agents.kind === 'local'
+        ? goldenKataClient.local()
+        : await goldenKataClient.fromRuntimeConfig(agents),
+    ),
+  };
+}
+"
+`;
+
+exports[`connection > records the connection and renders what spans it > construct of one 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  TemporalWorker,
+  type TemporalWorkerProps,
+  type WorkerSecrets,
+} from '@beruangai/agentforge/infra';
+import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/golden-kata-workflows/secrets';
+import type { Construct } from 'constructs';
+import { RuntimeConfig } from '../../../core/runtime-config.js';
+import { findWorkspaceRoot } from '../../../core/workspace.js';
+import { AgenticProject as GoldenKata } from '../../agentic-projects/golden-kata/project.js';
+
+const WORKSPACE_ROOT = findWorkspaceRoot(fileURLToPath(import.meta.url));
+/** The worker's image build context: the project's \`bundle\` output. */
+const BUNDLE_DIRECTORY = join(
+  WORKSPACE_ROOT,
+  'dist/packages/examples/golden-kata-workflows/bundle',
+);
+
+function bundleDirectory(): string {
+  if (!existsSync(join(BUNDLE_DIRECTORY, 'worker.mjs'))) {
+    throw new Error(
+      \`\${BUNDLE_DIRECTORY}/worker.mjs is missing: bundle the worker first, with nx run @proj/golden-kata-workflows:bundle\`,
+    );
+  }
+  return BUNDLE_DIRECTORY;
+}
+
+/**
+ * The worker's secrets, by the environment variable each becomes: the
+ * Temporal Cloud API key, and the project's \`REQUIRED_SECRETS\`.
+ */
+export type Secrets = WorkerSecrets<(typeof PROJECT_SECRETS)[number]>;
+
+export type WorkflowProjectProps = Omit<
+  TemporalWorkerProps,
+  'directory' | 'secrets' | 'agents'
+> & {
+  readonly secrets: Secrets;
+  /** Each connected agentic project's construct: the worker may invoke its agents. */
+  readonly agenticProjects: {
+    readonly goldenKata: GoldenKata;
+  };
+};
+
+/**
+ * golden-kata-workflows's worker on ECS, polling its task queue on Temporal Cloud,
+ * granted invocation of exactly its connected projects' agents.
+ */
+export class WorkflowProject extends TemporalWorker {
+  constructor(scope: Construct, id: string, props: WorkflowProjectProps) {
+    const { agenticProjects, ...worker } = props;
+    super(scope, id, {
+      ...worker,
+      directory: bundleDirectory(),
+      agents: \`runtime-config:\${RuntimeConfig.ensure(scope).appConfigApplicationId}\`,
+    });
+    agenticProjects.goldenKata.grantInvoke(this);
+  }
+}
+"
+`;
+
+exports[`connection > records the connection and renders what spans it > workflow of one 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The workflow side of the connections: each connected agentic project's
+// agents as calls typed by their contracts — imported as types only, so the
+// workflow bundle carries none of their code.
+import { proxyProject } from '@beruangai/agentforge/temporal/workflow';
+import type { ActivityOptions } from '@temporalio/workflow';
+import type { CONTRACTS as GOLDEN_KATA_CONTRACTS } from '@proj/golden-kata/client';
+
+/**
+ * Each connected project's agents, \`agents().<project>.<agent>.<Procedure>(input,
+ * { runtimeSessionId })\`; \`options\` merge over AgentForge's defaults.
+ */
+export const agents = (options?: ActivityOptions) => ({
+  goldenKata: proxyProject<typeof GOLDEN_KATA_CONTRACTS>('goldenKata', options),
+});
+"
+`;

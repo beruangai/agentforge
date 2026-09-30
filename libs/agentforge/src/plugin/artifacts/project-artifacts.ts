@@ -3,11 +3,12 @@ import { formatFilesInSubtree } from '@aws/nx-plugin/sdk/utils/format';
 import {
   readJson,
   readProjectConfiguration,
+  type TargetConfiguration,
   type Tree,
   updateProjectConfiguration,
 } from '@nx/devkit';
 import { CONTAINER_ROOT_DEPENDENCIES } from '../container/container-workspace.ts';
-import type { AgenticProject } from '../project-record.ts';
+import type { AgenticProject, Detached } from '../project-record.ts';
 import { agentforgeSpecifier, peerRange } from '../workspace-dependencies.ts';
 import {
   agentConstruct,
@@ -79,6 +80,32 @@ export function projectArtifacts(context: RenderContext): ProjectArtifacts {
   };
 }
 
+/** A project's artifacts as rendered now, with what applying them reads from its record. */
+export interface ProjectRendering {
+  /** The Nx project's name. */
+  readonly name: string;
+  readonly detached: Detached;
+  readonly artifacts: ProjectArtifacts;
+  /** Whether a target AgentForge no longer renders is one it rendered before, and so is removed. */
+  readonly isStaleTarget: (
+    name: string,
+    target: TargetConfiguration,
+  ) => boolean;
+}
+
+/** An agentic project's rendering: its agents' targets are stale once the agent is not recorded. */
+export function agenticProjectRendering(
+  tree: Tree,
+  project: AgenticProject,
+): ProjectRendering {
+  return {
+    name: project.name,
+    detached: project.detached,
+    artifacts: projectArtifacts(renderContext(tree, project)),
+    isStaleTarget: isAgentTarget,
+  };
+}
+
 /** What applying a project's artifacts changed: workspace-relative files, and `<project>:<target>`s. */
 export interface AppliedChanges {
   readonly files: readonly string[];
@@ -94,38 +121,32 @@ interface Rewritten {
 /**
  * Brings every maintained, undetached artifact of a project to what this
  * version renders: files rewritten, maintained keys set, targets replaced,
- * and the targets of agents no longer recorded removed. A detachment that
- * names nothing maintained throws, naming it.
+ * and the stale targets removed. A detachment that names nothing maintained
+ * throws, naming it.
  */
 function applyProjectArtifacts(
   tree: Tree,
-  project: AgenticProject,
+  { name, detached, artifacts, isStaleTarget }: ProjectRendering,
 ): {
   readonly files: readonly Rewritten[];
   readonly targets: readonly string[];
 } {
-  if (!tree.exists(`${SHARED_CONSTRUCTS_DIRECTORY}/project.json`)) {
-    throw new Error(
-      `${SHARED_CONSTRUCTS_DIRECTORY} does not exist; the agentic-project generator creates it`,
-    );
-  }
-  const artifacts = projectArtifacts(renderContext(tree, project));
   const maintainedFiles = new Set(artifacts.files.map((file) => file.path));
   const unmaintained = [
-    ...project.detached.files
+    ...detached.files
       .filter((path) => !maintainedFiles.has(path))
       .map((path) => `file ${path}`),
-    ...project.detached.targets
-      .filter((name) => artifacts.targets[name] === undefined)
-      .map((name) => `target ${name}`),
+    ...detached.targets
+      .filter((target) => artifacts.targets[target] === undefined)
+      .map((target) => `target ${target}`),
   ];
   if (unmaintained.length > 0) {
     throw new Error(
-      `${project.name}'s metadata.agentforge.detached names what AgentForge does not maintain: ${unmaintained.join(', ')}`,
+      `${name}'s metadata.agentforge.detached names what AgentForge does not maintain: ${unmaintained.join(', ')}`,
     );
   }
-  const detachedFiles = new Set(project.detached.files);
-  const detachedTargets = new Set(project.detached.targets);
+  const detachedFiles = new Set(detached.files);
+  const detachedTargets = new Set(detached.targets);
 
   const files: Rewritten[] = [];
   for (const file of artifacts.files) {
@@ -138,46 +159,51 @@ function applyProjectArtifacts(
     }
   }
 
-  const configuration = readProjectConfiguration(tree, project.name);
+  const configuration = readProjectConfiguration(tree, name);
   const targets = { ...configuration.targets };
   const changedTargets: string[] = [];
-  for (const [name, target] of Object.entries(targets)) {
+  for (const [targetName, target] of Object.entries(targets)) {
     if (
-      artifacts.targets[name] === undefined &&
-      !detachedTargets.has(name) &&
-      isAgentTarget(name, target)
+      artifacts.targets[targetName] === undefined &&
+      !detachedTargets.has(targetName) &&
+      isStaleTarget(targetName, target)
     ) {
-      delete targets[name];
-      changedTargets.push(`${project.name}:${name}`);
+      delete targets[targetName];
+      changedTargets.push(`${name}:${targetName}`);
     }
   }
-  for (const [name, target] of Object.entries(artifacts.targets)) {
-    if (detachedTargets.has(name) || isDeepStrictEqual(targets[name], target)) {
+  for (const [targetName, target] of Object.entries(artifacts.targets)) {
+    if (
+      detachedTargets.has(targetName) ||
+      isDeepStrictEqual(targets[targetName], target)
+    ) {
       continue;
     }
-    targets[name] = target;
-    changedTargets.push(`${project.name}:${name}`);
+    targets[targetName] = target;
+    changedTargets.push(`${name}:${targetName}`);
   }
   if (changedTargets.length > 0) {
-    updateProjectConfiguration(tree, project.name, {
-      ...configuration,
-      targets,
-    });
+    updateProjectConfiguration(tree, name, { ...configuration, targets });
   }
   return { files, targets: changedTargets };
 }
 
 /**
- * Applies every project's artifacts and formats what changed, reporting only
+ * Applies every project's rendering and formats what changed, reporting only
  * the files that, once formatted, differ from what they held before — so a
  * file that renders as it already stands is not a change.
  */
 export async function applyAndFormat(
   tree: Tree,
-  projects: readonly AgenticProject[],
+  renderings: readonly ProjectRendering[],
 ): Promise<AppliedChanges> {
-  const applied = projects.map((project) =>
-    applyProjectArtifacts(tree, project),
+  if (!tree.exists(`${SHARED_CONSTRUCTS_DIRECTORY}/project.json`)) {
+    throw new Error(
+      `${SHARED_CONSTRUCTS_DIRECTORY} does not exist; the agentic-project and workflow-project generators create it`,
+    );
+  }
+  const applied = renderings.map((rendering) =>
+    applyProjectArtifacts(tree, rendering),
   );
   await formatFilesInSubtree(tree);
   const files = new Set<string>();

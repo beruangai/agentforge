@@ -3,7 +3,10 @@ import {
   installPackagesTask,
   type Tree,
 } from '@nx/devkit';
-import { applyAndFormat } from '../../artifacts/project-artifacts.ts';
+import {
+  agenticProjectRendering,
+  applyAndFormat,
+} from '../../artifacts/project-artifacts.ts';
 import { agentScaffolds } from '../../artifacts/scaffolds.ts';
 import { KebabNameField, ProcedureNameField, parseName } from '../../names.ts';
 import {
@@ -55,6 +58,6 @@ export default async function agentGenerator(
   for (const file of agentScaffolds(updated, recorded, procedure)) {
     if (!tree.exists(file.path)) tree.write(file.path, file.content);
   }
-  await applyAndFormat(tree, [updated]);
+  await applyAndFormat(tree, [agenticProjectRendering(tree, updated)]);
   return () => installPackagesTask(tree);
 }

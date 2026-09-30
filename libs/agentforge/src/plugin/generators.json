@@ -16,10 +16,20 @@
       "schema": "./generators/agent/schema.json",
       "description": "Generates an agent as a component of an agentic project"
     },
+    "workflow-project": {
+      "factory": "./generators/workflow-project/generator.ts",
+      "schema": "./generators/workflow-project/schema.json",
+      "description": "Generates a workflow project: workflows, activities and one worker, with no connections"
+    },
+    "connection": {
+      "factory": "./generators/connection/generator.ts",
+      "schema": "./generators/connection/schema.json",
+      "description": "Connects a workflow project to an agentic project whose agents its workflows call"
+    },
     "sync": {
       "factory": "./generators/sync/generator.ts",
       "schema": "./generators/sync/schema.json",
-      "description": "Keeps every agentic project's maintained artifacts current",
+      "description": "Keeps every agentic and workflow project's maintained artifacts current",
       "hidden": true
     }
   }

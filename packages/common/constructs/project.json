@@ -12,7 +12,8 @@
       "dependsOn": [
         "compile",
         "@beruangai/golden-kata:assemble",
-        "@beruangai/smoke-coverage:assemble"
+        "@beruangai/smoke-coverage:assemble",
+        "@beruangai/golden-kata-workflows:assemble"
       ]
     },
     "build": {

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "AgentForgeConnection",
+  "title": "Connects a workflow project to an agentic project whose agents its workflows call",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "string",
+      "description": "The workflow project that calls",
+      "x-prompt": "Which workflow project calls the agents?"
+    },
+    "agenticProject": {
+      "type": "string",
+      "description": "The agentic project whose agents it calls",
+      "x-prompt": "Which agentic project's agents does it call?"
+    }
+  },
+  "required": ["project", "agenticProject"],
+  "additionalProperties": false
+}

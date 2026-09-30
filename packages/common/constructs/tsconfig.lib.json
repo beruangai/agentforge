@@ -28,6 +28,9 @@
   ],
   "references": [
     {
+      "path": "../../examples/golden-kata-workflows/tsconfig.lib.json"
+    },
+    {
       "path": "../../examples/smoke-coverage/tsconfig.lib.json"
     },
     {

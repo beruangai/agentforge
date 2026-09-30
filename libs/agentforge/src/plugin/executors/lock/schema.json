@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/schema",
   "version": 2,
-  "title": "Locks a layer of an agentic project's container workspace",
+  "title": "Locks a layer of an agentic project's container workspace, or a workflow project's worker",
   "type": "object",
   "properties": {
     "layer": {
       "type": "string",
-      "description": "base, or agents/<agent>",
-      "pattern": "^(base|agents/[a-z][a-z0-9-]*)$"
+      "description": "base, or agents/<agent>; worker, for a workflow project",
+      "pattern": "^(base|agents/[a-z][a-z0-9-]*|worker)$"
     }
   },
   "required": ["layer"],

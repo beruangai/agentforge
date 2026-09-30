@@ -11,7 +11,8 @@
     "tslib": "^2.3.0",
     "@beruangai/agentforge": "workspace:*",
     "@beruangai/golden-kata": "workspace:*",
-    "@beruangai/smoke-coverage": "workspace:*"
+    "@beruangai/smoke-coverage": "workspace:*",
+    "@beruangai/golden-kata-workflows": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "AgentForgeWorkflowProject",
+  "title": "Generates a workflow project: workflows, activities and one worker, with no connections",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The project's name, kebab-case",
+      "$default": { "$source": "argv", "index": 0 },
+      "x-prompt": "What is the workflow project's name?"
+    },
+    "directory": {
+      "type": "string",
+      "description": "The directory the project is created in",
+      "default": "packages"
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false
+}

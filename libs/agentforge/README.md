@@ -21,8 +21,10 @@ Runs a consumer's procedure as an asynchronous task on Bedrock AgentCore Runtime
 |---|---|
 | `agentic-project <name> [--directory packages]` | A project with a base layer and no agents, its targets, client and construct |
 | `agent --project <project> <name> [--procedure Run]` | An agent in the project, recorded as a component; `base` is reserved |
+| `workflow-project <name> [--directory packages]` | A workflow project: a placeholder workflow and activity, a test of the workflow, one worker, no connections; the Temporal packages declared at AgentForge's ranges |
+| `connection --project <workflow project> --agenticProject <agentic project>` | The workflow project's workflows call the agentic project's agents, recorded as a component of the workflow project |
 
-Every artifact spanning a project's agents is rendered from `metadata.components` in its `project.json`. Remove an agent's record and sync drops it from those artifacts; its folder stays.
+Every artifact spanning a project's agents — or a workflow project's connections — is rendered from `metadata.components` in its `project.json`. Remove an agent's or a connection's record and sync drops it from those artifacts; an agent's folder stays.
 
 ### What AgentForge owns
 
@@ -48,6 +50,25 @@ Every artifact spanning a project's agents is rendered from `metadata.components
 | shared constructs `src/app/index.ts`, `agentic-projects/index.ts` | the `export *` line for each project's index |
 
 **Scaffolded** — written once when absent, then never touched: `base/agentic/options.ts` and `secrets.ts`, `agents/<agent>/agent/contract.ts`, `procedures.ts` and `secrets.ts`, every `$claude/` file, the project's `tsconfig.json` and the rest of its `tsconfig.lib.json`, and the host `package.json`'s other dependencies.
+
+### Workflow projects
+
+A workflow project is a Temporal caller: its workflows call its connected agents' procedures, `agents().goldenKata.writer.Write(input, { runtimeSessionId })` from `agents/workflow.ts`, typed by their contracts and carrying none of their code. Its one worker runs on Node, polls the task queue `<scope>-<project>`, and deploys through its construct as an ECS service on Temporal Cloud. A contract's output reaches a workflow as JSON, as Temporal's payload converter decodes it — a `Date` or a transformed value arrives as its JSON form, whatever the type says; a contract whose output survives the A2A wire survives this.
+
+**Maintained**: `worker.ts`, `client.ts` (`TASK_QUEUE`, `connectClient`), `agents/activities.ts` and `agents/workflow.ts` (one entry per connection), `container/Dockerfile`; in the shared constructs, `src/app/workflow-projects/<project>/project.ts` (`WorkflowProject`, `WorkflowProjectProps`, `Secrets`, requiring each connected project's construct and granting invocation of exactly its agents) and its `index.ts`; the targets `bundle-workflows`, `lock` (writes `container/bun.lock`), `bundle` (the worker and its image's build context under `dist/<project>/bundle`), `assemble`, `temporal-server`, `serve` (`local`, `hybrid`) and `test`.
+
+**Maintained keys**:
+
+| File | Keys |
+|---|---|
+| `package.json` | `exports["./client"]`, `exports["./secrets"]`; `dependencies`: AgentForge, the `@temporalio/*` packages, each connected project `workspace:*` and no other agentic project |
+| `tsconfig.lib.json` | `compilerOptions.paths["@<scope>/<agentic project>-base/*"]` for each connected project, and no other |
+| `container/package.json` | `name`, `private`, `type`, `dependencies`: the Temporal packages the worker bundle leaves external, at the workspace's versions |
+| shared constructs `package.json`, `project.json`, `src/app/index.ts`, `workflow-projects/index.ts` | as for an agentic project |
+
+**Scaffolded**: `workflows/index.ts` (the bundle's entry), `workflows/example.ts` and `example.test.ts`, `activities/index.ts` (the project's own activities), `secrets.ts`, `vitest.unit.mts`, the project's `tsconfig.json` and the rest of its `tsconfig.lib.json`, and the host `package.json`'s other keys.
+
+**The environment the worker reads**, failing at start and naming each that is unset or wrong: `TEMPORAL_ADDRESS` and `TEMPORAL_NAMESPACE`; `TEMPORAL_API_KEY` for Temporal Cloud, never with a local address; `AGENTFORGE_AGENTS` — `local`, or `runtime-config:<applicationId>`; and each secret `secrets.ts` declares. No connection profile file is read. Locally, `temporal-server` runs the Temporal CLI's dev server (on `PATH`, `brew install temporal`) with its UI on 8233, and `serve` runs the worker against it — `serve:local` with the agents in local containers, `serve:hybrid` with the agents on AgentCore from `.env.hybrid.local`.
 
 ### Detaching
 

@@ -1,0 +1,23 @@
+{
+  "name": "@beruangai/golden-kata-workflows",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@temporalio/testing": "catalog:"
+  },
+  "exports": {
+    "./client": "./client.ts",
+    "./secrets": "./secrets.ts"
+  },
+  "dependencies": {
+    "@beruangai/agentforge": "workspace:*",
+    "@temporalio/activity": "catalog:",
+    "@temporalio/client": "catalog:",
+    "@temporalio/common": "catalog:",
+    "@temporalio/envconfig": "catalog:",
+    "@temporalio/worker": "catalog:",
+    "@temporalio/workflow": "catalog:",
+    "@beruangai/golden-kata": "workspace:*"
+  }
+}

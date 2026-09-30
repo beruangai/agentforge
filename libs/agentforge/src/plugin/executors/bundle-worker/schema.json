@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Bundles a workflow project's worker, and stages its image's build context",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
