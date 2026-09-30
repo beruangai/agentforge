@@ -12,6 +12,7 @@ import {
 import { applyAndFormat } from '../../artifacts/project-artifacts.ts';
 import {
   TEMPORAL_TESTING,
+  VITEST,
   WORKFLOW_PROJECT_TEMPORAL_PACKAGES,
   workflowProjectRendering,
 } from '../../artifacts/workflow-project.ts';
@@ -96,11 +97,12 @@ export default async function workflowProjectGenerator(
           version: '0.0.0',
           private: true,
           type: 'module',
-          devDependencies: {
-            [TEMPORAL_TESTING]: (await catalogsEnabled(tree))
-              ? 'catalog:'
-              : temporalRange,
-          },
+          devDependencies: (await catalogsEnabled(tree))
+            ? { [TEMPORAL_TESTING]: 'catalog:', [VITEST]: 'catalog:' }
+            : {
+                [TEMPORAL_TESTING]: temporalRange,
+                [VITEST]: peerRange(VITEST),
+              },
         },
         null,
         2,
@@ -145,6 +147,7 @@ export default async function workflowProjectGenerator(
       ]),
     ),
     [TEMPORAL_TESTING]: temporalRange,
+    [VITEST]: peerRange(VITEST),
   });
   const project = readWorkflowProject(tree, packageName);
   if (existing === undefined) {

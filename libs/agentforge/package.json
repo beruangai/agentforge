@@ -84,7 +84,8 @@
     "constructs": "^10.8.1",
     "nx": "^23.2.1",
     "@nx/devkit": "^23.2.1",
-    "@aws/nx-plugin": "^1.0.3"
+    "@aws/nx-plugin": "^1.0.3",
+    "vitest": "^4.1.11"
   },
   "peerDependenciesMeta": {
     "@orpc/server": {
@@ -151,6 +152,9 @@
       "optional": true
     },
     "@aws/nx-plugin": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   },

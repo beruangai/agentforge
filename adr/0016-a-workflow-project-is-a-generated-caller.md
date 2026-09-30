@@ -16,7 +16,7 @@ Both consumers orchestrate their agents from Temporal (§REQ710). AgentForge giv
 * **Workflow side**: activity proxies computed from the agents' contracts at run time — or typed from them, with the contracts imported as types only
 * **Worker runtime**: Bun, as the consumers' other code — or Node
 * **Where it runs deployed**: ECS Fargate — Lambda workers — self-hosted Temporal
-* **Local Temporal**: a docker-compose server (Postgres, Elasticsearch, UI) — or the Temporal CLI's dev server
+* **Local Temporal**: a docker-compose server (PostgreSQL, Elasticsearch, UI) shared by every project — or the Temporal CLI's dev server, per project
 * **Cancelling an agent's task**: on any cancellation of its activity — or only on a cancel the workflow requested
 
 ## Decision Outcome
@@ -25,14 +25,15 @@ Both consumers orchestrate their agents from Temporal (§REQ710). AgentForge giv
 * **The workflow side imports contracts as types only.** A workflow calls `agents.<project>.<agent>.<Procedure>(input, start)`, typed by the agent's contract and erased from the bundle, so the workflow bundle resolves no agentic project's modules and needs no import aliases. Liveness comes from a heartbeat timeout, and each attempt's length is bounded by the agent's own time budget, so the workflow needs no value from the contract at run time.
 * **The worker runs on Node** — the version the workspace declares — never Bun: the SDK's Bun support is experimental, without the guarantee that a workflow valid on Node is valid on Bun. A workflow project's `test` runs its workflows against the dev server on every build, which is where an unsupported Node version would show.
 * **Deployed, the worker is an ECS Fargate service connected to Temporal Cloud** with an API key. Lambda workers are pre-release, and a self-hosted cluster is an operations burden the operator's Temporal Cloud subscription removes. The connection is read from the environment through `@temporalio/envconfig`, profile files disabled, with the address and namespace required.
-* **Locally, the Temporal CLI's dev server**, persisted to a file, with its UI — for unit tests, local runs and hybrid runs (local orchestration, agents on AgentCore) alike. A docker-compose server adds Postgres and Elasticsearch, neither of which a local run relies on ([research](../docs/research/temporal.md)).
+* **Locally, one docker-compose server every project on the machine shares** (§REQ711) — PostgreSQL and Elasticsearch in named volumes, with the UI — for local and hybrid runs (local orchestration, agents on AgentCore). A project stays local for long before it is piloted, so its workflows' history must survive a restart, and its visibility is Temporal Cloud's advanced visibility; the stack is the predecessor's, proven. AgentForge ships it and the `temporal-server` executor, which starts it unless running and registers the project's namespace, so a target depends on it. Unit tests keep the CLI's dev server, started for each run by `TestWorkflowEnvironment`: isolated, and nothing to persist ([research](../docs/research/temporal.md)).
 * **The activity cancels its task only when the workflow asked for the cancel.** A worker shutting down, a heartbeat timeout, a pause or a reset leave the task running, and the next attempt attaches to it by the idempotency key ([ADR 0009](0009-the-caller-supplies-the-idempotency-key.md)) — so a redeploy never stops an agent's run (§REQ302). A workflow's calls default to `WAIT_CANCELLATION_COMPLETED`, so a cancelled workflow stays open until its activity has seen the cancel and cancelled the task; under the SDK's own default the workflow closes first and the activity finds itself gone, not cancelled ([research](../docs/research/temporal.md)).
 
 ### Consequences
 
 * Good, because a consumer's orchestration is generated and kept current like its agents, and a redeploy of the worker loses nothing
 * Good, because a workflow's calls are checked against the agents' contracts at compile time while its bundle carries none of their code
-* Good, because one binary serves every local use, and the local namespace is the cloud one's name
+* Good, because every project shares one local server that keeps its workflows across restarts, and the local namespace is the cloud one's name
+* Bad, because a local run needs Docker and the stack's memory (Elasticsearch alone takes 256 MB of heap)
 * Bad, because a deploy replaces the worker: a workflow changed while runs are in flight is guarded by the consumer with `patched()` until Worker Versioning runs on ECS (§ODO011)
 * Bad, because a workflow terminated or reset leaves its running task to end at its time budget; stopping it is a requested cancel, which the consumer issues
 * Bad, because the worker's Node version sits outside the SDK's tested range until the SDK catches up

@@ -57,6 +57,9 @@ export const WORKER_RUNTIME_PACKAGES = [
 /** The scaffolded test's server; released with the rest of the SDK, at the worker's range. */
 export const TEMPORAL_TESTING = '@temporalio/testing';
 
+/** What the project's `test` target runs. */
+export const VITEST = 'vitest';
+
 /** The worker's image: its dependencies installed by Bun, run by Node on glibc (musl is unsupported). */
 const BUN_IMAGE =
   'docker.io/oven/bun:1.4.0-alpine@sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb';
@@ -319,10 +322,30 @@ ${body}
 function agentWorkflowModule(context: WorkflowRenderContext): MaintainedFile {
   const { project } = context;
   const connected = sorted(context);
-  const imports = connected.map(
-    ({ connection }) =>
-      `import type { CONTRACTS as ${upperSnake(connection)}_CONTRACTS } from '${connection.packageName}/client';`,
-  );
+  // By source, as Biome organizes them.
+  const imports = [
+    ...(connected.length === 0
+      ? []
+      : [
+          {
+            source: '@beruangai/agentforge/temporal/workflow',
+            statement:
+              "import { proxyProject } from '@beruangai/agentforge/temporal/workflow';",
+          },
+        ]),
+    {
+      source: '@temporalio/workflow',
+      statement: "import type { ActivityOptions } from '@temporalio/workflow';",
+    },
+    ...connected.map(({ connection }) => ({
+      source: `${connection.packageName}/client`,
+      statement: `import type { CONTRACTS as ${upperSnake(connection)}_CONTRACTS } from '${connection.packageName}/client';`,
+    })),
+  ]
+    .sort((left, right) =>
+      left.source < right.source ? -1 : left.source > right.source ? 1 : 0,
+    )
+    .map(({ statement }) => statement);
   return {
     path: `${project.root}/agents/workflow.ts`,
     render: () => `${maintainedHeader('//')}
@@ -330,7 +353,6 @@ function agentWorkflowModule(context: WorkflowRenderContext): MaintainedFile {
 // The workflow side of the connections: each connected agentic project's
 // agents as calls typed by their contracts — imported as types only, so the
 // workflow bundle carries none of their code.
-${connected.length === 0 ? '' : "import { proxyProject } from '@beruangai/agentforge/temporal/workflow';\n"}import type { ActivityOptions } from '@temporalio/workflow';
 ${imports.join('\n')}
 
 /**
@@ -443,14 +465,16 @@ export function workflowProjectTargets(): Record<string, TargetConfiguration> {
       executor: 'nx:noop',
       dependsOn: ['bundle'],
     },
+    // The machine's shared local server, started unless running, with the
+    // workspace's TEMPORAL_NAMESPACE registered: what a local run depends on.
     'temporal-server': {
-      executor: 'nx:run-commands',
-      continuous: true,
-      options: {
-        command:
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell's expansion, failing on an unset namespace
-          'mkdir -p dist/{projectRoot}/temporal-server && temporal server start-dev --db-filename dist/{projectRoot}/temporal-server/temporal.db --namespace "${TEMPORAL_NAMESPACE:?TEMPORAL_NAMESPACE is unset}"',
-      },
+      executor: `${EXECUTOR}:temporal-server`,
+      cache: false,
+    },
+    'temporal-server-stop': {
+      executor: `${EXECUTOR}:temporal-server`,
+      cache: false,
+      options: { stop: true },
     },
     // Run as the image runs it: the bundle beside the Temporal packages its
     // lock pins, installed apart from the build context, which stays free of

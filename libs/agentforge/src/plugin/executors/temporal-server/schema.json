@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Starts the local Temporal server every project shares, if it is not running, and registers TEMPORAL_NAMESPACE on it; or stops it",
+  "type": "object",
+  "properties": {
+    "stop": {
+      "type": "boolean",
+      "description": "Stops the shared server, keeping its data, instead of starting it"
+    }
+  },
+  "additionalProperties": false
+}

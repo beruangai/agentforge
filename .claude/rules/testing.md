@@ -32,7 +32,7 @@ A live slice is integration however expensive it is; e2e means the whole path.
 - Each tier is an `nx:run-commands` target running `vitest run` with its own config. The guard is the target: **no `skipIf`, no environment guards** — an integration test fails when its environment is missing.
 - **`integ` and `e2e` are `cache: false`.** A platform's or a model's behaviour is not an input Nx can hash; a cached pass would replay without reaching it.
 - A cached target (`test`) hashes every external dependency and declares the runtimes it shells out to as `runtime` inputs.
-- **A workflow project's `test` runs its workflows against the Temporal CLI's dev server**, started for the run from the CLI on `PATH` — no credentials, and the same binary its `temporal-server` target serves. The CLI is a prerequisite of that `test` as of `integ` local, and `temporal --version` is one of its `runtime` inputs.
+- **A workflow project's `test` runs its workflows against the Temporal CLI's dev server**, started for the run from the CLI on `PATH` — no credentials. Its local and hybrid runs use the shared compose server its `temporal-server` target starts, which needs Docker. The CLI is a prerequisite of that `test` as of `integ` local, and `temporal --version` is one of its `runtime` inputs.
 - `vitest.integ.mts` spreads the unit config rather than `mergeConfig` it (which would concatenate `include`), one project per dimension, one file at a time, long timeouts. `integ/aws/agentcore/` runs files in parallel because each owns a uniquely named runtime.
 - No placeholder tests. Fixtures go in `__fixtures__/` beside what uses them.
 

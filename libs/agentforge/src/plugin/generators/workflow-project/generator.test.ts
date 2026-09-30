@@ -62,11 +62,12 @@ describe('workflow-project', () => {
     ).toEqual({ dependsOn: ['@proj/golden-kata-workflows:assemble'] });
   });
 
-  it("declares the Temporal packages in the workspace's catalog", async () => {
+  it("declares the Temporal packages and vitest in the workspace's catalog", async () => {
     await generate();
     expect(readJson(tree, 'package.json').catalog).toMatchObject({
       '@temporalio/worker': expect.stringMatching(/^\^1\./),
       '@temporalio/testing': expect.stringMatching(/^\^1\./),
+      vitest: expect.stringMatching(/^\^4\./),
     });
   });
 

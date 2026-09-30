@@ -73,23 +73,20 @@
       "dependsOn": ["bundle"]
     },
     "temporal-server": {
-      "executor": "nx:run-commands",
-      "continuous": true,
-      "options": {
-        "command": "mkdir -p dist/{projectRoot}/temporal-server && temporal server start-dev --db-filename dist/{projectRoot}/temporal-server/temporal.db --namespace \"${TEMPORAL_NAMESPACE:?TEMPORAL_NAMESPACE is unset}\""
-      }
+      "executor": "@beruangai/agentforge:temporal-server",
+      "cache": false
     },
     "serve": {
       "executor": "nx:run-commands",
       "continuous": true,
       "dependsOn": ["bundle", "temporal-server"],
+      "defaultConfiguration": "local",
       "options": {
         "command": "rm -rf dist/{projectRoot}/serve && cp -R dist/{projectRoot}/bundle dist/{projectRoot}/serve && bun install --cwd dist/{projectRoot}/serve --frozen-lockfile --production && node dist/{projectRoot}/serve/worker.mjs",
         "env": {
           "TEMPORAL_ADDRESS": "localhost:7233"
         }
       },
-      "defaultConfiguration": "local",
       "configurations": {
         "local": {
           "env": {
@@ -116,6 +113,35 @@
       "options": {
         "command": "vitest run --config vitest.unit.mts",
         "cwd": "{projectRoot}"
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        "serve",
+        {
+          "projects": ["@beruangai/golden-kata"],
+          "target": "serve-writer"
+        },
+        {
+          "projects": ["@beruangai/golden-kata"],
+          "target": "serve-grader"
+        }
+      ],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project local",
+        "cwd": "{projectRoot}",
+        "env": {
+          "TEMPORAL_ADDRESS": "localhost:7233"
+        }
+      }
+    },
+    "temporal-server-stop": {
+      "executor": "@beruangai/agentforge:temporal-server",
+      "cache": false,
+      "options": {
+        "stop": true
       }
     }
   }

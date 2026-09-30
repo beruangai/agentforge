@@ -24,6 +24,11 @@
       "implementation": "./executors/bundle-worker/executor.ts",
       "schema": "./executors/bundle-worker/schema.json",
       "description": "Bundles a workflow project's worker, and stages its image's build context"
+    },
+    "temporal-server": {
+      "implementation": "./executors/temporal-server/executor.ts",
+      "schema": "./executors/temporal-server/schema.json",
+      "description": "Starts the local Temporal server every project shares, if it is not running, and registers TEMPORAL_NAMESPACE on it; or stops it"
     }
   }
 }

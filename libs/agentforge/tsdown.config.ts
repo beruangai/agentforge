@@ -59,6 +59,12 @@ export default defineConfig({
       ],
       to: `${BUNDLE_DIRECTORY}/container`,
     },
+    // The shared local Temporal server's compose project, beside its executor.
+    {
+      from: 'src/plugin/executors/temporal-server/compose/**',
+      to: BUNDLE_DIRECTORY,
+      flatten: false,
+    },
     // The plugin's option schemas, beside the implementations its manifests name.
     {
       from: 'src/plugin/**/schema.json',

@@ -19,7 +19,7 @@ Reading `procedureActivity` against the SDK also found a defect that a generated
   - routing is passed per call — `(input, start)` — by the workflow, instead of derived from the input by callbacks fixed when the activity is built;
   - it cancels its task **only on a cancel the workflow requested**. A worker shutdown, a heartbeat timeout, a pause or a reset leave the task running, and the next attempt attaches to it.
 - **The worker runs on Node**, never Bun, and deploys as an **ECS Fargate service** connected to **Temporal Cloud** with an API key, through a new `/infra` construct, `TemporalWorker`, and the workflow project's generated construct over it, which requires each connected agentic project's construct and grants the worker exactly their agents.
-- **Locally, the Temporal CLI's dev server** — file-backed, with its UI — serves unit tests, local runs and hybrid runs (local orchestration, agents on AgentCore). No docker-compose server.
+- **Locally, one docker-compose Temporal server every project on the machine shares** — PostgreSQL and Elasticsearch in named volumes, with its UI — serves local and hybrid runs (local orchestration, agents on AgentCore); AgentForge ships it with a `temporal-server` executor that starts it unless running and registers the project's namespace (§REQ711). Unit tests run against the CLI's dev server, started for each run.
 - **Dogfood: `packages/examples/golden-kata-workflows`**, connected to `golden-kata`: a workflow that writes a kata and grades it, verified end to end locally, hybrid, and with the worker on ECS against Temporal Cloud. `golden-kata-infra` deploys the worker beside the agents, and its stand-in caller role is replaced by the worker's.
 
 ## Capabilities
@@ -52,7 +52,7 @@ Reading `procedureActivity` against the SDK also found a defect that a generated
 ## Impact
 
 - **Package**: `/temporal` and `/temporal/workflow`; `TemporalWorker` in `infra/`; the plugin's workflow-project artifacts, generators and executors.
-- **Workspace prerequisite**: the Temporal CLI on `PATH` (`brew install temporal`), for workflow projects' `test`, their local server, and `integ` local. `.claude/rules/testing.md` records that a workflow project's `test` runs against the dev server, with `temporal --version` as a runtime input.
+- **Workspace prerequisite**: the Temporal CLI on `PATH` (`brew install temporal`), for workflow projects' `test` and `integ` local; Docker, for the shared local server. `.claude/rules/testing.md` records that a workflow project's `test` runs against the dev server, with `temporal --version` as a runtime input.
 - **Examples**: `golden-kata-workflows` added; `golden-kata-infra` gains a VPC (public subnets, no NAT gateway — the worker needs only outbound traffic), an ECS cluster and the worker, and drops its `Caller` role. smoke-coverage's activity test moves to the new signature.
 - **Credentials and operator steps**:
   - Temporal Cloud namespace `beruangai-agentforge.vwhld` with API-key authentication (done; its name is `TEMPORAL_NAMESPACE` in `.env`, so the local server creates the same name).

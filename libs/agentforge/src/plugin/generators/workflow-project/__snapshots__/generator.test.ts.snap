@@ -123,7 +123,8 @@ exports[`workflow-project > generates the project, its worker, a placeholder wor
   "private": true,
   "type": "module",
   "devDependencies": {
-    "@temporalio/testing": "catalog:"
+    "@temporalio/testing": "catalog:",
+    "vitest": "catalog:"
   },
   "exports": {
     "./client": "./client.ts",
@@ -210,10 +211,14 @@ exports[`workflow-project > generates the project, its worker, a placeholder wor
       "dependsOn": ["bundle"]
     },
     "temporal-server": {
-      "executor": "nx:run-commands",
-      "continuous": true,
+      "executor": "@beruangai/agentforge:temporal-server",
+      "cache": false
+    },
+    "temporal-server-stop": {
+      "executor": "@beruangai/agentforge:temporal-server",
+      "cache": false,
       "options": {
-        "command": "mkdir -p dist/{projectRoot}/temporal-server && temporal server start-dev --db-filename dist/{projectRoot}/temporal-server/temporal.db --namespace \\"\${TEMPORAL_NAMESPACE:?TEMPORAL_NAMESPACE is unset}\\""
+        "stop": true
       }
     },
     "serve": {
@@ -312,8 +317,7 @@ export default defineConfig({
     name: '@proj/golden-kata-workflows',
     watch: false,
     environment: 'node',
-    include: ['**/*.test.ts'],
-    exclude: ['node_modules/**'],
+    include: ['workflows/**/*.test.ts', 'activities/**/*.test.ts'],
     passWithNoTests: false,
     testTimeout: 60_000,
     hookTimeout: 60_000,
@@ -595,10 +599,14 @@ exports[`workflow-project > generates the project, its worker, a placeholder wor
     },
   },
   "temporal-server": {
-    "continuous": true,
-    "executor": "nx:run-commands",
+    "cache": false,
+    "executor": "@beruangai/agentforge:temporal-server",
+  },
+  "temporal-server-stop": {
+    "cache": false,
+    "executor": "@beruangai/agentforge:temporal-server",
     "options": {
-      "command": "mkdir -p dist/{projectRoot}/temporal-server && temporal server start-dev --db-filename dist/{projectRoot}/temporal-server/temporal.db --namespace "\${TEMPORAL_NAMESPACE:?TEMPORAL_NAMESPACE is unset}"",
+      "stop": true,
     },
   },
   "test": {

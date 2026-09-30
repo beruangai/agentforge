@@ -61,7 +61,15 @@ On a stop signal, the worker SHALL stop taking new tasks, give running activitie
 - **THEN** the retry attaches to the same task, and the workflow completes with its output
 
 ### Requirement: The project runs locally against a local Temporal server
-The project SHALL run a local Temporal server with its web UI, keeping its state across restarts in a file, with the namespace the worker's environment names. The worker served locally SHALL reach the connected agents either in local containers or deployed, as one setting chooses, and SHALL fail at start, naming the setting, when it is unset. The project's unit tests SHALL run its workflows against the same local server binary, with no credentials.
+The project SHALL run against the local Temporal server every project on the machine shares, with its web UI, keeping workflow history and advanced visibility across restarts; a target SHALL start it when it is not running and register the namespace the worker's environment names, failing, naming the setting, when the namespace is unset. The worker served locally SHALL reach the connected agents either in local containers or deployed, as one setting chooses, and SHALL fail at start, naming the setting, when it is unset. The project's unit tests SHALL run its workflows against a Temporal server started for the run, with no credentials.
+
+#### Scenario: The shared server is running
+- **WHEN** a project's local run starts while another project's has the server up
+- **THEN** it uses that server, registering its own namespace unless it exists
+
+#### Scenario: The shared server restarts
+- **WHEN** the shared server is stopped and started again
+- **THEN** workflows and namespaces recorded before the stop are still there
 
 #### Scenario: Local agents
 - **WHEN** a consumer serves the worker with local agents, the agents served locally
