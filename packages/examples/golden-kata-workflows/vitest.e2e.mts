@@ -24,6 +24,18 @@ export default defineConfig({
         extends: true,
         test: { name: 'local', include: ['e2e/local/**/*.test.ts'] },
       },
+      {
+        extends: true,
+        test: {
+          name: 'hybrid',
+          include: ['e2e/hybrid/**/*.test.ts'],
+          globalSetup: ['e2e/hybrid/worker.global-setup.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: { name: 'agentcore', include: ['e2e/agentcore/**/*.test.ts'] },
+      },
     ],
   },
 });

@@ -47,7 +47,7 @@ Group 1 is done with the change's artifacts. Groups 2–5 build the package's si
 ## 8. `golden-kata-workflows`, deployed
 
 - [x] 8.1 `golden-kata-infra`: the application stack's VPC (public subnets, no NAT gateway), cluster and `GoldenKataWorkflows`, its key the operator's `agentforge/temporal-api-key` referenced by name; the `Caller` role and output removed; the stack test asserting the worker's grants; checkov passing; its README naming the operator's secret — verified by `test`, `synth` and `checkov`
-- [ ] 8.2 The `hybrid` project and `e2e-hybrid`: the worker spawned from the `bundle` output with `AGENTFORGE_AGENTS` read from the deploy outputs, as the test role — verified by `nx run @beruangai/golden-kata-workflows:e2e-hybrid`
+- [x] 8.2 The `hybrid` project and `e2e-hybrid`: the worker spawned from the `bundle` output with `AGENTFORGE_AGENTS` read from the deploy outputs, as the test role — verified by `nx run @beruangai/golden-kata-workflows:e2e-hybrid`
 - [ ] 8.3 The `agentcore` project and `e2e-agentcore`: the workflow started on Temporal Cloud and run by the ECS worker — verified by `nx run @beruangai/golden-kata-workflows:e2e-agentcore`, then golden-kata's own `e2e-agentcore` still passing against the same deployment
 
 ## 9. Close

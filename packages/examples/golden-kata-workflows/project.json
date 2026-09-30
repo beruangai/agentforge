@@ -143,6 +143,47 @@
       "options": {
         "stop": true
       }
+    },
+    "e2e-hybrid": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        "temporal-server",
+        "bundle",
+        {
+          "projects": ["@beruangai/golden-kata-infra"],
+          "target": "deploy"
+        }
+      ],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project hybrid",
+        "cwd": "{projectRoot}",
+        "envFile": "{workspaceRoot}/.env.integ",
+        "env": {
+          "TEMPORAL_ADDRESS": "localhost:7233"
+        }
+      }
+    },
+    "e2e-agentcore": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        {
+          "projects": ["@beruangai/golden-kata-infra"],
+          "target": "deploy"
+        }
+      ],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project agentcore",
+        "cwd": "{projectRoot}",
+        "env": {
+          "TEMPORAL_ADDRESS": "beruangai-agentforge.vwhld.tmprl.cloud:7233"
+        }
+      },
+      "defaultConfiguration": "integ",
+      "configurations": {
+        "integ": {}
+      }
     }
   }
 }
