@@ -44,10 +44,6 @@ const SHARED_CONSTRUCTS_DECLARATION = {
   py: [],
 } as const;
 
-function writeIfAbsent(tree: Tree, path: string, content: string): void {
-  if (!tree.exists(path)) tree.write(path, content);
-}
-
 /**
  * A workflow project: a placeholder workflow and activity, a unit test of
  * the workflow against the local server, one worker, and no connections —
@@ -151,8 +147,12 @@ export default async function workflowProjectGenerator(
     [TEMPORAL_TESTING]: temporalRange,
   });
   const project = readWorkflowProject(tree, packageName);
-  for (const file of workflowProjectScaffolds(project)) {
-    writeIfAbsent(tree, file.path, file.content);
+  if (existing === undefined) {
+    // Written once, with the project: a placeholder the consumer removed
+    // stays removed when the project is generated again.
+    for (const file of workflowProjectScaffolds(project)) {
+      tree.write(file.path, file.content);
+    }
   }
   await sharedConstructsGenerator(
     tree,

@@ -4,4 +4,4 @@
  * runs in Temporal's sandbox, so it imports agents' contracts as types only,
  * through `../agents/workflow.ts`.
  */
-export * from './example.ts';
+export * from './write-and-grade.ts';

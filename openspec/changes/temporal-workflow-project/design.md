@@ -217,7 +217,7 @@ What a connection renders: the host `package.json`'s dependency on the agentic p
 | `activities/index.ts` (the consumer's own activities, a placeholder) | scaffolded |
 | `secrets.ts` (`REQUIRED_SECRETS = []`) | scaffolded |
 
-The placeholder workflow calls the placeholder activity only, since a new project has no connections; its test runs it with `TestWorkflowEnvironment.createLocal({ server: { executable: { type: 'existing-path', path: <temporal on PATH> } } })` and `Worker.create({ workflowsPath })`, the activity stubbed. `worker.ts` is `runWorker({ taskQueue: TASK_QUEUE, workflowBundle: new URL('./workflows.js', import.meta.url), activities, agentActivities: await agentActivities(), requiredSecrets: REQUIRED_SECRETS })`.
+Scaffolds are written when the project is created, so a placeholder the consumer removed stays removed when `workflow-project` runs again. The placeholder workflow calls the placeholder activity only, since a new project has no connections; its test runs it with `TestWorkflowEnvironment.createLocal({ server: { executable: { type: 'existing-path', path: <temporal on PATH> } } })` and `Worker.create({ workflowsPath })`, the activity stubbed. `worker.ts` is `runWorker({ taskQueue: TASK_QUEUE, workflowBundle: new URL('./workflows.js', import.meta.url), activities, agentActivities: await agentActivities(), requiredSecrets: REQUIRED_SECRETS })`.
 
 ### Targets
 

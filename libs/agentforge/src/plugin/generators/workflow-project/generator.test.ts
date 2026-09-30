@@ -78,6 +78,15 @@ describe('workflow-project', () => {
     expect(await syncGenerator(tree)).toEqual({});
   });
 
+  it('leaves a removed placeholder removed when generated again', async () => {
+    await generate();
+    tree.delete(`${ROOT}/workflows/example.ts`);
+    tree.delete(`${ROOT}/workflows/example.test.ts`);
+    const before = treeFiles(tree);
+    await generate();
+    expect(treeFiles(tree)).toEqual(before);
+  });
+
   it('keeps an edited workflow and restores a drifted worker entry', async () => {
     await generate();
     const worker = tree.read(`${ROOT}/worker.ts`, 'utf8');
