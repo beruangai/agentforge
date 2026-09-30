@@ -12,7 +12,14 @@ import {
   type AgentComponent,
   agentComponent,
   appendAgentComponent,
+  appendConnectionComponent,
+  CONNECTION_GENERATOR,
+  connectedProjects,
+  connectionComponent,
   readAgenticProject,
+  readAgenticProjects,
+  readWorkflowProject,
+  WORKFLOW_PROJECT_GENERATOR,
 } from './project-record.ts';
 
 let tree: Tree;
@@ -129,5 +136,112 @@ describe('appendAgentComponent', () => {
     expect(() => appendAgentComponent(tree, '@proj/other', WRITER)).toThrow(
       '@proj/other already has a component named writer, recorded by ts#agent',
     );
+  });
+});
+
+describe('a workflow project', () => {
+  const GOLDEN_KATA_CONNECTION = {
+    generator: CONNECTION_GENERATOR,
+    name: 'golden-kata',
+    path: '../golden-kata',
+    packageName: '@proj/golden-kata',
+    key: 'goldenKata',
+  } as const;
+
+  function addWorkflowProject(metadata: Record<string, unknown>): void {
+    addProjectConfiguration(tree, '@proj/golden-kata-workflows', {
+      root: 'packages/golden-kata-workflows',
+      metadata,
+      targets: {},
+    });
+    writeJson(tree, 'packages/golden-kata-workflows/package.json', {
+      name: '@proj/golden-kata-workflows',
+    });
+  }
+
+  const RECORD = {
+    generator: WORKFLOW_PROJECT_GENERATOR,
+    components: [GOLDEN_KATA_CONNECTION],
+    agentforge: { detached: { files: [], targets: [] } },
+  };
+
+  it('reads a valid record', () => {
+    addWorkflowProject(RECORD);
+    expect(readWorkflowProject(tree, 'golden-kata-workflows')).toEqual({
+      name: '@proj/golden-kata-workflows',
+      root: 'packages/golden-kata-workflows',
+      packageName: '@proj/golden-kata-workflows',
+      projectName: 'golden-kata-workflows',
+      scope: 'proj',
+      connections: [GOLDEN_KATA_CONNECTION],
+      detached: { files: [], targets: [] },
+    });
+  });
+
+  it('refuses an invalid record, naming the component', () => {
+    addWorkflowProject({
+      ...RECORD,
+      components: [{ ...GOLDEN_KATA_CONNECTION, key: 'GoldenKata' }],
+    });
+    expect(() => readWorkflowProject(tree, 'golden-kata-workflows')).toThrow(
+      `@proj/golden-kata-workflows's component "golden-kata" is not a connection's record`,
+    );
+  });
+
+  it('refuses an agentic project as a workflow project', () => {
+    addProject({
+      generator: AGENTIC_PROJECT_GENERATOR,
+      components: [],
+      agentforge: { detached: { files: [], targets: [] } },
+    });
+    expect(() => readWorkflowProject(tree, 'golden-kata')).toThrow(
+      '@proj/golden-kata is not a workflow project',
+    );
+  });
+
+  it("resolves a connection's agentic project by package name", () => {
+    addWorkflowProject(RECORD);
+    addProject({
+      generator: AGENTIC_PROJECT_GENERATOR,
+      components: [WRITER],
+      agentforge: { detached: { files: [], targets: [] } },
+    });
+    const [connected] = connectedProjects(
+      readWorkflowProject(tree, 'golden-kata-workflows'),
+      readAgenticProjects(tree),
+    );
+    expect(connected?.agenticProject.root).toBe('packages/golden-kata');
+    expect(connected?.connection).toEqual(GOLDEN_KATA_CONNECTION);
+  });
+
+  it('fails a connection whose project is gone, naming it', () => {
+    addWorkflowProject(RECORD);
+    expect(() =>
+      connectedProjects(
+        readWorkflowProject(tree, 'golden-kata-workflows'),
+        readAgenticProjects(tree),
+      ),
+    ).toThrow(
+      '@proj/golden-kata-workflows records a connection to @proj/golden-kata, which is not an agentic project in the workspace',
+    );
+  });
+
+  it('records a connection once', () => {
+    addWorkflowProject({ ...RECORD, components: [] });
+    const component = connectionComponent(
+      { root: 'packages/golden-kata-workflows' },
+      {
+        root: 'packages/golden-kata',
+        packageName: '@proj/golden-kata',
+        projectName: 'golden-kata',
+      },
+    );
+    expect(component).toEqual(GOLDEN_KATA_CONNECTION);
+    appendConnectionComponent(tree, 'golden-kata-workflows', component);
+    appendConnectionComponent(tree, 'golden-kata-workflows', component);
+    expect(
+      readProjectConfiguration(tree, '@proj/golden-kata-workflows').metadata
+        ?.components,
+    ).toEqual([GOLDEN_KATA_CONNECTION]);
   });
 });
