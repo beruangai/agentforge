@@ -47,7 +47,7 @@ Reading `procedureActivity` against the SDK also found a defect that a generated
 - **The plugin gains** the `workflow-project` and `connection` generators, and executors for the workflow bundle and the worker bundle; `lock` learns the worker's layer; sync renders workflow projects beside agentic ones.
 - **Optional peers** grow by `@temporalio/worker`, `@temporalio/client`, `@temporalio/workflow` and `@temporalio/envconfig`, caret like the Temporal peers already there; ECS comes with `aws-cdk-lib`, already a peer.
 - No change to the A2A wire, the task-process IPC, `/agent`, `/server`, the runtime or the harness. Temporal stays above the client ([ADR 0001](../../../adr/0001-four-layers-with-contracts-at-the-boundaries.md)).
-- **[ADR 0016](../../../adr/0016-a-workflow-project-is-a-generated-caller.md)**, proposed, records the decisions; §REQ710 is in `REQUIREMENTS.md`, §ODO011 in `DESIGN_OPTIONS.md`, the platform facts in [`research/temporal.md`](../../../docs/research/temporal.md) (2026-09-30).
+- **[ADR 0016](../../../adr/0016-a-workflow-project-is-a-generated-caller.md)**, accepted 2026-09-30, records the decisions; §REQ710 is in `REQUIREMENTS.md`, §ODO011 in `DESIGN_OPTIONS.md`, the platform facts in [`research/temporal.md`](../../../docs/research/temporal.md) (2026-09-30).
 
 ## Impact
 

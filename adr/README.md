@@ -8,7 +8,7 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 - **A decision that stops being relevant is dropped**, not kept as a record of a road not taken.
 - **Until a consumer depends on it, an accepted ADR is mutated in place** when its reasoning stops holding — nothing outside this repository has to migrate, and the operator's standing rule is to get it right now. 0002, 0003, 0004, 0006, 0008, 0009 and 0013 were brought in line with the A1 implementation on 2026-09-25. Once a consumer depends on one, a replaced decision is *superseded*: the old ADR stays, marked, and is never edited into agreement with its replacement.
 - **A new ADR is written `proposed`** and becomes `accepted` only when the operator accepts it. Never write one as accepted yourself, and never treat a proposed one as settled — raise it.
-- **0001–0011 were accepted by the operator on 2026-09-21, 0012–0014 on 2026-09-22, and 0015 on 2026-09-29.** Each ADR's own `date` is when its decision was made, which is not always when it was first written: 0003 and 0013 were re-decided on 2026-09-22 and rewritten in place.
+- **0001–0011 were accepted by the operator on 2026-09-21, 0012–0014 on 2026-09-22, 0015 on 2026-09-29, and 0016 on 2026-09-30.** Each ADR's own `date` is when its decision was made, which is not always when it was first written: 0003 and 0013 were re-decided on 2026-09-22 and rewritten in place.
 - **Numbers are stable ids.** 0005 was dropped when its decision — that the executor is agnostic of what a task runs — became a consequence of 0001 and 0004 rather than a choice.
 
 | ADR | Title | Status |
@@ -27,4 +27,4 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0013](0013-a-procedure-is-an-orpc-contract.md) | A procedure is an oRPC contract, split into A2A's own task calls | accepted |
 | [0014](0014-agentforge-speaks-a2a-1-0-only.md) | AgentForge speaks A2A 1.0 only | accepted |
 | [0015](0015-filesystems-mount-around-a-procedure.md) | Filesystems mount around a procedure; S3 syncs with `s7cmd` | accepted |
-| [0016](0016-a-workflow-project-is-a-generated-caller.md) | A workflow project is a generated caller | proposed |
+| [0016](0016-a-workflow-project-is-a-generated-caller.md) | A workflow project is a generated caller | accepted |

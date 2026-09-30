@@ -1,6 +1,6 @@
 # Design
 
-Guidance, not prescription: adapt to actual constraints. The decisions are recorded in [ADR 0016](../../../adr/0016-a-workflow-project-is-a-generated-caller.md) (proposed) — a workflow project and its connections, the type-only workflow side, Node, ECS on Temporal Cloud, the dev server locally, cancelling only on a requested cancel — and are not argued again here. The platform facts are in [`research/temporal.md`](../../../docs/research/temporal.md), read 2026-09-30.
+Guidance, not prescription: adapt to actual constraints. The decisions are recorded in [ADR 0016](../../../adr/0016-a-workflow-project-is-a-generated-caller.md) (accepted 2026-09-30) — a workflow project and its connections, the type-only workflow side, Node, ECS on Temporal Cloud, the dev server locally, cancelling only on a requested cancel — and are not argued again here. The platform facts are in [`research/temporal.md`](../../../docs/research/temporal.md), read 2026-09-30.
 
 ## Context
 

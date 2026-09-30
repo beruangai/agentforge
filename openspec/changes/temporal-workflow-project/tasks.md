@@ -6,7 +6,7 @@ Group 1 is done with the change's artifacts. Groups 2–5 build the package's si
 
 ## 1. Records
 
-- [x] 1.1 §REQ710 in `docs/REQUIREMENTS.md`; §ODO011 (Worker Versioning) in `docs/DESIGN_OPTIONS.md`, next id `ODO012`; [ADR 0016](../../../adr/0016-a-workflow-project-is-a-generated-caller.md) written `proposed` and indexed; `docs/research/temporal.md` gains the dated facts the design rests on — verified by reading each against design.md
+- [x] 1.1 §REQ710 in `docs/REQUIREMENTS.md`; §ODO011 (Worker Versioning) in `docs/DESIGN_OPTIONS.md`, next id `ODO012`; [ADR 0016](../../../adr/0016-a-workflow-project-is-a-generated-caller.md) written `proposed`, indexed, and accepted by the operator on 2026-09-30; `docs/research/temporal.md` gains the dated facts the design rests on — verified by reading each against design.md
 
 ## 2. `/temporal`
 
