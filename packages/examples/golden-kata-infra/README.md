@@ -1,0 +1,19 @@
+# golden-kata-infra
+
+AgentForge's test deployment of [golden-kata](../golden-kata/README.md), generated with `@aws/nx-plugin`'s `ts#infra` and adapted in place:
+
+```bash
+nx g @aws/nx-plugin:ts#infra golden-kata-infra --directory packages/examples
+```
+
+Its stack declares `GoldenKata` — both agents, each its own AgentCore runtime registered in the stage's runtime configuration, with the subscription token from the `agentforge/claude-code-oauth-token` secret the operator creates — and a `Caller` role granted exactly those agents and the configuration read, the stand-in for a consumer's Temporal worker. The stage is `agentforge-example-golden-kata`, in `us-east-2`, removed on `destroy`.
+
+```bash
+nx run @beruangai/golden-kata-infra:deploy
+```
+
+```bash
+nx run @beruangai/golden-kata-infra:destroy
+```
+
+`synth`, `checkov`, `deploy` and `destroy` run as the test role from `.env.integ`. `deploy` builds the images first (`^assemble`), gates on `checkov`, deploys the checked `cdk.out`, and writes its outputs, among them `RuntimeConfigApplicationId`, to `dist/packages/examples/golden-kata-infra/deploy/outputs.json`. `destroy` empties the versioned session buckets first. `test` asserts the caller's grant against the synthesized template.

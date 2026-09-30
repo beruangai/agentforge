@@ -1,0 +1,120 @@
+{
+  "name": "@beruangai/golden-kata-infra",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/golden-kata-infra/src",
+  "projectType": "application",
+  "tags": [],
+  "metadata": {
+    "generator": "ts#infra",
+    "iac": "cdk"
+  },
+  "targets": {
+    "assemble": {
+      "dependsOn": ["compile", "synth"]
+    },
+    "build": {
+      "dependsOn": ["lint", "compile", "test", "synth", "checkov"]
+    },
+    "checkov": {
+      "cache": false,
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/checkov"],
+      "dependsOn": ["synth"],
+      "options": {
+        "command": "uvx --from checkov==3.3.19 checkov --config-file {projectRoot}/checkov.yml --directory dist/{projectRoot}/cdk.out --framework cloudformation"
+      }
+    },
+    "compile": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/tsc"],
+      "options": {
+        "command": "tsc --build tsconfig.lib.json",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["checkov"],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/deploy"],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk deploy --all --app ../../../dist/{projectRoot}/cdk.out --require-approval never --no-notices --outputs-file ../../../dist/{projectRoot}/deploy/outputs.json",
+        "envFile": "{workspaceRoot}/.env.integ",
+        "env": {
+          "CDK_DISABLE_CLI_TELEMETRY": "true",
+          "NODE_OPTIONS": "--conditions=@beruangai/source"
+        }
+      }
+    },
+    "destroy": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "bun scripts/empty-buckets.ts ../../../dist/{projectRoot}/deploy/outputs.json && cdk destroy --all --app ../../../dist/{projectRoot}/cdk.out --force --no-notices",
+        "envFile": "{workspaceRoot}/.env.integ",
+        "env": {
+          "CDK_DISABLE_CLI_TELEMETRY": "true",
+          "NODE_OPTIONS": "--conditions=@beruangai/source"
+        }
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["biome"],
+      "options": {
+        "command": "biome format {projectRoot}"
+      },
+      "configurations": {
+        "fix": {
+          "command": "biome format --write {projectRoot}"
+        },
+        "skip-lint": {
+          "command": "node -e \"\""
+        }
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["biome"],
+      "dependsOn": ["format"],
+      "options": {
+        "command": "biome lint {projectRoot}"
+      },
+      "configurations": {
+        "fix": {
+          "command": "biome check --write {projectRoot}"
+        },
+        "skip-lint": {
+          "command": "node -e \"\""
+        }
+      }
+    },
+    "synth": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/cdk.out"],
+      "dependsOn": ["^assemble", "compile"],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "export DOCKER_CONFIG=\"$(mktemp -d)\" && trap 'rm -rf \"$DOCKER_CONFIG\"' EXIT && echo \"{}\" > \"$DOCKER_CONFIG/config.json\" && cdk synth --quiet --no-notices",
+        "envFile": "{workspaceRoot}/.env.integ",
+        "env": {
+          "CDK_DISABLE_CLI_TELEMETRY": "true",
+          "NODE_OPTIONS": "--conditions=@beruangai/source"
+        }
+      }
+    },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "coverage/packages/examples/golden-kata-infra"
+      },
+      "dependsOn": ["^assemble"]
+    }
+  }
+}

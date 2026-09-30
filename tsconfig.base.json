@@ -13,11 +13,15 @@
     "paths": {
       "@beruangai/common-constructs": [
         "./packages/common/constructs/src/index.ts"
+      ],
+      "@beruangai/golden-kata-infra": [
+        "./packages/examples/golden-kata-infra/src/index.ts"
       ]
     },
     "rootDir": ".",
     "composite": true,
     "emitDeclarationOnly": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   }
 }

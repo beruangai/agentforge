@@ -15,9 +15,9 @@ export class App extends _App {
 class MetricsAspect implements IAspect {
   visit(node: IConstruct): void {
     if (node instanceof Stack) {
-      const id = '';
-      const version = '';
-      const tags: string[] = [];
+      const id = 'uksb-4wk0bqpg5s';
+      const version = '1.0.3';
+      const tags: string[] = ['g1', 'g8'];
       node.templateOptions.description =
         `${node.templateOptions.description ?? ''} (${id}) (version:${version}) (tag:${tags.join(',')})`.trim();
     }

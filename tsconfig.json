@@ -11,6 +11,9 @@
     },
     {
       "path": "./packages/examples/golden-kata"
+    },
+    {
+      "path": "./packages/examples/golden-kata-infra"
     }
   ]
 }
