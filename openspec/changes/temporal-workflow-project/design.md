@@ -9,6 +9,7 @@ Guidance, not prescription: adapt to actual constraints. The decisions are recor
 - The plugin's record is `metadata.generator` plus `metadata.components[]` in `@aws/nx-plugin`'s form, and `agentforge.detached`; sync renders every maintained artifact from it ([project-record.ts](../../../libs/agentforge/src/plugin/project-record.ts)). Constructs are generated into `packages/common/constructs/src/app/agentic-projects/<project>/`, typed from the layers' `secrets.ts`.
 - `@temporalio/*` 1.24.0 is in the catalog. `@temporalio/envconfig` 1.24.0 exposes `loadClientConnectConfig({ disableFile, overrideEnvVars, … })`. On Node 26.8.2 the core bridge loads and `TestWorkflowEnvironment.createLocal()` starts the brew CLI (observed 2026-09-30).
 - `.env` sets `TEMPORAL_NAMESPACE=beruangai-agentforge.vwhld`, and Nx loads it into every task: the local server and Temporal Cloud share the namespace's name.
+- In this repository the plugin runs from source and the Nx daemon keeps it loaded: after changing a renderer, `nx sync` reports no drift until `nx reset` (or `NX_DAEMON=false`). Verify sync with the daemon off.
 
 ## Goals / Non-Goals
 
@@ -300,4 +301,4 @@ Each waits for a poller on the task queue (`DescribeTaskQueue`) before starting,
 
 ## Migration Plan
 
-No consumer depends on `/temporal`. smoke-coverage's `temporal-activity` test moves to `(input, start)`. `.env.hybrid.local.example` is removed; `.env.hybrid.local` holds `AGENTFORGE_AGENTS` and `AWS_PROFILE`, and no `TEMPORAL_API_KEY`.
+No consumer depends on `/temporal`. smoke-coverage's `temporal-activity` test moves to `(input, start)` with the signature (task 2.1). `.env.hybrid.local.example` is removed; `.env.hybrid.local` holds `AGENTFORGE_AGENTS` and `AWS_PROFILE`, and no `TEMPORAL_API_KEY`.

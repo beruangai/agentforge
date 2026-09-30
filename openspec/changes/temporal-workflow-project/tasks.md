@@ -1,6 +1,6 @@
 # Tasks
 
-Lands after the generic-names refactor (generated seams export generic names and the importer aliases them), which every rendered import below assumes.
+Builds on the generic-names refactor (6248280): generated seams export generic names and the importer aliases them, which every rendered import below assumes.
 
 Group 1 is done with the change's artifacts. Groups 2–5 build the package's side and can proceed in parallel once 2.1 lands (3 and 5 need only 2.1's types; 4 needs 2). Group 6 builds the plugin and needs 2 and 5 for what it renders. 7 generates and verifies `golden-kata-workflows` locally; 8 deploys it; 9 closes the docs.
 
@@ -10,7 +10,7 @@ Group 1 is done with the change's artifacts. Groups 2–5 build the package's si
 
 ## 2. `/temporal`
 
-- [ ] 2.1 `procedureActivity(procedure, { cancelTask, pollIntervalMilliseconds? })` returning `(input, start: ActivityStart)`; the start's fields from the call, the idempotency key still derived; the task cancelled only when `cancellationDetails()?.cancelRequested`, any other abort rethrowing `CancelledFailure` with the task untouched — verified by unit tests: a requested cancel cancels; `WORKER_SHUTDOWN`, a timed-out cancel and one with no details do not; the start carries the call's routing; the existing refusal and failure-mapping tests on the new signature
+- [ ] 2.1 `procedureActivity(procedure, { cancelTask, pollIntervalMilliseconds? })` returning `(input, start: ActivityStart)`; the start's fields from the call, the idempotency key still derived; the task cancelled only when `cancellationDetails()?.cancelRequested`, any other abort rethrowing `CancelledFailure` with the task untouched — verified by unit tests: a requested cancel cancels; `WORKER_SHUTDOWN`, a timed-out cancel and one with no details do not; the start carries the call's routing; the existing refusal and failure-mapping tests on the new signature; smoke-coverage's `temporal-activity` e2e and the README's activity example moved to `(input, start)` in the same commit, so the workspace keeps typechecking — verified also by smoke-coverage's `e2e`
 - [ ] 2.2 `projectActivities`: walks a project's contracts, one activity per procedure named `<project>.<agent>.<namespace…>.<Procedure>`, each over that agent's procedure client with its `CancelTask` — verified by unit tests over a nested contract and a scripted client, and a typecheck that the client must match the contracts
 - [ ] 2.3 `temporalConnectConfig` over `@temporalio/envconfig` with `disableFile: true`, refusing an unset address or namespace and a key with a local address, each named; `connectTemporalClient`; `agentsFromEnvironment` — verified by unit tests of each refusal and each setting, and that a profile file in the default location is not read
 - [ ] 2.4 `runWorker`: the required secrets and a duplicate activity name refused at start, the workflow bundle's absence named with its target, `NativeConnection` from `temporalConnectConfig`, `Worker.create` with the bundle, both activity sets and `shutdownGraceTime` (default 110 s), run until a shutdown signal — verified by unit tests of the refusals; the run itself in 4.1
@@ -51,5 +51,5 @@ Group 1 is done with the change's artifacts. Groups 2–5 build the package's si
 
 ## 9. Close
 
-- [ ] 9.1 smoke-coverage's `temporal-activity` test on `(input, start)`; `.env.hybrid.local.example` removed — verified by smoke-coverage's `e2e`
+- [ ] 9.1 `.env.hybrid.local.example` removed — verified by `git grep -n hybrid.local.example` finding nothing
 - [ ] 9.2 ARCHITECTURE §1, §7 (workflow projects), §8 (`/temporal`, `/temporal/workflow`, `TemporalWorker`, layout), §9; ROADMAP A5 (the Temporal layer delivered, S3 filesystems next); GLOSSARY (workflow project, connection, worker); CLAUDE.md's status line — verified by `git grep -n "procedureActivity"` over the docs showing only the new signature
