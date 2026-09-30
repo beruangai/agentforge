@@ -62,4 +62,4 @@ Lands after `move-package-to-libs`. Groups 1–6 build the plugin and its client
 
 ## 9. Integration
 
-- [ ] 9.1 `nx run-many -t build`, `nx sync:check`, the `integ` `local` configuration, and both `golden-kata` e2e projects pass; ROADMAP A5 and §ODO003 updated to what was delivered, what was dropped (the procedure generator, the generated infra project) and what is pending — verified by the runs and by reading the docs
+- [x] 9.1 `nx run-many -t build`, `nx sync:check`, the `integ` `local` configuration, and both `golden-kata` e2e projects pass; ROADMAP A5 and §ODO003 updated to what was delivered, what was dropped (the procedure generator, the generated infra project) and what is pending — verified by the runs and by reading the docs
