@@ -22,10 +22,18 @@ export type WorkflowCalls<Contract> =
  * a lost worker is noticed in about a minute; a day to close is only a
  * backstop, since the agent's time budget bounds the task and a longer
  * attempt merely attaches again.
+ *
+ * `WAIT_CANCELLATION_COMPLETED` keeps a cancelled workflow open until the
+ * activity has cancelled its task. An unset cancellation type is sent as
+ * `TRY_CANCEL` (SDK 1.24.0, whatever its documentation says): the workflow
+ * closes at once, the activity then finds itself gone rather than cancelled,
+ * and the task runs on to its time budget. A caller overriding it to
+ * `TRY_CANCEL` or `ABANDON` gives up cancelling the task.
  */
 export const DEFAULT_ACTIVITY_OPTIONS = {
   heartbeatTimeout: '1 minute',
   startToCloseTimeout: '1 day',
+  cancellationType: 'WAIT_CANCELLATION_COMPLETED',
 } as const satisfies ActivityOptions;
 
 type Activity = (input: unknown, start: ActivityStart) => Promise<unknown>;

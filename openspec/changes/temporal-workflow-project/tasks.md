@@ -22,8 +22,8 @@ Group 1 is done with the change's artifacts. Groups 2–5 build the package's si
 
 ## 4. `integ` local
 
-- [ ] 4.1 `integ/local/temporal-worker/`: a real worker against the dev server (the CLI on `PATH`) over a scripted procedure client — shut down mid-activity with a second worker taking the retry: no `CancelTask`, the same idempotency key on the retry's start; a workflow's cancel reaching `CancelTask`; `runWorker` exiting on `SIGTERM` inside its grace — verified by `nx run @beruangai/agentforge:integ --configuration=local -- integ/local/temporal-worker`
-- [ ] 4.2 `.claude/rules/testing.md`: the Temporal CLI is a prerequisite of `integ` local and of a workflow project's `test`, which runs against the dev server with `temporal --version` as a runtime input — verified by reading it against design.md
+- [x] 4.1 `integ/local/temporal-worker/`: a real worker against the dev server (the CLI on `PATH`) over a scripted procedure client — shut down mid-activity with a second worker taking the retry: no `CancelTask`, the same idempotency key on the retry's start; a workflow's cancel reaching `CancelTask`; `runWorker` exiting on `SIGTERM` inside its grace — verified by `nx run @beruangai/agentforge:integ --configuration=local -- integ/local/temporal-worker`
+- [x] 4.2 `.claude/rules/testing.md`: the Temporal CLI is a prerequisite of `integ` local and of a workflow project's `test`, which runs against the dev server with `temporal --version` as a runtime input — verified by reading it against design.md
 
 ## 5. `/infra`
 

@@ -54,6 +54,7 @@ describe('proxyProject', () => {
         {
           heartbeatTimeout: '1 minute',
           startToCloseTimeout: '2 hours',
+          cancellationType: 'WAIT_CANCELLATION_COMPLETED',
           retry: { maximumAttempts: 3 },
         },
       ],
