@@ -1,7 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/Dockerfile 1`] = `
-"# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+"# check=skip=InvalidDefaultArgInFrom
+# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
 # installed version generates. To own it, name it in the project's
 # project.json metadata.agentforge.detached.files.
 #

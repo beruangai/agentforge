@@ -309,7 +309,8 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
 `;
 
 exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/Dockerfile 1`] = `
-"# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+"# check=skip=InvalidDefaultArgInFrom
+# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
 # installed version generates. To own it, name it in the project's
 # project.json metadata.agentforge.detached.files.
 #

@@ -48,11 +48,19 @@ export function contractName(agent: Pick<AgentComponent, 'name'>): string {
   return camelCase(agent.name);
 }
 
+/**
+ * A layer's Dockerfile starts with this parser directive, which must precede
+ * every comment: `BASE_IMAGE` has no default, since the image executor and
+ * the agent's construct always pass it, and a missing one fails the build.
+ */
+const DOCKERFILE_DIRECTIVE = '# check=skip=InvalidDefaultArgInFrom';
+
 /** The agentic image: the base layer on the AgentForge image. */
 export function baseDockerfile(project: AgenticProject): MaintainedFile {
   return {
     path: `${baseDirectory(project)}/Dockerfile`,
-    render: () => `${maintainedHeader('#')}
+    render: () => `${DOCKERFILE_DIRECTIVE}
+${maintainedHeader('#')}
 #
 # The agentic image: the project's base layer at /workspace/agentic, on the
 # AgentForge image. \`agentic/$claude/\` becomes its \`.claude/\`, which every
@@ -75,7 +83,8 @@ export function agentDockerfile(
 ): MaintainedFile {
   return {
     path: `${agentDirectory(project, agent)}/Dockerfile`,
-    render: () => `${maintainedHeader('#')}
+    render: () => `${DOCKERFILE_DIRECTIVE}
+${maintainedHeader('#')}
 #
 # The ${agent.name} agent's image: its layer at /workspace/agentic/agent — every
 # run's cwd — on the project's agentic image. \`agent/$claude/\` becomes its

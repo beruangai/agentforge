@@ -70,6 +70,45 @@
         "nx",
       ],
     },
+    "agentic": {
+      "name": "@beruangai/golden-kata-base",
+      "dependencies": {
+        "@beruangai/agentforge": "workspace:*",
+      },
+      "peerDependencies": {
+        "@a2a-js/sdk": "^1.2.0",
+        "@anthropic-ai/claude-agent-sdk": "0.3.280",
+        "@anthropic-ai/sdk": "0.128.0",
+        "@aws-sdk/client-cloudwatch": "^3.1138.0",
+        "@aws-sdk/client-dynamodb": "^3.1138.0",
+        "@aws-sdk/client-s3": "^3.1138.0",
+        "@aws-sdk/client-secrets-manager": "^3.1138.0",
+        "@orpc/contract": "2.0.0-beta.39",
+        "@orpc/server": "2.0.0-beta.39",
+        "express": "^5.2.1",
+        "zod": "^4.6.5",
+      },
+    },
+    "agentic/agent": {
+      "name": "@beruangai/golden-kata-writer",
+      "dependencies": {
+        "@beruangai/agentforge": "workspace:*",
+        "@beruangai/golden-kata-base": "workspace:*",
+      },
+      "peerDependencies": {
+        "@a2a-js/sdk": "^1.2.0",
+        "@anthropic-ai/claude-agent-sdk": "0.3.280",
+        "@anthropic-ai/sdk": "0.128.0",
+        "@aws-sdk/client-cloudwatch": "^3.1138.0",
+        "@aws-sdk/client-dynamodb": "^3.1138.0",
+        "@aws-sdk/client-s3": "^3.1138.0",
+        "@aws-sdk/client-secrets-manager": "^3.1138.0",
+        "@orpc/contract": "2.0.0-beta.39",
+        "@orpc/server": "2.0.0-beta.39",
+        "express": "^5.2.1",
+        "zod": "^4.6.5",
+      },
+    },
   },
   "packages": {
     "@a2a-js/sdk": ["@a2a-js/sdk@1.2.0", "", { "dependencies": { "jose": "^6.2.3" }, "peerDependencies": { "@bufbuild/protobuf": "^2.10.2", "@grpc/grpc-js": "^1.11.0", "express": "^4.21.2 || ^5.1.0" }, "optionalPeers": ["@bufbuild/protobuf", "@grpc/grpc-js", "express"] }, "sha512-zxjvBrxhPV4J/RN8QTbsYaUIu9Y9RvmR06IP5o42UdJX42A9I0m1StGVvqrcCQ3bdu3SzWHPm5CeC2FNHARvkw=="],
@@ -145,6 +184,10 @@
     "@babel/runtime": ["@babel/runtime@7.29.7", "", {}, "sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw=="],
 
     "@beruangai/agentforge": ["@beruangai/agentforge@workspace:agentforge"],
+
+    "@beruangai/golden-kata-base": ["@beruangai/golden-kata-base@workspace:agentic"],
+
+    "@beruangai/golden-kata-writer": ["@beruangai/golden-kata-writer@workspace:agentic/agent"],
 
     "@hono/node-server": ["@hono/node-server@2.1.1", "", { "peerDependencies": { "hono": "^4" } }, "sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg=="],
 
