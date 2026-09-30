@@ -159,6 +159,25 @@
       "configurations": {
         "serve": {}
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/base/**/*",
+        "{projectRoot}/vitest.unit.mts",
+        "{projectRoot}/tsconfig*.json",
+        {
+          "runtime": "node --version"
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "options": {
+        "command": "vitest run --config vitest.unit.mts",
+        "cwd": "{projectRoot}"
+      }
     }
   }
 }
