@@ -6,7 +6,8 @@ import { type MaintainedFile, maintainedHeader } from './maintained.ts';
  * typed by each agent's contract, composing `createClient` per agent over a
  * transport for each — given, a local container found by name, or an
  * AgentCore runtime resolved from the deployment's runtime configuration.
- * Its exports are generic — `client`, `Client`, `CONTRACTS` — and a caller
+ * Its exports are generic — `client`, `Client`, `CONTRACTS`, `Inputs`,
+ * `Outputs` — and a caller
  * aliases them to the project on import, as this file aliases each agent's
  * `contract`.
  */
@@ -39,6 +40,10 @@ export function projectClient(context: RenderContext): MaintainedFile {
         'import {',
         ...clientImports.map((name) => `  ${name},`),
         "} from '@beruangai/agentforge/client';",
+        'import type {',
+        '  InferRouterContractInputs,',
+        '  InferRouterContractOutputs,',
+        "} from '@orpc/contract';",
         ...contractImports,
         '',
         `/** Each agent's contract. */`,
@@ -57,6 +62,12 @@ export function projectClient(context: RenderContext): MaintainedFile {
         '} as const;',
         '',
         'export type Agent = keyof typeof CONTRACTS;',
+        '',
+        "/** Each procedure's input, by agent and procedure: `Inputs['<agent>']['<Procedure>']`. */",
+        'export type Inputs = InferRouterContractInputs<typeof CONTRACTS>;',
+        '',
+        "/** Each procedure's output, by agent and procedure: `Outputs['<agent>']['<Procedure>']`. */",
+        'export type Outputs = InferRouterContractOutputs<typeof CONTRACTS>;',
         '',
         'export type Client = {',
         '  readonly [Name in Agent]: AgentForgeClient<(typeof CONTRACTS)[Name]>;',

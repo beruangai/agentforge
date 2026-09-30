@@ -2,15 +2,18 @@ import { execFileSync } from 'node:child_process';
 import { randomUUIDv7 } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import type { ActivityStart } from '@beruangai/agentforge/temporal';
+import type {
+  Inputs as GoldenKataInputs,
+  Outputs as GoldenKataOutputs,
+} from '@beruangai/golden-kata/client';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { Worker } from '@temporalio/worker';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type {
-  Grade,
-  WriteInput,
-  Written,
-  writeAndGrade,
-} from './write-and-grade.ts';
+import type { writeAndGrade } from './write-and-grade.ts';
+
+type WriteInput = GoldenKataInputs['writer']['Write'];
+type Written = GoldenKataOutputs['writer']['Write'];
+type Grade = GoldenKataOutputs['grader']['Grade'];
 
 const WRITTEN: Written = {
   kata: {
@@ -45,7 +48,8 @@ const write = vi.fn(
   async (_input: WriteInput, _start: ActivityStart) => WRITTEN,
 );
 const grade = vi.fn(
-  async (_input: { kata: Written['kata'] }, _start: ActivityStart) => GRADE,
+  async (_input: GoldenKataInputs['grader']['Grade'], _start: ActivityStart) =>
+    GRADE,
 );
 
 let environment: TestWorkflowEnvironment;

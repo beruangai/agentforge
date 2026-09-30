@@ -28,7 +28,7 @@ Every artifact spanning a project's agents — or a workflow project's connectio
 
 ### What AgentForge owns
 
-**Generic names at the seams.** What AgentForge generates exports the same names in every agent and project — an agent's `contract.ts` exports `contract`; `client.ts` exports `client`, `Client`, `Agent`, `CONTRACTS`, `RUNTIME_CONFIG_KEYS` and `CONTAINER_NAMES`; `project.ts` exports `AgenticProject` and `AgenticProjectProps`; an agent's `agent.ts` exports `Agent`, `AgentProps` and `Secrets` — and whoever imports one names it for its context: `import { client as goldenKataClient } from '@<scope>/golden-kata/client'`. The shared constructs package is the exception a flat `export *` forces: each project's `index.ts` aliases its constructs to the project's names (`GoldenKata`, `GoldenKataWriter`).
+**Generic names at the seams.** What AgentForge generates exports the same names in every agent and project — an agent's `contract.ts` exports `contract`; `client.ts` exports `client`, `Client`, `Agent`, `CONTRACTS`, `Inputs`, `Outputs` (each procedure's input and output types, `Inputs['<agent>']['<Procedure>']`), `RUNTIME_CONFIG_KEYS` and `CONTAINER_NAMES`; `project.ts` exports `AgenticProject` and `AgenticProjectProps`; an agent's `agent.ts` exports `Agent`, `AgentProps` and `Secrets` — and whoever imports one names it for its context: `import { client as goldenKataClient } from '@<scope>/golden-kata/client'`. The shared constructs package is the exception a flat `export *` forces: each project's `index.ts` aliases its constructs to the project's names (`GoldenKata`, `GoldenKataWriter`).
 
 **Maintained** — `nx sync` rewrites these to what the installed version renders, and `nx sync:check` fails while any differs:
 

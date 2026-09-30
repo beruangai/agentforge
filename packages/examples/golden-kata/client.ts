@@ -12,6 +12,10 @@ import {
   type RuntimeConfigSource,
   type Transport,
 } from '@beruangai/agentforge/client';
+import type {
+  InferRouterContractInputs,
+  InferRouterContractOutputs,
+} from '@orpc/contract';
 import { contract as grader } from './agents/grader/agent/contract.ts';
 import { contract as writer } from './agents/writer/agent/contract.ts';
 
@@ -34,6 +38,12 @@ export const CONTAINER_NAMES = {
 } as const;
 
 export type Agent = keyof typeof CONTRACTS;
+
+/** Each procedure's input, by agent and procedure: `Inputs['<agent>']['<Procedure>']`. */
+export type Inputs = InferRouterContractInputs<typeof CONTRACTS>;
+
+/** Each procedure's output, by agent and procedure: `Outputs['<agent>']['<Procedure>']`. */
+export type Outputs = InferRouterContractOutputs<typeof CONTRACTS>;
 
 export type Client = {
   readonly [Name in Agent]: AgentForgeClient<(typeof CONTRACTS)[Name]>;
