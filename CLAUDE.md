@@ -27,7 +27,7 @@ AgentForge is a few small, rock-solid capabilities for one engineer across a few
 
 Settled and not reopened: **AgentForge owns its requirements**, and the operator negotiates with a consumer where one is affected; invocation is asynchronous; authentication is the operator's Claude Max subscription, used as intended.
 
-- **A capability no `REQ` id asks for is not built.** Ids are blocked by category a hundred at a time and are permanent; cite them as `§REQ304`. A need only one consumer has is met by configuration or a helper it calls, never a branch in the harness or runtime.
+- **Every capability traces to a `REQ` id.** The operator owns AgentForge and both consumers, so what the operator asks for is recorded as a requirement, not refused for lacking one. Push back on the merits — bloat, over-engineering, a simpler route — never on the register alone. Ids are blocked by category a hundred at a time and are permanent; cite them as `§REQ304`. A need only one consumer has is met by configuration or a helper it calls, never a branch in the harness or runtime.
 - **Four layers.** Runtime and harness never import each other; both import `core/`. The consumer's task entry is where they meet. A failure is fixed in the layer that owns it.
 - **The caller is outside the boundary.** Nothing below the client knows a caller exists; Temporal is never a dependency of the runtime or the harness.
 - **The consumer owns isolation and side effects**, and their recovery. AgentForge carries identifiers and enforces only mechanical invariants.

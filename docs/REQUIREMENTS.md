@@ -6,7 +6,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 
 ## Rules
 
-- **A capability no requirement here asks for is not built.** Every proposal traces to a `REQ` id.
+- **Every capability traces to a requirement here.** Every proposal cites a `REQ` id; what the operator asks for enters as one before it is built, challenged on its merits rather than refused for lacking an id.
 - **A requirement states behavior, never mechanism.** How it is met is AgentForge's, entirely.
 - **One consumer's need is met by configuration, or by a helper it calls** — never by a branch in the harness or the runtime.
 - **The consumer owns its isolation strategy and its side effects**, including recovery when one may have partly happened.
