@@ -27,7 +27,13 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
   exports: Record<string, unknown>;
 };
 const AGENT_CONDITION = 'agentforge-agent';
-const OPEN_ENTRY_POINTS = ['contract', 'client', 'temporal', 'infra'];
+const OPEN_ENTRY_POINTS = [
+  'contract',
+  'client',
+  'temporal',
+  'temporal/workflow',
+  'infra',
+];
 
 /** Every file an export target names, however deeply its conditions nest. */
 function exportTargets(value: unknown): string[] {

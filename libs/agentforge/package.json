@@ -26,6 +26,11 @@
       "types": "./temporal.d.ts",
       "default": "./temporal.js"
     },
+    "./temporal/workflow": {
+      "@beruangai/source": "./src/client/temporal/workflow/index.ts",
+      "types": "./temporal/workflow.d.ts",
+      "default": "./temporal/workflow.js"
+    },
     "./agent": {
       "agentforge-agent": {
         "@beruangai/source": "./src/server/harness/index.ts",

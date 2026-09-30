@@ -9,7 +9,7 @@ import {
 } from './published-manifest.ts';
 
 /**
- * One package, six entry points and the Nx plugin's implementations. Code shared between entry points is split
+ * One package, seven entry points and the Nx plugin's implementations. Code shared between entry points is split
  * into common chunks rather than duplicated into each, and every dependency
  * stays external — only this repository's own source is bundled. tsdown
  * externalises only what the manifest declares and inlines anything else with
@@ -23,6 +23,7 @@ export default defineConfig({
     contract: 'src/core/contract/index.ts',
     client: 'src/client/index.ts',
     temporal: 'src/client/temporal/index.ts',
+    'temporal/workflow': 'src/client/temporal/workflow/index.ts',
     agent: 'src/server/harness/index.ts',
     server: 'src/server/runtime/index.ts',
     infra: 'src/infra/index.ts',
