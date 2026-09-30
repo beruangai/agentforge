@@ -5,6 +5,12 @@
   "references": [
     {
       "path": "./libs/agentforge"
+    },
+    {
+      "path": "./packages/common/constructs"
+    },
+    {
+      "path": "./packages/examples/golden-kata"
     }
   ]
 }

@@ -232,7 +232,25 @@ exports[`agentic-project > generates a base layer, its targets, client and const
 exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/tsconfig.json 1`] = `
 "{
   "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {},
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.lib.json"
+    }
+  ]
+}
+"
+`;
+
+exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/tsconfig.lib.json 1`] = `
+"{
+  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../dist/packages/examples/golden-kata/tsc",
+    "tsBuildInfoFile": "../../../dist/packages/examples/golden-kata/tsc/tsconfig.lib.tsbuildinfo",
     "allowImportingTsExtensions": true,
     "customConditions": [
       "agentforge-agent"
@@ -300,5 +318,6 @@ exports[`agentic-project > generates a base layer, its targets, client and const
   "packages/examples/golden-kata/package.json",
   "packages/examples/golden-kata/project.json",
   "packages/examples/golden-kata/tsconfig.json",
+  "packages/examples/golden-kata/tsconfig.lib.json",
 ]
 `;

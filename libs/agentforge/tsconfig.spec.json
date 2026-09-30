@@ -1,11 +1,10 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": [
       "node",
       "vitest/importMeta"
-    ],
-    "allowImportingTsExtensions": true
+    ]
   },
   "include": [
     "vitest.config.mts",

@@ -29,6 +29,56 @@
     "build": {
       "cache": true,
       "inputs": ["default"]
+    },
+    "@beruangai/agentforge:lock": {
+      "syncGenerators": ["@beruangai/agentforge:sync"]
+    },
+    "@beruangai/agentforge:image": {
+      "syncGenerators": ["@beruangai/agentforge:sync"]
+    },
+    "@nx/js:tsc": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"]
+    },
+    "@nx/vitest:test": {
+      "cache": true,
+      "inputs": ["default", "^production"],
+      "configurations": {
+        "update-snapshot": {
+          "args": "--update"
+        }
+      }
+    },
+    "compile": {
+      "cache": true,
+      "inputs": ["default"]
     }
-  }
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/js/typescript",
+      "options": {
+        "typecheck": {
+          "targetName": "typecheck"
+        },
+        "build": {
+          "targetName": "compile",
+          "configName": "tsconfig.lib.json",
+          "buildDepsName": "build-deps",
+          "watchDepsName": "watch-deps"
+        }
+      },
+      "include": ["packages/**/*"]
+    },
+    {
+      "plugin": "@nx/vitest",
+      "options": {
+        "testTargetName": "vitest:test",
+        "ciTargetName": "test-ci",
+        "testMode": "watch"
+      },
+      "include": ["packages/**/*"]
+    }
+  ]
 }

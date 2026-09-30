@@ -1,0 +1,164 @@
+{
+  "name": "@beruangai/golden-kata",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/golden-kata",
+  "projectType": "library",
+  "metadata": {
+    "generator": "@beruangai/agentforge:agentic-project",
+    "components": [
+      {
+        "generator": "@beruangai/agentforge:agent",
+        "name": "writer",
+        "path": "agents/writer",
+        "runtimeConfigKey": "GoldenKataWriter",
+        "containerName": "beruangai-golden-kata-writer"
+      },
+      {
+        "generator": "@beruangai/agentforge:agent",
+        "name": "grader",
+        "path": "agents/grader",
+        "runtimeConfigKey": "GoldenKataGrader",
+        "containerName": "beruangai-golden-kata-grader"
+      }
+    ],
+    "agentforge": {
+      "detached": {
+        "files": [],
+        "targets": []
+      }
+    }
+  },
+  "targets": {
+    "image-agentforge": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["^bundle"],
+      "options": {
+        "layer": "agentforge"
+      }
+    },
+    "lock": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["^bundle"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/base/agentic/bun.lock"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "image": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock", "image-agentforge"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "assemble": {
+      "executor": "nx:noop",
+      "dependsOn": ["image-writer", "image-grader"]
+    },
+    "lock-writer": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["lock"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        "{projectRoot}/agents/writer/agent/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/agents/writer/agent/bun.lock"],
+      "options": {
+        "layer": "agents/writer"
+      }
+    },
+    "image-writer": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock-writer", "image"],
+      "options": {
+        "layer": "agents/writer"
+      }
+    },
+    "serve-writer": {
+      "executor": "@beruangai/agentforge:serve",
+      "continuous": true,
+      "dependsOn": ["image-writer"],
+      "defaultConfiguration": "serve",
+      "options": {
+        "agent": "writer"
+      },
+      "configurations": {
+        "serve": {}
+      }
+    },
+    "lock-grader": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["lock"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        "{projectRoot}/agents/grader/agent/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/agents/grader/agent/bun.lock"],
+      "options": {
+        "layer": "agents/grader"
+      }
+    },
+    "image-grader": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock-grader", "image"],
+      "options": {
+        "layer": "agents/grader"
+      }
+    },
+    "serve-grader": {
+      "executor": "@beruangai/agentforge:serve",
+      "continuous": true,
+      "dependsOn": ["image-grader"],
+      "defaultConfiguration": "serve",
+      "options": {
+        "agent": "grader"
+      },
+      "configurations": {
+        "serve": {}
+      }
+    }
+  }
+}

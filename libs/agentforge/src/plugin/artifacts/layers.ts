@@ -217,14 +217,14 @@ export function hostManifest(context: RenderContext): MaintainedFile {
 }
 
 /**
- * The project's tsconfig: `agentforge-agent` among its custom conditions,
+ * The project's `tsconfig.lib.json`: `agentforge-agent` among its custom conditions,
  * beside the workspace's own, and the base layer's package name mapped to its
  * modules — in the image the container workspace links it; in the host,
  * where the layers are not workspace members, this mapping does.
  */
 export function projectTsconfig(context: RenderContext): MaintainedFile {
   const { project } = context;
-  return maintainedJson(`${project.root}/tsconfig.json`, (current) => {
+  return maintainedJson(`${project.root}/tsconfig.lib.json`, (current) => {
     const compilerOptions = (current.compilerOptions ?? {}) as Record<
       string,
       unknown

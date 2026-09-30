@@ -39,13 +39,13 @@ Every artifact spanning a project's agents is rendered from `metadata.components
 | File | Keys |
 |---|---|
 | `package.json` | `exports`; `dependencies["@beruangai/agentforge"]` |
-| `tsconfig.json` | `agentforge-agent` in `compilerOptions.customConditions`; `compilerOptions.paths["@<scope>/<project>-base/*"]` |
+| `tsconfig.lib.json` | `agentforge-agent` in `compilerOptions.customConditions`; `compilerOptions.paths["@<scope>/<project>-base/*"]` |
 | `base/agentic/package.json`, `agents/<agent>/agent/package.json` | `name`, `type`; the `workspace:*` layers in `dependencies`; the runtime peers in `peerDependencies` |
 | shared constructs `package.json` | `dependencies["@beruangai/agentforge"]` |
 | shared constructs `project.json` | `<project>:assemble` in `targets.assemble.dependsOn` |
 | shared constructs `src/app/index.ts`, `agents/index.ts`, `agentic-projects/index.ts` | the `export *` line for each construct |
 
-**Scaffolded** — written once when absent, then never touched: `base/agentic/options.ts`, `agents/<agent>/agent/contract.ts` and `procedures.ts`, every `$claude/` file, and the host `package.json`'s other dependencies.
+**Scaffolded** — written once when absent, then never touched: `base/agentic/options.ts`, `agents/<agent>/agent/contract.ts` and `procedures.ts`, every `$claude/` file, the project's `tsconfig.json` and the rest of its `tsconfig.lib.json`, and the host `package.json`'s other dependencies.
 
 ### Detaching
 

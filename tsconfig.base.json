@@ -4,17 +4,20 @@
     "customConditions": [
       "@beruangai/source"
     ],
-    "erasableSyntaxOnly": true,
-    "exactOptionalPropertyTypes": true,
     "isolatedModules": true,
-    "noEmit": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
-    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
     "strict": true,
-    "verbatimModuleSyntax": true
+    "paths": {
+      "@beruangai/common-constructs": [
+        "./packages/common/constructs/src/index.ts"
+      ]
+    },
+    "rootDir": ".",
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true
   }
 }

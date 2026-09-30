@@ -7,6 +7,7 @@ import {
   installPackagesTask,
   readJson,
   type Tree,
+  writeJson,
 } from '@nx/devkit';
 import { applyAndFormat } from '../../artifacts/project-artifacts.ts';
 import { baseScaffolds } from '../../artifacts/scaffolds.ts';
@@ -106,18 +107,27 @@ export default async function agenticProjectGenerator(
         2,
       )}\n`,
     );
-    tree.write(
-      `${root}/tsconfig.json`,
-      `${JSON.stringify(
-        {
-          extends: relative(root, 'tsconfig.base.json'),
-          compilerOptions: { allowImportingTsExtensions: true },
-          include: ['**/*.ts'],
-        },
-        null,
-        2,
-      )}\n`,
-    );
+    // As @aws/nx-plugin's TypeScript projects: a solution tsconfig.json the
+    // workspace's references and inferred typecheck build, and a
+    // tsconfig.lib.json emitting only under dist/.
+    const toWorkspaceRoot = relative(root, '.');
+    writeJson(tree, `${root}/tsconfig.json`, {
+      extends: `${toWorkspaceRoot}/tsconfig.base.json`,
+      compilerOptions: {},
+      files: [],
+      include: [],
+      references: [{ path: './tsconfig.lib.json' }],
+    });
+    writeJson(tree, `${root}/tsconfig.lib.json`, {
+      extends: './tsconfig.json',
+      compilerOptions: {
+        rootDir: '.',
+        outDir: `${toWorkspaceRoot}/dist/${root}/tsc`,
+        tsBuildInfoFile: `${toWorkspaceRoot}/dist/${root}/tsc/tsconfig.lib.tsbuildinfo`,
+        allowImportingTsExtensions: true,
+      },
+      include: ['**/*.ts'],
+    });
     addProjectConfiguration(tree, packageName, {
       root,
       sourceRoot: root,

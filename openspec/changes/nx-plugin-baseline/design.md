@@ -14,6 +14,7 @@ See proposal.md for why. Written against `libs/agentforge`, after `move-package-
   - It records generated projects as `metadata.generator` and their parts as `metadata.components[]` (`{ generator, name, path, …extra }`), and assigns ports against `metadata.ports`.
   - `ts#agent` generates an agent's construct in the shared constructs project but never connects it to an infra project; the consumer declares it in the stack `ts#infra` generated.
 - Nx 23 resolves a plugin's manifests through its package, from the workspace root; its local-project fallback (`resolveLocalNxPlugin`) cannot match a package exporting no `.`, as AgentForge's does not. The root therefore depends on `@beruangai/agentforge` (`workspace:*`), as `nx add` makes a consumer's do, and Nx imports the source manifests' `.ts` implementations through Node's native type stripping — in this repository the plugin runs from source.
+- `@aws/nx-plugin`'s shared constructs generator assumes a workspace made by its preset: a composite base tsconfig emitting declarations only, the `@nx/js/typescript` and `@nx/vitest` inference plugins it registers, and `@nx/vite`, which it imports but does not add. This repository takes that shape for `packages/` — the base is the preset's, plus `allowImportingTsExtensions` because AgentForge resolves from source here, and the plugins are scoped to `packages/**` — while `libs/agentforge` keeps its stricter options and explicit targets in its own tsconfig. An agentic project's TypeScript follows `@aws/nx-plugin`'s projects: a solution `tsconfig.json` and a `tsconfig.lib.json` emitting under `dist/`.
 - `ScratchFilesystem` (ADR 0015) gives a task an empty directory of its own, removed when the task ends; `context.filesystemPermissions` carries its allow rules, which a run applies under `permissionMode: 'dontAsk'`.
 
 ## Goals / Non-Goals
@@ -128,7 +129,7 @@ Each agent's construct registers its ARN under namespace `agentcore`, key `agent
 
 ```
 <directory>/<name>/                                   agentic project
-  project.json  package.json  tsconfig.json  client.ts
+  project.json  package.json  tsconfig.json  tsconfig.lib.json  client.ts
   base/Dockerfile
   base/agentic/package.json                           → /workspace/agentic, @<scope>/<project>-base
   base/agentic/$claude/{CLAUDE.md, settings.json, skills/, agents/}
@@ -146,7 +147,7 @@ The contract is only what a generator creates. Files the consumer or a build cre
 | Ownership | Artifacts | On sync or regeneration |
 |---|---|---|
 | **Maintained** | Dockerfiles, `server.ts`, `task.ts`, `client.ts`, the agent and project constructs and their star exports, the project's targets | Rewritten to what the installed version renders from the components |
-| **Maintained keys** | A container member's `name`, `type`, `exports` (base layer), its `workspace:*` layers and the peers AgentForge's root provides; the host manifest's AgentForge dependency and its `exports`; `agentforge-agent` in the project's `customConditions` and the base layer's `paths` entry; the shared constructs project's `assemble` edge and its dependency on AgentForge | Those keys rewritten; every other key kept |
+| **Maintained keys** | A container member's `name`, `type`, `exports` (base layer), its `workspace:*` layers and the peers AgentForge's root provides; the host manifest's AgentForge dependency and its `exports`; `agentforge-agent` in `tsconfig.lib.json`'s `customConditions` and the base layer's `paths` entry; the shared constructs project's `assemble` edge and its dependency on AgentForge | Those keys rewritten; every other key kept |
 | **Scaffolded** | Contracts, procedures, `options.ts`, `$claude/` | Written once when absent; never touched again by anything |
 | **Detached** | A maintained file or target named in `metadata.agentforge.detached` | Never touched; the consumer owns its updates |
 

@@ -10,5 +10,14 @@
       "path": "./tsconfig.spec.json"
     }
   ],
-  "compilerOptions": {}
+  "compilerOptions": {
+    "composite": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "erasableSyntaxOnly": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true
+  }
 }

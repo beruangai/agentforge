@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../dist/packages/examples/golden-kata/tsc",
+    "tsBuildInfoFile": "../../../dist/packages/examples/golden-kata/tsc/tsconfig.lib.tsbuildinfo",
+    "allowImportingTsExtensions": true,
+    "customConditions": [
+      "@beruangai/source",
+      "agentforge-agent"
+    ],
+    "paths": {
+      "@beruangai/golden-kata-base/*": [
+        "./base/agentic/*.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}
