@@ -1,5 +1,5 @@
+import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import {
   composeOptions,
   filesystems,
@@ -20,7 +20,8 @@ const os = implementAgent(contract);
 export const router = os.router({
   Write: os.Write.use(filesystems({ kata: new ScratchFilesystem() })).handler(
     async ({ input, context }) => {
-      const directory = context.filesystems.kata.localPath;
+      const { kata } = context.filesystems;
+      const directory = kata.localPath;
       const run = await context.runAgent({
         prompt: [
           `Write a ${input.difficulty} coding kata about the topic below, following the kata-style skill.`,
@@ -28,27 +29,39 @@ export const router = os.router({
           `In ${directory}, write ${KATA_FILE} (the kata) and ${SOLUTION_FILE} (a correct reference solution). Run run_cases, and fix the kata or the solution until every case passes. Then answer with the kata exactly as ${KATA_FILE} holds it.`,
         ],
         output: KataSchema,
+        // The answer is held back until both files it is checked against exist.
+        guardrails: {
+          stop: [
+            async () => {
+              const missing = [KATA_FILE, SOLUTION_FILE].filter(
+                (file) => !existsSync(kata.path(file)),
+              );
+              return missing.length === 0
+                ? undefined
+                : {
+                    reason: `Write ${missing.join(' and ')} in ${directory} before answering.`,
+                  };
+            },
+          ],
+        },
         // The base options, plus what the writer alone may do: write the kata's files.
         options: composeOptions(baseOptions(directory), {
           tools: ['Write', 'Edit'],
-          allowedTools: [...context.filesystems.kata.permissions.allow],
+          allowedTools: [...kata.permissions.allow],
           maxTurns: 20,
         }),
       });
       // The kata as answered is the kata: written back, so its results are
       // computed from what the caller receives, never from a draft.
       await writeFile(
-        join(directory, KATA_FILE),
+        kata.writablePath(KATA_FILE),
         JSON.stringify(run.output, null, 2),
       );
       return {
         kata: {
           ...run.output,
           difficulty: input.difficulty,
-          referenceSolution: await readFile(
-            join(directory, SOLUTION_FILE),
-            'utf8',
-          ),
+          referenceSolution: await readFile(kata.path(SOLUTION_FILE), 'utf8'),
         },
         results: await runCases(directory),
       };
