@@ -178,6 +178,25 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
     ]);
   });
 
+  it('pulls and pushes under its remote root joined with the subpath', async () => {
+    await put('projects/alpha/r/pulled.md', 'pulled');
+    await put('r/elsewhere.md', 'not under the root');
+    const vault = await mount('remote-root', {
+      remoteRoot: '/projects/alpha',
+      scope: () => ({ subpath: 'r' }),
+    });
+    const { localPath } = vault.mounted;
+    expect(await readFile(join(localPath, 'pulled.md'), 'utf8')).toBe('pulled');
+    expect(existsSync(join(localPath, 'elsewhere.md'))).toBe(false);
+    await writeFile(join(localPath, 'pushed.md'), 'pushed');
+    await vault.unmount('TASK_STATE_COMPLETED');
+    expect(await listRelativeKeys(s3, bucket, 'projects/alpha/r/')).toEqual([
+      'pulled.md',
+      'pushed.md',
+    ]);
+    expect(await listRelativeKeys(s3, bucket, 'r/')).toEqual(['elsewhere.md']);
+  });
+
   it('pushes checkpoints, leaving a file that has not settled; a cancel pushes nothing more', async () => {
     const vault = await mount('checkpoints', {
       scope: () => ({ subpath: 'c' }),
