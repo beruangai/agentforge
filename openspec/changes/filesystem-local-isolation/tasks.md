@@ -34,7 +34,7 @@ Group 1 changes how a mount resolves its paths. Group 2 adds the claim registry 
 
 ## 5. Records
 
-- [ ] 5.1 Verify each record by reading it against design.md:
+- [x] 5.1 Verify each record by reading it against design.md:
   - **ADR 0015, mutated in place:**
     - the scope bullet becomes `subpath` under `localRoot` and `remoteRoot`;
     - "A kind decides its `localPath`" becomes `localRoot`, with a scratch root holding a directory per task;
