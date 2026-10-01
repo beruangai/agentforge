@@ -32,8 +32,11 @@ export const router = os.router({
       const run = await context.runAgent({
         prompt: `Grade the ${input.kata.difficulty} kata in ${directory} — ${KATA_FILE} and its reference ${SOLUTION_FILE} — against the kata-style skill: score each rubric criterion from 1 to 5 with your reasoning, then sum up. Read both files and run run_cases before you judge; change nothing.`,
         output: GradeSchema,
-        // The base options alone: the grader reads and runs, and writes nothing.
-        options: composeOptions(baseOptions(directory), { maxTurns: 12 }),
+        // The base options and its mount: the grader reads and runs, and writes nothing.
+        options: composeOptions(baseOptions(directory), {
+          additionalDirectories: [...context.filesystemDirectories],
+          maxTurns: 12,
+        }),
       });
       return { ...run.output, results: await runCases(directory) };
     },

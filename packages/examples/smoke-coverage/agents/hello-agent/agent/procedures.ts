@@ -4,7 +4,6 @@ import {
   distill,
   filesystems,
   implementAgent,
-  type MountedFilesystem,
   S3Filesystem,
   type S3FilesystemOptions,
 } from '@beruangai/agentforge/agent';
@@ -23,15 +22,6 @@ const NOTEBOOK: S3FilesystemOptions = {
     subpath: `topics/${z.object({ topic: TopicField }).parse(input).topic}`,
   }),
 };
-
-/** The topic's note in the mounted notebook. */
-function noteFile(
-  filesystems: Readonly<Record<string, MountedFilesystem>>,
-): string {
-  const notebook = filesystems.notebook;
-  if (notebook === undefined) throw new Error('the notebook is not mounted');
-  return notebook.path('note.md');
-}
 
 export const router = os.router({
   Summarise: os.Summarise.handler(async ({ input, context }) => {
@@ -99,7 +89,7 @@ export const router = os.router({
       }),
     }),
   ).handler(async ({ input, context }) => {
-    const note = noteFile(context.filesystems);
+    const note = context.filesystems.notebook.path('note.md');
     await context.runAgent({
       prompt: [
         `Write the note below, exactly, to the file \`${note}\` with the Write tool, then answer that you did.`,
@@ -110,6 +100,7 @@ export const router = os.router({
         maxTurns: 4,
         tools: ['Write'],
         permissionMode: 'dontAsk',
+        additionalDirectories: [...context.filesystemDirectories],
         allowedTools: [...context.filesystemPermissions.allow],
       }),
     });
@@ -121,12 +112,13 @@ export const router = os.router({
     filesystems({ notebook: new S3Filesystem(NOTEBOOK) }),
   ).handler(async ({ context }) => {
     const run = await context.runAgent({
-      prompt: `Read the file \`${noteFile(context.filesystems)}\` with the Read tool, and answer with its content, exactly.`,
+      prompt: `Read the file \`${context.filesystems.notebook.path('note.md')}\` with the Read tool, and answer with its content, exactly.`,
       output: z.object({ note: z.string().describe("The file's content") }),
       options: composeOptions(baseOptions(), {
         maxTurns: 4,
         tools: ['Read'],
         permissionMode: 'dontAsk',
+        additionalDirectories: [...context.filesystemDirectories],
         allowedTools: [...context.filesystemPermissions.allow],
       }),
     });

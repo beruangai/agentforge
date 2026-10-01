@@ -47,6 +47,7 @@ export const router = os.router({
         // The base options, plus what the writer alone may do: write the kata's files.
         options: composeOptions(baseOptions(directory), {
           tools: ['Write', 'Edit'],
+          additionalDirectories: [...context.filesystemDirectories],
           allowedTools: [...kata.permissions.allow],
           maxTurns: 20,
         }),

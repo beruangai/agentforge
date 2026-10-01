@@ -6,9 +6,9 @@ import { kataServer, RUN_CASES_TOOL } from './kata-server.ts';
  * options with `composeOptions`. An agent's cwd is its own directory, so the
  * `project` setting source composes this layer's `.claude/` — `CLAUDE.md` and
  * the `kata-style` skill — from the parent. The kata's `directory` is added,
- * so reading it needs no approval; the `kata` server runs it. Anything else
- * that would ask is denied. Agents import it as
- * `@beruangai/golden-kata-base/options`.
+ * so reading it needs no approval; the `kata` server runs it. Reads outside
+ * the working directories are refused, and anything else that would ask is
+ * denied. Agents import it as `@beruangai/golden-kata-base/options`.
  */
 export function baseOptions(directory: string): AgentOptions {
   return {
@@ -19,5 +19,6 @@ export function baseOptions(directory: string): AgentOptions {
     tools: ['Read', 'Glob', 'Grep', 'Skill'],
     allowedTools: ['Skill', RUN_CASES_TOOL],
     permissionMode: 'dontAsk',
+    settings: { permissions: { blockReadsOutsideWorkingDirectories: true } },
   };
 }

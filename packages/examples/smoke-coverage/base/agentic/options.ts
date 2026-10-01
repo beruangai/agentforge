@@ -5,8 +5,13 @@ import type { AgentOptions } from '@beruangai/agentforge/agent';
  * options with `composeOptions`: the cheapest model, since the smoke suites
  * assert what AgentForge does around a run, never what the model answers. An
  * agent's cwd is its own directory, so the `project` setting source composes
- * this layer's `.claude/` from the parent.
+ * this layer's `.claude/` from the parent. Reads outside a run's working
+ * directories are refused, so a procedure gives a run its mounts.
  */
 export function baseOptions(): AgentOptions {
-  return { model: 'claude-haiku-4-5', settingSources: ['project'] };
+  return {
+    model: 'claude-haiku-4-5',
+    settingSources: ['project'],
+    settings: { permissions: { blockReadsOutsideWorkingDirectories: true } },
+  };
 }
