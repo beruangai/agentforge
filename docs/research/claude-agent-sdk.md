@@ -101,3 +101,11 @@ From [How Claude remembers your project](https://code.claude.com/docs/en/memory.
 - **An instruction fragment replaces the preset.** Spiked the same day: a custom `systemPrompt` (`string[]`) holding only a memory fragment, and the fragment after a procedure's own prompt. Both times the agent saved a topic file with the frontmatter the fragment describes and indexed it in `MEMORY.md`; a later run with the default prompt and no tools recalled it. The fragment names the directory, when to save, the file format and the index rule. The preset's memory section, like most of the preset, is for software development, and AgentForge does not use the preset.
 - A recall without `Read` sees only the index: a detail kept only in a topic file is missing.
 - Claude Code stamps each topic file's frontmatter with `node_type`, `originSessionId` and `modified`, whatever wrote it. The directory sits outside `CLAUDE_CONFIG_DIR`, so the config directory swapped on a run resumed from the store (above) does not affect it.
+
+## Holding an answer back in-turn — spiked 2026-10-01 against `0.3.280` (CLI 2.1.284)
+
+One `query()` on Haiku 4.5 with an `outputFormat` schema and no other tools. The question was whether a check can make the agent fix its answer before the run ends.
+
+- **A `Stop` hook cannot.** It fired once, after the agent had submitted its answer through `StructuredOutput`. Its `decision: 'block'` changed nothing: the run ended `success` with the first answer, in two turns.
+- **A `PreToolUse` hook on `StructuredOutput` can.** `StructuredOutput` is in `init.tools`, so a matcher on it is live. Denying the submission with a reason returns that reason to the agent as the tool's error. The agent resubmitted a corrected answer in the same run, and the result's `structured_output` was the accepted resubmission.
+- **The CLI bounds it.** A hook that always denies ends the run `error_max_structured_output_retries` after five attempts: "Failed to provide valid structured output after 5 attempts — last StructuredOutput error: …", carrying the hook's last reason. The SDK then throws after the result. The limit is the CLI's structured-output retry limit, `MAX_STRUCTURED_OUTPUT_RETRIES`, shared with schema failures.

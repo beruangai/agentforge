@@ -13,4 +13,8 @@ How a consumer's Claude Code picks up skills AgentForge ships inside `@beruangai
 - The link dangles until the package is installed, and the package must be installed where the link points (the workspace root's `node_modules`).
 - What it gives up against a plugin: a namespace (`/agentforge:…`), and bundling agents, commands, hooks or MCP servers. Agents can be linked into `.claude/agents/` the same way.
 
-**What AgentForge takes from this:** the guidance is for a consumer's interactive Claude Code, not the Agent SDK, so a plugin with a one-time trust prompt per machine is acceptable. The project settings must carry the marketplace's path relative to the repository, written by hand rather than by `marketplace add`. Whether the trust prompt resolves a relative `directory` path is not yet observed; it is checked interactively when the plugin is built.
+**Registered once per machine at user scope, enabled per project: the route AgentForge takes.**
+- `claude plugin marketplace add <dir> --scope user` registers the marketplace in the user's settings, with its absolute path, which is per machine anyway. With `enabledPlugins: { "agentforge@agentforge": false }` beside it, no project gets the plugin.
+- A project that sets `enabledPlugins: { "agentforge@agentforge": true }` in `.claude/settings.json` (committed) or `.claude/settings.local.json` (not) gets it. That held on a fresh config directory in a headless session, with no `install` step and no trust prompt.
+- It loads in place: an edit to the marketplace directory reached the next session.
+- The marketplace is one directory per machine, so every project on the machine gets the guidance of whichever AgentForge it points at, not each project's installed version.
