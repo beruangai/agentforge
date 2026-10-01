@@ -13,15 +13,16 @@ import {
 } from './filesystem.ts';
 
 export interface S3FilesystemOptions extends FilesystemOptions {
-  /** The local directory it mounts at: an S3 filesystem has no default, so prompts can name it. */
-  readonly localPath: string;
+  /** Required: an S3 filesystem has no default local root. */
+  readonly localRoot: string;
   /** The bucket's name as the deployment declared it (`AgentRuntime.filesystems`). */
   readonly bucket: string;
   /**
    * Off by default. When on, the push at the end deletes every object in the
    * write scope that has no local file — not only what the task removed, but
    * anything written to the prefix by someone else since the pull. Never on
-   * a checkpoint, and only on a non-empty `remotePath`.
+   * a checkpoint, and only when the remote root and subpath together are
+   * not `/`, the whole bucket.
    */
   readonly dangerouslyEnableDeletes?: boolean;
   /** Globs relative to the mount, like `read` and `write`: never pulled, pushed or deleted. */
@@ -115,9 +116,9 @@ export class S3Filesystem extends Filesystem {
 
   protected override validate(mount: Mount): void {
     this.#remoteUrl(mount);
-    if (this.#s3Options.dangerouslyEnableDeletes && mount.remotePath === '') {
+    if (this.#s3Options.dangerouslyEnableDeletes && mount.remotePath === '/') {
       throw new Error(
-        `filesystem "${mount.name}": dangerouslyEnableDeletes needs a remotePath, since on the whole bucket it could empty it`,
+        `filesystem "${mount.name}": dangerouslyEnableDeletes needs a remote root or subpath, since on the whole bucket it could empty it`,
       );
     }
   }
@@ -158,7 +159,9 @@ export class S3Filesystem extends Filesystem {
         `no bucket "${this.#s3Options.bucket}" is declared to this agent; declared: ${Object.keys(declaredBuckets).join(', ') || 'none'}`,
       );
     }
-    return `s3://${bucket}/${mount.remotePath === '' ? '' : `${mount.remotePath}/`}`;
+    // A remote path is absolute within the store; an S3 key has no leading slash.
+    const prefix = mount.remotePath.replace(/^\/+/, '');
+    return `s3://${bucket}/${prefix === '' ? '' : `${prefix}/`}`;
   }
 
   /** One `s7cmd sync`; any exit but 0 — an error, or a warning such as an ETag mismatch — is unsynced. */

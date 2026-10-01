@@ -84,7 +84,7 @@ function execute(procedure: keyof typeof contract, fail = false) {
 
 /** A filesystem that pushes on success, mounted at `name` under the test's root. */
 const at = (name: string) =>
-  ({ localPath: join(root, name), pushOn: ['TASK_STATE_COMPLETED'] }) as const;
+  ({ localRoot: join(root, name), pushOn: ['TASK_STATE_COMPLETED'] }) as const;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'agentforge-registry-'));
@@ -114,7 +114,7 @@ describe('filesystems registered on a procedure', () => {
       },
     });
     expect(house.calls).toEqual([]);
-    expect(workspace.calls).toEqual(['pull ', 'push ']);
+    expect(workspace.calls).toEqual(['pull /', 'push /']);
     for (const name of ['workspace', 'scratch', 'notes']) {
       expect(existsSync(join(root, name))).toBe(false);
     }
@@ -125,7 +125,7 @@ describe('filesystems registered on a procedure', () => {
       output: { names: ['notes'] },
     });
     expect(scratch.calls).toEqual([]);
-    expect(notes.calls).toEqual(['pull ', 'push ']);
+    expect(notes.calls).toEqual(['pull /', 'push /']);
   });
 
   it('fail a completed task whose push fails, unsynced', async () => {

@@ -23,10 +23,13 @@ export interface FilesystemRequest {
   readonly context: TaskContext;
 }
 
-/** What a filesystem mounts from its store, and what within it the agent may read and write. */
+/** Where under its roots a filesystem mounts for a request, and what within it the agent may read and write. */
 export interface FilesystemScope {
-  /** The subtree mounted — an S3 prefix, a path in a repository — relative; `''` for all of it. */
-  readonly remotePath: string;
+  /**
+   * Relative to both roots: the mount is `<localRoot>/<subpath>` here and
+   * `<remoteRoot>/<subpath>` in the store; `''` for the whole root.
+   */
+  readonly subpath: string;
   /** Globs relative to the mount; the whole mount by default. */
   readonly read?: readonly string[];
   /** Globs relative to the mount; the whole mount by default when the filesystem pushes, none when it does not. A push never leaves them. */
@@ -35,8 +38,10 @@ export interface FilesystemScope {
 
 /** Options every filesystem kind shares (ADR 0015). */
 export interface FilesystemOptions {
-  /** The local directory it mounts at, absolute; a kind sets a default or requires it. */
-  readonly localPath?: string;
+  /** The local directory its mounts live under, absolute; a kind sets a default or requires it. */
+  readonly localRoot?: string;
+  /** The store's partition its mounts live under, absolute within the store; `/`, the whole store, when absent. */
+  readonly remoteRoot?: string;
   readonly scope: (request: FilesystemRequest) => FilesystemScope;
   /**
    * The task states unmount pushes the write scope back on, verified before
@@ -54,9 +59,24 @@ export interface FilesystemOptions {
 /** Strict: a misspelt option is refused, never dropped. A kind strips its own before these. */
 const FilesystemOptionsSchema = z
   .strictObject({
-    localPath: z
+    localRoot: z
       .string()
-      .refine(isAbsolute, 'a filesystem mounts at an absolute local path')
+      .refine(isAbsolute, 'a local root is an absolute directory')
+      .refine(
+        (root) => !hasDotSegment(root),
+        'a local root has no "." or ".." segment',
+      )
+      .optional(),
+    remoteRoot: z
+      .string()
+      .refine(
+        (root) => root.startsWith('/'),
+        'a remote root is absolute within its store: it starts with "/"',
+      )
+      .refine(
+        (root) => !hasDotSegment(root),
+        'a remote root has no "." or ".." segment',
+      )
       .optional(),
     scope: z.custom<FilesystemOptions['scope']>(
       (value) => typeof value === 'function',
@@ -81,8 +101,9 @@ const FilesystemOptionsSchema = z
 export interface Mount {
   readonly name: string;
   readonly taskId: string;
-  /** The local directory it is mounted at: absolute. */
+  /** The local directory it is mounted at: `<localRoot>/<subpath>`, absolute. */
   readonly localPath: string;
+  /** What it mounts from the store: `<remoteRoot>/<subpath>`, absolute within the store, `/` for all of it. A kind maps it to its store's addressing. */
   readonly remotePath: string;
   readonly read: readonly string[];
   readonly write: readonly string[];
@@ -110,18 +131,14 @@ export class FilesystemUnsynced extends Error {}
  */
 export abstract class Filesystem {
   readonly options: FilesystemOptions;
-  /** The local directory it mounts at for a task: the consumer's, or the kind's default. */
-  readonly #resolveLocalPath: (task: {
-    readonly taskId: string;
-    readonly name: string;
-  }) => string;
+  /** The local root for a registered name: the consumer's, or the kind's default. */
+  readonly #resolveLocalRoot: (filesystem: { readonly name: string }) => string;
 
   protected constructor(
     options: FilesystemOptions,
     kind: {
-      /** The local directory it mounts at when the consumer names none; absent, the consumer must. */
-      readonly defaultLocalPath?: (task: {
-        readonly taskId: string;
+      /** The local root when the consumer names none; absent, the consumer must. */
+      readonly defaultLocalRoot?: (filesystem: {
         readonly name: string;
       }) => string;
     } = {},
@@ -133,15 +150,15 @@ export abstract class Filesystem {
       );
     }
     this.options = parsed.data as FilesystemOptions;
-    const { localPath } = this.options;
-    const resolveLocalPath =
-      localPath === undefined ? kind.defaultLocalPath : () => localPath;
-    if (resolveLocalPath === undefined) {
+    const { localRoot } = this.options;
+    const resolveLocalRoot =
+      localRoot === undefined ? kind.defaultLocalRoot : () => localRoot;
+    if (resolveLocalRoot === undefined) {
       throw new Error(
-        `${this.constructor.name} needs a localPath: where it mounts`,
+        `${this.constructor.name} needs a localRoot: the directory its mounts live under`,
       );
     }
-    this.#resolveLocalPath = resolveLocalPath;
+    this.#resolveLocalRoot = resolveLocalRoot;
   }
 
   /** Fetches the scope's contents into the mount; every mount pulls, so a task starts from the store, never blind. */
@@ -153,23 +170,11 @@ export abstract class Filesystem {
     options: { readonly modifiedBefore?: Date },
   ): Promise<void>;
 
-  /** The local directory it mounts at for a task, as `mount` resolves it. */
-  localPathFor(task: {
-    readonly taskId: string;
-    readonly name: string;
-  }): string {
-    return this.#resolveLocalPath(task).replace(/\/+$/, '');
-  }
-
   /** Refuses a mount the kind cannot honour, before anything is fetched. */
   protected validate(_mount: Mount): void {}
 
-  async mount(task: {
-    readonly name: string;
-    readonly taskId: string;
-    readonly request: FilesystemRequest;
-  }): Promise<MountLifecycle> {
-    const mount = this.#resolve(task);
+  /** Mounts what `resolve` resolved: refused by the kind, or pulled into its local directory. */
+  async mount(mount: Mount): Promise<MountLifecycle> {
     this.validate(mount);
     await mkdir(mount.localPath, { recursive: true });
     try {
@@ -186,23 +191,23 @@ export abstract class Filesystem {
     );
   }
 
-  #resolve(task: {
+  /**
+   * Resolves the scope for a request: the subpath under both roots, and the
+   * read and write scopes within it. Nothing is touched; `mount` acts on it.
+   */
+  resolve(task: {
     readonly name: string;
     readonly taskId: string;
     readonly request: FilesystemRequest;
   }): Mount {
     const scope = this.options.scope(task.request);
-    const remotePath = scope.remotePath.replace(/\/+$/, '');
-    if (
-      remotePath.startsWith('/') ||
-      remotePath
-        .split('/')
-        .some((segment) => segment === '..' || segment === '.')
-    ) {
+    const subpath = scope.subpath.replace(/\/+$/, '');
+    if (subpath.startsWith('/') || hasDotSegment(subpath)) {
       throw new Error(
-        `filesystem "${task.name}": a scope's remotePath is relative, and never climbs: "${scope.remotePath}"`,
+        `filesystem "${task.name}": a scope's subpath is relative to its roots, and never climbs: "${scope.subpath}"`,
       );
     }
+    const localRoot = this.#resolveLocalRoot(task).replace(/\/+$/, '');
     const pushes = this.options.pushOn !== undefined;
     const write = scope.write ?? (pushes ? ['**'] : []);
     if (pushes && write.length === 0) {
@@ -213,8 +218,10 @@ export abstract class Filesystem {
     return {
       name: task.name,
       taskId: task.taskId,
-      localPath: this.localPathFor(task),
-      remotePath,
+      localPath: subpath === '' ? localRoot : join(localRoot, subpath),
+      remotePath: posix
+        .join(this.options.remoteRoot ?? '/', subpath)
+        .replace(/(.)\/+$/, '$1'),
       read: scope.read ?? ['**'],
       write,
     };
@@ -319,6 +326,11 @@ export class MountLifecycle {
       .then(() => this.#push(options));
     return this.#latestPush;
   }
+}
+
+/** Whether any segment of a slash-separated path is `.` or `..`. */
+function hasDotSegment(path: string): boolean {
+  return path.split('/').some((segment) => segment === '.' || segment === '..');
 }
 
 /** `relativePath` within the mount's local directory; refused when absolute or climbing out of it. */

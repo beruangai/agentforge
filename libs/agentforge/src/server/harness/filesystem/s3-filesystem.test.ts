@@ -11,9 +11,11 @@ import {
 } from './s3-filesystem.ts';
 import { ScratchFilesystem } from './scratch-filesystem.ts';
 
+let localRoot: string;
 let localPath: string;
 beforeEach(async () => {
-  localPath = join(await mkdtemp(join(tmpdir(), 'agentforge-s3-')), 'vault');
+  localRoot = join(await mkdtemp(join(tmpdir(), 'agentforge-s3-')), 'vault');
+  localPath = join(localRoot, 'topics', 'a');
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -27,9 +29,9 @@ function s3(
   const calls: (readonly string[])[] = [];
   const filesystem = new S3Filesystem(
     {
-      localPath,
+      localRoot,
       bucket: 'vault',
-      scope: () => ({ remotePath: 'topics/a' }),
+      scope: () => ({ subpath: 'topics/a' }),
       pushOn: ['TASK_STATE_COMPLETED'],
       ...options,
     },
@@ -45,12 +47,14 @@ function s3(
       },
     },
   );
-  const mount = () =>
-    filesystem.mount({
-      name: 'vault',
-      taskId: 't-1',
-      request: { input: {}, context: {} as TaskContext },
-    });
+  const mount = async () =>
+    filesystem.mount(
+      filesystem.resolve({
+        name: 'vault',
+        taskId: 't-1',
+        request: { input: {}, context: {} as TaskContext },
+      }),
+    );
   return { calls, mount };
 }
 
@@ -117,7 +121,7 @@ describe('S3Filesystem', () => {
   it('pushes only within its write scope', async () => {
     const { calls, mount } = s3({
       scope: () => ({
-        remotePath: '',
+        subpath: '',
         write: ['notes/today.md', 'drafts/**'],
       }),
     });
@@ -136,6 +140,26 @@ describe('S3Filesystem', () => {
     }
     expect(calls[1]?.at(-1)).toBe('s3://vault-bucket/');
   });
+
+  it.each([
+    [
+      '/projects/alpha',
+      'topics/a',
+      's3://vault-bucket/projects/alpha/topics/a/',
+    ],
+    ['/projects/alpha/', '', 's3://vault-bucket/projects/alpha/'],
+    [undefined, 'topics/a', 's3://vault-bucket/topics/a/'],
+  ])(
+    'keys under remote root %s and subpath "%s" without the leading slash',
+    async (remoteRoot, subpath, url) => {
+      const { calls, mount } = s3({
+        ...(remoteRoot === undefined ? {} : { remoteRoot }),
+        scope: () => ({ subpath }),
+      });
+      await mount();
+      expect(calls[0]?.at(-2)).toBe(url);
+    },
+  );
 
   it('fails unsynced on any exit but 0, and as the procedure’s error on refused arguments', async () => {
     await expect(
@@ -157,17 +181,24 @@ describe('S3Filesystem', () => {
   it('refuses a delete on the whole bucket and an undeclared bucket before anything runs', async () => {
     const whole = s3({
       dangerouslyEnableDeletes: true,
-      scope: () => ({ remotePath: '' }),
+      scope: () => ({ subpath: '' }),
     });
     await expect(whole.mount()).rejects.toThrow(
-      /dangerouslyEnableDeletes needs a remotePath/,
+      /dangerouslyEnableDeletes needs a remote root or subpath/,
     );
+    const underRoot = s3({
+      dangerouslyEnableDeletes: true,
+      remoteRoot: '/projects/alpha',
+      scope: () => ({ subpath: '' }),
+    });
+    await (await underRoot.mount()).unmount('TASK_STATE_COMPLETED');
     const undeclared = s3({ bucket: 'other' });
     await expect(undeclared.mount()).rejects.toThrow(
       /no bucket "other" is declared to this agent; declared: vault/,
     );
     expect([...whole.calls, ...undeclared.calls]).toEqual([]);
-    expect(existsSync(localPath)).toBe(false);
+    expect(existsSync(localRoot)).toBe(false);
+    expect(underRoot.calls[1]).toContain('--delete');
   });
 });
 
@@ -185,9 +216,9 @@ describe('the declared buckets', () => {
       const calls: (readonly string[])[] = [];
       const filesystem = new S3Filesystem(
         {
-          localPath,
+          localRoot,
           bucket: 'vault',
-          scope: () => ({ remotePath: 'topics/a' }),
+          scope: () => ({ subpath: 'topics/a' }),
         },
         {
           s7cmd: async (args) => {
@@ -198,11 +229,13 @@ describe('the declared buckets', () => {
         },
       );
       await expect(
-        filesystem.mount({
-          name: 'vault',
-          taskId: 't-1',
-          request: { input: {}, context: {} as TaskContext },
-        }),
+        filesystem.mount(
+          filesystem.resolve({
+            name: 'vault',
+            taskId: 't-1',
+            request: { input: {}, context: {} as TaskContext },
+          }),
+        ),
       ).rejects.toThrow(message);
       expect(calls).toEqual([]);
     },
@@ -211,13 +244,16 @@ describe('the declared buckets', () => {
 
 describe('ScratchFilesystem', () => {
   it('mounts an empty directory of the task’s own, removed when the task ends', async () => {
-    const scratch = await new ScratchFilesystem().mount({
-      name: 'scratch',
-      taskId: 't-1',
-      request: { input: {}, context: {} as TaskContext },
-    });
+    const filesystem = new ScratchFilesystem();
+    const scratch = await filesystem.mount(
+      filesystem.resolve({
+        name: 'scratch',
+        taskId: 't-1',
+        request: { input: {}, context: { taskId: 't-1' } as TaskContext },
+      }),
+    );
     expect(scratch.mounted.localPath).toBe(
-      join(tmpdir(), 'agentforge-scratch', 't-1', 'scratch'),
+      join(tmpdir(), 'agentforge-scratch', 'scratch', 't-1'),
     );
     expect(existsSync(scratch.mounted.localPath)).toBe(true);
     await scratch.unmount('TASK_STATE_COMPLETED');

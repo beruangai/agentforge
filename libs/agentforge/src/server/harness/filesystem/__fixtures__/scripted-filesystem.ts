@@ -22,7 +22,7 @@ export class ScriptedFilesystem extends Filesystem {
 
   constructor(options: Partial<FilesystemOptions>, script: Script = {}) {
     super({
-      scope: () => ({ remotePath: '' }),
+      scope: () => ({ subpath: '' }),
       ...options,
     });
     this.#script = script;

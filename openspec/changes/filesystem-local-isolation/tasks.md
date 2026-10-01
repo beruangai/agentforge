@@ -4,7 +4,7 @@ Group 1 changes how a mount resolves its paths. Group 2 adds the claim registry 
 
 ## 1. Roots and subpath
 
-- [ ] 1.1 `FilesystemOptions.localRoot` and `remoteRoot`, `FilesystemScope.subpath`, `S3FilesystemOptions.localRoot` (required). `Mount.localPath` and `remotePath` are resolved from the roots and the subpath. A kind's default is `defaultLocalRoot({ name })`. `S3Filesystem`'s delete guard is on the resolved remote path. Verified by unit tests, `nx run @beruangai/agentforge:test`:
+- [x] 1.1 `FilesystemOptions.localRoot` and `remoteRoot`, `FilesystemScope.subpath`, `S3FilesystemOptions.localRoot` (required). `Mount.localPath` and `remotePath` are resolved from the roots and the subpath. A kind's default is `defaultLocalRoot({ name })`. `S3Filesystem`'s delete guard is on the resolved remote path. Verified by unit tests, `nx run @beruangai/agentforge:test`:
   - roots and subpath compose: with and without a remote root, and with an empty subpath; the S3 key prefix drops the remote path's leading slash;
   - a malformed root throws at construction;
   - a malformed subpath fails `EXECUTION_ERROR` before anything is mounted;

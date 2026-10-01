@@ -45,12 +45,12 @@ import {
 } from './__fixtures__/scratch-bucket.ts';
 
 /** Everything but where it mounts, which is per task. */
-const OPTIONS: Omit<S3FilesystemOptions, 'localPath'> = {
+const OPTIONS: Omit<S3FilesystemOptions, 'localRoot'> = {
   bucket: 'vault',
-  scope: () => ({ remotePath: 'p' }),
+  scope: () => ({ subpath: 'p' }),
   pushOn: ['TASK_STATE_COMPLETED'],
   dangerouslyEnableDeletes: true,
-  // `cache/**` holds only if s7cmd matches paths relative to the remote path.
+  // `cache/**` holds only if s7cmd matches paths relative to the mount.
   exclude: ['cache/**', '**/*.tmp'],
 };
 
@@ -78,7 +78,7 @@ function mount(
   options: Partial<S3FilesystemOptions> = {},
 ): Promise<MountLifecycle> {
   const filesystem = new S3Filesystem(
-    { ...OPTIONS, localPath: join(root, taskId), ...options },
+    { ...OPTIONS, localRoot: join(root, taskId), ...options },
     {
       s7cmd,
       environment: {
@@ -87,11 +87,13 @@ function mount(
     },
   );
   // No scope here reads the request.
-  return filesystem.mount({
-    name: 'vault',
-    taskId,
-    request: { input: undefined, context: {} as never },
-  });
+  return filesystem.mount(
+    filesystem.resolve({
+      name: 'vault',
+      taskId,
+      request: { input: undefined, context: {} as never },
+    }),
+  );
 }
 
 beforeAll(async () => {
@@ -162,7 +164,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
   it('pushes only within its write scope, and deletes nothing outside it', async () => {
     await put('w/outside.md', 'remote');
     const vault = await mount('write-scope', {
-      scope: () => ({ remotePath: 'w', write: ['notes/today.md'] }),
+      scope: () => ({ subpath: 'w', write: ['notes/today.md'] }),
     });
     const { localPath } = vault.mounted;
     await mkdir(join(localPath, 'notes'));
@@ -178,7 +180,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
 
   it('pushes checkpoints, leaving a file that has not settled; a cancel pushes nothing more', async () => {
     const vault = await mount('checkpoints', {
-      scope: () => ({ remotePath: 'c' }),
+      scope: () => ({ subpath: 'c' }),
       dangerouslyEnableDeletes: false,
       pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
       checkpoints: { intervalSeconds: 5, settleSeconds: 3_600 },
@@ -195,7 +197,7 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
 
   it('fails unsynced when the object store refuses', async () => {
     const refused = new S3Filesystem(
-      { ...OPTIONS, localPath: join(root, 'refused') },
+      { ...OPTIONS, localRoot: join(root, 'refused') },
       {
         s7cmd,
         environment: {
@@ -206,11 +208,13 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
       },
     );
     await expect(
-      refused.mount({
-        name: 'vault',
-        taskId: 'refused',
-        request: { input: undefined, context: {} as never },
-      }),
+      refused.mount(
+        refused.resolve({
+          name: 'vault',
+          taskId: 'refused',
+          request: { input: undefined, context: {} as never },
+        }),
+      ),
     ).rejects.toMatchObject({
       taskCause: {
         code: 'FILESYSTEM_UNSYNCED',

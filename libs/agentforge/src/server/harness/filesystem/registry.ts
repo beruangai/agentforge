@@ -4,6 +4,7 @@ import { FILESYSTEM_NAME_PATTERN } from '#core/filesystem.ts';
 import type { TaskContext } from '../task-process.ts';
 import type {
   Filesystem,
+  Mount,
   MountedFilesystem,
   MountLifecycle,
 } from './filesystem.ts';
@@ -61,17 +62,24 @@ export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
   return os
     .$context<TaskContext & RegistryContext>()
     .middleware(async ({ context, next }, input) => {
-      const registered = Object.entries(context[FILESYSTEM_REGISTRY] ?? {});
-      refuseOverlappingMounts(registered, context.taskId);
+      // Every scope resolves first, so a clash is refused before anything mounts.
+      const resolved = Object.entries(context[FILESYSTEM_REGISTRY] ?? {}).map(
+        ([name, filesystem]) =>
+          [
+            filesystem,
+            filesystem.resolve({
+              name,
+              taskId: context.taskId,
+              request: { input, context },
+            }),
+          ] as const,
+      );
+      refuseOverlappingMounts(resolved.map(([, mount]) => mount));
       const filesystems: Record<string, MountedFilesystem> = {};
-      for (const [name, filesystem] of registered) {
-        const lifecycle = await filesystem.mount({
-          name,
-          taskId: context.taskId,
-          request: { input, context },
-        });
+      for (const [filesystem, mount] of resolved) {
+        const lifecycle = await filesystem.mount(mount);
         lifecycles.push(lifecycle);
-        filesystems[name] = lifecycle.mounted;
+        filesystems[mount.name] = lifecycle.mounted;
       }
       const allow = Object.values(filesystems).flatMap(
         (filesystem) => filesystem.permissions.allow,
@@ -90,13 +98,9 @@ export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
  * directory or one inside the other: each removes its own at unmount, and
  * unmounts run concurrently, so one's removal could race the other's push.
  */
-function refuseOverlappingMounts(
-  registered: readonly (readonly [string, Filesystem])[],
-  taskId: string,
-): void {
-  const localPaths = registered.map(
-    ([name, filesystem]) =>
-      [name, resolve(filesystem.localPathFor({ taskId, name }))] as const,
+function refuseOverlappingMounts(mounts: readonly Mount[]): void {
+  const localPaths = mounts.map(
+    (mount) => [mount.name, resolve(mount.localPath)] as const,
   );
   for (const [index, [name, localPath]] of localPaths.entries()) {
     for (const [otherName, otherLocalPath] of localPaths.slice(index + 1)) {

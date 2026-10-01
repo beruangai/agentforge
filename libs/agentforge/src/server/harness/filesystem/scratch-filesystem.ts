@@ -4,21 +4,22 @@ import { Filesystem } from './filesystem.ts';
 
 /**
  * An empty directory of the task's own, removed when the task ends: nothing
- * is pulled or pushed. Mounts under the system's temporary directory unless
- * the consumer names a `localPath`.
+ * is pulled or pushed. Its subpath is the task's id, so each task mounts its
+ * own directory under the root: the consumer's `localRoot`, or one of its
+ * name under the system's temporary directory.
  */
 export class ScratchFilesystem extends Filesystem {
-  constructor(options: { readonly localPath?: string } = {}) {
+  constructor(options: { readonly localRoot?: string } = {}) {
     super(
       {
-        ...(options.localPath === undefined
+        ...(options.localRoot === undefined
           ? {}
-          : { localPath: options.localPath }),
-        scope: () => ({ remotePath: '', write: ['**'] }),
+          : { localRoot: options.localRoot }),
+        scope: ({ context }) => ({ subpath: context.taskId, write: ['**'] }),
       },
       {
-        defaultLocalPath: ({ taskId, name }) =>
-          join(tmpdir(), 'agentforge-scratch', taskId, name),
+        defaultLocalRoot: ({ name }) =>
+          join(tmpdir(), 'agentforge-scratch', name),
       },
     );
   }
