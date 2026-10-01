@@ -56,7 +56,7 @@ export function filesystems(
 /**
  * The innermost middleware, appended by the harness to the procedure it
  * calls: mounts every registered filesystem and hands the handler their
- * paths and baseline permissions. Each mount joins `lifecycles` as it
+ * paths, baseline permissions and directories. Each mount joins `lifecycles` as it
  * succeeds, for the harness to unmount once the outcome is known.
  */
 export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
@@ -89,6 +89,9 @@ export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
         context: {
           filesystems,
           filesystemPermissions: { allow: [...new Set(allow)] },
+          filesystemDirectories: Object.values(filesystems).map(
+            (filesystem) => filesystem.localPath,
+          ),
         },
       });
     });

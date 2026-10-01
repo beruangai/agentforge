@@ -62,6 +62,8 @@ export interface TaskContext {
   readonly filesystems: Readonly<Record<string, MountedFilesystem>>;
   /** Every mounted filesystem's baseline permissions, merged; no agent gets them unless the handler gives them. */
   readonly filesystemPermissions: { readonly allow: readonly string[] };
+  /** Every mounted filesystem's `localPath`, to give a run as its `additionalDirectories`. */
+  readonly filesystemDirectories: readonly string[];
 }
 
 /** The oRPC implementer for a contract, with AgentForge's task context. */
@@ -216,6 +218,7 @@ async function runProcedure(
     // Set by the lifecycle middleware, which runs just before the handler.
     filesystems: {},
     filesystemPermissions: { allow: [] },
+    filesystemDirectories: [],
   };
   // Appended last, so it runs innermost: after every registration.
   try {

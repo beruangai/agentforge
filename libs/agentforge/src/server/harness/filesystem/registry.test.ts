@@ -17,10 +17,12 @@ const Mounted = z.object({
   names: z.array(z.string()),
   pulled: z.boolean(),
   allow: z.array(z.string()),
+  directories: z.array(z.string()),
 });
 const contract = {
   added: oc.input(z.object({ fail: z.boolean() })).output(Mounted),
   alone: oc.input(z.object({ fail: z.boolean() })).output(Mounted),
+  bare: oc.input(z.object({ fail: z.boolean() })).output(Mounted),
 };
 
 let root: string;
@@ -48,6 +50,7 @@ function build() {
             join(context.filesystems.workspace?.localPath ?? '', 'pulled.md'),
           ),
           allow: [...context.filesystemPermissions.allow],
+          directories: [...context.filesystemDirectories],
         };
       }),
     alone: os.alone
@@ -56,6 +59,15 @@ function build() {
         names: Object.keys(context.filesystems),
         pulled: false,
         allow: [],
+        directories: [],
+      })),
+    bare: os.bare
+      .use(filesystems({}, { replaceUpstream: true }))
+      .handler(async ({ context }) => ({
+        names: Object.keys(context.filesystems),
+        pulled: false,
+        allow: [...context.filesystemPermissions.allow],
+        directories: [...context.filesystemDirectories],
       })),
   });
 }
@@ -111,6 +123,11 @@ describe('filesystems registered on a procedure', () => {
           `Read(/${root}/notes/**)`,
           `Edit(/${root}/notes/**)`,
         ],
+        directories: [
+          join(root, 'workspace'),
+          join(root, 'scratch'),
+          join(root, 'notes'),
+        ],
       },
     });
     expect(house.calls).toEqual([]);
@@ -118,6 +135,13 @@ describe('filesystems registered on a procedure', () => {
     for (const name of ['workspace', 'scratch', 'notes']) {
       expect(existsSync(join(root, name))).toBe(false);
     }
+  });
+
+  it('give a procedure with none no permissions and no directories', async () => {
+    expect(await execute('bare')).toMatchObject({
+      state: 'TASK_STATE_COMPLETED',
+      output: { names: [], allow: [], directories: [] },
+    });
   });
 
   it('drop those upstream when they replace them', async () => {

@@ -96,9 +96,7 @@ describe('the mount claims', () => {
     await claimInChild(localPath, { exit: true });
     expect(await readdir(claims)).toHaveLength(1);
     const release = await claim(localPath);
-    expect(await readdir(claims)).toEqual([
-      `t-1.vault.${process.pid}.json`,
-    ]);
+    expect(await readdir(claims)).toEqual([`t-1.vault.${process.pid}.json`]);
     await release();
   });
 

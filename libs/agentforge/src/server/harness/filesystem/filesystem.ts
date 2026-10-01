@@ -24,15 +24,13 @@ export interface FilesystemRequest {
   readonly context: TaskContext;
 }
 
-/** Where under its roots a filesystem mounts for a request, and what within it the agent may read and write. */
+/** Where under its roots a filesystem mounts for a request, and what within it may be written. A mount is readable whole. */
 export interface FilesystemScope {
   /**
    * Relative to both roots: the mount is `<localRoot>/<subpath>` here and
    * `<remoteRoot>/<subpath>` in the store; `''` for the whole root.
    */
   readonly subpath: string;
-  /** Globs relative to the mount; the whole mount by default. */
-  readonly read?: readonly string[];
   /** Globs relative to the mount; the whole mount by default when the filesystem pushes, none when it does not. A push never leaves them. */
   readonly write?: readonly string[];
 }
@@ -106,14 +104,13 @@ export interface Mount {
   readonly localPath: string;
   /** What it mounts from the store: `<remoteRoot>/<subpath>`, absolute within the store, `/` for all of it. A kind maps it to its store's addressing. */
   readonly remotePath: string;
-  readonly read: readonly string[];
   readonly write: readonly string[];
 }
 
 /** What the handler receives for a mounted filesystem: its local path, and permissions it may give an agent. */
 export interface MountedFilesystem {
   readonly localPath: string;
-  /** Claude Code permission rules for its read and write scopes. AgentForge applies none: the handler decides. */
+  /** Claude Code permission rules: reading the whole mount, and editing its write scope. AgentForge applies none: the handler decides. */
   readonly permissions: { readonly allow: readonly string[] };
   /** The local path of `relativePath` in the mount; throws if it is absolute or climbs out. */
   path(relativePath: string): string;
@@ -211,7 +208,7 @@ export abstract class Filesystem {
 
   /**
    * Resolves the scope for a request: the subpath under both roots, and the
-   * read and write scopes within it. Nothing is touched; `mount` acts on it.
+   * write scope within it. Nothing is touched; `mount` acts on it.
    */
   resolve(task: {
     readonly name: string;
@@ -219,6 +216,12 @@ export abstract class Filesystem {
     readonly request: FilesystemRequest;
   }): Mount {
     const scope = this.options.scope(task.request);
+    // Typed away, but a scope is the consumer's code: a dropped key would be silent.
+    if (Object.hasOwn(scope, 'read')) {
+      throw new Error(
+        `filesystem "${task.name}": a scope's \`read\` is not supported: a mount is readable whole, and a run reads it as a working directory from \`context.filesystemDirectories\``,
+      );
+    }
     const subpath = scope.subpath.replace(/\/+$/, '');
     if (subpath.startsWith('/') || hasDotSegment(subpath)) {
       throw new Error(
@@ -240,7 +243,6 @@ export abstract class Filesystem {
       remotePath: posix
         .join(this.options.remoteRoot ?? '/', subpath)
         .replace(/(.)\/+$/, '$1'),
-      read: scope.read ?? ['**'],
       write,
     };
   }
@@ -289,7 +291,7 @@ export class MountLifecycle {
       },
       permissions: {
         allow: [
-          ...mount.read.map((glob) => `Read(/${mount.localPath}/${glob})`),
+          `Read(/${mount.localPath}/**)`,
           ...mount.write.map((glob) => `Edit(/${mount.localPath}/${glob})`),
         ],
       },

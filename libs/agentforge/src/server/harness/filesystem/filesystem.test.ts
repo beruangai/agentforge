@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskContext } from '../task-process.ts';
 import { ScriptedFilesystem } from './__fixtures__/scripted-filesystem.ts';
-import { type FilesystemOptions, FilesystemUnsynced } from './filesystem.ts';
+import {
+  type FilesystemOptions,
+  type FilesystemScope,
+  FilesystemUnsynced,
+} from './filesystem.ts';
 
 let root: string;
 beforeEach(async () => {
@@ -306,6 +310,14 @@ describe('Filesystem', () => {
     expect(() => new ScriptedFilesystem({})).toThrow(
       /ScriptedFilesystem needs a localRoot/,
     );
+    await expect(
+      mount(
+        new ScriptedFilesystem({
+          localRoot: join(root, 'x'),
+          scope: () => ({ subpath: '', read: ['notes/**'] }) as FilesystemScope,
+        }),
+      ),
+    ).rejects.toThrow(/a scope's `read` is not supported/);
     await expect(
       mount(
         new ScriptedFilesystem({

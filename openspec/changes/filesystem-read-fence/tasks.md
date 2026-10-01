@@ -4,7 +4,7 @@ Group 1 is the package work. Group 2 runs the fence against a real model. Group 
 
 ## 1. Directories, not read scopes
 
-- [ ] 1.1 `FilesystemScope.read` is removed: a scope carrying it fails `EXECUTION_ERROR` before anything is mounted, naming the key. A mount's baseline rules are `Read(/<localPath>/**)` and `Edit(/<localPath>/<write>)`. `TaskContext.filesystemDirectories` lists every mounted `localPath`. Verified by unit tests, `nx run @beruangai/agentforge:test`:
+- [x] 1.1 `FilesystemScope.read` is removed: a scope carrying it fails `EXECUTION_ERROR` before anything is mounted, naming the key. A mount's baseline rules are `Read(/<localPath>/**)` and `Edit(/<localPath>/<write>)`. `TaskContext.filesystemDirectories` lists every mounted `localPath`. Verified by unit tests, `nx run @beruangai/agentforge:test`:
   - the baseline rules;
   - `filesystemDirectories` with two mounts and with none;
   - a scope carrying `read` refused.
