@@ -12,7 +12,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 
 ## 2. Several runs
 
-- [ ] 2.1 Task-process unit tests against the scripted `query()`, verified by `nx run @beruangai/agentforge:test`:
+- [x] 2.1 Task-process unit tests against the scripted `query()`, verified by `nx run @beruangai/agentforge:test`:
   - two `context.runAgent` calls emit two records and the task completes with the handler's value;
   - a handler with no run completes with no record;
   - a run started after the signal aborted throws `TaskCanceled`, never reaching the SDK, and the task ends `TASK_STATE_CANCELED`.

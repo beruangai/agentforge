@@ -2,6 +2,7 @@ import { oc } from '@orpc/contract';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { contractHash } from '#core/contract/procedures.ts';
+import type { RunRecord } from '#core/contract/task.ts';
 import type { TaskInvocation } from '#core/task-protocol/messages.ts';
 import { TASK_OUTPUT_CAP_BYTES } from '#core/task-table.ts';
 import { result, scriptedQuery } from './__fixtures__/scripted-query.ts';
@@ -19,7 +20,17 @@ const contract = {
     broken: oc.input(z.object({})).output(z.object({ ok: z.boolean() })),
     failing: oc.input(z.object({})).output(z.object({ ok: z.boolean() })),
   },
+  runs: {
+    twice: oc.input(z.object({})).output(z.object({ summaries: z.string() })),
+    none: oc.input(z.object({})).output(z.object({ ran: z.boolean() })),
+    afterCancel: oc.input(z.object({})).output(z.object({ ok: z.boolean() })),
+  },
 };
+
+/** Called by `runs.afterCancel` between its runs: the test cancels there. */
+let betweenRuns: () => void = () => undefined;
+
+const SUMMARY = z.object({ summary: z.string() });
 
 const os = implementAgent(contract);
 const router = os.router({
@@ -39,6 +50,25 @@ const router = os.router({
     broken: os.nested.broken.handler(async () => ({ ok: 'yes' }) as never),
     failing: os.nested.failing.handler(async () => {
       throw new Error('the handler gave up');
+    }),
+  },
+  runs: {
+    twice: os.runs.twice.handler(async ({ context }) => {
+      const first = await context.runAgent({ prompt: 'one', output: SUMMARY });
+      const second = await context.runAgent({
+        prompt: ['two', { tag: 'first', context: first.output.summary }],
+        output: SUMMARY,
+      });
+      return {
+        summaries: `${first.output.summary} + ${second.output.summary}`,
+      };
+    }),
+    none: os.runs.none.handler(async () => ({ ran: false })),
+    afterCancel: os.runs.afterCancel.handler(async ({ context }) => {
+      await context.runAgent({ prompt: 'one', output: SUMMARY });
+      betweenRuns();
+      await context.runAgent({ prompt: 'two', output: SUMMARY });
+      return { ok: true };
     }),
   },
 });
@@ -199,5 +229,63 @@ describe('executeProcedure', () => {
     expect(await execute(invocation(), undefined, controller.signal)).toEqual({
       state: 'TASK_STATE_CANCELED',
     });
+  });
+});
+
+describe('a procedure’s runs', () => {
+  function executeRuns(
+    procedure: 'twice' | 'none' | 'afterCancel',
+    controller = new AbortController(),
+  ) {
+    const records: RunRecord[] = [];
+    const scripted = scriptedQuery([
+      result({ structured_output: { summary: 'short' } }),
+    ]);
+    const outcome = executeProcedure({
+      contract,
+      router,
+      invocation: invocation({
+        procedure: `runs.${procedure}`,
+        contractHash: contractHash(contract.runs[procedure]),
+        input: {},
+      }),
+      signal: controller.signal,
+      onRecord: (record) => records.push(record),
+      query: scripted.query,
+    });
+    return { outcome, records, scripted };
+  }
+
+  it('settles and records each of several runs, and completes with what the procedure returns', async () => {
+    const { outcome, records, scripted } = executeRuns('twice');
+    expect(await outcome).toEqual({
+      state: 'TASK_STATE_COMPLETED',
+      output: { summaries: 'short + short' },
+    });
+    expect(scripted.calls).toHaveLength(2);
+    expect(records).toHaveLength(2);
+  });
+
+  it('completes with no run, and no record', async () => {
+    const { outcome, records, scripted } = executeRuns('none');
+    expect(await outcome).toEqual({
+      state: 'TASK_STATE_COMPLETED',
+      output: { ran: false },
+    });
+    expect(scripted.calls).toHaveLength(0);
+    expect(records).toHaveLength(0);
+  });
+
+  it('starts no run after a cancel', async () => {
+    const controller = new AbortController();
+    betweenRuns = () => controller.abort();
+    const { outcome, records, scripted } = executeRuns(
+      'afterCancel',
+      controller,
+    );
+    expect(await outcome).toEqual({ state: 'TASK_STATE_CANCELED' });
+    expect(scripted.calls).toHaveLength(1);
+    expect(records).toHaveLength(1);
+    betweenRuns = () => undefined;
   });
 });
