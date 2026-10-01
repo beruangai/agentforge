@@ -22,7 +22,7 @@ Group 1 is the package work. Group 2 runs the fence against a real model. Group 
 
 ## 4. Records
 
-- [ ] 4.1 Verify each record by reading it against design.md:
+- [x] 4.1 Verify each record by reading it against design.md:
   - **ARCHITECTURE §3, the filesystems paragraph:** `filesystemDirectories`, mounts as working directories, the fence as the house default, no read scope;
   - **ADR 0015, mutated in place:** the scope bullet without `read`, the handler receiving the directories;
   - **the root README's note on permissions:** the fence and what it does not cover;

@@ -44,7 +44,7 @@
 
 **Distillation** — Documents over a token cap compacted by a utility run into one context block that cites its sources by line.
 
-**Task context** — What a handler receives beside its input: the ids, the attempt and prior attempt, metadata, the cancellation signal, `runAgent`, and the mounted `filesystems` with their merged `filesystemPermissions`.
+**Task context** — What a handler receives beside its input: the ids, the attempt and prior attempt, metadata, the cancellation signal, `runAgent`, and the mounted `filesystems` with their merged `filesystemPermissions` and their `filesystemDirectories`.
 
 **Time budget** — How long a task may run; declared with `timeBudget(seconds)` in the contract's meta, overridable per call, enforced by the executor.
 
@@ -86,7 +86,9 @@
 
 **Working directory** — The SDK's name for `cwd`, as §REQ401 uses it. The files a procedure works on are its **filesystems**, not its working directory.
 
-**Filesystem** — Files AgentForge manages for a procedure, persistent or scratch: a kind (`S3Filesystem`, `ScratchFilesystem`, or a consumer's subclass) registered by name with the `filesystems()` middleware, mounted before the handler and unmounted once the outcome is known. To **mount** one is to pull its store into a local directory — not a runtime or container mount. Its operations are **pull** and **push**; `pushOn` lists the task states it pushes on — `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, or both; never a cancel or a timeout, and absent it never pushes. A **checkpoint** is a push, while the task runs, of what has settled. Its **local root** is the absolute directory its mounts live under, and its **remote root** the partition of its store, absolute within it (`/` by default); its **scope** — the **subpath**, relative to both roots, and the `read` and `write` globs within it — is resolved per request, mounting `<localRoot>/<subpath>` from `<remoteRoot>/<subpath>`, and no two live tasks in a container share or nest a local directory; the handler receives its `localPath` and **baseline permissions** and decides what an agent gets ([ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)).
+**Filesystem** — Files AgentForge manages for a procedure, persistent or scratch: a kind (`S3Filesystem`, `ScratchFilesystem`, or a consumer's subclass) registered by name with the `filesystems()` middleware, mounted before the handler and unmounted once the outcome is known. To **mount** one is to pull its store into a local directory — not a runtime or container mount. Its operations are **pull** and **push**; `pushOn` lists the task states it pushes on — `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, or both; never a cancel or a timeout, and absent it never pushes. A **checkpoint** is a push, while the task runs, of what has settled. Its **local root** is the absolute directory its mounts live under, and its **remote root** the partition of its store, absolute within it (`/` by default); its **scope** — the **subpath**, relative to both roots, and the `write` globs within it — is resolved per request, mounting `<localRoot>/<subpath>` from `<remoteRoot>/<subpath>`, and no two live tasks in a container share or nest a local directory; the handler receives its `localPath`, its **baseline permissions** — reading the whole mount, editing its write scope — and every mount's directory, to give a run as a working directory and decides what an agent gets ([ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)).
+
+**Read fence** — Claude Code's `permissions.blockReadsOutsideWorkingDirectories`, on in a generated project's base options: a run reads only its working directories — its cwd and its `additionalDirectories`, its mounts among them — even where an allow rule names another path. Not isolation from Bash that is not read-only.
 
 ## Delivery
 
