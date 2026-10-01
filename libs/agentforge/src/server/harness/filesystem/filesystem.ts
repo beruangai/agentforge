@@ -1,5 +1,5 @@
 import { mkdir, rm } from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
+import { isAbsolute, join, matchesGlob, posix } from 'node:path';
 import { z } from 'zod';
 import {
   cause,
@@ -93,6 +93,10 @@ export interface MountedFilesystem {
   readonly localPath: string;
   /** Claude Code permission rules for its read and write scopes. AgentForge applies none: the handler decides. */
   readonly permissions: { readonly allow: readonly string[] };
+  /** The local path of `relativePath` in the mount; throws if it is absolute or climbs out. */
+  path(relativePath: string): string;
+  /** As `path`, and throws unless a write glob of the scope matches it: a write outside the scope would never be pushed. */
+  writablePath(relativePath: string): string;
 }
 
 /** The store failed or disagreed; retrying may succeed. Kinds throw it from `pull` and `push`. */
@@ -243,6 +247,17 @@ export class MountLifecycle {
     this.name = mount.name;
     this.mounted = {
       localPath: mount.localPath,
+      path: (relativePath) => pathIn(mount, relativePath),
+      writablePath: (relativePath) => {
+        const resolved = pathIn(mount, relativePath);
+        const inMount = posix.normalize(relativePath);
+        if (!mount.write.some((glob) => matchesGlob(inMount, glob))) {
+          throw new Error(
+            `filesystem "${mount.name}": "${relativePath}" is outside its write scope (${mount.write.join(', ') || 'none'}), so a write there would never be pushed`,
+          );
+        }
+        return resolved;
+      },
       permissions: {
         allow: [
           ...mount.read.map((glob) => `Read(/${mount.localPath}/${glob})`),
@@ -304,6 +319,21 @@ export class MountLifecycle {
       .then(() => this.#push(options));
     return this.#latestPush;
   }
+}
+
+/** `relativePath` within the mount's local directory; refused when absolute or climbing out of it. */
+function pathIn(mount: Mount, relativePath: string): string {
+  const inMount = posix.normalize(relativePath);
+  if (
+    isAbsolute(relativePath) ||
+    inMount === '..' ||
+    inMount.startsWith('../')
+  ) {
+    throw new Error(
+      `filesystem "${mount.name}": "${relativePath}" is not a path inside its mount at ${mount.localPath}`,
+    );
+  }
+  return join(mount.localPath, inMount);
 }
 
 /** A store's failure becomes `FILESYSTEM_UNSYNCED`; anything else is the procedure's error, as it is. */

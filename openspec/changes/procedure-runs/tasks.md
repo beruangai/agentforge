@@ -34,7 +34,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 
 ## 4. Mount paths and `distill`
 
-- [ ] 4.1 `MountedFilesystem.path` and `writablePath`, built by `MountLifecycle`. Verified by unit tests over the mount at `/workspace/vault`, using `path.matchesGlob` against the write globs:
+- [x] 4.1 `MountedFilesystem.path` and `writablePath`, built by `MountLifecycle`. Verified by unit tests over the mount at `/workspace/vault`, using `path.matchesGlob` against the write globs:
   - a nested path resolves;
   - an absolute path, `..`, and a path normalising out of the mount are refused, naming the path and the mount;
   - `writablePath` accepts under `**`, under `notes/**` and an exact file, and refuses `index.md` under `notes/**`, naming the scope.

@@ -37,11 +37,64 @@ describe('Filesystem', () => {
     const vault = await mount(filesystem);
     expect(filesystem.calls).toEqual(['pull topics/today']);
     expect(existsSync(join(localPath, 'pulled.md'))).toBe(true);
-    expect(vault.mounted).toEqual({
+    expect(vault.mounted).toMatchObject({
       localPath,
       permissions: {
         allow: [`Read(/${localPath}/**)`, `Edit(/${localPath}/notes/today.md)`],
       },
+    });
+  });
+
+  describe('paths inside the mount', () => {
+    async function mounted(write: readonly string[]) {
+      const filesystem = new ScriptedFilesystem({
+        localPath: join(root, 'vault'),
+        pushOn: ['TASK_STATE_COMPLETED'],
+        scope: () => ({ remotePath: '', write }),
+      });
+      return (await mount(filesystem)).mounted;
+    }
+
+    it('resolves a path inside the mount', async () => {
+      const vault = await mounted(['**']);
+      expect(vault.path('notes/today.md')).toBe(
+        join(root, 'vault', 'notes/today.md'),
+      );
+      expect(vault.path('notes/../index.md')).toBe(
+        join(root, 'vault', 'index.md'),
+      );
+    });
+
+    it.each(['../other/secret.md', '/etc/passwd', 'notes/../../out.md', '..'])(
+      'refuses %s, naming the path and the mount',
+      async (relativePath) => {
+        const vault = await mounted(['**']);
+        expect(() => vault.path(relativePath)).toThrow(
+          `"${relativePath}" is not a path inside its mount at ${join(root, 'vault')}`,
+        );
+        expect(() => vault.writablePath(relativePath)).toThrow(
+          /is not a path inside its mount/,
+        );
+      },
+    );
+
+    it.each<[string, readonly string[]]>([
+      ['notes/a/b.md', ['**']],
+      ['notes/a/b.md', ['notes/**']],
+      ['notes/today.md', ['notes/today.md']],
+    ])('resolves %s for writing under %j', async (relativePath, write) => {
+      const vault = await mounted(write);
+      expect(vault.writablePath(relativePath)).toBe(
+        join(root, 'vault', relativePath),
+      );
+    });
+
+    it('refuses a write outside the write scope, naming the scope', async () => {
+      const vault = await mounted(['notes/**']);
+      expect(() => vault.writablePath('index.md')).toThrow(
+        '"index.md" is outside its write scope (notes/**)',
+      );
+      expect(vault.path('index.md')).toBe(join(root, 'vault', 'index.md'));
     });
   });
 
