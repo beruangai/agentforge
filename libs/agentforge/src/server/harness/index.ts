@@ -6,6 +6,10 @@
  */
 
 export {
+  type StopGuard,
+  type StopGuardDenial,
+} from './answer-check.ts';
+export {
   Filesystem,
   type FilesystemOptions,
   type FilesystemRequest,

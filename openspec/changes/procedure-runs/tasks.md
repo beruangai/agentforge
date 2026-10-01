@@ -19,7 +19,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 
 ## 3. The answer check
 
-- [ ] 3.1 `StopGuard`, `StopGuardDenial` and `AgentRunSpec.guardrails.stop`, exported from `/agent`. Every run gets the kernel's own `PreToolUse` entry (matcher `StructuredOutput`), after the procedure's hooks. On each submission it collects the contract's `safeParseAsync` of the unwrapped input and every guard's result:
+- [x] 3.1 `StopGuard`, `StopGuardDenial` and `AgentRunSpec.guardrails.stop`, exported from `/agent`. Every run gets the kernel's own `PreToolUse` entry (matcher `StructuredOutput`), after the procedure's hooks. On each submission it collects the contract's `safeParseAsync` of the unwrapped input and every guard's result:
   - all failures are joined into one `deny` reason, the contract's first, and logged as `agentforge.answer.refused`;
   - a guard's rejection is recorded, the run aborted, and the run fails `EXECUTION_ERROR` naming it.
 
@@ -30,7 +30,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
   - a passing submission returns `{}`;
   - a rejection recorded and the run failing `EXECUTION_ERROR`;
   - the entry is present on a run with no guards, and the procedure's own `PreToolUse` hooks are kept.
-- [ ] 3.2 `settle` carries `result.errors` into the `OUTPUT_INVALID` cause for `error_max_structured_output_retries`, verified by the kernel unit test for that subtype asserting the message.
+- [x] 3.2 `settle` carries `result.errors` into the `OUTPUT_INVALID` cause for `error_max_structured_output_retries`, verified by the kernel unit test for that subtype asserting the message.
 
 ## 4. Mount paths and `distill`
 

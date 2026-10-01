@@ -11,6 +11,7 @@ import {
 import { hash as ohash } from 'ohash';
 import { z } from 'zod';
 import { type Cause, cause, type RunRecord } from '#core/contract/task.ts';
+import { answerCheck, type StopGuard } from './answer-check.ts';
 import {
   type AgentPrompt,
   createStreamingInput,
@@ -36,6 +37,14 @@ export interface AgentRunSpec<Output> {
    */
   readonly wrapNonObjectOutput?: boolean;
   readonly options?: AgentOptions;
+  /**
+   * Checks an answer must pass, beside the agent contract, before it is
+   * accepted: run on each submission, every failure told to the agent at
+   * once, in its turn (§REQ208).
+   */
+  readonly guardrails?: {
+    readonly stop?: readonly StopGuard[];
+  };
 }
 
 export interface AgentRun<Output> {
@@ -123,6 +132,18 @@ export async function runAgent<Output>(
   const { promise: inputEnded, resolve: endInput } =
     Promise.withResolvers<void>();
 
+  // A guard that throws ends the run: a defect, never told to the agent.
+  let guardError: { readonly error: unknown } | undefined;
+  const answerHook = answerCheck({
+    output: spec.output,
+    wrapped: wire.wrapped,
+    guards: spec.guardrails?.stop ?? [],
+    onGuardError: (error) => {
+      guardError ??= { error };
+      abortController.abort();
+    },
+  });
+
   const declaredStore = spec.options?.sessionStore ?? context.sessionStore;
   const mirror =
     declaredStore === undefined ? undefined : recordingStore(declaredStore);
@@ -133,6 +154,11 @@ export async function runAgent<Output>(
       ...process.env,
       ...spec.options?.env,
       ...BACKGROUND_WORK_DISABLED,
+    },
+    // The kernel's answer check after the procedure's own hooks (§REQ204).
+    hooks: {
+      ...spec.options?.hooks,
+      PreToolUse: [...(spec.options?.hooks?.PreToolUse ?? []), answerHook],
     },
     outputFormat: { type: 'json_schema', schema: wire.schema },
     abortController,
@@ -247,6 +273,15 @@ export async function runAgent<Output>(
   context.onRecord(record);
 
   if (canceled) throw new TaskCanceled();
+  if (guardError !== undefined) {
+    throw new TaskFailure(
+      cause(
+        'EXECUTION_ERROR',
+        `a stop guard threw while the answer was checked: ${describe(guardError.error)}`,
+        { stackTrace: inspect(guardError.error, { depth: 8 }) },
+      ),
+    );
+  }
   if (observed.deadMatchers.length > 0) {
     throw new TaskFailure(
       cause(
@@ -477,10 +512,12 @@ export function settle<Output>(
     );
   }
   if (result.subtype === 'error_max_structured_output_retries') {
+    // The CLI's message carries the last refusal: the contract's error or a
+    // stop guard's reasons.
     throw new TaskFailure(
       cause(
         'OUTPUT_INVALID',
-        'the agent could not produce a conforming answer',
+        `the agent could not produce an accepted answer: ${result.errors.join('; ') || result.subtype}`,
       ),
     );
   }

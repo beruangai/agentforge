@@ -1,4 +1,7 @@
 import type {
+  HookCallback,
+  HookInput,
+  Options,
   SDKMessage,
   SessionStore,
   SessionStoreEntry,
@@ -358,5 +361,100 @@ describe('hook matchers', () => {
       scripted.query,
     );
     await expect(promise).rejects.toThrow(/PreToolUse "Bash"/);
+  });
+});
+
+describe('the answer check', () => {
+  it('is on every run, after the procedure’s own PreToolUse hooks', async () => {
+    const own = { matcher: 'StructuredOutput', hooks: [async () => ({})] };
+    const scripted = scriptedQuery([
+      init(),
+      result({ structured_output: { answer: 'yes' } }),
+    ]);
+    await runAgent(
+      {
+        prompt: 'q',
+        output: OutputSchema,
+        options: { hooks: { PreToolUse: [own] } },
+      },
+      { signal: new AbortController().signal, onRecord: () => undefined },
+      scripted.query,
+    );
+    const hooks = scripted.calls[0]?.options.hooks as Options['hooks'];
+    expect(hooks?.PreToolUse).toEqual([
+      own,
+      { matcher: 'StructuredOutput', hooks: [expect.any(Function)] },
+    ]);
+  });
+
+  it('fails the run with the last refusal when the attempts run out', async () => {
+    const promise = run(
+      scriptedQuery([
+        init(),
+        result({
+          subtype: 'error_max_structured_output_retries',
+          is_error: true,
+          errors: [
+            'Failed to provide valid structured output after 5 attempts — last StructuredOutput error: Write kata.md before answering.',
+          ],
+        }),
+      ]),
+    ).promise;
+    await expect(promise).rejects.toMatchObject({
+      taskCause: {
+        code: 'OUTPUT_INVALID',
+        message: expect.stringMatching(/Write kata\.md before answering/),
+      },
+    });
+  });
+
+  it('ends the run when a stop guard throws, naming its error', async () => {
+    // A stand-in for the CLI: the agent submits, the hook runs, and the run
+    // stops once the kernel aborts it.
+    const query = ((parameters: { options: Options }) => {
+      async function* stream(): AsyncGenerator<SDKMessage, void> {
+        yield init();
+        const entries = parameters.options.hooks?.PreToolUse ?? [];
+        const hook = entries.at(-1)?.hooks[0] as HookCallback;
+        await hook(
+          {
+            hook_event_name: 'PreToolUse',
+            tool_name: 'StructuredOutput',
+            tool_input: { answer: 'yes' },
+          } as unknown as HookInput,
+          'tool-1',
+          { signal: new AbortController().signal },
+        );
+        if (parameters.options.abortController?.signal.aborted) {
+          throw new Error('aborted');
+        }
+        yield result({ structured_output: { answer: 'yes' } });
+      }
+      return Object.assign(stream(), {
+        interrupt: async () => undefined,
+        close: () => undefined,
+      });
+    }) as unknown as QueryFunction;
+    const promise = runAgent(
+      {
+        prompt: 'q',
+        output: OutputSchema,
+        guardrails: {
+          stop: [
+            async () => {
+              throw new Error('the guard broke');
+            },
+          ],
+        },
+      },
+      { signal: new AbortController().signal, onRecord: () => undefined },
+      query,
+    );
+    await expect(promise).rejects.toMatchObject({
+      taskCause: {
+        code: 'EXECUTION_ERROR',
+        message: expect.stringMatching(/a stop guard threw .*the guard broke/),
+      },
+    });
   });
 });
