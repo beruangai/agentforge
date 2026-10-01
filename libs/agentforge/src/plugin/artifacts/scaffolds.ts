@@ -55,10 +55,17 @@ export function baseScaffolds(project: AgenticProject): ScaffoldedFile[] {
  * What every agent in ${project.projectName} runs with, composed under each agent's own
  * options with \`composeOptions\`. An agent's cwd is its own directory, so the
  * \`project\` setting source composes this layer's \`.claude/\` from the parent.
- * Agents import it as \`${basePackageName(project)}/options\`.
+ * Reads outside a run's working directories are refused, so a procedure
+ * gives a run its mounts as \`additionalDirectories\`, from
+ * \`context.filesystemDirectories\`; one that must read more turns the fence
+ * off in its own options. Agents import it as
+ * \`${basePackageName(project)}/options\`.
  */
 export function baseOptions(): AgentOptions {
-  return { settingSources: ['project'] };
+  return {
+    settingSources: ['project'],
+    settings: { permissions: { blockReadsOutsideWorkingDirectories: true } },
+  };
 }
 `,
     },
