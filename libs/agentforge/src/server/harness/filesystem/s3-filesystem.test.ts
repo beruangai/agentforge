@@ -243,6 +243,32 @@ describe('the declared buckets', () => {
 });
 
 describe('ScratchFilesystem', () => {
+  it('mounts a directory per task under one named root, the consumer’s or its default', async () => {
+    const mountFor = (filesystem: ScratchFilesystem, taskId: string) =>
+      filesystem.mount(
+        filesystem.resolve({
+          name: 'drafts',
+          taskId,
+          request: { input: {}, context: { taskId } as TaskContext },
+        }),
+      );
+    const defaulted = new ScratchFilesystem();
+    const [one, two] = await Promise.all([
+      mountFor(defaulted, 't-1'),
+      mountFor(defaulted, 't-2'),
+    ]);
+    expect([one.mounted.localPath, two.mounted.localPath]).toEqual([
+      join(tmpdir(), 'agentforge-scratch', 'drafts', 't-1'),
+      join(tmpdir(), 'agentforge-scratch', 'drafts', 't-2'),
+    ]);
+    await one.unmount('TASK_STATE_COMPLETED');
+    expect(existsSync(two.mounted.localPath)).toBe(true);
+    await two.unmount('TASK_STATE_COMPLETED');
+    const named = await mountFor(new ScratchFilesystem({ localRoot }), 't-3');
+    expect(named.mounted.localPath).toBe(join(localRoot, 't-3'));
+    await named.unmount('TASK_STATE_COMPLETED');
+  });
+
   it('mounts an empty directory of the task’s own, removed when the task ends', async () => {
     const filesystem = new ScratchFilesystem();
     const scratch = await filesystem.mount(

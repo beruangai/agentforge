@@ -160,8 +160,28 @@ describe('filesystems registered on a procedure', () => {
     });
   });
 
-  it('fail the task before anything mounts when two share a directory, or one is inside another', async () => {
-    notes = new ScriptedFilesystem(at('workspace/notes'));
+  it.each<[string, () => void]>([
+    [
+      'one root inside another',
+      () => {
+        notes = new ScriptedFilesystem(at('workspace/notes'));
+      },
+    ],
+    [
+      'subpaths resolving to one directory under different roots',
+      () => {
+        workspace = new ScriptedFilesystem({
+          ...at('shared'),
+          scope: () => ({ subpath: 'topics/a' }),
+        });
+        notes = new ScriptedFilesystem({
+          ...at('shared/topics'),
+          scope: () => ({ subpath: 'a' }),
+        });
+      },
+    ],
+  ])('fail the task before anything mounts for %s', async (_label, arrange) => {
+    arrange();
     expect(await execute('added')).toMatchObject({
       state: 'TASK_STATE_FAILED',
       cause: {

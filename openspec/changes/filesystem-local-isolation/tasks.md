@@ -10,7 +10,7 @@ Group 1 changes how a mount resolves its paths. Group 2 adds the claim registry 
   - a malformed subpath fails `EXECUTION_ERROR` before anything is mounted;
   - the baseline permissions and `path()` are rooted at the resolved mount;
   - deletes are refused when the resolved remote path is `/`.
-- [ ] 1.2 `ScratchFilesystem({ localRoot? })` with the task id as its subpath, under a default root of `<tmpdir>/agentforge-scratch/<name>`. The per-procedure overlap check in `registry.ts` compares resolved local paths after every scope resolves, still before anything is mounted. Verified by unit tests: two tasks under one named scratch root mount separate directories, and two filesystems of one procedure resolving overlapping directories fail `EXECUTION_ERROR`, naming both.
+- [x] 1.2 `ScratchFilesystem({ localRoot? })` with the task id as its subpath, under a default root of `<tmpdir>/agentforge-scratch/<name>`. The per-procedure overlap check in `registry.ts` compares resolved local paths after every scope resolves, still before anything is mounted. Verified by unit tests: two tasks under one named scratch root mount separate directories, and two filesystems of one procedure resolving overlapping directories fail `EXECUTION_ERROR`, naming both.
 
 ## 2. One live task per local directory
 
