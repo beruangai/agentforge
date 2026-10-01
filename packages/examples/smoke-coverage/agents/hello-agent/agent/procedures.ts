@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import {
   composeOptions,
   distill,
   filesystems,
   implementAgent,
+  type MountedFilesystem,
   S3Filesystem,
   type S3FilesystemOptions,
 } from '@beruangai/agentforge/agent';
@@ -14,19 +14,24 @@ import { contract, TopicField } from './contract.ts';
 
 const os = implementAgent(contract);
 
-/** Where the notebook mounts, so prompts can name it. */
-const NOTEBOOK_PATH = '/workspace/notebook';
-const NOTE_FILE = join(NOTEBOOK_PATH, 'note.md');
-
-/** The notebook, scoped to the request's topic; a procedure that writes declares its push. */
+/** The notebook, a directory per topic under one root; a procedure that writes declares its push. */
 const NOTEBOOK: S3FilesystemOptions = {
-  localPath: NOTEBOOK_PATH,
+  localRoot: '/workspace/notebook',
   bucket: 'notebook',
   // A scope receives its input untyped; the contract's own field reads it.
   scope: ({ input }) => ({
-    remotePath: `topics/${z.object({ topic: TopicField }).parse(input).topic}`,
+    subpath: `topics/${z.object({ topic: TopicField }).parse(input).topic}`,
   }),
 };
+
+/** The topic's note in the mounted notebook. */
+function noteFile(
+  filesystems: Readonly<Record<string, MountedFilesystem>>,
+): string {
+  const notebook = filesystems.notebook;
+  if (notebook === undefined) throw new Error('the notebook is not mounted');
+  return notebook.path('note.md');
+}
 
 export const router = os.router({
   Summarise: os.Summarise.handler(async ({ input, context }) => {
@@ -94,9 +99,10 @@ export const router = os.router({
       }),
     }),
   ).handler(async ({ input, context }) => {
+    const note = noteFile(context.filesystems);
     await context.runAgent({
       prompt: [
-        `Write the note below, exactly, to the file \`${NOTE_FILE}\` with the Write tool, then answer that you did.`,
+        `Write the note below, exactly, to the file \`${note}\` with the Write tool, then answer that you did.`,
         { tag: 'note', context: input.note },
       ],
       output: z.object({ written: z.boolean() }),
@@ -108,14 +114,14 @@ export const router = os.router({
       }),
     });
     return {
-      kept: (await readFile(NOTE_FILE, 'utf8')).trim() === input.note.trim(),
+      kept: (await readFile(note, 'utf8')).trim() === input.note.trim(),
     };
   }),
   RecallNote: os.RecallNote.use(
     filesystems({ notebook: new S3Filesystem(NOTEBOOK) }),
   ).handler(async ({ context }) => {
     const run = await context.runAgent({
-      prompt: `Read the file \`${NOTE_FILE}\` with the Read tool, and answer with its content, exactly.`,
+      prompt: `Read the file \`${noteFile(context.filesystems)}\` with the Read tool, and answer with its content, exactly.`,
       output: z.object({ note: z.string().describe("The file's content") }),
       options: composeOptions(baseOptions(), {
         maxTurns: 4,

@@ -24,7 +24,7 @@ Group 1 changes how a mount resolves its paths. Group 2 adds the claim registry 
 ## 3. Examples and integration
 
 - [x] 3.1 `integ/aws/filesystem-s3-sync/` moves to `localRoot` and `subpath` and gains a case with a `remoteRoot`, asserting that the objects land under the joined prefix. Verified by `nx run @beruangai/agentforge:integ --configuration=aws -- integ/aws/filesystem-s3-sync`.
-- [ ] 3.2 `smoke-coverage`'s notebook: `localRoot: '/workspace/notebook'`, `subpath: topics/<topic>`. Its prompts name the note's file through `context.filesystems.notebook.path('note.md')`, and `KeepNote` reads it back the same way. Verified by `nx run @beruangai/smoke-coverage:typecheck` and `nx run @beruangai/smoke-coverage:e2e`.
+- [x] 3.2 `smoke-coverage`'s notebook: `localRoot: '/workspace/notebook'`, `subpath: topics/<topic>`. Its prompts name the note's file through `context.filesystems.notebook.path('note.md')`, and `KeepNote` reads it back the same way. Verified by `nx run @beruangai/smoke-coverage:typecheck` and `nx run @beruangai/smoke-coverage:e2e`.
 
 ## 4. Dogfood on AgentCore
 
