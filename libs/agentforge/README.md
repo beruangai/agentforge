@@ -7,7 +7,7 @@ Runs a consumer's procedure as an asynchronous task on Bedrock AgentCore Runtime
 | `@beruangai/agentforge/contract` | Anywhere, including a worker — the procedure contract |
 | `@beruangai/agentforge/client` | A caller — the A2A client |
 | `@beruangai/agentforge/temporal` | A Temporal worker — the activity factory |
-| `@beruangai/agentforge/agent` | A consumer's agent build only — the task entry: procedures, the kernel, filesystems |
+| `@beruangai/agentforge/agent` | A consumer's agent build only — the task entry: procedures, the kernel and its stop guards (`StopGuard`), `distill`, filesystems |
 | `@beruangai/agentforge/server` | A consumer's agent build only — the server entry |
 | `@beruangai/agentforge/infra` | A CDK application — the constructs |
 

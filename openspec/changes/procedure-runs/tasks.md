@@ -60,7 +60,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 
 ## 7. Docs
 
-- [ ] 7.1 Verified by reading them against design.md:
+- [x] 7.1 Verified by reading them against design.md:
   - **ARCHITECTURE §6:** a procedure is one process whose runs are its own to coordinate, each settled and recorded; the answer check — the contract and the stop guards on the submission, bounded by the CLI's retry limit; `distill`; mount path resolution;
   - **ARCHITECTURE's structured-output bullet and `research/claude-agent-sdk.md`:** a `format` or refinement is now refused in-turn, no longer found only after the run;
   - **GLOSSARY:** stop guard, as distinct from the SDK's `Stop` event; utility run; distillation;

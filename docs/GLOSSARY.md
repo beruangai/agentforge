@@ -30,11 +30,19 @@
 
 **Contract hash** — A hash of a contract's input and output JSON Schema; a container refuses a task whose hash it does not implement.
 
-**Implementation** — The oRPC handler registered through `implementAgent(contract)`. Ordinary code around one or more agent runs.
+**Implementation** — The oRPC handler registered through `implementAgent(contract)`. Ordinary code around any number of agent runs, or none.
 
 **Agent contract** — The Zod schema given to `runAgent` as `output`: what the model fills in. The handler builds the outer output from it.
 
 **Agent run** — One `context.runAgent({ prompt, output, options })`, recorded as a **run record**.
+
+**Answer check** — The kernel's `PreToolUse` hook on an agent run's answer submission: the agent contract and every stop guard, all failures told to the agent at once, in its turn.
+
+**Stop guard** — A check a run declares in `guardrails.stop` that must pass before its answer is accepted; denied, it tells the agent why. Not the SDK's `Stop` hook event, which cannot hold back a submitted answer.
+
+**Utility run** — An agent run a procedure makes for itself rather than for its outcome, such as `distill`'s.
+
+**Distillation** — Documents over a token cap compacted by a utility run into one context block that cites its sources by line.
 
 **Task context** — What a handler receives beside its input: the ids, the attempt and prior attempt, metadata, the cancellation signal, `runAgent`, and the mounted `filesystems` with their merged `filesystemPermissions`.
 
