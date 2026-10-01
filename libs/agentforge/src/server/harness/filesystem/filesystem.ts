@@ -8,6 +8,7 @@ import {
 } from '#core/contract/task.ts';
 import { TaskFailure } from '../kernel.ts';
 import type { TaskContext } from '../task-process.ts';
+import { claimLocalDirectory } from './mount-claims.ts';
 
 /** The task states a filesystem may push on: a cancel never pushes, and a rejected task never mounts. */
 export const PushOnStateEnum = TerminalTaskStateEnum.extract([
@@ -173,21 +174,38 @@ export abstract class Filesystem {
   /** Refuses a mount the kind cannot honour, before anything is fetched. */
   protected validate(_mount: Mount): void {}
 
-  /** Mounts what `resolve` resolved: refused by the kind, or pulled into its local directory. */
+  /**
+   * Mounts what `resolve` resolved: refused by the kind, refused while
+   * another live task in the container holds its local directory, or
+   * claimed and pulled into it.
+   */
   async mount(mount: Mount): Promise<MountLifecycle> {
     this.validate(mount);
-    await mkdir(mount.localPath, { recursive: true });
+    let release: () => Promise<void>;
     try {
+      release = await claimLocalDirectory(mount);
+    } catch (error) {
+      throw asTaskFailure(
+        error,
+        `filesystem "${mount.name}" could not be mounted`,
+      );
+    }
+    try {
+      await mkdir(mount.localPath, { recursive: true });
       await this.pull(mount);
     } catch (error) {
       await rm(mount.localPath, { recursive: true, force: true });
+      await release();
       throw asTaskFailure(
         error,
         `filesystem "${mount.name}" could not be pulled`,
       );
     }
-    return new MountLifecycle(this, mount, (options) =>
-      this.push(mount, options),
+    return new MountLifecycle(
+      this,
+      mount,
+      (options) => this.push(mount, options),
+      release,
     );
   }
 
@@ -237,6 +255,8 @@ export class MountLifecycle {
   readonly #push: (options: {
     readonly modifiedBefore?: Date;
   }) => Promise<void>;
+  /** Frees the local directory's claim, once it is removed. */
+  readonly #release: () => Promise<void>;
   #checkpointTimer: ReturnType<typeof setInterval> | undefined;
   /** Pushes run one at a time: a checkpoint never overlaps the last. */
   #latestPush: Promise<void> = Promise.resolve();
@@ -247,10 +267,12 @@ export class MountLifecycle {
     filesystem: Filesystem,
     mount: Mount,
     push: (options: { readonly modifiedBefore?: Date }) => Promise<void>,
+    release: () => Promise<void>,
   ) {
     this.#filesystem = filesystem;
     this.#mount = mount;
     this.#push = push;
+    this.#release = release;
     this.name = mount.name;
     this.mounted = {
       localPath: mount.localPath,
@@ -295,7 +317,7 @@ export class MountLifecycle {
     }
   }
 
-  /** Pushes if `pushOn` has the state the task ended in, then removes the local copy. */
+  /** Pushes if `pushOn` has the state the task ended in, then removes the local copy and frees its claim. */
   async unmount(
     state: Exclude<TerminalTaskState, 'TASK_STATE_REJECTED'>,
   ): Promise<void> {
@@ -317,6 +339,7 @@ export class MountLifecycle {
       }
     } finally {
       await rm(this.#mount.localPath, { recursive: true, force: true });
+      await this.#release();
     }
   }
 

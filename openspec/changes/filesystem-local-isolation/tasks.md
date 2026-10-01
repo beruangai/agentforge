@@ -14,7 +14,7 @@ Group 1 changes how a mount resolves its paths. Group 2 adds the claim registry 
 
 ## 2. One live task per local directory
 
-- [ ] 2.1 The container-wide claim registry (`<tmpdir>/agentforge-mounts/`, an injectable directory for tests). A claim is taken in `mount()` before the directory is created; refused, it throws `FilesystemUnsynced` naming the directory and the holding task. It is released after unmount's removal and on a failed pull. Stale claims, whose pid is dead, are cleared. Verified by unit tests:
+- [x] 2.1 The container-wide claim registry (`<tmpdir>/agentforge-mounts/`, an injectable directory for tests). A claim is taken in `mount()` before the directory is created; refused, it throws `FilesystemUnsynced` naming the directory and the holding task. It is released after unmount's removal and on a failed pull. Stale claims, whose pid is dead, are cleared. Verified by unit tests:
   - an overlapping claim held by a live child process is refused with `FILESYSTEM_UNSYNCED`, retryable, and the holder's directory is untouched;
   - a directory inside or around a held one is refused;
   - a claim from an exited pid is cleared and the mount succeeds;

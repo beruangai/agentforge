@@ -1,4 +1,4 @@
-import { isAbsolute, relative, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { os } from '@orpc/server';
 import { FILESYSTEM_NAME_PATTERN } from '#core/filesystem.ts';
 import type { TaskContext } from '../task-process.ts';
@@ -8,6 +8,7 @@ import type {
   MountedFilesystem,
   MountLifecycle,
 } from './filesystem.ts';
+import { isWithin } from './mount-claims.ts';
 
 /**
  * Where registrations accumulate on the context, until the lifecycle mounts
@@ -114,15 +115,4 @@ function refuseOverlappingMounts(mounts: readonly Mount[]): void {
       }
     }
   }
-}
-
-/** Whether `path` is `directory` or inside it. */
-function isWithin(directory: string, path: string): boolean {
-  const fromDirectory = relative(directory, path);
-  return (
-    fromDirectory === '' ||
-    (!isAbsolute(fromDirectory) &&
-      fromDirectory !== '..' &&
-      !fromDirectory.startsWith('../'))
-  );
 }

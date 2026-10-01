@@ -91,11 +91,11 @@ Its scope is `({ context }) => ({ subpath: context.taskId, write: ['**'] })`, an
 
 ### One live task per local directory: a container-wide claim registry
 
-Task processes share nothing but the container's filesystem, so the registry lives there: `<tmpdir>/agentforge-mounts/`, one JSON file per live mount, `<taskId>.<name>.json`, holding `{ localPath, taskId, name, pid }`.
+Task processes share nothing but the container's filesystem, so the registry lives there: `<tmpdir>/agentforge-mounts/`, one JSON file per live mount, `<taskId>.<name>.<pid>.json`, holding `{ localPath, taskId, name, pid }`. The pid in the name keeps a crashed attempt's leftover entry from blocking a retry of the same task in the same container.
 
 `claimLocalDirectory(mount)` runs in `mount()`, **before** the directory is created or pulled:
 
-1. Write the task's own entry exclusively (flag `wx`).
+1. Write the task's own entry, renamed into place so a concurrent lister never reads it half-written.
 2. List every entry. An entry whose `pid` is not alive (`process.kill(pid, 0)` throws `ESRCH`) is stale: remove it and skip it.
 3. If any other live entry's `localPath` equals, contains or is inside this one, remove the task's own entry and throw `FilesystemUnsynced`, naming the directory and the holding task. The lifecycle turns that into `FILESYSTEM_UNSYNCED`, which is retryable. Nothing is created or removed, so the holder's files are untouched.
 
