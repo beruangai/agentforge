@@ -5,11 +5,11 @@ Group 1 changes how a mount resolves its paths. Group 2 adds the claim registry 
 ## 1. Roots and subpath
 
 - [ ] 1.1 `FilesystemOptions.localRoot` and `remoteRoot`, `FilesystemScope.subpath`, `S3FilesystemOptions.localRoot` (required). `Mount.localPath` and `remotePath` are resolved from the roots and the subpath. A kind's default is `defaultLocalRoot({ name })`. `S3Filesystem`'s delete guard is on the resolved remote path. Verified by unit tests, `nx run @beruangai/agentforge:test`:
-  - roots and subpath compose: with and without a remote root, and with an empty subpath;
+  - roots and subpath compose: with and without a remote root, and with an empty subpath; the S3 key prefix drops the remote path's leading slash;
   - a malformed root throws at construction;
   - a malformed subpath fails `EXECUTION_ERROR` before anything is mounted;
   - the baseline permissions and `path()` are rooted at the resolved mount;
-  - deletes are refused on an empty resolved remote path.
+  - deletes are refused when the resolved remote path is `/`.
 - [ ] 1.2 `ScratchFilesystem({ localRoot? })` with the task id as its subpath, under a default root of `<tmpdir>/agentforge-scratch/<name>`. The per-procedure overlap check in `registry.ts` compares resolved local paths after every scope resolves, still before anything is mounted. Verified by unit tests: two tasks under one named scratch root mount separate directories, and two filesystems of one procedure resolving overlapping directories fail `EXECUTION_ERROR`, naming both.
 
 ## 2. One live task per local directory

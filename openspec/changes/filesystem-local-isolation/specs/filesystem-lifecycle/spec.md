@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: A mount is its subpath under the filesystem's local and remote roots
-A filesystem SHALL declare a local root, an absolute directory, and MAY declare a remote root, a path relative to its store; without one, the remote root SHALL be the store's own root. Its scope SHALL resolve, per request, a subpath relative to both roots, empty for the whole root. The filesystem SHALL mount the store's subtree at the remote root joined with the subpath into the local directory at the local root joined with the same subpath, and only that subtree SHALL be pulled and pushed. A remote root or subpath that is absolute or climbs SHALL fail the task with cause `EXECUTION_ERROR` before anything is mounted.
+A filesystem SHALL declare a local root, an absolute directory, and MAY declare a remote root, an absolute path within its store; without one, the remote root SHALL be the store's own root, `/`. Its scope SHALL resolve, per request, a subpath relative to both roots, empty for the whole root. The filesystem SHALL mount the store's subtree at the remote root joined with the subpath into the local directory at the local root joined with the same subpath, and only that subtree SHALL be pulled and pushed. A local or remote root that is not absolute, or that climbs, SHALL be refused when the filesystem is declared. A subpath that is absolute or climbs SHALL fail the task with cause `EXECUTION_ERROR` before anything is mounted.
 
 #### Scenario: Two requests, two subpaths
-- **WHEN** a filesystem with local root `/workspace/memories` and remote root `projects/alpha` resolves subpath `spaces/a` for one request and `spaces/b` for another
-- **THEN** the first mounts the store's `projects/alpha/spaces/a` at `/workspace/memories/spaces/a`, and the second the store's `projects/alpha/spaces/b` at `/workspace/memories/spaces/b`
+- **WHEN** a filesystem with local root `/workspace/memories` and remote root `/projects/alpha` resolves subpath `spaces/a` for one request and `spaces/b` for another
+- **THEN** the first mounts the store's `/projects/alpha/spaces/a` at `/workspace/memories/spaces/a`, and the second the store's `/projects/alpha/spaces/b` at `/workspace/memories/spaces/b`
 
 #### Scenario: The handler sees the resolved mount
 - **WHEN** a handler reads a filesystem's path whose local root is `/workspace/memories` and whose subpath resolved to `spaces/a`
@@ -42,7 +42,7 @@ Each filesystem kind SHALL either set a default local root the consumer may over
 - **THEN** each mounts its own empty directory under that root
 
 #### Scenario: An S3 filesystem refuses an unsafe delete
-- **WHEN** an S3 filesystem enables deletes while its remote root and subpath together are empty, the whole bucket
+- **WHEN** an S3 filesystem enables deletes while its remote root joined with its subpath is `/`, the whole bucket
 - **THEN** the task fails `EXECUTION_ERROR` before anything is mounted
 
 #### Scenario: Two filesystems at one directory

@@ -29,7 +29,7 @@ See proposal.md — Why. What holds today ([filesystem-lifecycle](../../specs/fi
 export interface FilesystemOptions {
   /** The local directory its mounts live under, absolute; a kind sets a default or requires it. */
   readonly localRoot?: string;
-  /** The store's partition its mounts live under, relative; the store's root when absent. */
+  /** The store's partition its mounts live under, absolute within the store; `/`, the whole store, when absent. */
   readonly remoteRoot?: string;
   readonly scope: (request: FilesystemRequest) => FilesystemScope;
   readonly pushOn?: readonly PushOnState[];
@@ -52,7 +52,7 @@ export interface S3FilesystemOptions extends FilesystemOptions {
 }
 ```
 
-`Mount` keeps `localPath` and `remotePath`, now resolved: `join(localRoot, subpath)` and `posix.join(remoteRoot, subpath)`, with trailing slashes trimmed. So `S3Filesystem.pull` and `push` and the `MountedFilesystem` the handler gets are unchanged. Both `remoteRoot` and `subpath` are checked the way `remotePath` is today: relative, with no `.` or `..` segment. The checks run at construction for the root and at resolve for the subpath.
+`Mount` keeps `localPath` and `remotePath`, now resolved: `join(localRoot, subpath)` and `posix.join(remoteRoot, subpath)`, with trailing slashes trimmed, so `remotePath` is absolute within the store (`/` for all of it). A kind maps it to its store's own addressing: `S3Filesystem` drops the leading slash to form the key prefix, since an S3 key has none. A key that itself begins with `/` is therefore out of a filesystem's reach. So `S3Filesystem.pull` and `push` and the `MountedFilesystem` the handler gets are unchanged. Both roots must be absolute, and `subpath` relative; none may have a `.` or `..` segment. The roots are checked at construction, the subpath at resolve. *Why the remote root is absolute:* a root is a position from the top of its store, as the local root is from the top of the filesystem; only the S3 key encoding has no leading slash, and that is the kind's to apply.
 
 A kind's default becomes `defaultLocalRoot({ name })`. It no longer takes the task, because the task's part of the path is now the subpath.
 
@@ -62,7 +62,7 @@ Shared defaults are a plain object, which is the pattern ARCHITECTURE §3 alread
 const MEMORIES = {
   bucket: 'memories',
   localRoot: '/workspace/memories',
-  remoteRoot: 'projects/alpha',
+  remoteRoot: '/projects/alpha',
   pushOn: ['TASK_STATE_COMPLETED'],
 } as const satisfies Omit<S3FilesystemOptions, 'scope'>;
 
@@ -122,12 +122,12 @@ No consumer depends on it yet, so it is mutated in place. The commit says what c
 
 | Failure | When | Outcome |
 |---|---|---|
-| `remoteRoot` absolute, or with a `.` or `..` segment | construction | throws, so the procedure module fails to load |
+| `remoteRoot` not absolute, or with a `.` or `..` segment | construction | throws, so the procedure module fails to load |
 | `localRoot` not absolute | construction | throws, as `localPath` does today |
 | `subpath` absolute, or with a `.` or `..` segment | resolve, before any mount | `EXECUTION_ERROR`, naming the subpath |
 | Two filesystems of one procedure resolve overlapping directories | after resolution, before any mount | `EXECUTION_ERROR`, naming both |
 | Another live task in the container holds the directory, or one around or inside it | `mount()`, before anything is created | `FILESYSTEM_UNSYNCED`, retryable, naming the directory and the task |
-| `dangerouslyEnableDeletes` with an empty `remoteRoot` joined to `subpath` | `validate`, before any mount | `EXECUTION_ERROR` |
+| `dangerouslyEnableDeletes` with `remoteRoot` joined to `subpath` resolving to `/` | `validate`, before any mount | `EXECUTION_ERROR` |
 | The claim registry cannot be written or read | `mount()` | `FILESYSTEM_UNSYNCED`, retryable, carrying the error |
 
 ## What earns which test

@@ -13,7 +13,7 @@ Nothing fails. This is silent cross-prefix contamination, today on the notebook 
 ## What Changes
 
 - **Roots and a subpath.**
-  - A filesystem declares a **local root** (`localRoot`, absolute) and optionally a **remote root** (`remoteRoot`, relative). The remote root is a static partition of the store, such as one bucket shared across projects and agents.
+  - A filesystem declares a **local root** (`localRoot`, absolute) and optionally a **remote root** (`remoteRoot`, absolute within the store, `/` by default). The remote root is a static partition of the store, such as one bucket shared across projects and agents.
   - Per request, its scope resolves a **subpath** (`subpath`), relative to both roots.
   - The mount is the store's `<remoteRoot>/<subpath>` at `<localRoot>/<subpath>`. Only that subtree is pulled and pushed.
   - **BREAKING:** `S3Filesystem`'s `localPath` option becomes `localRoot`, and a scope's `remotePath` becomes `subpath`. `context.filesystems.<name>.localPath` keeps its name: it is the resolved mount.
@@ -24,7 +24,7 @@ Nothing fails. This is silent cross-prefix contamination, today on the notebook 
 - **`ScratchFilesystem`'s subpath is the task id.**
   - Its default root is a directory of its name under the system's temporary directory.
   - A `localRoot` the consumer names holds one directory per task instead of being shared.
-- **`dangerouslyEnableDeletes`** needs a non-empty resolved remote path: remote root and subpath together.
+- **`dangerouslyEnableDeletes`** needs a resolved remote path other than `/`: remote root and subpath together.
 - **Records.** ADR 0015 is mutated in place: no consumer depends on it. The README's note on keeping paths to one task is rewritten: the local directory is now AgentForge's, and the prefix stays the consumer's. ARCHITECTURE §2 lists the new invariant.
 - **Examples:** `smoke-coverage`'s notebook moves to `localRoot` and `subpath`, and its prompts take the note's path from the mount.
 
