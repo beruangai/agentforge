@@ -44,7 +44,10 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ203** | A session starts from exactly what the procedure composed. Nothing is discovered at the entry point, and what capabilities a session can see is the consumer's configuration rather than a resolution algorithm AgentForge runs |
 | **REQ204** | Guardrails a procedure supplies compose with the harness's own, and none is lost to ordering or merging. Their enforcement *semantics* are the consumer's to define |
 | **REQ205** | Side effects run before the run, and after it on success and on failure, each opt-in per procedure and each surfacing its own failure rather than swallowing it. Recovery when one may have partly happened is the consumer's |
-| **REQ206** | The outcome is the agent's last declared answer, taken only once the run has settled with the work it dispatched complete. A run that ends with no answer is an error |
+| **REQ206** | Each agent run's outcome is its agent's last declared answer, taken only once the run has settled with the work it dispatched complete. A run that ends with no answer is an error. A task's outcome is what its procedure returns |
+| **REQ207** | A procedure makes any number of agent runs, or none, in its one process, and each run is recorded on its task. How its runs relate — in sequence or at once, sharing a directory — is the procedure's |
+| **REQ208** | An answer is checked in the agent's turn — against the agent contract, always, and by checks the procedure opts into — so the agent can fix what is wrong before the run ends, every failure told at once. Checking is bounded; an answer still failing when it ends fails the task, carrying why |
+| **REQ209** | A procedure can bring documents larger than a run should carry into its context within a bound it sets, distilled by a run of its own when they exceed it |
 
 ### Invoking, waiting, recovering — `REQ3xx`
 

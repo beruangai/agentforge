@@ -4,7 +4,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 
 ## 1. Records
 
-- [ ] 1.1 `docs/REQUIREMENTS.md`, verified by reading each against the spec deltas:
+- [x] 1.1 `docs/REQUIREMENTS.md`, verified by reading each against the spec deltas:
   - §REQ206 amended: each run settles on its own agent's last declared answer, and the task's outcome is what the procedure returns;
   - §REQ207 added: a procedure makes any number of runs, or none, in its one process, each recorded;
   - §REQ208 added: stop guards checked in the agent's turn, bounded, failing loudly;
