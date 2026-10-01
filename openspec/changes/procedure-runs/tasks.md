@@ -38,7 +38,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
   - a nested path resolves;
   - an absolute path, `..`, and a path normalising out of the mount are refused, naming the path and the mount;
   - `writablePath` accepts under `**`, under `notes/**` and an exact file, and refuses `index.md` under `notes/**`, naming the scope.
-- [ ] 4.2 `distill(context, { documents, instruction, capTokens?, model? })` in `server/harness/distill.ts`, exported from `/agent` with `DistillDocument` and `DistillSpec`. Verified by unit tests against a stub `runAgent`:
+- [x] 4.2 `distill(context, { documents, instruction, capTokens?, model? })` in `server/harness/distill.ts`, exported from `/agent` with `DistillDocument` and `DistillSpec`. Verified by unit tests against a stub `runAgent`:
   - within the cap: one `document` block per document and no run;
   - over the cap: one run with the utility preset (`tools: []`, `settingSources: []`, `dontAsk`, `maxTurns: 3`, the model), line-numbered documents and the instruction last, returning one `distillation` block;
   - a distillation at 1.5× the cap passes, and one past it fails `OUTPUT_INVALID` carrying it;

@@ -5,10 +5,16 @@
  * `agentforge-agent` export condition, so a worker's build cannot import it.
  */
 
-export {
-  type StopGuard,
-  type StopGuardDenial,
+export type {
+  StopGuard,
+  StopGuardDenial,
 } from './answer-check.ts';
+export {
+  DEFAULT_DISTILL_CAP_TOKENS,
+  type DistillDocument,
+  type DistillSpec,
+  distill,
+} from './distill.ts';
 export {
   Filesystem,
   type FilesystemOptions,
