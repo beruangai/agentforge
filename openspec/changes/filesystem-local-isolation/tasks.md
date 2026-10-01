@@ -28,7 +28,7 @@ Group 1 changes how a mount resolves its paths. Group 2 adds the claim registry 
 
 ## 4. Dogfood on AgentCore
 
-- [ ] 4.1 The `smoke-coverage` AgentCore suite gains two tests. Verified by `nx run @beruangai/smoke-coverage:e2e-agentcore` after its deploy:
+- [x] 4.1 The `smoke-coverage` AgentCore suite gains two tests. Verified by `nx run @beruangai/smoke-coverage:e2e-agentcore` after its deploy:
   - two `KeepNote` tasks on different topics, started together in one runtime session: both keep their note, and `RecallNote` returns each topic's own;
   - two on the same topic, started together in one runtime session: one completes, and the other ends `TASK_STATE_FAILED` with cause `FILESYSTEM_UNSYNCED`, retryable.
 

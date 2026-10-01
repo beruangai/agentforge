@@ -5,7 +5,8 @@
  * Agent SDK and a real model — as the test role. A retry attaches; a session
  * outlives its container, resuming in another from its transcript in S3; so
  * do an S3 filesystem's files; a task whose container the platform stops
- * ends `LOST`, its retry running as the next attempt; and a procedure's runs
+ * ends `LOST`, its retry running as the next attempt; two tasks in one
+ * container never share a mount's local directory; and a procedure's runs
  * — a distillation, then the answer — are each recorded on its task.
  */
 import { randomUUIDv7 } from 'node:crypto';
@@ -196,6 +197,83 @@ describe('hello-agent, on AgentCore', () => {
       throw new Error(`expected completion, got ${JSON.stringify(recalled)}`);
     }
     expect(recalled.output.note.trim()).toBe(note);
+  });
+
+  describe('two notes kept at once in one container', () => {
+    /** Starts KeepNote on each topic together, in one runtime session, and waits for both. */
+    async function keepTogether(topics: readonly [string, string]) {
+      const runtimeSessionId = newRuntimeSessionId();
+      return Promise.all(
+        topics.map(async (topic, index) => {
+          const context = { runtimeSessionId, idempotencyKey: randomUUIDv7() };
+          const note = `Note ${index} kept on ${topic}.`;
+          const ended = await awaitTask(
+            helloAgent.KeepNote,
+            await helloAgent.KeepNote.SendMessage({ topic, note }, context),
+            {
+              ...context,
+              pollIntervalMilliseconds: POLL_INTERVAL_MILLISECONDS,
+            },
+          );
+          return { topic, note, ended };
+        }),
+      );
+    }
+
+    async function recall(topic: string): Promise<string> {
+      const context = {
+        runtimeSessionId: newRuntimeSessionId(),
+        idempotencyKey: randomUUIDv7(),
+      };
+      const recalled = await awaitTask(
+        helloAgent.RecallNote,
+        await helloAgent.RecallNote.SendMessage({ topic }, context),
+        { ...context, pollIntervalMilliseconds: POLL_INTERVAL_MILLISECONDS },
+      );
+      if (recalled.state !== 'TASK_STATE_COMPLETED') {
+        throw new Error(`expected completion, got ${JSON.stringify(recalled)}`);
+      }
+      return recalled.output.note.trim();
+    }
+
+    it('keeps each on its own topic, in its own directory', async () => {
+      const kept = await keepTogether([
+        `e2e-${randomUUIDv7()}`,
+        `e2e-${randomUUIDv7()}`,
+      ]);
+      for (const { ended } of kept) {
+        expect(ended).toMatchObject({
+          state: 'TASK_STATE_COMPLETED',
+          output: { kept: true },
+        });
+      }
+      for (const { topic, note } of kept) {
+        expect(await recall(topic)).toBe(note);
+      }
+    });
+
+    it('refuses the second on one topic while the first holds its directory, retryably', async () => {
+      const topic = `e2e-${randomUUIDv7()}`;
+      const kept = await keepTogether([topic, topic]);
+      const completed = kept.filter(
+        ({ ended }) => ended.state === 'TASK_STATE_COMPLETED',
+      );
+      const refused = kept.filter(
+        ({ ended }) => ended.state === 'TASK_STATE_FAILED',
+      );
+      expect(completed).toHaveLength(1);
+      expect(refused).toHaveLength(1);
+      expect(refused[0]?.ended).toMatchObject({
+        cause: {
+          code: 'FILESYSTEM_UNSYNCED',
+          retryable: true,
+          message: expect.stringMatching(
+            /mounted by task .+ in this container/,
+          ),
+        },
+      });
+      expect(await recall(topic)).toBe(completed[0]?.note);
+    });
   });
 
   it('ends a task LOST when the platform stops its container mid-Bash, and runs the retry as the next attempt', async () => {
