@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   composeOptions,
+  distill,
   filesystems,
   implementAgent,
   S3Filesystem,
@@ -51,6 +52,28 @@ export const router = os.router({
       sessionId: run.sessionId,
     };
   }),
+  DistillThenAnswer: os.DistillThenAnswer.handler(
+    async ({ input, context }) => {
+      const documents = await distill(context, {
+        documents: input.documents,
+        instruction: `what answers this question: ${input.question}`,
+        capTokens: input.capTokens,
+      });
+      const run = await context.runAgent({
+        prompt: [
+          ...documents,
+          `Answer the question from the context above only.`,
+          { tag: 'question', context: input.question },
+        ],
+        output: z.object({ answer: z.string() }),
+        options: composeOptions(baseOptions(), { maxTurns: 3, tools: [] }),
+      });
+      return {
+        answer: run.output.answer,
+        distilled: documents.some((block) => block.tag === 'distillation'),
+      };
+    },
+  ),
   SleepThenAnswer: os.SleepThenAnswer.handler(async ({ input, context }) => {
     const run = await context.runAgent({
       prompt: `Run the shell command \`sleep ${input.seconds}\` with the Bash tool, then answer "done".`,

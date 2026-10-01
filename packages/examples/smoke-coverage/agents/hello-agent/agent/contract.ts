@@ -26,6 +26,29 @@ export const contract = {
         sessionId: z.string(),
       }),
     ),
+  /** Answers a question from documents, distilled first when they exceed the cap: two runs, or one. */
+  DistillThenAnswer: oc
+    .input(
+      z.object({
+        documents: z
+          .array(
+            z.object({
+              source: z.string().min(1),
+              content: z.string().min(1),
+            }),
+          )
+          .min(1),
+        question: z.string().min(1),
+        capTokens: z.number().int().positive(),
+      }),
+    )
+    .output(
+      z.object({
+        answer: z.string(),
+        /** Whether the documents were distilled: read from the context, never asked of the model. */
+        distilled: z.boolean(),
+      }),
+    ),
   /** Runs a shell command for a while before answering: something to cancel, or to lose. */
   SleepThenAnswer: oc
     .meta(timeBudget(300))

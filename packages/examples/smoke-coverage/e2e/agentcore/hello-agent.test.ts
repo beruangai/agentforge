@@ -4,8 +4,9 @@
  * smoke-coverage-infra's `deploy` left it — the runtime, the harness, the
  * Agent SDK and a real model — as the test role. A retry attaches; a session
  * outlives its container, resuming in another from its transcript in S3; so
- * do an S3 filesystem's files; and a task whose container the platform stops
- * ends `LOST`, its retry running as the next attempt.
+ * do an S3 filesystem's files; a task whose container the platform stops
+ * ends `LOST`, its retry running as the next attempt; and a procedure's runs
+ * — a distillation, then the answer — are each recorded on its task.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -22,6 +23,14 @@ import {
   type Client as SmokeCoverageClient,
   client as smokeCoverageClient,
 } from '../../client.ts';
+import {
+  ANSWER,
+  LARGE_CAP_TOKENS,
+  LOGBOOKS,
+  NOTE,
+  QUESTION,
+  SMALL_CAP_TOKENS,
+} from '../__fixtures__/documents.ts';
 
 const OUTPUTS_FILE = new URL(
   '../../../../../dist/packages/examples/smoke-coverage-infra/deploy/outputs.json',
@@ -230,5 +239,50 @@ describe('hello-agent, on AgentCore', () => {
     }
     expect(retried.attempt).toBe(2);
     expect(retried.output.answer.length).toBeGreaterThan(0);
+  });
+
+  describe('distill, then answer', () => {
+    async function distillThenAnswer(
+      input: Parameters<typeof helloAgent.DistillThenAnswer.SendMessage>[0],
+    ) {
+      const context = {
+        runtimeSessionId: newRuntimeSessionId(),
+        idempotencyKey: randomUUIDv7(),
+      };
+      const started = await helloAgent.DistillThenAnswer.SendMessage(
+        input,
+        context,
+      );
+      const ended = await awaitTask(helloAgent.DistillThenAnswer, started, {
+        ...context,
+        pollIntervalMilliseconds: POLL_INTERVAL_MILLISECONDS,
+      });
+      if (ended.state !== 'TASK_STATE_COMPLETED') {
+        throw new Error(`expected completion, got ${JSON.stringify(ended)}`);
+      }
+      return ended;
+    }
+
+    it('distills documents over the cap in a run of their own, then answers from the distillation', async () => {
+      const ended = await distillThenAnswer({
+        documents: LOGBOOKS,
+        question: QUESTION,
+        capTokens: SMALL_CAP_TOKENS,
+      });
+      expect(ended.output.distilled).toBe(true);
+      expect(ended.output.answer).toMatch(ANSWER);
+      expect(ended.runs).toHaveLength(2);
+    });
+
+    it('passes documents within the cap whole, in one run', async () => {
+      const ended = await distillThenAnswer({
+        documents: NOTE,
+        question: QUESTION,
+        capTokens: LARGE_CAP_TOKENS,
+      });
+      expect(ended.output.distilled).toBe(false);
+      expect(ended.output.answer).toMatch(ANSWER);
+      expect(ended.runs).toHaveLength(1);
+    });
   });
 });

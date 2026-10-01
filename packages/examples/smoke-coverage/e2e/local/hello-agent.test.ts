@@ -2,7 +2,8 @@
  * The whole path, locally: a caller, through the project client, to
  * hello-agent's container as `serve-hello-agent` runs it — server, task
  * process, harness, the Agent SDK and a real model — and back as a typed
- * outcome; an attach, a resumed session, and a cancel mid-Bash.
+ * outcome; an attach, a resumed session, a cancel mid-Bash, and a procedure
+ * that distills its documents in a run before answering in another.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { awaitTask } from '@beruangai/agentforge/client';
@@ -11,6 +12,14 @@ import {
   type Client as SmokeCoverageClient,
   client as smokeCoverageClient,
 } from '../../client.ts';
+import {
+  ANSWER,
+  LARGE_CAP_TOKENS,
+  LOGBOOKS,
+  NOTE,
+  QUESTION,
+  SMALL_CAP_TOKENS,
+} from '../__fixtures__/documents.ts';
 import { logs, servedUrl, untilServing } from './__fixtures__/served-agent.ts';
 
 let helloAgent: SmokeCoverageClient['helloAgent'];
@@ -117,5 +126,45 @@ describe('hello-agent, locally', () => {
       (response) => response.json(),
     );
     expect(ping).toEqual({ status: 'Healthy' });
+  });
+
+  it('distills documents over the cap in a run of their own, then answers from the distillation', async () => {
+    const started = await helloAgent.DistillThenAnswer.SendMessage(
+      { documents: LOGBOOKS, question: QUESTION, capTokens: SMALL_CAP_TOKENS },
+      { runtimeSessionId: RUNTIME_SESSION_ID, idempotencyKey: randomUUIDv7() },
+    );
+    const ended = await awaitTask(
+      helloAgent.DistillThenAnswer,
+      started,
+      POLL_OPTIONS,
+    );
+    if (ended.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(
+        `expected completion, got ${JSON.stringify(ended)}\n${logs()}`,
+      );
+    }
+    expect(ended.output.distilled).toBe(true);
+    expect(ended.output.answer).toMatch(ANSWER);
+    expect(ended.runs).toHaveLength(2);
+  });
+
+  it('passes documents within the cap whole, in one run', async () => {
+    const started = await helloAgent.DistillThenAnswer.SendMessage(
+      { documents: NOTE, question: QUESTION, capTokens: LARGE_CAP_TOKENS },
+      { runtimeSessionId: RUNTIME_SESSION_ID, idempotencyKey: randomUUIDv7() },
+    );
+    const ended = await awaitTask(
+      helloAgent.DistillThenAnswer,
+      started,
+      POLL_OPTIONS,
+    );
+    if (ended.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(
+        `expected completion, got ${JSON.stringify(ended)}\n${logs()}`,
+      );
+    }
+    expect(ended.output.distilled).toBe(false);
+    expect(ended.output.answer).toMatch(ANSWER);
+    expect(ended.runs).toHaveLength(1);
   });
 });
