@@ -365,6 +365,37 @@ describe('hook matchers', () => {
 });
 
 describe('the answer check', () => {
+  /**
+   * A stand-in for the CLI: the agent submits once, the kernel's answer check
+   * runs, and the run stops once the kernel aborts it or ends with `final`.
+   */
+  function submittingQuery(final: SDKMessage): QueryFunction {
+    return ((parameters: { options: Options }) => {
+      async function* stream(): AsyncGenerator<SDKMessage, void> {
+        yield init();
+        const entries = parameters.options.hooks?.PreToolUse ?? [];
+        const hook = entries.at(-1)?.hooks[0] as HookCallback;
+        await hook(
+          {
+            hook_event_name: 'PreToolUse',
+            tool_name: 'StructuredOutput',
+            tool_input: { answer: 'yes' },
+          } as unknown as HookInput,
+          'tool-1',
+          { signal: new AbortController().signal },
+        );
+        if (parameters.options.abortController?.signal.aborted) {
+          throw new Error('aborted');
+        }
+        yield final;
+      }
+      return Object.assign(stream(), {
+        interrupt: async () => undefined,
+        close: () => undefined,
+      });
+    }) as unknown as QueryFunction;
+  }
+
   it('is on every run, after the procedure’s own PreToolUse hooks', async () => {
     const own = { matcher: 'StructuredOutput', hooks: [async () => ({})] };
     const scripted = scriptedQuery([
@@ -408,33 +439,33 @@ describe('the answer check', () => {
     });
   });
 
+  it('fails the run with the last refusal when the agent gives up rather than answer again', async () => {
+    const promise = runAgent(
+      {
+        prompt: 'q',
+        output: OutputSchema,
+        guardrails: {
+          stop: [async () => ({ reason: 'Write kata.md before answering.' })],
+        },
+      },
+      { signal: new AbortController().signal, onRecord: () => undefined },
+      submittingQuery(result({ result: 'I cannot answer that.' })),
+    );
+    await expect(promise).rejects.toMatchObject({
+      taskCause: {
+        code: 'OUTPUT_INVALID',
+        message: expect.stringMatching(
+          /without an accepted answer; the last was refused: .*Write kata\.md before answering/s,
+        ),
+        payload: 'I cannot answer that.',
+      },
+    });
+  });
+
   it('ends the run when a stop guard throws, naming its error', async () => {
-    // A stand-in for the CLI: the agent submits, the hook runs, and the run
-    // stops once the kernel aborts it.
-    const query = ((parameters: { options: Options }) => {
-      async function* stream(): AsyncGenerator<SDKMessage, void> {
-        yield init();
-        const entries = parameters.options.hooks?.PreToolUse ?? [];
-        const hook = entries.at(-1)?.hooks[0] as HookCallback;
-        await hook(
-          {
-            hook_event_name: 'PreToolUse',
-            tool_name: 'StructuredOutput',
-            tool_input: { answer: 'yes' },
-          } as unknown as HookInput,
-          'tool-1',
-          { signal: new AbortController().signal },
-        );
-        if (parameters.options.abortController?.signal.aborted) {
-          throw new Error('aborted');
-        }
-        yield result({ structured_output: { answer: 'yes' } });
-      }
-      return Object.assign(stream(), {
-        interrupt: async () => undefined,
-        close: () => undefined,
-      });
-    }) as unknown as QueryFunction;
+    const query = submittingQuery(
+      result({ structured_output: { answer: 'yes' } }),
+    );
     const promise = runAgent(
       {
         prompt: 'q',

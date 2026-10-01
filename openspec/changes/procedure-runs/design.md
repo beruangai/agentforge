@@ -113,7 +113,7 @@ Every run gets one `PreToolUse` entry of the kernel's own, with matcher `Structu
 - **A separate hook for the contract, as TrendBot had.** Two `PreToolUse` hooks on one submission each answer on their own, so the agent learns the failures one denial at a time and spends an attempt on each. The operator chose one hook so that every failure comes in one denial.
 - **A kernel counter defaulting to 3.** The CLI already bounds attempts at 5 and ends the run with a typed subtype. A second counter would have to let an unmet answer through and fail after the run; it duplicates the bound for nothing. A procedure wanting fewer attempts sets `MAX_STRUCTURED_OUTPUT_RETRIES` in its `env`. The limit is shared with the CLI's own schema refusals, which is right: all are "this answer is not acceptable".
 
-`settle` now carries `result.errors` into the `OUTPUT_INVALID` cause for `error_max_structured_output_retries`. That cause therefore names the last failures.
+`settle` now carries `result.errors` into the `OUTPUT_INVALID` cause for `error_max_structured_output_retries`. That cause therefore names the last failures. An agent may instead give up after a refusal and end its turn without answering (seen on Haiku after two refusals): the kernel keeps the last refusal and the `OUTPUT_INVALID` cause for a run without an answer names it too.
 
 ### Paths resolve inside a mount, and writes inside the write scope
 `MountLifecycle` builds `path` and `writablePath` onto the `MountedFilesystem` it hands the handler.

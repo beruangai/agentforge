@@ -132,12 +132,25 @@ export async function runAgent<Output>(
   const { promise: inputEnded, resolve: endInput } =
     Promise.withResolvers<void>();
 
+  const observed: Observed = {
+    sessionId: undefined,
+    rateLimitResetsAt: undefined,
+    assistantError: undefined,
+    mirrorError: undefined,
+    assistantMessages: [],
+    deadMatchers: [],
+    lastRefusal: undefined,
+  };
+
   // A guard that throws ends the run: a defect, never told to the agent.
   let guardError: { readonly error: unknown } | undefined;
   const answerHook = answerCheck({
     output: spec.output,
     wrapped: wire.wrapped,
     guards: spec.guardrails?.stop ?? [],
+    onRefused: (reason) => {
+      observed.lastRefusal = reason;
+    },
     onGuardError: (error) => {
       guardError ??= { error };
       abortController.abort();
@@ -189,14 +202,6 @@ export async function runAgent<Output>(
   };
   context.signal.addEventListener('abort', onAbort, { once: true });
 
-  const observed: Observed = {
-    sessionId: undefined,
-    rateLimitResetsAt: undefined,
-    assistantError: undefined,
-    mirrorError: undefined,
-    assistantMessages: [],
-    deadMatchers: [],
-  };
   let result: SDKResultMessage | undefined;
   let drainDeadline: number | undefined;
   let streamError: unknown;
@@ -345,6 +350,8 @@ interface Observed {
   /** Every assistant message's uuid, which the transcript entry for it shares. */
   assistantMessages: string[];
   deadMatchers: string[];
+  /** Why the agent's last submitted answer was refused, if it was. */
+  lastRefusal: string | undefined;
 }
 
 /** The hook events whose matcher is tested against a tool name. */
@@ -477,7 +484,10 @@ const CREDENTIAL_ERRORS = new Set<SDKAssistantMessageError>([
 export function settle<Output>(
   result: SDKResultMessage,
   schema: z.ZodType<Output>,
-  observed: Pick<Observed, 'rateLimitResetsAt' | 'assistantError'>,
+  observed: Pick<
+    Observed,
+    'rateLimitResetsAt' | 'assistantError' | 'lastRefusal'
+  >,
   wrapped = false,
 ): Output {
   if (result.subtype === 'success' && !result.is_error) {
@@ -485,10 +495,15 @@ export function settle<Output>(
       result.structured_output === undefined ||
       result.structured_output === null
     ) {
+      // An agent may give up after a refusal rather than answer again.
       throw new TaskFailure(
-        cause('OUTPUT_INVALID', 'the run ended without a structured answer', {
-          payload: result.result,
-        }),
+        cause(
+          'OUTPUT_INVALID',
+          observed.lastRefusal === undefined
+            ? 'the run ended without a structured answer'
+            : `the run ended without an accepted answer; the last was refused: ${observed.lastRefusal}`,
+          { payload: result.result },
+        ),
       );
     }
     const parsed = schema.safeParse(

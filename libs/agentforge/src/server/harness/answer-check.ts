@@ -23,12 +23,14 @@ export const ANSWER_TOOL = 'StructuredOutput';
  * collected before the hook answers, so the agent learns all of them in one
  * denial rather than spending an attempt on each. A guard that throws is a
  * defect, not something to tell the agent: it is handed to `onGuardError`,
- * which ends the run.
+ * which ends the run. Each refusal is handed to `onRefused`, so a run whose
+ * agent gives up after one can say why.
  */
 export function answerCheck(options: {
   readonly output: z.ZodType;
   readonly wrapped: boolean;
   readonly guards: readonly StopGuard[];
+  readonly onRefused: (reason: string) => void;
   readonly onGuardError: (error: unknown) => void;
 }): HookCallbackMatcher {
   const hook: HookCallback = async (input) => {
@@ -70,7 +72,9 @@ export function answerCheck(options: {
         reasons,
       }),
     );
-    return refuse(refusal(contractError, reasons));
+    const reason = refusal(contractError, reasons);
+    options.onRefused(reason);
+    return refuse(reason);
   };
   return { matcher: ANSWER_TOOL, hooks: [hook] };
 }

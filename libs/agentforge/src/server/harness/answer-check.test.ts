@@ -14,6 +14,7 @@ function submit(
     readonly output?: z.ZodType;
     readonly wrapped?: boolean;
     readonly guards?: readonly StopGuard[];
+    readonly onRefused?: (reason: string) => void;
     readonly onGuardError?: (error: unknown) => void;
   },
   toolInput: unknown,
@@ -22,6 +23,7 @@ function submit(
     output: options.output ?? OutputSchema,
     wrapped: options.wrapped ?? false,
     guards: options.guards ?? [],
+    onRefused: options.onRefused ?? (() => undefined),
     onGuardError: options.onGuardError ?? (() => undefined),
   });
   expect(entry.matcher).toBe(ANSWER_TOOL);
@@ -56,8 +58,13 @@ describe('answerCheck', () => {
     expect(guard).toHaveBeenCalledTimes(2);
   });
 
-  it('refuses what the contract refuses beyond the JSON Schema', async () => {
-    const output = await submit({}, { ...VALID, source: 'not a url' });
+  it('refuses what the contract refuses beyond the JSON Schema, and hands the refusal to the run', async () => {
+    const onRefused = vi.fn();
+    const output = await submit(
+      { onRefused },
+      { ...VALID, source: 'not a url' },
+    );
+    expect(onRefused).toHaveBeenCalledWith(reasonOf(output));
     expect(output).toMatchObject({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
@@ -123,6 +130,7 @@ describe('answerCheck', () => {
       output: OutputSchema,
       wrapped: false,
       guards: [async () => ({ reason: 'never' })],
+      onRefused: () => undefined,
       onGuardError: () => undefined,
     });
     const hook = entry.hooks[0] as HookCallback;

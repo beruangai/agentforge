@@ -46,7 +46,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 
 ## 5. Model `integ`
 
-- [ ] 5.1 `integ/model/answer-check/answer-check.test.ts` through `runAgent` against a real model. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/answer-check`:
+- [x] 5.1 `integ/model/answer-check/answer-check.test.ts` through `runAgent` against a real model. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/answer-check`:
   - a contract with a `format: uri` field, the prompt inviting a non-URL first: the run returns a valid URL;
   - a guard requiring a file the agent can `Write`: the agent is denied, writes the file and answers again, and the run returns the answer with the file present;
   - a guard that never passes: the run fails `OUTPUT_INVALID` and the cause names the guard's reason.
