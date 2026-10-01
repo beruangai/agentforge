@@ -17,10 +17,10 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
   - a handler with no run completes with no record;
   - a run started after the signal aborted throws `TaskCanceled`, never reaching the SDK, and the task ends `TASK_STATE_CANCELED`.
 
-## 3. The answer check
+## 3. Structured output validation
 
 - [x] 3.1 `StopGuard`, `StopGuardDenial` and `AgentRunSpec.guardrails.stop`, exported from `/agent`. Every run gets the kernel's own `PreToolUse` entry (matcher `StructuredOutput`), after the procedure's hooks. On each submission it collects the contract's `safeParseAsync` of the unwrapped input and every guard's result:
-  - all failures are joined into one `deny` reason, the contract's first, and logged as `agentforge.answer.refused`;
+  - all failures are joined into one `deny` reason, the contract's first, and logged as `agentforge.structured_output.refused`;
   - a guard's rejection is recorded, the run aborted, and the run fails `EXECUTION_ERROR` naming it.
 
   Verified by unit tests of the hook:
@@ -46,7 +46,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 
 ## 5. Model `integ`
 
-- [x] 5.1 `integ/model/answer-check/answer-check.test.ts` through `runAgent` against a real model. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/answer-check`:
+- [x] 5.1 `integ/model/structured-output-validation/structured-output-validation.test.ts` through `runAgent` against a real model. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/structured-output-validation`:
   - a contract with a `format: uri` field, the prompt inviting a non-URL first: the run returns a valid URL;
   - a guard requiring a file the agent can `Write`: the agent is denied, writes the file and answers again, and the run returns the answer with the file present;
   - a guard that never passes: the run fails `OUTPUT_INVALID` and the cause names the guard's reason.
@@ -61,7 +61,7 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 ## 7. Docs
 
 - [x] 7.1 Verified by reading them against design.md:
-  - **ARCHITECTURE §6:** a procedure is one process whose runs are its own to coordinate, each settled and recorded; the answer check — the contract and the stop guards on the submission, bounded by the CLI's retry limit; `distill`; mount path resolution;
+  - **ARCHITECTURE §6:** a procedure is one process whose runs are its own to coordinate, each settled and recorded; structured output validation — the contract and the stop guards on the submission, bounded by the CLI's retry limit; `distill`; mount path resolution;
   - **ARCHITECTURE's structured-output bullet and `research/claude-agent-sdk.md`:** a `format` or refinement is now refused in-turn, no longer found only after the run;
   - **GLOSSARY:** stop guard, as distinct from the SDK's `Stop` event; utility run; distillation;
   - **the package README:** the agent entry's new exports.

@@ -46,7 +46,7 @@ async function causeOf(promise: Promise<unknown>): Promise<string> {
 }
 
 describe('runAgent', () => {
-  it('returns the structured answer, the session id and a record', async () => {
+  it('returns the structured output, the session id and a record', async () => {
     const scripted = scriptedQuery([
       init('s-42'),
       result({ structured_output: { answer: 'yes' }, session_id: 's-42' }),
@@ -223,7 +223,7 @@ describe('runAgent', () => {
       'OUTPUT_INVALID',
     ],
     [
-      'a non-conforming answer',
+      'non-conforming structured output',
       result({ structured_output: { answer: 7 } }),
       'OUTPUT_INVALID',
     ],
@@ -364,9 +364,9 @@ describe('hook matchers', () => {
   });
 });
 
-describe('the answer check', () => {
+describe('structured output validation', () => {
   /**
-   * A stand-in for the CLI: the agent submits once, the kernel's answer check
+   * A stand-in for the CLI: the agent submits once, the kernel's validation
    * runs, and the run stops once the kernel aborts it or ends with `final`.
    */
   function submittingQuery(final: SDKMessage): QueryFunction {
@@ -426,7 +426,7 @@ describe('the answer check', () => {
           subtype: 'error_max_structured_output_retries',
           is_error: true,
           errors: [
-            'Failed to provide valid structured output after 5 attempts — last StructuredOutput error: Write kata.md before answering.',
+            'Failed to provide valid structured output after 5 attempts — last StructuredOutput error: Write kata.md before submitting.',
           ],
         }),
       ]),
@@ -434,18 +434,18 @@ describe('the answer check', () => {
     await expect(promise).rejects.toMatchObject({
       taskCause: {
         code: 'OUTPUT_INVALID',
-        message: expect.stringMatching(/Write kata\.md before answering/),
+        message: expect.stringMatching(/Write kata\.md before submitting/),
       },
     });
   });
 
-  it('fails the run with the last refusal when the agent gives up rather than answer again', async () => {
+  it('fails the run with the last refusal when the agent gives up rather than submit again', async () => {
     const promise = runAgent(
       {
         prompt: 'q',
         output: OutputSchema,
         guardrails: {
-          stop: [async () => ({ reason: 'Write kata.md before answering.' })],
+          stop: [async () => ({ reason: 'Write kata.md before submitting.' })],
         },
       },
       { signal: new AbortController().signal, onRecord: () => undefined },
@@ -455,7 +455,7 @@ describe('the answer check', () => {
       taskCause: {
         code: 'OUTPUT_INVALID',
         message: expect.stringMatching(
-          /without an accepted answer; the last was refused: .*Write kata\.md before answering/s,
+          /without accepted structured output; the last was refused: .*Write kata\.md before submitting/s,
         ),
         payload: 'I cannot answer that.',
       },

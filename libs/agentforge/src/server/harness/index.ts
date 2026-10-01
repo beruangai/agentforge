@@ -5,10 +5,6 @@
  * `agentforge-agent` export condition, so a worker's build cannot import it.
  */
 
-export type {
-  StopGuard,
-  StopGuardDenial,
-} from './answer-check.ts';
 export {
   DEFAULT_DISTILL_CAP_TOKENS,
   type DistillDocument,
@@ -49,6 +45,10 @@ export {
   documentBlock,
   type PromptContent,
 } from './prompt.ts';
+export type {
+  StopGuard,
+  StopGuardDenial,
+} from './structured-output-validation.ts';
 export {
   executeProcedure,
   implementAgent,

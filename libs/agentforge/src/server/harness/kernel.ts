@@ -11,7 +11,6 @@ import {
 import { hash as ohash } from 'ohash';
 import { z } from 'zod';
 import { type Cause, cause, type RunRecord } from '#core/contract/task.ts';
-import { answerCheck, type StopGuard } from './answer-check.ts';
 import {
   type AgentPrompt,
   createStreamingInput,
@@ -21,6 +20,10 @@ import {
   structuredOutputWireSchema,
   unwrapStructuredOutput,
 } from './structured-output.ts';
+import {
+  type StopGuard,
+  structuredOutputValidation,
+} from './structured-output-validation.ts';
 
 /** The SDK options a procedure may set; the kernel owns the rest. */
 export type AgentOptions = Omit<Options, 'outputFormat' | 'abortController'>;
@@ -38,8 +41,8 @@ export interface AgentRunSpec<Output> {
   readonly wrapNonObjectOutput?: boolean;
   readonly options?: AgentOptions;
   /**
-   * Checks an answer must pass, beside the agent contract, before it is
-   * accepted: run on each submission, every failure told to the agent at
+   * Checks the structured output must pass, beside the agent contract,
+   * before it is accepted: run on each submission, every failure told to the agent at
    * once, in its turn (§REQ208).
    */
   readonly guardrails?: {
@@ -144,7 +147,7 @@ export async function runAgent<Output>(
 
   // A guard that throws ends the run: a defect, never told to the agent.
   let guardError: { readonly error: unknown } | undefined;
-  const answerHook = answerCheck({
+  const validationHook = structuredOutputValidation({
     output: spec.output,
     wrapped: wire.wrapped,
     guards: spec.guardrails?.stop ?? [],
@@ -168,10 +171,10 @@ export async function runAgent<Output>(
       ...spec.options?.env,
       ...BACKGROUND_WORK_DISABLED,
     },
-    // The kernel's answer check after the procedure's own hooks (§REQ204).
+    // The kernel's structured output validation after the procedure's own hooks (§REQ204).
     hooks: {
       ...spec.options?.hooks,
-      PreToolUse: [...(spec.options?.hooks?.PreToolUse ?? []), answerHook],
+      PreToolUse: [...(spec.options?.hooks?.PreToolUse ?? []), validationHook],
     },
     outputFormat: { type: 'json_schema', schema: wire.schema },
     abortController,
@@ -282,7 +285,7 @@ export async function runAgent<Output>(
     throw new TaskFailure(
       cause(
         'EXECUTION_ERROR',
-        `a stop guard threw while the answer was checked: ${describe(guardError.error)}`,
+        `a stop guard threw while the structured output was validated: ${describe(guardError.error)}`,
         { stackTrace: inspect(guardError.error, { depth: 8 }) },
       ),
     );
@@ -350,7 +353,7 @@ interface Observed {
   /** Every assistant message's uuid, which the transcript entry for it shares. */
   assistantMessages: string[];
   deadMatchers: string[];
-  /** Why the agent's last submitted answer was refused, if it was. */
+  /** Why the agent's last submitted structured output was refused, if it was. */
   lastRefusal: string | undefined;
 }
 
@@ -495,13 +498,13 @@ export function settle<Output>(
       result.structured_output === undefined ||
       result.structured_output === null
     ) {
-      // An agent may give up after a refusal rather than answer again.
+      // An agent may give up after a refusal rather than submit again.
       throw new TaskFailure(
         cause(
           'OUTPUT_INVALID',
           observed.lastRefusal === undefined
-            ? 'the run ended without a structured answer'
-            : `the run ended without an accepted answer; the last was refused: ${observed.lastRefusal}`,
+            ? 'the run ended without structured output'
+            : `the run ended without accepted structured output; the last was refused: ${observed.lastRefusal}`,
           { payload: result.result },
         ),
       );
@@ -532,7 +535,7 @@ export function settle<Output>(
     throw new TaskFailure(
       cause(
         'OUTPUT_INVALID',
-        `the agent could not produce an accepted answer: ${result.errors.join('; ') || result.subtype}`,
+        `the agent could not produce accepted structured output: ${result.errors.join('; ') || result.subtype}`,
       ),
     );
   }

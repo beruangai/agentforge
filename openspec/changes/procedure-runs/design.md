@@ -94,7 +94,7 @@ const run = await context.runAgent({
 ### Several runs: stated and tested, not built
 No kernel change. ARCHITECTURE §6 states that a procedure is one process, and that its runs, in sequence or concurrently, are its own to coordinate. Each run settles and is recorded on its own, and the task's outcome is the handler's return. §REQ206 is amended and §REQ207 added. A task-process unit test covers two runs, none, and one after a cancel; `smoke-coverage`'s e2e asserts two records on one task.
 
-### One answer check on the submission: the contract and the guards
+### One structured output validation on the submission: the contract and the guards
 Every run gets one `PreToolUse` entry of the kernel's own, with matcher `StructuredOutput`, appended after the procedure's hooks (§REQ204: additive; a procedure's own `PreToolUse` hooks are untouched). Consumers never add the contract check: AgentForge applies it to every run.
 
 **On each submission, the hook collects every failure before it answers:**
@@ -103,7 +103,7 @@ Every run gets one `PreToolUse` entry of the kernel's own, with matcher `Structu
 - **A guard that rejects** is a defect, not something to tell the agent. The hook records the error and denies, the kernel aborts the run, and the run fails `EXECUTION_ERROR` naming it.
 
 **Then it answers:**
-- If anything failed, it returns `permissionDecision: 'deny'` with one reason holding every failure, the contract's first. It logs `{ event: 'agentforge.answer.refused', failures }` to the container log (§REQ601).
+- If anything failed, it returns `permissionDecision: 'deny'` with one reason holding every failure, the contract's first. It logs `{ event: 'agentforge.structured_output.refused', failures }` to the container log (§REQ601).
 - Otherwise it returns `{}`.
 
 `settle` keeps its parse after the run as the last word. The hook makes it unreachable in practice, but the answer that is returned is still parsed by the schema that types it.
@@ -153,7 +153,7 @@ Both throw a plain `Error`, which fails the task `EXECUTION_ERROR` unless the ha
 
 ## What earns which test
 
-- **Model `integ`, because it can drift:** `integ/model/answer-check/`. The answer check against a real model:
+- **Model `integ`, because it can drift:** `integ/model/structured-output-validation/`. Structured output validation against a real model:
   - a contract with a `format: uri` field the agent first fills with a non-URL: the agent is denied and the run returns a URL;
   - a guard requiring a file the agent writes in response, after which the accepted answer is returned;
   - a guard never satisfied, which ends `OUTPUT_INVALID` carrying its reason.
@@ -161,7 +161,7 @@ Both throw a plain `Error`, which fails the task `EXECUTION_ERROR` unless the ha
   It asserts only what holds whichever way the model words its answer.
 - **Settled once, a research note:** a `Stop` block after a submission is ignored (`research/claude-agent-sdk.md`, 2026-10-01).
 - **Unit:**
-  - the answer hook: the contract parsed from the unwrapped submission; all guards run though one denies; the contract's failure and every denial in one reason; a passing submission returns `{}`; a rejection recorded; installed on every run and after the procedure's hooks;
+  - the validation hook: the contract parsed from the unwrapped submission; all guards run though one denies; the contract's failure and every denial in one reason; a passing submission returns `{}`; a rejection recorded; installed on every run and after the procedure's hooks;
   - `settle`'s carried message;
   - `path` and `writablePath`;
   - `distill` against a stub `runAgent`: pass-through, the preset and prompt, the allowance edges, no documents;

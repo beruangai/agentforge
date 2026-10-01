@@ -1,14 +1,14 @@
 /**
- * The kernel's answer check (§REQ208) against a real model, through
- * `runAgent`: one PreToolUse entry on the `StructuredOutput` submission
- * refuses an answer the agent contract or a stop guard rejects, and the agent
- * answers again in its turn. AgentForge relies on it, and the SDK documents
+ * The kernel's structured output validation (§REQ208) against a real model,
+ * through `runAgent`: one PreToolUse entry on the `StructuredOutput`
+ * submission refuses structured output the agent contract or a stop guard
+ * rejects, and the agent submits again in its turn. AgentForge relies on it, and the SDK documents
  * none of it: that a denied submission is retried in the same run, that the
  * result carries the accepted one, and that the CLI ends a run whose
  * submissions are all refused with `error_max_structured_output_retries`
  * carrying the last refusal (docs/research/claude-agent-sdk.md, 2026-10-01).
  *
- * What is asserted holds whichever way the model words its answers.
+ * What is asserted holds whichever way the model words its output.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -44,9 +44,9 @@ function recordingSubmissions() {
   };
 }
 
-describe('the answer check', () => {
-  it('refuses what the contract refuses beyond the JSON Schema, and the run returns the accepted answer', async () => {
-    const sandbox = sandboxed('answer-check-contract');
+describe('structured output validation', () => {
+  it('refuses what the contract refuses beyond the JSON Schema, and the run returns the accepted structured output', async () => {
+    const sandbox = sandboxed('structured-output-validation-contract');
     const AddressSchema = z.object({
       address: z.url().describe('The address the text gives'),
     });
@@ -79,8 +79,8 @@ describe('the answer check', () => {
     }
   });
 
-  it('holds the answer back until a stop guard passes, in the same run', async () => {
-    const sandbox = sandboxed('answer-check-guard');
+  it('holds the structured output back until a stop guard passes, in the same run', async () => {
+    const sandbox = sandboxed('structured-output-validation-guard');
     const notes = join(sandbox.workingDirectory, 'notes.md');
     const run = await runAgent(
       {
@@ -94,7 +94,7 @@ describe('the answer check', () => {
                 ? undefined
                 : {
                     reason:
-                      'Write a file named notes.md in your working directory containing the word CHECKED, then answer again.',
+                      'Write a file named notes.md in your working directory containing the word CHECKED, then submit again.',
                   },
           ],
         },
@@ -115,8 +115,8 @@ describe('the answer check', () => {
     expect(readFileSync(notes, 'utf8')).toContain('CHECKED');
   });
 
-  it('fails OUTPUT_INVALID, carrying the guard’s reason, when no answer is ever accepted', async () => {
-    const sandbox = sandboxed('answer-check-never');
+  it('fails OUTPUT_INVALID, carrying the guard’s reason, when no structured output is ever accepted', async () => {
+    const sandbox = sandboxed('structured-output-validation-never');
     const promise = runAgent(
       {
         prompt: 'What is two plus two? Answer in words.',
@@ -124,7 +124,7 @@ describe('the answer check', () => {
         guardrails: {
           stop: [
             async () => ({
-              reason: 'The ledger is closed today; no answer can be accepted.',
+              reason: 'The ledger is closed today; nothing can be accepted.',
             }),
           ],
         },

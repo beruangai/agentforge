@@ -36,9 +36,9 @@
 
 **Agent run** — One `context.runAgent({ prompt, output, options })`, recorded as a **run record**.
 
-**Answer check** — The kernel's `PreToolUse` hook on an agent run's answer submission: the agent contract and every stop guard, all failures told to the agent at once, in its turn.
+**Structured output validation** — The kernel's `PreToolUse` hook on an agent run's `StructuredOutput` submission: the agent contract and every stop guard, all failures told to the agent at once, in its turn.
 
-**Stop guard** — A check a run declares in `guardrails.stop` that must pass before its answer is accepted; denied, it tells the agent why. Not the SDK's `Stop` hook event, which cannot hold back a submitted answer.
+**Stop guard** — A check a run declares in `guardrails.stop` that must pass before its structured output is accepted; denied, it tells the agent why. Not the SDK's `Stop` hook event, which cannot hold back a submission.
 
 **Utility run** — An agent run a procedure makes for itself rather than for its outcome, such as `distill`'s.
 

@@ -1,8 +1,12 @@
 import type { HookCallback, HookInput } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { ANSWER_TOOL, answerCheck, type StopGuard } from './answer-check.ts';
 import { STRUCTURED_OUTPUT_WRAPPER_KEY } from './structured-output.ts';
+import {
+  STRUCTURED_OUTPUT_TOOL,
+  type StopGuard,
+  structuredOutputValidation,
+} from './structured-output-validation.ts';
 
 const OutputSchema = z.object({
   answer: z.string(),
@@ -19,19 +23,19 @@ function submit(
   },
   toolInput: unknown,
 ) {
-  const entry = answerCheck({
+  const entry = structuredOutputValidation({
     output: options.output ?? OutputSchema,
     wrapped: options.wrapped ?? false,
     guards: options.guards ?? [],
     onRefused: options.onRefused ?? (() => undefined),
     onGuardError: options.onGuardError ?? (() => undefined),
   });
-  expect(entry.matcher).toBe(ANSWER_TOOL);
+  expect(entry.matcher).toBe(STRUCTURED_OUTPUT_TOOL);
   const hook = entry.hooks[0] as HookCallback;
   return hook(
     {
       hook_event_name: 'PreToolUse',
-      tool_name: ANSWER_TOOL,
+      tool_name: STRUCTURED_OUTPUT_TOOL,
       tool_input: toolInput,
       tool_use_id: 'tool-1',
       session_id: 'session-1',
@@ -51,7 +55,7 @@ function reasonOf(output: unknown): string {
   ).hookSpecificOutput.permissionDecisionReason;
 }
 
-describe('answerCheck', () => {
+describe('structuredOutputValidation', () => {
   it('accepts a submission the contract takes and every guard passes', async () => {
     const guard = vi.fn<StopGuard>(async () => undefined);
     expect(await submit({ guards: [guard, guard] }, VALID)).toEqual({});
@@ -87,12 +91,12 @@ describe('answerCheck', () => {
 
   it('runs every guard though one denies, and tells every failure in one denial', async () => {
     const later = vi.fn<StopGuard>(async () => ({
-      reason: 'Write notes.md before answering.',
+      reason: 'Write notes.md before submitting.',
     }));
     const output = await submit(
       {
         guards: [
-          async () => ({ reason: 'Write kata.md before answering.' }),
+          async () => ({ reason: 'Write kata.md before submitting.' }),
           async () => undefined,
           later,
         ],
@@ -102,8 +106,8 @@ describe('answerCheck', () => {
     expect(later).toHaveBeenCalledOnce();
     const reason = reasonOf(output);
     expect(reason).toMatch(/at source/);
-    expect(reason).toMatch(/- Write kata\.md before answering\./);
-    expect(reason).toMatch(/- Write notes\.md before answering\./);
+    expect(reason).toMatch(/- Write kata\.md before submitting\./);
+    expect(reason).toMatch(/- Write notes\.md before submitting\./);
     expect(reason.indexOf('at source')).toBeLessThan(reason.indexOf('kata.md'));
   });
 
@@ -126,7 +130,7 @@ describe('answerCheck', () => {
   });
 
   it('ignores any other event or tool', async () => {
-    const entry = answerCheck({
+    const entry = structuredOutputValidation({
       output: OutputSchema,
       wrapped: false,
       guards: [async () => ({ reason: 'never' })],
