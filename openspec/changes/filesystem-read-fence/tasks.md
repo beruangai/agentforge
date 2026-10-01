@@ -11,7 +11,7 @@ Group 1 is the package work. Group 2 runs the fence against a real model. Group 
 
 ## 2. Against a real model
 
-- [ ] 2.1 `integ/model/read-fence/read-fence.test.ts` through `runAgent`, fenced, in a sandbox: one directory given as `additionalDirectories`, and a sibling directory named by a `Read` allow rule. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/read-fence`:
+- [x] 2.1 `integ/model/read-fence/read-fence.test.ts` through `runAgent`, fenced, in a sandbox: one directory given as `additionalDirectories`, and a sibling directory named by a `Read` allow rule. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/read-fence`:
   - the tool results show a `Read` of the given directory succeeding;
   - a `Read` of the sibling is refused, and so is `cat` of it through Bash.
 
