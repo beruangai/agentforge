@@ -53,8 +53,8 @@ Group 1 records the requirements. Groups 2–4 are independent package work: sev
 
 ## 6. Examples
 
-- [ ] 6.1 `golden-kata`'s writer guards its kata and solution files through `kata.path`, verified by `nx run @beruangai/golden-kata:e2e`, and by `e2e-agentcore` after its deploy.
-- [ ] 6.2 `smoke-coverage`'s `hello-agent` gains `DistillThenAnswer`: documents and a question in; it distills, then runs, and returns the answer with whether it distilled. Verified by `nx run @beruangai/smoke-coverage:e2e`, and by `e2e-agentcore` after its deploy, in local and AgentCore suites:
+- [x] 6.1 `golden-kata`'s writer guards its kata and solution files through `kata.path`, verified by `nx run @beruangai/golden-kata:e2e`, and by `e2e-agentcore` after its deploy.
+- [x] 6.2 `smoke-coverage`'s `hello-agent` gains `DistillThenAnswer`: documents and a question in; it distills, then runs, and returns the answer with whether it distilled. Verified by `nx run @beruangai/smoke-coverage:e2e`, and by `e2e-agentcore` after its deploy, in local and AgentCore suites:
   - large documents under a small cap record two runs on the task, and the answer is grounded in them;
   - documents within the cap record one run.
 
