@@ -15,11 +15,13 @@ import { oc } from '@orpc/contract';
 
 export const contract = {
   summarise: oc
-    .input(z.object({ text: z.string(), resumeSessionId: z.string().optional() }))
-    .output(z.object({ summary: z.string(), words: z.number(), sessionId: z.string() })),
+    .input(z.strictObject({ text: z.string(), resumeSessionId: z.string().optional() }))
+    .output(z.strictObject({ summary: z.string(), words: z.number(), sessionId: z.string() })),
   sleepThenAnswer: oc.meta(timeBudget(300)).input(…).output(…),
 };
 ```
+
+Every object in a contract is `z.strictObject` or `z.looseObject`: `z.object` drops an undeclared key silently, so a contract holding one is refused (§REQ103).
 
 **2. Implement it** — a handler per procedure. `context.runAgent` is one Claude run with structured output; everything around it is ordinary code.
 

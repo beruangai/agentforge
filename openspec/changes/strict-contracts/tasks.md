@@ -27,7 +27,7 @@ Applied second in the A6 batch, after `glibc-base-image`. Group 1 is the check. 
 
 ## 4. Records
 
-- [ ] 4.1 Verify each record by reading it against design.md:
+- [x] 4.1 Verify each record by reading it against design.md:
   - **ARCHITECTURE §3:** a contract's objects are strict or loose, never stripping, and refused otherwise, where the refusal surfaces; its contract sample uses `z.strictObject`;
   - **ARCHITECTURE §7:** the wire across a deploy, as design.md states it;
   - **DESIGN_OPTIONS:** §ODO001 removed, its id spent;

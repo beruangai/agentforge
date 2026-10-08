@@ -6,7 +6,6 @@ What is not decided. Everything built or decided is in [ARCHITECTURE.md](ARCHITE
 
 | | Question | Settled by | Blocks |
 |---|---|---|---|
-| **ODO001** | Strict parsing (§REQ103): Zod's `z.object` strips undeclared keys, so an undeclared field is dropped silently unless the consumer wrote `z.strictObject`. Enforce it — refuse a contract with a non-strict object at `createClient` and `implementAgent` — or accept the consumer's schema as written | **Decided 2026-10-08 by the operator: enforce**, built in A6; moves to ARCHITECTURE.md when delivered | Nothing |
 | **ODO002** | A transcript view (§REQ602): the CLI's export, its mapping onto `gen_ai.*` and the per-agent counts and dashboard are built (ARCHITECTURE §7), but the CLI does not emit `gen_ai.input.messages` (at `ALL` its raw bodies only nest in spans, as TrendBot's Honeycomb mapping found), so reading a run as a conversation waits on the CLI's support or a renderer of our own over the session transcript | The CLI's support, or the operator | Nothing |
 | **ODO005** | A credential broker, so a provider key never sits in the task's environment; token rotation | When a procedure needs a key beyond the subscription | Nothing yet |
 | **ODO006** | Whether background work can be allowed with a deterministic final answer | A spike, when a procedure asks for background work | Nothing — it is off |
