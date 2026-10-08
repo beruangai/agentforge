@@ -43,7 +43,13 @@ const procedure: ProcedureClient<string, string> = {
 const activity = procedureActivity(procedure, { cancelTask });
 const START = { runtimeSessionId: 'session', continuityKey: 'continuity' };
 
-const TASK = { taskId: 'task', contextId: 'context', attempt: 1, runs: [] };
+const TASK = {
+  taskId: 'task',
+  contextId: 'context',
+  attempt: 1,
+  image: 'image',
+  runs: [],
+};
 const WORKING: TaskView<string> = { ...TASK, state: 'TASK_STATE_WORKING' };
 const COMPLETED: TaskView<string> = {
   ...TASK,

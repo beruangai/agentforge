@@ -9,7 +9,13 @@ import {
   type TaskView,
 } from './client.ts';
 
-const base = { taskId: 'task', contextId: 'context', attempt: 1, runs: [] };
+const base = {
+  taskId: 'task',
+  contextId: 'context',
+  attempt: 1,
+  image: 'image',
+  runs: [],
+};
 
 describe('awaitTask', () => {
   it('polls to the end without leaving a listener on the signal', async () => {
@@ -95,7 +101,7 @@ describe('GetTask', () => {
         ],
       },
     ],
-    metadata: { attempt: 2, runs: [] },
+    metadata: { attempt: 2, image: 'agent-image', runs: [] },
   };
 
   it('reads the typed output of a finished task off the wire', async () => {
@@ -107,6 +113,7 @@ describe('GetTask', () => {
       taskId: 'task',
       contextId: 'context',
       attempt: 2,
+      image: 'agent-image',
       runs: [],
       state: 'TASK_STATE_COMPLETED',
       output: { summary: 'short' },
@@ -132,6 +139,12 @@ describe('GetTask', () => {
         { runtimeSessionId: 'session' },
       ),
     ).rejects.toThrow(/cannot read/);
+    await expect(
+      answering({
+        ...wireTask,
+        metadata: { attempt: 2, runs: [] },
+      }).summarise.GetTask('task', { runtimeSessionId: 'session' }),
+    ).rejects.toThrow(/cannot read[\s\S]*image/);
     await expect(
       answering({ ...wireTask, artifacts: [] }).summarise.GetTask('task', {
         runtimeSessionId: 'session',

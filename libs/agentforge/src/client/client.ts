@@ -45,6 +45,8 @@ interface TaskViewBase {
   readonly taskId: string;
   readonly contextId: string;
   readonly attempt: number;
+  /** The image the task was admitted in (§REQ601): deployed, its container URI. */
+  readonly image: string;
   readonly runs: readonly RunRecord[];
 }
 
@@ -188,6 +190,7 @@ const WireTaskSchema = z.object({
   artifacts: z.unknown().optional(),
   metadata: z.object({
     attempt: z.number().int().positive(),
+    image: z.string().min(1),
     runs: z.array(RunRecordSchema),
   }),
 });
@@ -209,6 +212,7 @@ function taskView<Output>(
     taskId: task.id,
     contextId: task.contextId,
     attempt: task.metadata.attempt,
+    image: task.metadata.image,
     runs: task.metadata.runs,
   };
   if (state === 'TASK_STATE_SUBMITTED' || state === 'TASK_STATE_WORKING') {

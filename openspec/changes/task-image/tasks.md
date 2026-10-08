@@ -8,7 +8,7 @@ Applied last in the A6 batch, after `project-infrastructure`. Group 1 is the pac
   - the metadata carries `image`;
   - a start the gateway rejects for its size carries `image`;
   - the server refuses to start without it, naming the variable.
-- [ ] 1.2 `TaskView.image`, read and required by the client's wire schema. Verified by unit tests: the view carries it, and a task without it is refused.
+- [x] 1.2 `TaskView.image`, read and required by the client's wire schema. Verified by unit tests: the view carries it, and a task without it is refused.
 
 ## 2. Supplying it
 

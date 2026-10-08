@@ -35,7 +35,13 @@ import type {
 import { projectActivities } from '../../../src/client/temporal/project-activities.ts';
 import { CONTRACTS } from './__fixtures__/contract.ts';
 
-const TASK = { taskId: 'task', contextId: 'context', attempt: 1, runs: [] };
+const TASK = {
+  taskId: 'task',
+  contextId: 'context',
+  attempt: 1,
+  image: 'image',
+  runs: [],
+};
 const WORKING: TaskView<string> = { ...TASK, state: 'TASK_STATE_WORKING' };
 const COMPLETED: TaskView<string> = {
   ...TASK,

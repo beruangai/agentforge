@@ -16,7 +16,13 @@ const CONTRACTS = {
   },
 };
 
-const TASK = { taskId: 'task', contextId: 'context', attempt: 1, runs: [] };
+const TASK = {
+  taskId: 'task',
+  contextId: 'context',
+  attempt: 1,
+  image: 'image',
+  runs: [],
+};
 
 function answering<Output>(output: Output): ProcedureClient<never, Output> {
   return {
