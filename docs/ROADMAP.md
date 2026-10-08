@@ -78,7 +78,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 ## A6 — Before the first live consumer
 
-**In progress since 2026-10-01**, on branch `a6`. Nine changes delivered, each verified locally and on AgentCore against a real model:
+**Delivered 2026-10-08**, on branch `a6`, in nine changes, each verified locally and on AgentCore against a real model:
 
 - **A procedure's runs, 2026-10-01** ([change](../openspec/changes/archive/2026-10-01-procedure-runs/proposal.md)): a procedure makes any number of agent runs, each settled and recorded on its own (§REQ206, §REQ207). **Structured output validation** checks every submission in the agent's turn against the agent contract and the stop guards the run gives — the guardrail this milestone called for, the expected files' guard first, on `golden-kata`'s writer — all failures told at once, past the CLI's limit `OUTPUT_INVALID` with the last refusal (§REQ208). Paths resolved inside a mount, writes inside its scope. `distill` keeps documents within a token cap (§REQ209)
 - **Filesystem local isolation, 2026-10-08** ([change](../openspec/changes/archive/2026-10-08-filesystem-local-isolation/proposal.md)): a filesystem has a `localRoot`, an optional `remoteRoot` and a `subpath` its scope resolves, so a mount is `<root>/<subpath>` on both sides and shared options are a plain spread; a scratch filesystem holds a directory per task; a container refuses a second live task on a held local directory `FILESYSTEM_UNSYNCED`, retryable, through a claim registry. `smoke-coverage` keeps two notes at once in one AgentCore container
@@ -94,7 +94,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 - the four changes above, delivered 2026-10-08 and verified together
 
-Then the StrategyFoundry corrections doc, and A6 is delivered.
+Then the StrategyFoundry corrections doc, written into StrategyFoundry as `docs/AGENTFORGE_CORRECTIONS.md` for a StrategyFoundry session to resolve: every assumption its docs made about AgentForge that no longer holds, with the fact and its source.
 
 ## A7 — StrategyFoundry, locally
 
