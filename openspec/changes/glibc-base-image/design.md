@@ -76,7 +76,7 @@ FROM ${BASE_IMAGE}
 # is cached across their changes; installed as root, then back to bun.
 USER root
 RUN apt-get update \
- && apt-get install --yes --no-install-recommends python3 python3-venv \
+ && apt-get install --yes --no-install-recommends python3 python3-venv libpython3.13 \
  && rm -rf /var/lib/apt/lists/* \
  && python3 -m venv /opt/python \
  && /opt/python/bin/pip install --no-cache-dir --only-binary=:all: nautilus_trader==1.231.0
@@ -87,6 +87,7 @@ COPY …   # the maintained lines, unchanged
 
 - `--only-binary=:all:` makes a missing wheel fail the build, so the proof can never pass by building from source.
 - The venv sidesteps Debian's externally managed system Python (PEP 668).
+- `libpython3.13`: NautilusTrader's Rust extension links `libpython3.13.so.1.0`, which Debian's `python3` does not install (observed 2026-10-08: without it, the import fails).
 - `ENV PATH` reaches the server, every task process and the CLI's Bash tool, which inherit the image's environment.
 
 The base layer is the place for it because ADR 0008 puts the language runtimes a project's agents share there; `smoke-coverage` has one agent, so ADR 0010's project of its own for such an agent is met as it stands. An agent layer that alone needs a package detaches its own Dockerfile the same way.

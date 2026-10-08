@@ -16,7 +16,7 @@
     ],
     "agentforge": {
       "detached": {
-        "files": [],
+        "files": ["packages/examples/smoke-coverage/base/Dockerfile"],
         "targets": []
       }
     }
