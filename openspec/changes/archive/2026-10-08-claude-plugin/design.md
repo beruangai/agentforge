@@ -64,7 +64,7 @@ See proposal.md — Why. What holds today:
   - It never shows an `onSuccess` hook, which AgentForge does not have (§REQ205).
   - Recovery from a partial side effect is the consumer's, told by `attempt` and `priorAttempt`.
 
-*Alternative:* the skill symlinked into each project's `.claude/skills/` from `node_modules`, which the research found needs no registration and works headless. The operator chose the plugin: the guide is for a developer's interactive Claude Code, and a plugin can grow commands, agents and hooks under one namespace. Recorded as proposed [ADR 0019](../../../adr/0019-claude-code-guidance-ships-as-a-plugin-from-the-repository.md).
+*Alternative:* the skill symlinked into each project's `.claude/skills/` from `node_modules`, which the research found needs no registration and works headless. The operator chose the plugin: the guide is for a developer's interactive Claude Code, and a plugin can grow commands, agents and hooks under one namespace. Recorded as proposed [ADR 0019](../../../../adr/0019-claude-code-guidance-ships-as-a-plugin-from-the-repository.md).
 
 ### Registration is documented, not generated
 
