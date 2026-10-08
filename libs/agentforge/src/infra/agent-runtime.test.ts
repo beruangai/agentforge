@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { App, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
@@ -253,6 +254,41 @@ describe('AgentRuntime', () => {
     expect(() =>
       synthesize({ environmentVariables: { AGENTFORGE_AGENT_NAME: 'other' } }),
     ).toThrow(/AGENTFORGE_AGENT_NAME is set by AgentRuntime/);
+  });
+
+  it('names to the server the container URI it runs, the image every task records', () => {
+    const template = synthesize();
+    const [runtime] = Object.values(
+      template.findResources('AWS::BedrockAgentCore::Runtime'),
+    );
+    const properties = runtime?.Properties;
+    expect(properties.EnvironmentVariables.AGENTFORGE_AGENT_IMAGE).toEqual(
+      '123456789012.dkr.ecr.us-east-2.amazonaws.com/agent:latest',
+    );
+    expect(properties.EnvironmentVariables.AGENTFORGE_AGENT_IMAGE).toEqual(
+      properties.AgentRuntimeArtifact.ContainerConfiguration.ContainerUri,
+    );
+    expect(() =>
+      synthesize({ environmentVariables: { AGENTFORGE_AGENT_IMAGE: 'mine' } }),
+    ).toThrow(/AGENTFORGE_AGENT_IMAGE is set by AgentRuntime/);
+  });
+
+  it('records an asset image by the URI CloudFormation deploys', () => {
+    const template = synthesize({
+      agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(
+        join(import.meta.dirname, '__fixtures__', 'agent-image'),
+      ),
+    });
+    const [runtime] = Object.values(
+      template.findResources('AWS::BedrockAgentCore::Runtime'),
+    );
+    const properties = runtime?.Properties;
+    expect(properties.EnvironmentVariables.AGENTFORGE_AGENT_IMAGE).toEqual(
+      properties.AgentRuntimeArtifact.ContainerConfiguration.ContainerUri,
+    );
+    expect(
+      JSON.stringify(properties.EnvironmentVariables.AGENTFORGE_AGENT_IMAGE),
+    ).toMatch(/cdk-hnb659fds-container-assets/);
   });
 
   it('refuses an agent name that is not kebab-case', () => {

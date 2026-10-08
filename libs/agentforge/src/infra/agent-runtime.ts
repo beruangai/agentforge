@@ -1,4 +1,4 @@
-import { ArnFormat, Stack, Validations } from 'aws-cdk-lib';
+import { ArnFormat, Lazy, Stack, Validations } from 'aws-cdk-lib';
 import {
   type CfnRuntime,
   ProtocolType,
@@ -13,6 +13,7 @@ import {
 import type { ISecret } from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { A2A_VERSION_HEADER } from '#core/a2a-version.ts';
+import { AGENT_IMAGE_VARIABLE } from '#core/agent-image.ts';
 import { AGENT_NAME_PATTERN, AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import {
   FILESYSTEM_BUCKETS_VARIABLE,
@@ -103,6 +104,11 @@ export interface AgentRuntimeProps
  */
 export class AgentRuntime extends Construct {
   readonly runtime: Runtime;
+  /**
+   * The container URI the runtime runs, which every task it admits records
+   * (§REQ601): an asset's is tagged by its content hash.
+   */
+  readonly image: string;
 
   constructor(scope: Construct, id: string, props: AgentRuntimeProps) {
     super(scope, id);
@@ -124,6 +130,7 @@ export class AgentRuntime extends Construct {
     }
     for (const owned of [
       AGENT_NAME_VARIABLE,
+      AGENT_IMAGE_VARIABLE,
       TASK_TABLE_NAME_VARIABLE,
       SESSION_BUCKET_VARIABLE,
       METRICS_VARIABLE,
@@ -205,6 +212,26 @@ export class AgentRuntime extends Construct {
     cfnRuntime.addPropertyOverride(
       `EnvironmentVariables.${METRICS_VARIABLE}`,
       this.runtime.agentRuntimeName,
+    );
+    // The container URI the L2 renders for the artifact, which binds it
+    // (an asset is built there) only as the template is synthesized.
+    this.image = Lazy.string({
+      produce: () => {
+        const artifact = Stack.of(this).resolve(
+          cfnRuntime.agentRuntimeArtifact,
+        ) as { containerConfiguration?: { containerUri?: string } };
+        const containerUri = artifact.containerConfiguration?.containerUri;
+        if (containerUri === undefined) {
+          throw new Error(
+            `runtime ${this.node.path} renders no container URI: a task records the image it runs in, so AgentRuntime takes a container artifact`,
+          );
+        }
+        return containerUri;
+      },
+    });
+    cfnRuntime.addPropertyOverride(
+      `EnvironmentVariables.${AGENT_IMAGE_VARIABLE}`,
+      this.image,
     );
     Validations.of(cfnRuntime).acknowledge({
       id: 'CloudFormation-Validate::F3002',
