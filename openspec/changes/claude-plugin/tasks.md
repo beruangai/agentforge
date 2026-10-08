@@ -18,7 +18,7 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
 
 ## 2. The guide
 
-- [ ] 2.1 Write `SKILL.md` and `references/implementing.md`, `consuming.md` and `operating.md`. Content, from ARCHITECTURE, the root README and the package README as they stand:
+- [x] 2.1 Write `SKILL.md` and `references/implementing.md`, `consuming.md` and `operating.md`. Content, from ARCHITECTURE, the root README and the package README as they stand:
   - **`SKILL.md`:** when the skill applies; the loop (adopt → generate → define → implement → consume → run); which reference serves each step.
   - **`implementing.md`:**
     - a contract, strict or loose objects;
@@ -46,11 +46,14 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
     - the known limits.
 
   Each reference links the repository's docs (the root README, `libs/agentforge/README.md`, ARCHITECTURE) by relative path for what is generated and maintained, rather than restating it. Verified by the local check, and by the operator reading it.
-- [ ] 2.2 Write `references/migrations.md`: its convention (one entry per breaking change set, newest first, headed by milestone and date until published; what breaks, what to change, how to verify), and the A6 entry:
+- [ ] 2.2 Write `references/migrations.md`: its convention (one entry per breaking change set, newest first, headed by milestone and date until published; what breaks, what to change, how to verify), and the A6 entry, from A5, covering every A6 change that alters what a consumer wrote or runs:
   - contracts strict or loose;
+  - filesystem options (`localRoot`, `subpath`, no `read`) and `context.agentOptions` replacing `context.filesystemPermissions`;
+  - the read fence in the scaffolded base options, and code an agent runs shipped as a file;
   - agent constructs taking their project's resources, with `removalPolicy` and `sessionRetention` on the project;
-  - `TaskView.image`;
-  - the Debian image, and a detached `base/Dockerfile` installing with `apt-get`.
+  - `TaskView.image` and `AGENTFORGE_AGENT_IMAGE`;
+  - the Debian image, and a detached `Dockerfile` installing with `apt-get`;
+  - memory off unless a run declares `memoryDirectory`.
 
   Verified by the local check, and by the operator reading it.
 

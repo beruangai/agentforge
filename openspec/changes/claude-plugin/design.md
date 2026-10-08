@@ -89,11 +89,14 @@ Then, in the user settings, `enabledPlugins: { "agentforge@agentforge": false }`
 - how to verify (`nx sync`, the project's targets).
 
 - **Until the package is published (A8),** sections are headed by the AgentForge milestone and date; afterwards, by version.
-- **The first entry is A6's breaking changes:**
+- **The first entry is A6's, from A5:** every A6 change that alters what a consumer wrote or runs:
   - contracts are strict or loose;
+  - filesystem options and `context.agentOptions`;
+  - the read fence;
   - an agent construct takes its project's resources;
   - a task carries `image`;
-  - the image is Debian.
+  - the image is Debian;
+  - memory is off unless declared.
 - **The standing rule** goes in `CLAUDE.md` (Working rules): a change to what a consumer writes or runs updates the skill, and a breaking one adds its migration entry, in the same change.
 
 ### The checks run with AgentForge's local integration tests, on the CLI the SDK ships
