@@ -35,7 +35,7 @@ Group 1 records the requirements. Groups 2 and 3 are the package work and are in
   - both procedures compose `context.agentOptions`.
 
   Verified by `nx run @beruangai/golden-kata:e2e`, and by `nx run @beruangai/golden-kata:e2e-agentcore` after its deploy.
-- [ ] 4.2 smoke-coverage's procedures compose `context.agentOptions` in place of the two fields. Verified by `nx run @beruangai/smoke-coverage:e2e`, and by `nx run @beruangai/smoke-coverage:e2e-agentcore` after its deploy.
+- [x] 4.2 smoke-coverage's procedures compose `context.agentOptions` in place of the two fields. Verified by `nx run @beruangai/smoke-coverage:e2e`, and by `nx run @beruangai/smoke-coverage:e2e-agentcore` after its deploy.
 
 ## 5. Records
 

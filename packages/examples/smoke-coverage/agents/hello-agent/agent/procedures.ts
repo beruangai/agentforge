@@ -106,12 +106,10 @@ export const router = os.router({
         { tag: 'note', context: input.note },
       ],
       output: z.object({ written: z.boolean() }),
-      options: composeOptions(baseOptions(), {
+      options: composeOptions(baseOptions(), context.agentOptions, {
         maxTurns: 4,
         tools: ['Write'],
         permissionMode: 'dontAsk',
-        additionalDirectories: [...context.filesystemDirectories],
-        allowedTools: [...context.filesystemPermissions.allow],
       }),
     });
     return {
@@ -124,12 +122,10 @@ export const router = os.router({
     const run = await context.runAgent({
       prompt: `Read the file \`${context.filesystems.notebook.path('note.md')}\` with the Read tool, and answer with its content, exactly.`,
       output: z.object({ note: z.string().describe("The file's content") }),
-      options: composeOptions(baseOptions(), {
+      options: composeOptions(baseOptions(), context.agentOptions, {
         maxTurns: 4,
         tools: ['Read'],
         permissionMode: 'dontAsk',
-        additionalDirectories: [...context.filesystemDirectories],
-        allowedTools: [...context.filesystemPermissions.allow],
       }),
     });
     return { note: run.output.note };
@@ -150,12 +146,10 @@ export const router = os.router({
       ],
       output: z.object({ saved: z.boolean() }),
       memoryDirectory: memory.localPath,
-      options: composeOptions(baseOptions(), {
+      options: composeOptions(baseOptions(), context.agentOptions, {
         maxTurns: 8,
         tools: ['Read', 'Write', 'Edit'],
         permissionMode: 'dontAsk',
-        additionalDirectories: [...context.filesystemDirectories],
-        allowedTools: [...context.filesystemPermissions.allow],
       }),
     });
     const index = memory.path('MEMORY.md');
@@ -174,12 +168,10 @@ export const router = os.router({
       ],
       output: z.object({ answer: z.string() }),
       memoryDirectory: context.filesystems.memory.localPath,
-      options: composeOptions(baseOptions(), {
+      options: composeOptions(baseOptions(), context.agentOptions, {
         maxTurns: 3,
         tools: [],
         permissionMode: 'dontAsk',
-        additionalDirectories: [...context.filesystemDirectories],
-        allowedTools: [...context.filesystemPermissions.allow],
       }),
     });
     return { answer: run.output.answer };
