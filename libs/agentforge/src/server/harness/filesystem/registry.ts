@@ -82,16 +82,25 @@ export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
         lifecycles.push(lifecycle);
         filesystems[mount.name] = lifecycle.mounted;
       }
-      const allow = Object.values(filesystems).flatMap(
-        (filesystem) => filesystem.permissions.allow,
-      );
+      const mounted = Object.values(filesystems);
       return next({
         context: {
           filesystems,
-          filesystemPermissions: { allow: [...new Set(allow)] },
-          filesystemDirectories: Object.values(filesystems).map(
-            (filesystem) => filesystem.localPath,
-          ),
+          agentOptions:
+            mounted.length === 0
+              ? {}
+              : {
+                  additionalDirectories: mounted.map(
+                    (filesystem) => filesystem.localPath,
+                  ),
+                  allowedTools: [
+                    ...new Set(
+                      mounted.flatMap(
+                        (filesystem) => filesystem.permissions.allow,
+                      ),
+                    ),
+                  ],
+                },
         },
       });
     });

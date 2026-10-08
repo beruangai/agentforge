@@ -219,7 +219,7 @@ export abstract class Filesystem {
     // Typed away, but a scope is the consumer's code: a dropped key would be silent.
     if (Object.hasOwn(scope, 'read')) {
       throw new Error(
-        `filesystem "${task.name}": a scope's \`read\` is not supported: a mount is readable whole, and a run reads it as a working directory from \`context.filesystemDirectories\``,
+        `filesystem "${task.name}": a scope's \`read\` is not supported: a mount is readable whole, and a run reads it as a working directory from \`context.agentOptions\``,
       );
     }
     const subpath = scope.subpath.replace(/\/+$/, '');

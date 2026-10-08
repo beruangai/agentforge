@@ -16,8 +16,10 @@ import { filesystems } from './registry.ts';
 const Mounted = z.object({
   names: z.array(z.string()),
   pulled: z.boolean(),
-  allow: z.array(z.string()),
-  directories: z.array(z.string()),
+  agentOptions: z.strictObject({
+    additionalDirectories: z.array(z.string()).optional(),
+    allowedTools: z.array(z.string()).optional(),
+  }),
 });
 const contract = {
   added: oc.input(z.object({ fail: z.boolean() })).output(Mounted),
@@ -49,8 +51,7 @@ function build() {
           pulled: existsSync(
             join(context.filesystems.workspace?.localPath ?? '', 'pulled.md'),
           ),
-          allow: [...context.filesystemPermissions.allow],
-          directories: [...context.filesystemDirectories],
+          agentOptions: structuredClone(context.agentOptions),
         };
       }),
     alone: os.alone
@@ -58,16 +59,14 @@ function build() {
       .handler(async ({ context }) => ({
         names: Object.keys(context.filesystems),
         pulled: false,
-        allow: [],
-        directories: [],
+        agentOptions: {},
       })),
     bare: os.bare
       .use(filesystems({}, { replaceUpstream: true }))
       .handler(async ({ context }) => ({
         names: Object.keys(context.filesystems),
         pulled: false,
-        allow: [...context.filesystemPermissions.allow],
-        directories: [...context.filesystemDirectories],
+        agentOptions: structuredClone(context.agentOptions),
       })),
   });
 }
@@ -115,19 +114,21 @@ describe('filesystems registered on a procedure', () => {
       output: {
         names: ['notes', 'scratch', 'workspace'],
         pulled: true,
-        allow: [
-          `Read(/${root}/workspace/**)`,
-          `Edit(/${root}/workspace/**)`,
-          `Read(/${root}/scratch/**)`,
-          `Edit(/${root}/scratch/**)`,
-          `Read(/${root}/notes/**)`,
-          `Edit(/${root}/notes/**)`,
-        ],
-        directories: [
-          join(root, 'workspace'),
-          join(root, 'scratch'),
-          join(root, 'notes'),
-        ],
+        agentOptions: {
+          additionalDirectories: [
+            join(root, 'workspace'),
+            join(root, 'scratch'),
+            join(root, 'notes'),
+          ],
+          allowedTools: [
+            `Read(/${root}/workspace/**)`,
+            `Edit(/${root}/workspace/**)`,
+            `Read(/${root}/scratch/**)`,
+            `Edit(/${root}/scratch/**)`,
+            `Read(/${root}/notes/**)`,
+            `Edit(/${root}/notes/**)`,
+          ],
+        },
       },
     });
     expect(house.calls).toEqual([]);
@@ -137,10 +138,10 @@ describe('filesystems registered on a procedure', () => {
     }
   });
 
-  it('give a procedure with none no permissions and no directories', async () => {
-    expect(await execute('bare')).toMatchObject({
+  it('give a procedure with none empty agent options', async () => {
+    expect(await execute('bare')).toEqual({
       state: 'TASK_STATE_COMPLETED',
-      output: { names: [], allow: [], directories: [] },
+      output: { names: [], pulled: false, agentOptions: {} },
     });
   });
 

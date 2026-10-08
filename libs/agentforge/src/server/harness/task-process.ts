@@ -34,6 +34,7 @@ import type {
 } from './filesystem/filesystem.ts';
 import { mountRegisteredFilesystems } from './filesystem/registry.ts';
 import {
+  type AgentOptions,
   type AgentRun,
   type AgentRunSpec,
   type QueryFunction,
@@ -60,10 +61,15 @@ export interface TaskContext {
   runAgent<Output>(spec: AgentRunSpec<Output>): Promise<AgentRun<Output>>;
   /** The filesystems mounted for this procedure, by the name it registered each under (ADR 0015). */
   readonly filesystems: Readonly<Record<string, MountedFilesystem>>;
-  /** Every mounted filesystem's baseline permissions, merged; no agent gets them unless the handler gives them. */
-  readonly filesystemPermissions: { readonly allow: readonly string[] };
-  /** Every mounted filesystem's `localPath`, to give a run as its `additionalDirectories`. */
-  readonly filesystemDirectories: readonly string[];
+  /**
+   * The run options AgentForge derives from this task — every mount as an
+   * additional directory, every mount's baseline rules as allowed tools — to
+   * compose into a run's own. Empty without mounts. AgentForge applies none
+   * of it: the handler decides (ADR 0015).
+   */
+  readonly agentOptions: Readonly<
+    Pick<AgentOptions, 'additionalDirectories' | 'allowedTools'>
+  >;
 }
 
 /** The oRPC implementer for a contract, with AgentForge's task context. */
@@ -217,8 +223,7 @@ async function runProcedure(
       ),
     // Set by the lifecycle middleware, which runs just before the handler.
     filesystems: {},
-    filesystemPermissions: { allow: [] },
-    filesystemDirectories: [],
+    agentOptions: {},
   };
   // Appended last, so it runs innermost: after every registration.
   try {

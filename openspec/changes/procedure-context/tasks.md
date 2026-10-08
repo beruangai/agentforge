@@ -10,7 +10,7 @@ Group 1 records the requirements. Groups 2 and 3 are the package work and are in
 
 ## 2. Run options from the task
 
-- [ ] 2.1 `TaskContext.agentOptions` replaces `filesystemPermissions` and `filesystemDirectories`. The registry middleware builds it: `additionalDirectories` from every mount and `allowedTools` from the merged baseline rules, or `{}` without mounts. The base-options scaffold's comment names it. Verified by `nx run @beruangai/agentforge:test`:
+- [x] 2.1 `TaskContext.agentOptions` replaces `filesystemPermissions` and `filesystemDirectories`. The registry middleware builds it: `additionalDirectories` from every mount and `allowedTools` from the merged baseline rules, or `{}` without mounts. The base-options scaffold's comment names it. Verified by `nx run @beruangai/agentforge:test`:
   - `agentOptions` with two mounts and with none;
   - the generator's snapshot.
 
