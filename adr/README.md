@@ -28,4 +28,4 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0014](0014-agentforge-speaks-a2a-1-0-only.md) | AgentForge speaks A2A 1.0 only | accepted |
 | [0015](0015-filesystems-mount-around-a-procedure.md) | Filesystems mount around a procedure; S3 syncs with `s7cmd` | accepted |
 | [0016](0016-a-workflow-project-is-a-generated-caller.md) | A workflow project is a generated caller | accepted |
-| [0017](0017-agentforge-adds-system-prompt-fragments-never-the-preset.md) | AgentForge adds system-prompt fragments of its own, never the `claude_code` preset | proposed |
+| [0017](0017-agentforge-adds-system-prompt-fragments-never-the-preset.md) | AgentForge adds system-prompt fragments of its own, never the `claude_code` preset | accepted |

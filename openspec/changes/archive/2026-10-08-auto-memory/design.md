@@ -77,7 +77,7 @@ A space's local directory is the same in every task, `/workspace/memories/spaces
 - **A `MountedFilesystem` instead of a path.** It would tie memory to a mount AgentForge made, but nothing in the kernel needs more than the path. A test, or a `ScratchFilesystem`, gives a directory the same way.
 - **A memory filesystem kind or helper** with a default bucket, path and push states. It saves a consumer four lines, at the cost of a second way to write an `S3Filesystem` and of defaults that hide the push and delete choices that matter for memory. Not built.
 
-### A registry of system-prompt fragments ([ADR 0017](../../../adr/0017-agentforge-adds-system-prompt-fragments-never-the-preset.md), proposed)
+### A registry of system-prompt fragments ([ADR 0017](../../../adr/0017-agentforge-adds-system-prompt-fragments-never-the-preset.md), accepted)
 
 ```ts
 // server/harness/system-prompt.ts
