@@ -12,7 +12,7 @@ Group 1 is the archive. Group 2 was a guard on a linked install, removed. Group 
 
 ## 3. The installed package, from another workspace
 
-- [ ] 3.1 `libs/agentforge/integ/local/package-tarball/`, as in design.md. In a temporary directory outside this repository, it:
+- [x] 3.1 `libs/agentforge/integ/local/package-tarball/`, as in design.md. In a temporary directory outside this repository, it:
   - creates a preset workspace at this workspace's Nx version;
   - installs the archive by absolute path with `nx add`, which runs `init`;
   - generates an agentic project with an agent, and a workflow project connected to it;
@@ -31,6 +31,7 @@ Group 1 is the archive. Group 2 was a guard on a linked install, removed. Group 
   - **ARCHITECTURE §8**: the `pack` target and the archive;
   - **ROADMAP A7**: AgentForge installed from its archive;
   - **the skill**: `SKILL.md`'s Adopt row; `operating.md` if it names the install;
+  - **ADR 0019**, context and consequences: amended in place, as no consumer depends on it;
   - **StrategyFoundry's `docs/AGENTFORGE_CORRECTIONS.md`**, §1 and §11, as the only edit there.
 
   The `integ/local/claude-plugin` link check passes.
