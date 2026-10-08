@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import {
   composeOptions,
@@ -9,7 +10,7 @@ import {
 } from '@beruangai/agentforge/agent';
 import { baseOptions } from '@beruangai/smoke-coverage-base/options';
 import { z } from 'zod';
-import { contract, TopicField } from './contract.ts';
+import { contract, SpaceField, TopicField } from './contract.ts';
 
 const os = implementAgent(contract);
 
@@ -20,6 +21,15 @@ const NOTEBOOK: S3FilesystemOptions = {
   // A scope receives its input untyped; the contract's own field reads it.
   scope: ({ input }) => ({
     subpath: `topics/${z.object({ topic: TopicField }).parse(input).topic}`,
+  }),
+};
+
+/** The memories bucket, a space per request under one root; a procedure that saves declares its push. */
+const MEMORIES: S3FilesystemOptions = {
+  localRoot: '/workspace/memories',
+  bucket: 'memories',
+  scope: ({ input }) => ({
+    subpath: `spaces/${z.object({ space: SpaceField }).parse(input).space}`,
   }),
 };
 
@@ -123,5 +133,55 @@ export const router = os.router({
       }),
     });
     return { note: run.output.note };
+  }),
+  Remember: os.Remember.use(
+    filesystems({
+      memory: new S3Filesystem({
+        ...MEMORIES,
+        pushOn: ['TASK_STATE_COMPLETED'],
+      }),
+    }),
+  ).handler(async ({ input, context }) => {
+    const memory = context.filesystems.memory;
+    await context.runAgent({
+      prompt: [
+        'Remember the fact below for all future tasks, then submit `saved: true`.',
+        { tag: 'fact', context: input.fact },
+      ],
+      output: z.object({ saved: z.boolean() }),
+      memoryDirectory: memory.localPath,
+      options: composeOptions(baseOptions(), {
+        maxTurns: 8,
+        tools: ['Read', 'Write', 'Edit'],
+        permissionMode: 'dontAsk',
+        additionalDirectories: [...context.filesystemDirectories],
+        allowedTools: [...context.filesystemPermissions.allow],
+      }),
+    });
+    const index = memory.path('MEMORY.md');
+    return {
+      saved:
+        existsSync(index) && /\]\(.+\.md\)/.test(await readFile(index, 'utf8')),
+    };
+  }),
+  Recall: os.Recall.use(
+    filesystems({ memory: new S3Filesystem(MEMORIES) }),
+  ).handler(async ({ input, context }) => {
+    const run = await context.runAgent({
+      prompt: [
+        'Answer the question from what you already know. If you do not know, answer "unknown".',
+        { tag: 'question', context: input.question },
+      ],
+      output: z.object({ answer: z.string() }),
+      memoryDirectory: context.filesystems.memory.localPath,
+      options: composeOptions(baseOptions(), {
+        maxTurns: 3,
+        tools: [],
+        permissionMode: 'dontAsk',
+        additionalDirectories: [...context.filesystemDirectories],
+        allowedTools: [...context.filesystemPermissions.allow],
+      }),
+    });
+    return { answer: run.output.answer };
   }),
 });

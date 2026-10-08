@@ -19,12 +19,13 @@ What is maintained, scaffolded and detachable is listed in [AgentForge's README]
 | `Summarise` | A typed output with a computed field; a session resumed by id |
 | `SleepThenAnswer` | A run long enough to cancel, or to lose, mid-Bash |
 | `KeepNote`, `RecallNote` | An S3 filesystem, `notebook`, scoped per topic: written in one container, read back in another |
+| `Remember`, `Recall` | Auto memory in an S3 filesystem, `memories`, a space per request: saved in one container, recalled in another with no tools |
 
 | Suite | Asserts |
 |---|---|
 | `e2e/local/hello-agent.test.ts` | A typed output, an attach under the same key, the run's record and its logged prompt; a resumed session; a cancel mid-Bash leaving the container idle |
 | `e2e/local/temporal-activity.test.ts` | The Temporal activity returning the typed output while heartbeating, and cancelling its task when cancelled |
-| `e2e/agentcore/hello-agent.test.ts` | On AgentCore: an attach to a completed task; a session resumed in another container from its transcript in S3; the notebook across containers; a container stopped mid-Bash ending the task `LOST`, its retry running as attempt 2 |
+| `e2e/agentcore/hello-agent.test.ts` | On AgentCore: an attach to a completed task; a session resumed in another container from its transcript in S3; the notebook across containers; a memory across containers; a container stopped mid-Bash ending the task `LOST`, its retry running as attempt 2 |
 
 ## Running it
 

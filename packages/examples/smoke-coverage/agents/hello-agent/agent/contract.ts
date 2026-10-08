@@ -5,6 +5,9 @@ import { z } from 'zod';
 /** A topic names the notebook's prefix its note is kept under. */
 export const TopicField = z.string().regex(/^[a-z0-9-]{1,64}$/);
 
+/** A space names the memory an agent keeps across tasks, a prefix of the memories bucket. */
+export const SpaceField = z.string().regex(/^[a-z0-9-]{1,64}$/);
+
 /**
  * What callers import to call the hello-agent agent: one procedure per
  * behaviour the smoke suites exercise.
@@ -67,4 +70,17 @@ export const contract = {
   RecallNote: oc
     .input(z.object({ topic: TopicField }))
     .output(z.object({ note: z.string() })),
+  /** Saves a fact to the agent's auto memory in a space. */
+  Remember: oc
+    .input(z.object({ space: SpaceField, fact: z.string().min(1) }))
+    .output(
+      z.object({
+        /** Whether the space's `MEMORY.md` indexes a memory: read back, never asked of the model. */
+        saved: z.boolean(),
+      }),
+    ),
+  /** Answers a question from the agent's memory in a space, with no tools, whichever container saved it. */
+  Recall: oc
+    .input(z.object({ space: SpaceField, question: z.string().min(1) }))
+    .output(z.object({ answer: z.string() })),
 };

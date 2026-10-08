@@ -6,7 +6,8 @@
  * outlives its container, resuming in another from its transcript in S3; so
  * do an S3 filesystem's files; a task whose container the platform stops
  * ends `LOST`, its retry running as the next attempt; two tasks in one
- * container never share a mount's local directory; and a procedure's runs
+ * container never share a mount's local directory; a memory saved in one
+ * container is recalled in another; and a procedure's runs
  * — a distillation, then the answer — are each recorded on its task.
  */
 import { randomUUIDv7 } from 'node:crypto';
@@ -197,6 +198,50 @@ describe('hello-agent, on AgentCore', () => {
       throw new Error(`expected completion, got ${JSON.stringify(recalled)}`);
     }
     expect(recalled.output.note.trim()).toBe(note);
+  });
+
+  it('remembers a fact in one container, and recalls it in another from its memory space', async () => {
+    const space = `e2e-${randomUUIDv7()}`;
+    const codename = `HERON-${randomUUIDv7().slice(-8).toUpperCase()}`;
+    const first = {
+      runtimeSessionId: newRuntimeSessionId(),
+      idempotencyKey: randomUUIDv7(),
+    };
+    const remembered = await awaitTask(
+      helloAgent.Remember,
+      await helloAgent.Remember.SendMessage(
+        {
+          space,
+          fact: `The deploy codename for this project is ${codename}, chosen because the release team names deploys after birds.`,
+        },
+        first,
+      ),
+      { ...first, pollIntervalMilliseconds: POLL_INTERVAL_MILLISECONDS },
+    );
+    if (remembered.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(`expected completion, got ${JSON.stringify(remembered)}`);
+    }
+    expect(remembered.output.saved).toBe(true);
+    await stopContainer(first.runtimeSessionId);
+
+    // Another runtime session is another container: the memory can only
+    // come from the bucket.
+    const second = {
+      runtimeSessionId: newRuntimeSessionId(),
+      idempotencyKey: randomUUIDv7(),
+    };
+    const recalled = await awaitTask(
+      helloAgent.Recall,
+      await helloAgent.Recall.SendMessage(
+        { space, question: 'What is the deploy codename for this project?' },
+        second,
+      ),
+      { ...second, pollIntervalMilliseconds: POLL_INTERVAL_MILLISECONDS },
+    );
+    if (recalled.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(`expected completion, got ${JSON.stringify(recalled)}`);
+    }
+    expect(recalled.output.answer).toContain(codename);
   });
 
   describe('two notes kept at once in one container', () => {
