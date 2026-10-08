@@ -62,6 +62,7 @@ Settled and not reopened: **AgentForge owns its requirements**, and the operator
 - **Ask over assume** on significant decisions; **never pivot a requirement to fix an issue** — if stuck, stop and say so.
 - **Complete means done to the spec.** Report what was skipped and why.
 - **Decisions live where they are owned**: structure in ARCHITECTURE, terms in GLOSSARY, reasoning in a short ADR, platform facts in `docs/research/` with their date.
+- **The AgentForge plugin follows the code.** A change to what a consumer writes or runs updates the skill in `claude-plugin/`, and a breaking one adds its entry to `references/migrations.md`, in the same change.
 - **OpenSpec** (`openspec/`, `.claude/rules/openspec.md`) is available for a behaviour change large enough to want a proposal; A0 and A1 were built without it at the operator's choice. Behaviour is specified by ARCHITECTURE.md and the tests.
 
 ## Related codebases

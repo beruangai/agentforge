@@ -94,7 +94,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 - the four changes above, delivered 2026-10-08 and verified together
 
-- **The Claude plugin** — agreed 2026-10-01, dropped from this list when the scope was re-settled and found missing 2026-10-08: the package ships a `directory` marketplace with an AgentForge skill — how to define, implement and consume an agentic project, `.then` chaining rather than an `onSuccess`, and migrations — registered once per machine at user scope, disabled there, and enabled per project ([research](research/claude-code-plugin-distribution.md))
+- **The Claude plugin** — agreed 2026-10-01, dropped from this list when the scope was re-settled and found missing 2026-10-08 ([change](../openspec/changes/claude-plugin/proposal.md)): the repository is a Claude Code marketplace whose `agentforge` skill guides a consumer's Claude Code — defining, implementing and consuming an agentic project, side effects chained on a run rather than an `onSuccess`, and migrations — registered once per machine from a local clone at user scope, disabled there, and enabled per project (§REQ712, [ADR 0019](../adr/0019-claude-code-guidance-ships-as-a-plugin-from-the-repository.md))
 
 The StrategyFoundry corrections doc is written into StrategyFoundry as `docs/AGENTFORGE_CORRECTIONS.md`, for a StrategyFoundry session to resolve once the plugin is delivered, since it is part of how StrategyFoundry integrates. Then A6 is delivered.
 

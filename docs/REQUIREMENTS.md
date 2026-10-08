@@ -102,6 +102,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ709** | A consumer adopts AgentForge, and takes each new version of it, without wiring its agents, images, clients or infrastructure by hand; what the consumer wrote is never overwritten, and anything AgentForge keeps current the consumer can take over |
 | **REQ710** | A consumer's Temporal workflows call its agents' procedures as activities typed by their contracts, and its workers are generated, built, run locally and deployed without wiring by hand |
 | **REQ711** | A consumer's workflows run locally on one Temporal server every project on the machine shares, keeping their history and advanced visibility across restarts, as Temporal Cloud does; a target starts it when it is not running and registers the project's namespace on it |
+| **REQ712** | A consumer's Claude Code is guided in developing with AgentForge by guidance AgentForge maintains in its repository, current with the developer's clone |
 
 ---
 
