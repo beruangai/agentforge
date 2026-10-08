@@ -27,7 +27,7 @@ Applied third in the A6 batch, after `strict-contracts`; the example stacks were
 
 ## 3. Plugin
 
-- [ ] 3.1 The project construct template creates `AgenticProjectResources` once from `removalPolicy` and `sessionRetention` at the top of its props, takes each agent's options without `project`, and passes `project` to each agent. The agent construct template passes `agentName` from its component, and its `AgentProps` omit `agentName`. Verified by `nx run @beruangai/agentforge:test` (the generators' snapshots), and by `nx sync` regenerating both examples' constructs with `nx sync:check` then clean.
+- [x] 3.1 The project construct template creates `AgenticProjectResources` once from `removalPolicy` and `sessionRetention` at the top of its props, takes each agent's options without `project`, and passes `project` to each agent. The agent construct template passes `agentName` from its component, and its `AgentProps` omit `agentName`. Verified by `nx run @beruangai/agentforge:test` (the generators' snapshots), and by `nx sync` regenerating both examples' constructs with `nx sync:check` then clean.
 
 ## 4. Examples
 

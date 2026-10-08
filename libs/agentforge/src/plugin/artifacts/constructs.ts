@@ -48,9 +48,10 @@ function specifier(
 }
 
 /**
- * An agent's construct: the agent as its own AgentCore runtime, built from
- * its layer on the agentic image and redeployed when the image below it
- * changes, registered in the runtime configuration under its key. Its props
+ * An agent's construct: the agent as its own AgentCore runtime, named as its
+ * image names it, built from its layer on the agentic image and redeployed
+ * when the image below it changes, registered in the runtime configuration
+ * under its key. Its props
  * require exactly the secrets AgentForge, the base layer and the agent
  * declare, typed from the layers' own `secrets.ts`. It exports generic names
  * — `Agent`, `AgentProps`, `Secrets` — which the project's index aliases.
@@ -108,7 +109,7 @@ export type Secrets = AgentSecrets<
 
 export type AgentProps = Omit<
   AgentRuntimeProps,
-  'agentRuntimeArtifact' | 'secrets'
+  'agentRuntimeArtifact' | 'secrets' | 'agentName'
 > & {
   readonly secrets: Secrets;
 };
@@ -121,6 +122,7 @@ export class Agent extends AgentRuntime {
   constructor(scope: Construct, id: string, props: AgentProps) {
     super(scope, id, {
       ...props,
+      agentName: '${agent.name}',
       agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
         platform: Platform.LINUX_ARM64,
         buildArgs: { BASE_IMAGE: '${agenticImage(project)}' },
@@ -146,8 +148,10 @@ function agentAlias(agent: AgentComponent): string {
 }
 
 /**
- * The project construct: every agent's construct, each agent's runtime
- * options, and the grant a caller of the project needs — invocation of
+ * The project construct: what its agents share, once — the table, bucket,
+ * dashboard and readiness probe — with the options that are the project's,
+ * every agent's construct, each agent's runtime options, and the grant a
+ * caller of the project needs — invocation of
  * exactly its agents, and read of the stage's runtime configuration. It
  * exports `AgenticProject` and `AgenticProjectProps`, which the project's
  * index aliases.
@@ -167,16 +171,22 @@ export function projectConstruct(context: RenderContext): MaintainedFile {
   return {
     path: `${projectConstructsDirectory(project)}/${PROJECT_MODULE}.ts`,
     render: () => `${maintainedHeader('//')}
+import {
+  AgenticProjectResources,
+  type AgenticProjectResourcesProps,
+} from '@beruangai/agentforge/infra';
 import type { IGrantable } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { RuntimeConfig } from '${specifier(context, '../../../core/runtime-config')}';
 ${imports.join('\n')}
 
-export interface AgenticProjectProps {
-  /** Each agent's runtime options, with the secrets it requires. */
+export interface AgenticProjectProps
+  extends Omit<AgenticProjectResourcesProps, 'projectName'> {
+  /** Each agent's runtime options, with the secrets it requires; the project's resources are passed to each. */
   readonly agents${hasAgents ? '' : '?'}: ${objectType(
     project.agents.map(
-      (agent) => `readonly ${agentKey(agent)}: ${agentAlias(agent)}Props;`,
+      (agent) =>
+        `readonly ${agentKey(agent)}: Omit<${agentAlias(agent)}Props, 'project'>;`,
     ),
     '  ',
   )};
@@ -184,9 +194,12 @@ export interface AgenticProjectProps {
 
 /**
  * ${project.projectName}'s agents, each its own AgentCore runtime registered in the stage's
- * runtime configuration, and the grant a caller of the project needs.
+ * runtime configuration, sharing one task table, session bucket, dashboard and
+ * readiness probe, and the grant a caller of the project needs.
  */
 export class AgenticProject extends Construct {
+  /** What the project's agents share. */
+  readonly resources: AgenticProjectResources;
   readonly agents: ${objectType(
     project.agents.map(
       (agent) => `readonly ${agentKey(agent)}: ${agentAlias(agent)};`,
@@ -196,13 +209,18 @@ export class AgenticProject extends Construct {
   /** The runtime configuration's AppConfig application, from which the project client resolves each agent. */
   readonly runtimeConfigApplicationId: string;
 
-  constructor(scope: Construct, id: string, ${hasAgents ? 'props: AgenticProjectProps' : '_props: AgenticProjectProps = {}'}) {
+  constructor(scope: Construct, id: string, ${hasAgents ? 'props: AgenticProjectProps' : 'props: AgenticProjectProps = {}'}) {
     super(scope, id);
+    const { agents${hasAgents ? '' : ': _agents'}, ...shared } = props;
+    this.resources = new AgenticProjectResources(this, 'Resources', {
+      projectName: '${project.projectName}',
+      ...shared,
+    });
     this.agents = {
 ${project.agents
   .map(
     (agent) =>
-      `      ${agentKey(agent)}: new ${agentAlias(agent)}(this, '${pascalCase(agent.name)}', props.agents.${agentKey(agent)}),`,
+      `      ${agentKey(agent)}: new ${agentAlias(agent)}(this, '${pascalCase(agent.name)}', {\n        ...agents.${agentKey(agent)},\n        project: this.resources,\n      }),`,
   )
   .join('\n')}
     };

@@ -50,7 +50,7 @@ export type Secrets = AgentSecrets<
 
 export type AgentProps = Omit<
   AgentRuntimeProps,
-  'agentRuntimeArtifact' | 'secrets'
+  'agentRuntimeArtifact' | 'secrets' | 'agentName'
 > & {
   readonly secrets: Secrets;
 };
@@ -63,6 +63,7 @@ export class Agent extends AgentRuntime {
   constructor(scope: Construct, id: string, props: AgentProps) {
     super(scope, id, {
       ...props,
+      agentName: 'hello-agent',
       agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
         platform: Platform.LINUX_ARM64,
         buildArgs: { BASE_IMAGE: 'beruangai/smoke-coverage:local' },
