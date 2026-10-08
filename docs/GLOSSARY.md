@@ -54,7 +54,7 @@
 
 ## Tasks
 
-**Task** — One attempt at one procedure, ending in one outcome. An A2A task.
+**Task** — One attempt at one procedure, ending in one outcome. An A2A task. It records the **image** it was admitted in: deployed, the runtime's container URI; served locally, the agent image's id.
 
 **Envelope** — The data part that starts a task: procedure, contract hash, input, idempotency key, and optionally the continuity key, time budget, metadata and tags.
 

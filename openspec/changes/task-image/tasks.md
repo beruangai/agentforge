@@ -21,7 +21,7 @@ Applied last in the A6 batch, after `project-infrastructure`. Group 1 is the pac
 
 ## 4. Records
 
-- [ ] 4.1 Verify each record by reading it against design.md:
+- [x] 4.1 Verify each record by reading it against design.md:
   - **ARCHITECTURE §4:** a task's metadata carries `image`. **§7:** `AgentRuntime` sets it, and `serve` runs by and passes the image id locally;
   - **ADR 0008:** the mixed-version bullet and its 2026-09-29 amendment say a task records its image, amended in place;
   - **`docs/research/agentcore-runtime.md`:** the note on draining sessions points to the image on the task, not to §ODO010;

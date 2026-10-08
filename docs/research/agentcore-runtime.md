@@ -102,7 +102,7 @@ From [CreateAgentRuntime](https://docs.aws.amazon.com/bedrock-agentcore-control/
 From [lifecycle settings](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-lifecycle-settings.html):
 
 - "Each microVM session uses the code assets (`agentRuntimeArtifact`) that were deployed at the time of microVM creation. **If you update your agent runtime with new code, existing sessions will continue using the previous version until they terminate and new sessions are created.**"
-- So a deploy does not recycle running containers and cannot interrupt a turn. Two artifact versions serve traffic while long sessions drain, which is normal rather than a fault — and a task's record does not yet say which artifact ran it (DESIGN_OPTIONS §ODO010).
+- So a deploy does not recycle running containers and cannot interrupt a turn. Two artifact versions serve traffic while long sessions drain, which is normal rather than a fault — and a task's record says which ran it, as `image` (ARCHITECTURE §4, since 2026-10-08).
 - Lifecycle timers are per session: the idle timeout resets on each invocation to that session, `maxLifetime` starts at creation and cannot be reset, and when either fires only that session's microVM is terminated.
 - **A termination by the idle timeout or `maxLifetime` "can last up to 15 seconds"** (read 2026-09-24) — close to the ~10 s measured after `StopRuntimeSession` on V2, against ~60 s on V1 ([observed](agentcore-runtime-observed.md)).
 

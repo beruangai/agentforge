@@ -86,6 +86,7 @@ const started = await client.summarise.SendMessage({ text }, { runtimeSessionId,
 const ended = await awaitTask(client.summarise, started, { runtimeSessionId });
 if (ended.state === 'TASK_STATE_COMPLETED') ended.output.summary;  // typed
 else if (ended.state === 'TASK_STATE_FAILED') ended.cause.code;    // OUTPUT_INVALID, TIMED_OUT, LOST, USAGE_LIMITED, …
+ended.image; ended.runs;  // the image it ran in; each agent run's record
 
 // In a Temporal worker: start-or-attach keyed by the workflow run and activity, heartbeats, a cancel the workflow requests, retry guidance
 export const summarise = procedureActivity(client.summarise, {
