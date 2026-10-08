@@ -21,11 +21,13 @@ Group 0 opens the batch of four A6 changes. Group 1 moves the base. Group 2 prov
 
 ## 3. End to end, in the batch
 
-- [ ] 3.1 Ticked when the batch's joint verification (`task-image`, group 5) passes the parts that prove this change:
+- [x] 3.1 Ticked when the batch's joint verification (`task-image`, group 5) passes the parts that prove this change:
   - `integ` aws: the AgentCore fixture on the new pin, and `filesystem-s3-sync`;
   - `smoke-coverage`'s `e2e` and `e2e-agentcore`, with `ReportNautilusTraderVersion`;
   - `golden-kata`'s `e2e` and `e2e-agentcore`;
   - `golden-kata-workflows:e2e-agentcore`, which builds and deploys the worker's image.
+
+  Passed 2026-10-08 (`task-image` 5.1–5.4): integ local 33/33 and aws 20/20; `smoke-coverage` e2e 8/8 and e2e-agentcore 10/10, after `ReportNautilusTraderVersion` moved to a script in its layer, since under the read fence `dontAsk` denies inline code (design.md); `golden-kata` 2/2 and 2/2; `golden-kata-workflows` 1/1 and 1/1.
 
 ## 4. Records
 

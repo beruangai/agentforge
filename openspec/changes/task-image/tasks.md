@@ -36,6 +36,6 @@ Run once, after `glibc-base-image`, `strict-contracts`, `project-infrastructure`
 
 - [x] 5.1 `nx run @beruangai/agentforge:integ --configuration=local` and `nx run @beruangai/agentforge:integ --configuration=aws` pass: strict contracts, the agent-scoped task store on DynamoDB Local, `image` on a task; the AgentCore fixture on the Debian pin, deployed through `AgenticProjectResources`, and `filesystem-s3-sync` with `s7cmd` in the Debian image.
 - [x] 5.2 `nx run @beruangai/smoke-coverage:e2e` and `nx run @beruangai/smoke-coverage:e2e-agentcore` pass: `ReportNautilusTraderVersion` answers `1.231.0`, `image` matches, transcripts are listed under `hello-agent/`, and everything the suites already covered holds.
-- [ ] 5.3 `nx run @beruangai/golden-kata:e2e` and `nx run @beruangai/golden-kata:e2e-agentcore` pass: two agents sharing one set of resources, with strict contracts.
-- [ ] 5.4 `nx run @beruangai/golden-kata-workflows:e2e` and `nx run @beruangai/golden-kata-workflows:e2e-agentcore` pass: the activities' clients on strict contracts, and the worker's image on its Debian dependency stage.
-- [ ] 5.5 `glibc-base-image` task 3.1 is ticked, citing 5.1–5.4, and the ROADMAP moves the batch's four A6 items to delivered, each with its change and the date.
+- [x] 5.3 `nx run @beruangai/golden-kata:e2e` and `nx run @beruangai/golden-kata:e2e-agentcore` pass: two agents sharing one set of resources, with strict contracts.
+- [x] 5.4 `nx run @beruangai/golden-kata-workflows:e2e` and `nx run @beruangai/golden-kata-workflows:e2e-agentcore` pass: the activities' clients on strict contracts, and the worker's image on its Debian dependency stage.
+- [x] 5.5 `glibc-base-image` task 3.1 is ticked, citing 5.1–5.4, and the ROADMAP moves the batch's four A6 items to delivered, each with its change and the date.
