@@ -179,8 +179,8 @@ export const router = os.router({
   ReportNautilusTraderVersion: os.ReportNautilusTraderVersion.handler(
     async ({ context }) => {
       const run = await context.runAgent({
-        // A script, not `python -c`: the read fence denies inline code in
-        // dontAsk mode, since it cannot tell what the code reads.
+        // A script, not `python -c`: under the read fence the CLI cannot
+        // trace inline code, and dontAsk denies it whatever the allow rules.
         prompt:
           'Run `python report_nautilus_trader_version.py` with the Bash tool, and answer with the version it printed, exactly.',
         output: z.object({

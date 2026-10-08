@@ -105,7 +105,7 @@ ReportNautilusTraderVersion: oc
   .output(z.strictObject({ version: z.string() })),
 ```
 
-- **The run:** its agent runs Python importing NautilusTrader with Bash and answers with the version it printed — `python report_nautilus_trader_version.py`, a script in the agent's layer, since the read fence denies inline code (`python -c`) in `dontAsk` (observed in the joint verification, 2026-10-08; `docs/research/claude-agent-sdk.md`). It has `tools: ['Bash']` and `allowedTools: ['Bash(python *)', 'Bash(python3 *)']` — the venv provides both names, and the model may pick either — in `dontAsk`, over the base options.
+- **The run:** its agent runs Python importing NautilusTrader with Bash and answers with the version it printed — `python report_nautilus_trader_version.py`, a script in the agent's layer, since under the read fence the CLI cannot trace inline code (`python -c`) and denies it in `dontAsk`, an allow rule notwithstanding (observed in the joint verification, 2026-10-08; `docs/research/claude-agent-sdk.md`). It has `tools: ['Bash']` and `allowedTools: ['Bash(python *)', 'Bash(python3 *)']` — the venv provides both names, and the model may pick either — in `dontAsk`, over the base options.
 - **The e2e:** it asserts the version is `1.231.0`, locally and on AgentCore.
 
 A procedure always runs an agent (REQUIREMENTS: settled), and an agent running Python through Bash is exactly the use the image serves. The fence does not bound Bash that is not read-only, which is already a known limit and unchanged.
