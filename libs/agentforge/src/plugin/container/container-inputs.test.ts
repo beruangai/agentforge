@@ -1,8 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { containerInputsOf } from './container-inputs.ts';
+import {
+  agentforgeManifest,
+  containerInputsOf,
+  requireInstalledInside,
+} from './container-inputs.ts';
 
 let workspace: string;
 
@@ -74,5 +84,31 @@ describe('containerInputsOf', () => {
     expect(() => containerInputsOf(workspace, false)).toThrow(
       `AgentForge's container inputs are missing: ${join(workspace, 'container/bun.lock')}`,
     );
+  });
+});
+
+describe('requireInstalledInside', () => {
+  it('accepts a package installed inside the workspace', () => {
+    const installed = join(workspace, 'node_modules/@beruangai/agentforge');
+    writePublished(installed);
+    expect(() => requireInstalledInside(installed, workspace)).not.toThrow();
+  });
+
+  it('refuses a package linked in from outside the workspace, naming where it lives and the archive', () => {
+    const consumer = join(workspace, 'consumer');
+    const bundle = join(workspace, 'agentforge/dist/libs/agentforge/bundle');
+    writePublished(bundle);
+    mkdirSync(join(consumer, 'node_modules/@beruangai'), { recursive: true });
+    const link = join(consumer, 'node_modules/@beruangai/agentforge');
+    symlinkSync(bundle, link);
+    expect(() => requireInstalledInside(link, consumer)).toThrow(
+      /installed as a link to .*agentforge\/dist\/libs\/agentforge\/bundle.*bun add @beruangai\/agentforge@<path to beruangai-agentforge\.tgz>/,
+    );
+  });
+});
+
+describe('agentforgeManifest', () => {
+  it('reads AgentForge from source in its own repository, with no workspace check', () => {
+    expect(agentforgeManifest().name).toBe('@beruangai/agentforge');
   });
 });

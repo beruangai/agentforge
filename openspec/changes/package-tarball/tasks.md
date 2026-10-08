@@ -8,7 +8,7 @@ Group 1 is the archive. Group 2 guards a linked install. Group 3 proves the inst
 
 ## 2. A linked install fails loudly
 
-- [ ] 2.1 In `container/container-inputs.ts`, when running installed, throw unless the package directory's real path lies inside the workspace running the plugin, with the message in design.md. Unit tests in `container-inputs.test.ts`: installed inside the workspace passes; installed as a link outside it throws, naming the link and the archive; from source is unaffected. Verified by `nx run @beruangai/agentforge:test`.
+- [x] 2.1 In `container/container-inputs.ts`, when running installed, throw unless the package directory's real path lies inside the workspace running the plugin, with the message in design.md. Unit tests in `container-inputs.test.ts`: installed inside the workspace passes; installed as a link outside it throws, naming the link and the archive; from source is unaffected. Verified by `nx run @beruangai/agentforge:test`.
 
 ## 3. The installed package, from another workspace
 
