@@ -179,8 +179,10 @@ export const router = os.router({
   ReportNautilusTraderVersion: os.ReportNautilusTraderVersion.handler(
     async ({ context }) => {
       const run = await context.runAgent({
+        // A script, not `python -c`: the read fence denies inline code in
+        // dontAsk mode, since it cannot tell what the code reads.
         prompt:
-          'Run `python -c "import nautilus_trader; print(nautilus_trader.__version__)"` with the Bash tool, and answer with the version it printed, exactly.',
+          'Run `python report_nautilus_trader_version.py` with the Bash tool, and answer with the version it printed, exactly.',
         output: z.object({
           version: z.string().describe('The version the command printed'),
         }),

@@ -20,7 +20,7 @@ What is maintained, scaffolded and detachable is listed in [AgentForge's README]
 | `SleepThenAnswer` | A run long enough to cancel, or to lose, mid-Bash |
 | `KeepNote`, `RecallNote` | An S3 filesystem, `notebook`, scoped per topic: written in one container, read back in another |
 | `Remember`, `Recall` | Auto memory in an S3 filesystem, `memories`, a space per request: saved in one container, recalled in another with no tools |
-| `ReportNautilusTraderVersion` | A layer extended beyond its manifest: the agent runs Python importing NautilusTrader through Bash, and answers with its version |
+| `ReportNautilusTraderVersion` | A layer extended beyond its manifest: the agent runs a script in its layer, Python importing NautilusTrader, through Bash, and answers with its version |
 
 | Suite | Asserts |
 |---|---|
