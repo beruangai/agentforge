@@ -47,11 +47,12 @@ See proposal.md, Why. What holds today:
   "outputs": ["{workspaceRoot}/dist/{projectRoot}/pack"],
   "options": {
     "cwd": "{workspaceRoot}/dist/{projectRoot}/bundle",
-    "command": "bun pm pack --destination ../pack --filename beruangai-agentforge.tgz --quiet"
+    "command": "mkdir -p ../pack && bun pm pack --filename ../pack/beruangai-agentforge.tgz --quiet"
   }
 }
 ```
 
+- **`--filename` takes the path**, since Bun refuses it together with `--destination` (1.4.0).
 - **The name is fixed and carries no version**, so a consumer's specifier never changes when the version does. The version stays in the archive's manifest, which tags the AgentForge image as it does today.
 - **It packs what `publint --pack npm` already checked.** `bundle` runs publint, and `pack` depends on `bundle`, so a malformed package fails before it is packed.
 - **It is an Nx target with its real inputs** (the bundle's), so it is cached and ordered like every other build.

@@ -41,6 +41,17 @@
       },
       "dependsOn": ["container-lock"]
     },
+    "pack": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["bundle"],
+      "inputs": ["production"],
+      "outputs": ["{workspaceRoot}/dist/{projectRoot}/pack"],
+      "options": {
+        "command": "mkdir -p ../pack && bun pm pack --filename ../pack/beruangai-agentforge.tgz --quiet",
+        "cwd": "{workspaceRoot}/dist/{projectRoot}/bundle"
+      }
+    },
     "container-lock": {
       "executor": "nx:run-commands",
       "cache": true,
@@ -105,7 +116,7 @@
           "args": "--project=@beruangai/agentforge:integ:model"
         }
       },
-      "dependsOn": ["image"]
+      "dependsOn": ["image", "pack"]
     },
     "lint": {
       "executor": "nx:run-commands",

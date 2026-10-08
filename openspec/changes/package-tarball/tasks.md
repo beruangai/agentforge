@@ -4,7 +4,7 @@ Group 1 is the archive. Group 2 guards a linked install. Group 3 proves the inst
 
 ## 1. The archive
 
-- [ ] 1.1 Add the `pack` target to `libs/agentforge/project.json`, as in design.md: cached, depending on `bundle`, writing `dist/libs/agentforge/pack/beruangai-agentforge.tgz`. Add `pack` to `integ`'s `dependsOn`. Verified by `nx run @beruangai/agentforge:pack` writing the archive, a second run read from the cache, and `tar -tzf` on the archive listing the manifest, the entry points, the plugin manifests, the `Dockerfile` and `container/`.
+- [x] 1.1 Add the `pack` target to `libs/agentforge/project.json`, as in design.md: cached, depending on `bundle`, writing `dist/libs/agentforge/pack/beruangai-agentforge.tgz`. Add `pack` to `integ`'s `dependsOn`. Verified by `nx run @beruangai/agentforge:pack` writing the archive, a second run read from the cache, and `tar -tzf` on the archive listing the manifest, the entry points, the plugin manifests, the `Dockerfile` and `container/`.
 
 ## 2. A linked install fails loudly
 
