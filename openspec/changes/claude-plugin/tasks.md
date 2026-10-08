@@ -68,7 +68,7 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
 
 ## 4. Dogfood
 
-- [ ] 4.1 This repository's `.claude/settings.json` enables `agentforge@agentforge`. The root README's "Claude Code plugin" section gives:
+- [x] 4.1 This repository's `.claude/settings.json` enables `agentforge@agentforge`. The root README's "Claude Code plugin" section gives:
   - the registration command from a local clone, at user scope;
   - the user-scope `false`, and the per-project `true` in either settings file;
   - that a machine registers one clone, and registering again after the clone moves.
@@ -77,9 +77,11 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
   - a new session here lists the skill;
   - asked to add a procedure to `smoke-coverage`'s agent, the session uses the skill.
 
+  The operator registered the clone and enabled the plugin here and in StrategyFoundry on 2026-10-08, and moved the session check to StrategyFoundry's corrections session.
+
 ## 5. Records
 
-- [ ] 5.1 Verify each record by reading it against design.md:
+- [x] 5.1 Verify each record by reading it against design.md:
   - **REQUIREMENTS:** §REQ712 added;
   - **ADR 0019:** proposed, linked from design.md, in the ADR index;
   - **ARCHITECTURE §8:** the repository is a Claude Code marketplace, registered from a local clone, and the plugin's layout;

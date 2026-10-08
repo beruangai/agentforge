@@ -78,7 +78,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 ## A6 — Before the first live consumer
 
-**In progress since 2026-10-01.** Nine changes delivered, each verified locally and on AgentCore against a real model:
+**Delivered 2026-10-08**, on branch `a6`: nine changes, each verified locally and on AgentCore against a real model, and the Claude plugin below:
 
 - **A procedure's runs, 2026-10-01** ([change](../openspec/changes/archive/2026-10-01-procedure-runs/proposal.md)): a procedure makes any number of agent runs, each settled and recorded on its own (§REQ206, §REQ207). **Structured output validation** checks every submission in the agent's turn against the agent contract and the stop guards the run gives — the guardrail this milestone called for, the expected files' guard first, on `golden-kata`'s writer — all failures told at once, past the CLI's limit `OUTPUT_INVALID` with the last refusal (§REQ208). Paths resolved inside a mount, writes inside its scope. `distill` keeps documents within a token cap (§REQ209)
 - **Filesystem local isolation, 2026-10-08** ([change](../openspec/changes/archive/2026-10-08-filesystem-local-isolation/proposal.md)): a filesystem has a `localRoot`, an optional `remoteRoot` and a `subpath` its scope resolves, so a mount is `<root>/<subpath>` on both sides and shared options are a plain spread; a scratch filesystem holds a directory per task; a container refuses a second live task on a held local directory `FILESYSTEM_UNSYNCED`, retryable, through a claim registry. `smoke-coverage` keeps two notes at once in one AgentCore container
@@ -94,9 +94,9 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 - the four changes above, delivered 2026-10-08 and verified together
 
-- **The Claude plugin** — agreed 2026-10-01, dropped from this list when the scope was re-settled and found missing 2026-10-08 ([change](../openspec/changes/claude-plugin/proposal.md)): the repository is a Claude Code marketplace whose `agentforge` skill guides a consumer's Claude Code — defining, implementing and consuming an agentic project, side effects chained on a run rather than an `onSuccess`, and migrations — registered once per machine from a local clone at user scope, disabled there, and enabled per project (§REQ712, [ADR 0019](../adr/0019-claude-code-guidance-ships-as-a-plugin-from-the-repository.md))
+- **The Claude plugin** — agreed 2026-10-01, dropped from this list when the scope was re-settled and found missing 2026-10-08 ([change](../openspec/changes/archive/2026-10-08-claude-plugin/proposal.md)): the repository is a Claude Code marketplace whose `agentforge` skill guides a consumer's Claude Code — defining, implementing and consuming an agentic project, side effects chained on a run rather than an `onSuccess`, and migrations — registered once per machine from a local clone at user scope, disabled there, and enabled per project (§REQ712, [ADR 0019](../adr/0019-claude-code-guidance-ships-as-a-plugin-from-the-repository.md)). Delivered 2026-10-08, verified by its local integration tests: the marketplace and plugin validate, the skill's links resolve, and it loads only where a project enables it. Its use in a session is checked in StrategyFoundry's corrections session, at the operator's choice
 
-The StrategyFoundry corrections doc is written into StrategyFoundry as `docs/AGENTFORGE_CORRECTIONS.md`, for a StrategyFoundry session to resolve once the plugin is delivered, since it is part of how StrategyFoundry integrates. Then A6 is delivered.
+The StrategyFoundry corrections doc is written into StrategyFoundry as `docs/AGENTFORGE_CORRECTIONS.md`: every assumption its docs made about AgentForge that no longer holds, with the fact and its source, and how to enable the plugin. A StrategyFoundry session resolves it with the plugin loaded, which opens A7.
 
 ## A7 — StrategyFoundry, locally
 
