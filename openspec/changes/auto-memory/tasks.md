@@ -8,11 +8,11 @@ Group 1 records the requirement. Group 2 is the package work, and group 3 runs i
 
 ## 2. The kernel
 
-- [ ] 2.1 `server/harness/system-prompt.ts`: `SystemPromptFragment`, the `SYSTEM_PROMPT_FRAGMENTS` registry holding the auto-memory fragment (the spike's text, as a template over the directory), and `composeSystemPrompt(spec)` per the design's table, the preset refused when a fragment applies. Verified by unit tests covering:
+- [x] 2.1 `server/harness/system-prompt.ts`: `SystemPromptFragment`, the `SYSTEM_PROMPT_FRAGMENTS` registry holding the auto-memory fragment (the spike's text, as a template over the directory), and `composeSystemPrompt(spec)` per the design's table, the preset refused when a fragment applies. Verified by unit tests covering:
   - each `systemPrompt` form with the fragment applying;
   - no fragment applying, where the prompt passes through untouched;
   - the preset refused, naming it and the fragment.
-- [ ] 2.2 `AgentRunSpec.memoryDirectory` in the kernel. Verified by kernel unit tests against the scripted `query()`:
+- [x] 2.2 `AgentRunSpec.memoryDirectory` in the kernel. Verified by kernel unit tests against the scripted `query()`:
   - with a directory, the call's `settings` carry `autoMemoryEnabled: true` and `autoMemoryDirectory`, merged with the procedure's own, and its `systemPrompt` ends with the memory fragment;
   - without one, `env` carries `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` and the system prompt is the procedure's own;
   - the logged `agentforge.prompt` and the record's hash are of the composed system prompt;

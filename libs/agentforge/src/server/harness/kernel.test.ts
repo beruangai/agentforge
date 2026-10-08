@@ -6,10 +6,13 @@ import type {
   SessionStore,
   SessionStoreEntry,
 } from '@anthropic-ai/claude-agent-sdk';
+import { hash as ohash } from 'ohash';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { init, result, scriptedQuery } from './__fixtures__/scripted-query.ts';
+import { AUTO_MEMORY_FRAGMENT } from './auto-memory.ts';
 import {
+  type AgentOptions,
   deadToolMatchers,
   matcherSelects,
   type QueryFunction,
@@ -99,6 +102,150 @@ describe('runAgent', () => {
     };
     expect(options.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBe('1');
     expect(options.outputFormat.type).toBe('json_schema');
+  });
+
+  describe('auto memory', () => {
+    const MEMORY_DIRECTORY = '/workspace/memories/spaces/a';
+    const FRAGMENT = AUTO_MEMORY_FRAGMENT.render({
+      prompt: 'q',
+      output: OutputSchema,
+      memoryDirectory: MEMORY_DIRECTORY,
+    });
+
+    async function runWith(options: AgentOptions, memoryDirectory?: string) {
+      const scripted = scriptedQuery([
+        result({ structured_output: { answer: 'x' } }),
+      ]);
+      const logged: string[] = [];
+      const log = vi
+        .spyOn(console, 'log')
+        .mockImplementation((line: string) => logged.push(line));
+      try {
+        const agentRun = await runAgent(
+          {
+            prompt: 'q',
+            output: OutputSchema,
+            options,
+            ...(memoryDirectory === undefined ? {} : { memoryDirectory }),
+          },
+          { signal: new AbortController().signal, onRecord: () => undefined },
+          scripted.query,
+        );
+        const prompt = logged
+          .map((line) => JSON.parse(line) as { event: string })
+          .find(({ event }) => event === 'agentforge.prompt') as {
+          systemPrompt?: unknown;
+        };
+        return {
+          agentRun,
+          prompt,
+          options: scripted.calls[0]?.options as Options & {
+            env: Record<string, string | undefined>;
+          },
+        };
+      } finally {
+        log.mockRestore();
+      }
+    }
+
+    it('points a run that declares a directory at it, with its instructions after the procedure’s own', async () => {
+      vi.stubEnv('CLAUDE_CODE_DISABLE_AUTO_MEMORY', '1');
+      try {
+        const { agentRun, prompt, options } = await runWith(
+          {
+            systemPrompt: 'own',
+            settings: {
+              permissions: { blockReadsOutsideWorkingDirectories: true },
+            },
+          },
+          MEMORY_DIRECTORY,
+        );
+        expect(options.settings).toEqual({
+          permissions: { blockReadsOutsideWorkingDirectories: true },
+          autoMemoryEnabled: true,
+          autoMemoryDirectory: MEMORY_DIRECTORY,
+        });
+        expect(options.systemPrompt).toEqual(['own', FRAGMENT]);
+        // The container's own variable would turn the declared memory off.
+        expect(options.env).not.toHaveProperty(
+          'CLAUDE_CODE_DISABLE_AUTO_MEMORY',
+        );
+        expect(prompt.systemPrompt).toEqual(['own', FRAGMENT]);
+        expect(agentRun.record.options.systemPrompt).toBe(
+          ohash(['own', FRAGMENT]),
+        );
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('turns auto memory off for a run that declares none, its prompt its own', async () => {
+      const { agentRun, prompt, options } = await runWith({
+        systemPrompt: 'own',
+      });
+      expect(options.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY).toBe('1');
+      expect(options.settings).toBeUndefined();
+      expect(options.systemPrompt).toBe('own');
+      expect(prompt.systemPrompt).toBe('own');
+      expect(agentRun.record.options.systemPrompt).toBe(ohash('own'));
+    });
+
+    it.each<[string, AgentOptions, string | undefined, RegExp]>([
+      [
+        'a relative directory',
+        {},
+        'memories',
+        /not an absolute directory: "memories"/,
+      ],
+      [
+        'the preset',
+        { systemPrompt: { type: 'preset', preset: 'claude_code' } },
+        MEMORY_DIRECTORY,
+        /"claude_code" system prompt preset/,
+      ],
+      [
+        'its own autoMemoryEnabled',
+        { settings: { autoMemoryEnabled: false } },
+        undefined,
+        /sets `autoMemoryEnabled` in its settings: declare `memoryDirectory`/,
+      ],
+      [
+        'its own autoMemoryDirectory',
+        { settings: { autoMemoryDirectory: '/elsewhere' } },
+        MEMORY_DIRECTORY,
+        /sets `autoMemoryDirectory` in its settings/,
+      ],
+      [
+        'its own variable',
+        { env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0' } },
+        undefined,
+        /sets CLAUDE_CODE_DISABLE_AUTO_MEMORY in its env/,
+      ],
+      [
+        'settings in a file',
+        { settings: '/etc/claude/settings.json' },
+        MEMORY_DIRECTORY,
+        /settings are the file "\/etc\/claude\/settings.json"/,
+      ],
+    ])(
+      'refuses %s before the run, EXECUTION_ERROR',
+      async (_label, options, memoryDirectory, message) => {
+        const scripted = scriptedQuery([]);
+        const promise = runAgent(
+          {
+            prompt: 'q',
+            output: OutputSchema,
+            options,
+            ...(memoryDirectory === undefined ? {} : { memoryDirectory }),
+          },
+          { signal: new AbortController().signal, onRecord: () => undefined },
+          scripted.query,
+        );
+        await expect(promise).rejects.toThrow(message);
+        expect(await causeOf(promise)).toBe('EXECUTION_ERROR');
+        expect(scripted.calls).toHaveLength(0);
+      },
+    );
   });
 
   describe('with a session store', () => {

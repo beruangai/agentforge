@@ -11,6 +11,7 @@ import {
 import { hash as ohash } from 'ohash';
 import { z } from 'zod';
 import { type Cause, cause, type RunRecord } from '#core/contract/task.ts';
+import { autoMemoryOptions } from './auto-memory.ts';
 import {
   type AgentPrompt,
   createStreamingInput,
@@ -24,6 +25,7 @@ import {
   type StopGuard,
   structuredOutputValidation,
 } from './structured-output-validation.ts';
+import { composeSystemPrompt } from './system-prompt.ts';
 
 /** The SDK options a procedure may set; the kernel owns the rest. */
 export type AgentOptions = Omit<Options, 'outputFormat' | 'abortController'>;
@@ -48,6 +50,13 @@ export interface AgentRunSpec<Output> {
   readonly guardrails?: {
     readonly stop?: readonly StopGuard[];
   };
+  /**
+   * An absolute directory to keep Claude Code's auto memory in, usually a
+   * mounted filesystem's `localPath`, one memory space: its `MEMORY.md` index
+   * is in context from the first turn, and the agent is told how to keep it
+   * (§REQ404). Without it, auto memory is off.
+   */
+  readonly memoryDirectory?: string;
 }
 
 export interface AgentRun<Output> {
@@ -110,6 +119,12 @@ export async function runAgent<Output>(
 ): Promise<AgentRun<Output>> {
   if (context.signal.aborted) throw new TaskCanceled();
   const startedAt = Date.now();
+  const { systemPrompt, memory } = ownedByTheKernel(spec);
+  const ownedOptions: AgentOptions = {
+    ...spec.options,
+    ...(systemPrompt === undefined ? {} : { systemPrompt }),
+    ...(memory.settings === undefined ? {} : { settings: memory.settings }),
+  };
   const wire = structuredOutputWireSchema(spec.output, {
     wrapNonObjectOutput: spec.wrapNonObjectOutput ?? false,
   });
@@ -128,7 +143,7 @@ export async function runAgent<Output>(
       event: 'agentforge.prompt',
       promptHash,
       prompt: message.message.content,
-      systemPrompt: spec.options?.systemPrompt,
+      systemPrompt,
     }),
   );
   const abortController = new AbortController();
@@ -164,11 +179,10 @@ export async function runAgent<Output>(
   const mirror =
     declaredStore === undefined ? undefined : recordingStore(declaredStore);
   const options: Options = {
-    ...spec.options,
+    ...ownedOptions,
     ...(mirror === undefined ? {} : { sessionStore: mirror.store }),
     env: {
-      ...process.env,
-      ...spec.options?.env,
+      ...memory.env,
       ...BACKGROUND_WORK_DISABLED,
     },
     // The kernel's structured output validation after the procedure's own hooks (§REQ204).
@@ -262,7 +276,7 @@ export async function runAgent<Output>(
   const record: RunRecord = {
     promptHash,
     promptBytes: Buffer.byteLength(JSON.stringify(message.message.content)),
-    options: recordableOptions(spec.options),
+    options: recordableOptions(ownedOptions),
     ...(observed.sessionId === undefined
       ? {}
       : { sessionId: observed.sessionId }),
@@ -577,6 +591,27 @@ export function settle<Output>(
     throw new TaskFailure(cause('PROVIDER_TRANSIENT', message));
   }
   throw new TaskFailure(cause('EXECUTION_ERROR', message));
+}
+
+/**
+ * What the kernel adds to the procedure's options from what the run declares
+ * — the system-prompt fragments it calls for, and its auto memory — refused
+ * `EXECUTION_ERROR` before anything runs: the procedure's code is wrong.
+ */
+function ownedByTheKernel(spec: AgentRunSpec<unknown>) {
+  try {
+    return {
+      systemPrompt: composeSystemPrompt(spec),
+      memory: autoMemoryOptions(spec, { ...process.env, ...spec.options?.env }),
+    };
+  } catch (error) {
+    throw new TaskFailure(
+      cause(
+        'EXECUTION_ERROR',
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+  }
 }
 
 /** The options as recorded: values that are functions or secrets are named, not kept (§REQ603). */
