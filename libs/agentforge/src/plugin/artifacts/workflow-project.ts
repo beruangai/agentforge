@@ -60,9 +60,13 @@ export const TEMPORAL_TESTING = '@temporalio/testing';
 /** What the project's `test` target runs. */
 export const VITEST = 'vitest';
 
-/** The worker's image: its dependencies installed by Bun, run by Node on glibc (musl is unsupported). */
+/**
+ * The worker's image: its dependencies installed by Bun on the AgentForge
+ * image's Debian base, so the Temporal core's native bridge is chosen for the
+ * glibc the Node stage runs it on (musl is unsupported).
+ */
 const BUN_IMAGE =
-  'docker.io/oven/bun:1.4.0-alpine@sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb';
+  'docker.io/oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6';
 const NODE_IMAGE =
   'docker.io/library/node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1';
 

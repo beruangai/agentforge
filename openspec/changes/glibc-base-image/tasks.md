@@ -12,7 +12,7 @@ Group 0 opens the batch of four A6 changes. Group 1 moves the base. Group 2 prov
   - `nx run @beruangai/agentforge:image` on `linux/arm64`;
   - inside the built image: `id -u` is `1000` as `bun`, and `bash`, `git`, `rg`, `s7cmd --version` and `aws-otel-collector --version` run;
   - the image's size against the Alpine one, for the commit message.
-- [ ] 1.2 The worker template's `BUN_IMAGE` (`src/plugin/artifacts/workflow-project.ts`) takes the slim pin. `nx sync` regenerates `golden-kata-workflows/container/Dockerfile`. Verified by `nx run @beruangai/agentforge:test` (the generator's snapshot, updated) and `nx sync:check`.
+- [x] 1.2 The worker template's `BUN_IMAGE` (`src/plugin/artifacts/workflow-project.ts`) takes the slim pin. `nx sync` regenerates `golden-kata-workflows/container/Dockerfile`. Verified by `nx run @beruangai/agentforge:test` (the generator's snapshot, updated) and `nx sync:check`.
 
 ## 2. Extending a layer
 
