@@ -13,6 +13,7 @@ import {
 } from '@beruangai/golden-kata-base/kata';
 import { baseOptions } from '@beruangai/golden-kata-base/options';
 import { runCases } from '@beruangai/golden-kata-base/run-cases';
+import { writeContext } from './context.ts';
 import { contract } from './contract.ts';
 
 const os = implementAgent(contract);
@@ -23,11 +24,7 @@ export const router = os.router({
       const { kata } = context.filesystems;
       const directory = kata.localPath;
       const run = await context.runAgent({
-        prompt: [
-          `Write a ${input.difficulty} coding kata about the topic below, following the kata-style skill.`,
-          { tag: 'topic', context: input.topic },
-          `In ${directory}, write ${KATA_FILE} (the kata) and ${SOLUTION_FILE} (a correct reference solution). Run run_cases, and fix the kata or the solution until every case passes. Then answer with the kata exactly as ${KATA_FILE} holds it.`,
-        ],
+        prompt: await writeContext({ directory, ...input }),
         output: KataSchema,
         // The answer is held back until both files it is checked against exist.
         guardrails: {
@@ -44,11 +41,9 @@ export const router = os.router({
             },
           ],
         },
-        // The base options, plus what the writer alone may do: write the kata's files.
-        options: composeOptions(baseOptions(directory), {
+        // The base options and the mount, plus what the writer alone may do: write the kata's files.
+        options: composeOptions(baseOptions(directory), context.agentOptions, {
           tools: ['Write', 'Edit'],
-          additionalDirectories: [...context.filesystemDirectories],
-          allowedTools: [...kata.permissions.allow],
           maxTurns: 20,
         }),
       });

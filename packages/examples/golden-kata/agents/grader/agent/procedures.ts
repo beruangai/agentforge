@@ -13,6 +13,7 @@ import {
 } from '@beruangai/golden-kata-base/kata';
 import { baseOptions } from '@beruangai/golden-kata-base/options';
 import { runCases } from '@beruangai/golden-kata-base/run-cases';
+import { gradeContext } from './context.ts';
 import { contract, GradeSchema } from './contract.ts';
 
 const os = implementAgent(contract);
@@ -30,11 +31,13 @@ export const router = os.router({
         input.kata.referenceSolution,
       );
       const run = await context.runAgent({
-        prompt: `Grade the ${input.kata.difficulty} kata in ${directory} — ${KATA_FILE} and its reference ${SOLUTION_FILE} — against the kata-style skill: score each rubric criterion from 1 to 5 with your reasoning, then sum up. Read both files and run run_cases before you judge; change nothing.`,
+        prompt: await gradeContext({
+          directory,
+          difficulty: input.kata.difficulty,
+        }),
         output: GradeSchema,
-        // The base options and its mount: the grader reads and runs, and writes nothing.
-        options: composeOptions(baseOptions(directory), {
-          additionalDirectories: [...context.filesystemDirectories],
+        // The base options and the mount: the grader reads and runs, and has no tool to write.
+        options: composeOptions(baseOptions(directory), context.agentOptions, {
           maxTurns: 12,
         }),
       });

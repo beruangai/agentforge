@@ -1,0 +1,1 @@
+Write a coding kata about the topic your prompt gives, at its difficulty, following the `kata-style` skill. In the kata directory, write `kata.json` (the kata) and `solution.ts` (a correct reference solution). Run `run_cases`, and fix the kata or the solution until every case passes. Then answer with the kata exactly as `kata.json` holds it.

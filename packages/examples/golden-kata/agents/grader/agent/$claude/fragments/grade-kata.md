@@ -1,0 +1,1 @@
+Grade the kata in the kata directory — `kata.json` and its reference `solution.ts` — at the difficulty your prompt gives, against the `kata-style` skill: score each rubric criterion from 1 to 5 with your reasoning, then sum up. Read both files and run `run_cases` before you judge; change nothing.

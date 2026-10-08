@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'] as const;
 export const DifficultyEnum = z.enum(DIFFICULTIES);
+export type Difficulty = z.infer<typeof DifficultyEnum>;
 
 /** The files a kata is worked on in: the kata itself, and a solution to it. */
 export const KATA_FILE = 'kata.json';

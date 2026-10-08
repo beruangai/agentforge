@@ -29,7 +29,7 @@ Group 1 records the requirements. Groups 2 and 3 are the package work and are in
 
 ## 4. Examples
 
-- [ ] 4.1 golden-kata:
+- [x] 4.1 golden-kata:
   - its base layer gains `context.ts` with `kataContext`: the file contract as a file-backed `protocol` block from `$claude/fragments/kata-files.md`, moved out of `CLAUDE.md`, and the kata directory;
   - the writer and the grader keep their procedure instructions in their layers' `$claude/fragments/`, and each prompt is one composite of `kataContext` and its own dynamic function;
   - both procedures compose `context.agentOptions`.
