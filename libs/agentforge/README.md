@@ -13,6 +13,8 @@ Runs a consumer's procedure as an asynchronous task on Bedrock AgentCore Runtime
 
 `/agent` and `/server` resolve only under the `agentforge-agent` export condition. An agent build opts in with `--conditions=agentforge-agent` (Bun, Node) and `"customConditions": ["agentforge-agent"]` (TypeScript); any other build fails to resolve them.
 
+For Claude Code, AgentForge's guide to developing with it is a plugin registered from a clone of the repository: see [Claude Code plugin](../../README.md#claude-code-plugin).
+
 ## The Nx plugin
 
 `nx add @beruangai/agentforge` runs `init`: an agentic project's dependencies at AgentForge's own peer ranges — in the root catalog when `aws-nx-plugin.config.mts` enables catalogs, otherwise the root manifest — and the plugin's sync attached to its `lock` and `image` tasks.

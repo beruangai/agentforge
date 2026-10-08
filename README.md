@@ -100,6 +100,30 @@ A start the container cannot run now — stopping, full, or already running the 
 
 The Nx plugin generates and maintains all of this (the [package README](libs/agentforge/README.md#the-nx-plugin)); [`packages/examples/smoke-coverage`](packages/examples/smoke-coverage) is this agent, generated, with its e2e.
 
+## Claude Code plugin
+
+AgentForge's guide for Claude Code is a plugin in this repository: the marketplace `agentforge` at its root, with one plugin, `agentforge`, whose skill walks a consumer's Claude Code through defining, implementing, consuming, running and upgrading an agentic project. Claude Code reads it in place from a local clone. The clone is the one route: not GitHub, not an installed package.
+
+Register a clone once per machine, at user scope:
+
+```bash
+claude plugin marketplace add <path to your clone of agentforge> --scope user
+```
+
+and disable the plugin there, in `~/.claude/settings.json`:
+
+```json
+{ "enabledPlugins": { "agentforge@agentforge": false } }
+```
+
+A project enables it in `.claude/settings.json`, shared with everyone who works on it, or in `.claude/settings.local.json`, for one developer:
+
+```json
+{ "enabledPlugins": { "agentforge@agentforge": true } }
+```
+
+A pull of the clone reaches the next session. A machine registers one clone, so every project on it gets that clone's guidance; projects linking AgentForge with `bun link` run the same clone. If the clone moves, register it again.
+
 ## Known limits
 
 Built to what the platforms document, with tests only where AgentForge relies on something they leave unsaid. Report what hits, and it is triaged in the layer that owns it.
