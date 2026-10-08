@@ -4,7 +4,7 @@ Applied third in the A6 batch, after `strict-contracts`; the example stacks were
 
 ## 1. Constructs
 
-- [ ] 1.1 `AGENT_NAME_PATTERN` in `core/agent-name.ts`, and the plugin's `KebabNameField` built from it. Verified by `nx run @beruangai/agentforge:test`.
+- [x] 1.1 `AGENT_NAME_PATTERN` in `core/agent-name.ts`, and the plugin's `KebabNameField` built from it. Verified by `nx run @beruangai/agentforge:test`.
 - [ ] 1.2 `AgenticProjectResources` in `src/infra/agentic-project-resources.ts`, exported from `/infra`, owns the task table, the session bucket, the dashboard and the readiness probe, with their settings moved unchanged from `AgentRuntime`, and `addAgent`, which adds the agent's dashboard section, titled by its name, and its readiness check, and refuses a duplicate name. Verified by `nx run @beruangai/agentforge:test` (`Template` assertions):
   - one project with two agents has one table, one bucket, one dashboard with a section per agent, one probe Lambda and two readiness resources;
   - a duplicate agent name is refused.

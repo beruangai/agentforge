@@ -8,6 +8,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import express from 'express';
 import { z } from 'zod';
 import { A2A_PROTOCOL_VERSION } from '#core/a2a-version.ts';
+import { AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
 import { TimeBudgetSecondsField } from '#core/contract/procedures.ts';
 import { SecretNameSchema } from '#core/secrets.ts';
@@ -84,7 +85,7 @@ function serverConfig(
   return {
     taskEntry: options.taskEntry,
     requiredSecrets: z.array(SecretNameSchema).parse(options.requiredSecrets),
-    agentName: options.agentName ?? required('AGENTFORGE_AGENT_NAME'),
+    agentName: options.agentName ?? required(AGENT_NAME_VARIABLE),
     tableName: options.tableName ?? required(TASK_TABLE_NAME_VARIABLE),
     ...(endpoint === undefined || endpoint === ''
       ? {}

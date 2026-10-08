@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { AGENT_NAME_PATTERN } from '#core/agent-name.ts';
 
 /** A project or agent name: kebab-case, which every name derived from it stays valid as. */
 export const KebabNameField = z
   .string()
   .regex(
-    /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/,
+    AGENT_NAME_PATTERN,
     'must be kebab-case: lowercase letters and digits, words joined by single hyphens',
   );
 

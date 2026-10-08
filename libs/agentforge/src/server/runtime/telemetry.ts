@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import {
   TELEMETRY_VARIABLE,
   type TelemetryLevel,
@@ -116,7 +117,7 @@ export async function startTelemetry(
       AGENTFORGE_OTEL_LOG_GROUP: logGroup,
       AGENTFORGE_OTEL_LOG_STREAM: logStream,
       AGENTFORGE_RUNTIME_SESSION_ID: runtimeSessionId,
-      AGENTFORGE_AGENT_NAME: agentName,
+      [AGENT_NAME_VARIABLE]: agentName,
       // ADOT logs to stderr, not to a file under /opt/aws it cannot create.
       RUN_IN_CONTAINER: 'True',
     },
