@@ -11,11 +11,13 @@
 #
 # Build context: the published bundle, which becomes the `agentforge` member.
 # The `container` context holds the root manifest and its lock.
-ARG BUN_IMAGE=docker.io/oven/bun:1.4.0-alpine@sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb
+# Debian slim, for glibc: native libraries are mostly published prebuilt for
+# it, and a layer installs them without building from source (ADR 0018).
+ARG BUN_IMAGE=docker.io/oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6
 ARG COLLECTOR_IMAGE=public.ecr.aws/aws-observability/aws-otel-collector:v0.50.0@sha256:7968fb60db6a2390a47ba6a2df029745638486e285c9b2487da1b722d0855a3e
 FROM ${COLLECTOR_IMAGE} AS collector
-# `s7cmd` syncs S3 filesystems (ADR 0015): a static musl build, pinned by
-# the sha256 its release publishes. A new release is admitted by changing both
+# `s7cmd` syncs S3 filesystems (ADR 0015): a static musl build, which runs on
+# glibc as any static binary does, pinned by the sha256 its release publishes. A new release is admitted by changing both
 # and passing integ/aws/filesystem-s3-sync.
 FROM ${BUN_IMAGE} AS s7cmd
 ADD --checksum=sha256:e81dc4321df8fb691c628f4ea97fe6e14e66295b29cd57fb9560ee954bcaf933 \
@@ -25,8 +27,10 @@ FROM ${BUN_IMAGE}
 # A static binary; the server starts it when the construct sets a telemetry level.
 COPY --from=collector /awscollector /usr/local/bin/aws-otel-collector
 COPY --from=s7cmd /usr/local/bin/s7cmd /usr/local/bin/s7cmd
-# The Claude CLI's Bash tool refuses busybox sh; it needs bash, named by SHELL.
-RUN apk add --no-cache bash git ca-certificates ripgrep \
+# The Claude CLI's Bash tool needs bash, named by SHELL; git and ripgrep are its tools'.
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends bash git ca-certificates ripgrep \
+ && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /workspace/agentforge /workspace/agentic/agent \
  && chown -R bun:bun /workspace
 # The CLI refuses to run tools unattended as root; the image never runs as root.

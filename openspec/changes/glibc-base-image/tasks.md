@@ -8,7 +8,7 @@ Group 0 opens the batch of four A6 changes. Group 1 moves the base. Group 2 prov
 
 ## 1. The Debian base
 
-- [ ] 1.1 `libs/agentforge/Dockerfile` is `FROM oven/bun:1.4.0-slim`, pinned by its index digest as resolved then, with `apt-get install --no-install-recommends bash git ca-certificates ripgrep`, and its comments are updated; the `s7cmd` stage takes the same pin. Verified by:
+- [x] 1.1 `libs/agentforge/Dockerfile` is `FROM oven/bun:1.4.0-slim`, pinned by its index digest as resolved then, with `apt-get install --no-install-recommends bash git ca-certificates ripgrep`, and its comments are updated; the `s7cmd` stage takes the same pin. Verified by:
   - `nx run @beruangai/agentforge:image` on `linux/arm64`;
   - inside the built image: `id -u` is `1000` as `bun`, and `bash`, `git`, `rg`, `s7cmd --version` and `aws-otel-collector --version` run;
   - the image's size against the Alpine one, for the commit message.
