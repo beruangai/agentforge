@@ -14,6 +14,7 @@ const STACK_NAME = 'agentforge-example-smoke-coverage-Application';
 const BUCKET_OUTPUTS = [
   'HelloAgentSessionBucketName',
   'NotebookBucketName',
+  'MemoriesBucketName',
 ] as const;
 
 const outputsPath = process.argv[2];
@@ -24,6 +25,7 @@ const OutputsSchema = z.object({
   [STACK_NAME]: z.object({
     HelloAgentSessionBucketName: z.string(),
     NotebookBucketName: z.string(),
+    MemoriesBucketName: z.string(),
   }),
 });
 const outputs = OutputsSchema.safeParse(
@@ -31,7 +33,7 @@ const outputs = OutputsSchema.safeParse(
 );
 if (!outputs.success) {
   throw new Error(
-    `${outputsPath} does not name ${BUCKET_OUTPUTS.join(' and ')}; redeploy first: ${z.prettifyError(outputs.error)}`,
+    `${outputsPath} does not name ${BUCKET_OUTPUTS.join(', ')}; redeploy first: ${z.prettifyError(outputs.error)}`,
   );
 }
 const stackOutputs = outputs.data[STACK_NAME];

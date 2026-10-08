@@ -16,11 +16,15 @@ export class ApplicationStack extends Stack {
     const notebook = new S3FilesystemBucket(this, 'Notebook', {
       removalPolicy,
     });
+    // The bucket hello-agent's memory spaces mount from.
+    const memories = new S3FilesystemBucket(this, 'Memories', {
+      removalPolicy,
+    });
     this.smokeCoverage = new SmokeCoverage(this, 'SmokeCoverage', {
       agents: {
         helloAgent: {
           removalPolicy,
-          filesystems: { notebook },
+          filesystems: { notebook, memories },
           // The operator creates this secret and sets its value.
           secrets: {
             CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
@@ -43,6 +47,9 @@ export class ApplicationStack extends Stack {
     });
     new CfnOutput(this, 'NotebookBucketName', {
       value: notebook.bucket.bucketName,
+    });
+    new CfnOutput(this, 'MemoriesBucketName', {
+      value: memories.bucket.bucketName,
     });
   }
 }

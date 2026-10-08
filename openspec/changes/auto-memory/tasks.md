@@ -29,7 +29,7 @@ Group 1 records the requirement. Group 2 is the package work, and group 3 runs i
 
 ## 4. Examples
 
-- [ ] 4.1 `smoke-coverage-infra` declares a `Memories` bucket beside `Notebook`. It is passed to `hello-agent` as `filesystems: { memories }`, with its name a stack output and among the buckets `empty-buckets.ts` empties before destroy. Verified by `nx run @beruangai/smoke-coverage-infra:synth`.
+- [x] 4.1 `smoke-coverage-infra` declares a `Memories` bucket beside `Notebook`. It is passed to `hello-agent` as `filesystems: { memories }`, with its name a stack output and among the buckets `empty-buckets.ts` empties before destroy. Verified by `nx run @beruangai/smoke-coverage-infra:synth`.
 - [ ] 4.2 `hello-agent` gains `Remember` (a space and a fact in; it saves the fact to memory, with `Read`, `Write` and `Edit`) and `Recall` (a space and a question in; no tools; it answers from memory). Both mount the space from shared `MEMORIES` options (`bucket: 'memories'`, `localRoot: '/workspace/memories'`) with `subpath: spaces/<space>`, declare its `localPath` as `memoryDirectory`, and pass `context.filesystemDirectories` and `context.filesystemPermissions` as the other procedures do; `Remember` pushes on `TASK_STATE_COMPLETED`. They run fenced, from the base options. The AgentCore suite saves a fact, stops the container, then recalls it in a new runtime session. Verified by `nx run @beruangai/smoke-coverage:e2e-agentcore` after its deploy. The README's procedure table lists both.
 
 ## 5. Docs
