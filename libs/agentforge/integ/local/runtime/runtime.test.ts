@@ -125,6 +125,7 @@ beforeAll(async () => {
   tableName = await dynamoDB.createTable();
   server = await startServer({
     agentName: 'runtime-integ',
+    image: 'runtime-integ',
     taskEntry: join(import.meta.dirname, '__fixtures__', 'task-entry.ts'),
     requiredSecrets: [],
     tableName,
@@ -144,7 +145,7 @@ afterAll(async () => {
 });
 
 describe('the runtime', () => {
-  it('runs a procedure to its typed output', async () => {
+  it('runs a procedure to its typed output, recording the image that ran it', async () => {
     const context = starting();
     const started = await client.echo.SendMessage({ text: 'hello' }, context);
     expect(['TASK_STATE_SUBMITTED', 'TASK_STATE_WORKING']).toContain(
@@ -157,6 +158,7 @@ describe('the runtime', () => {
     expect(ended).toMatchObject({
       state: 'TASK_STATE_COMPLETED',
       output: { text: 'hello', attempt: 1 },
+      image: 'runtime-integ',
     });
   });
 

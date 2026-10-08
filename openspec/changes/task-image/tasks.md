@@ -13,7 +13,7 @@ Applied last in the A6 batch, after `project-infrastructure`. Group 1 is the pac
 ## 2. Supplying it
 
 - [x] 2.1 `AgentRuntime` owns `AGENTFORGE_AGENT_IMAGE` and sets it from the runtime's rendered container URI, throwing at synth when that is absent, and exposes `readonly image: string`. Verified by `Template` assertions: the variable is the container URI, and setting it in `environmentVariables` is refused.
-- [ ] 2.2 The `serve` executor runs the agent's container by the id in its image id file and passes `AGENTFORGE_AGENT_IMAGE` from it, failing, naming the image build, when the file is missing. `integ/local/runtime` passes `image`, and asserts it on a task. Verified by the executor's unit tests and by `nx run @beruangai/agentforge:integ --configuration=local`.
+- [x] 2.2 The `serve` executor runs the agent's container by the id in its image id file and passes `AGENTFORGE_AGENT_IMAGE` from it, failing, naming the image build, when the file is missing. `integ/local/runtime` passes `image`, and asserts it on a task. Verified by the executor's unit tests and by `nx run @beruangai/agentforge:integ --configuration=local`.
 
 ## 3. End to end
 

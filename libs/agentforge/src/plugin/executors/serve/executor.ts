@@ -1,11 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ExecutorContext } from '@nx/devkit';
 import { z } from 'zod';
+import { AGENT_IMAGE_VARIABLE } from '#core/agent-image.ts';
 import { REQUIRED_SECRETS, SecretNameSchema } from '#core/secrets.ts';
 import { agentSecretsFile, baseSecretsFile } from '../../artifacts/layers.ts';
-import { agentImage } from '../../container/images.ts';
+import { imageIdFile } from '../../container/images.ts';
 import type { AgenticProject } from '../../project-record.ts';
 import { executorProject } from '../executor-project.ts';
 
@@ -21,22 +23,27 @@ const TABLE_NAME = 'agentforge-tasks';
 
 /**
  * What serving one agent starts: a private network, DynamoDB Local, and the
- * agent under its container name, with each secret it requires passed by name
- * from the executor's environment.
+ * agent under its container name, run by its image's id, with each secret it
+ * requires passed by name from the executor's environment.
  */
 export interface ServePlan {
   readonly network: string;
   readonly dynamoDB: string;
   readonly agent: string;
+  /** The id the agent's image build wrote, which the container runs by and every task records. */
   readonly image: string;
   readonly secrets: readonly string[];
 }
 
-/** The agent's secrets: AgentForge's own, then `declared` — its layers' `REQUIRED_SECRETS`. */
+/**
+ * The agent's secrets: AgentForge's own, then `declared` — its layers'
+ * `REQUIRED_SECRETS`; `image` is the id its image build wrote.
+ */
 export function servePlan(
   project: AgenticProject,
   agentName: string,
   declared: readonly string[],
+  image: string,
 ): ServePlan {
   const agent = project.agents.find((recorded) => recorded.name === agentName);
   if (agent === undefined) {
@@ -50,9 +57,30 @@ export function servePlan(
     network: agent.containerName,
     dynamoDB: `${agent.containerName}-dynamodb`,
     agent: agent.containerName,
-    image: agentImage(project, agentName),
+    image,
     secrets: [...new Set([...REQUIRED_SECRETS, ...declared])],
   };
+}
+
+/**
+ * The id the agent's image build wrote, so the container runs the image
+ * built, even if its tag has moved since.
+ */
+export function builtImageId(
+  workspaceRoot: string,
+  project: AgenticProject,
+  agentName: string,
+): string {
+  const file = join(
+    workspaceRoot,
+    imageIdFile(project.root, `agents/${agentName}`),
+  );
+  if (!existsSync(file)) {
+    throw new Error(
+      `${file} is missing: build the agent's image first, with nx run ${project.name}:image-${agentName}`,
+    );
+  }
+  return readFileSync(file, 'utf8').trim();
 }
 
 const RequiredSecretsSchema = z.array(SecretNameSchema).readonly();
@@ -151,6 +179,8 @@ export function startCommands(plan: ServePlan): {
       'AWS_SECRET_ACCESS_KEY=local',
       '--env',
       'AWS_REGION=us-east-2',
+      '--env',
+      `${AGENT_IMAGE_VARIABLE}=${plan.image}`,
       plan.image,
     ],
   };
@@ -227,6 +257,7 @@ export default async function* serveExecutor(
     project,
     options.agent,
     await declaredSecrets(context.root, project, options.agent),
+    builtImageId(context.root, project, options.agent),
   );
   const refusal = serveRefusal(plan, process.env, containerState);
   if (refusal !== undefined) throw new Error(refusal);
