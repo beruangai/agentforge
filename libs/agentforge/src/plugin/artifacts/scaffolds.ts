@@ -106,8 +106,8 @@ import { z } from 'zod';
 export const contract = {
   ${procedure}: oc
     .meta(timeBudget(300))
-    .input(z.object({}))
-    .output(z.object({})),
+    .input(z.strictObject({}))
+    .output(z.strictObject({})),
 };
 `,
     },

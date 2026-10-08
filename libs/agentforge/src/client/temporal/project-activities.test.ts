@@ -7,11 +7,11 @@ import { projectActivities } from './project-activities.ts';
 
 const CONTRACTS = {
   writer: {
-    Write: oc.input(z.object({ topic: z.string() })).output(z.string()),
+    Write: oc.input(z.strictObject({ topic: z.string() })).output(z.string()),
   },
   grader: {
     rubric: {
-      Grade: oc.input(z.object({ kata: z.string() })).output(z.number()),
+      Grade: oc.input(z.strictObject({ kata: z.string() })).output(z.number()),
     },
   },
 };

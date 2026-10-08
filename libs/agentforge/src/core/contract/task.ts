@@ -54,7 +54,7 @@ export const CAUSE_CODES = [
 export const CauseCodeEnum = z.enum(CAUSE_CODES);
 export type CauseCode = z.infer<typeof CauseCodeEnum>;
 
-export const CauseSchema = z.object({
+export const CauseSchema = z.strictObject({
   code: CauseCodeEnum,
   message: z.string(),
   /** What would resolve it: the first thing to try. */
@@ -146,16 +146,16 @@ function truncate(text: string, capBytes: number): string {
 
 /** How a task ended, as the task process reports it and the artifact carries it. */
 export const OutcomeSchema = z.discriminatedUnion('state', [
-  z.object({
+  z.strictObject({
     state: z.literal(TaskStateEnum.enum.TASK_STATE_COMPLETED),
     output: z.unknown(),
   }),
-  z.object({
+  z.strictObject({
     state: z.literal(TaskStateEnum.enum.TASK_STATE_FAILED),
     cause: CauseSchema,
   }),
-  z.object({ state: z.literal(TaskStateEnum.enum.TASK_STATE_CANCELED) }),
-  z.object({
+  z.strictObject({ state: z.literal(TaskStateEnum.enum.TASK_STATE_CANCELED) }),
+  z.strictObject({
     state: z.literal(TaskStateEnum.enum.TASK_STATE_REJECTED),
     reason: z.string(),
   }),
@@ -196,7 +196,7 @@ export function outcomeOfArtifacts(artifacts: unknown): Outcome | undefined {
 }
 
 /** What one agent run recorded (§REQ601). */
-export const RunRecordSchema = z.object({
+export const RunRecordSchema = z.strictObject({
   /** The prompt as sent, hashed; the container log and the transcript hold it whole. */
   promptHash: z.string(),
   promptBytes: z.number(),
@@ -211,7 +211,7 @@ export const RunRecordSchema = z.object({
 export type RunRecord = z.infer<typeof RunRecordSchema>;
 
 /** The attempt before this one under the same idempotency key, if any. */
-export const PriorAttemptSchema = z.object({
+export const PriorAttemptSchema = z.strictObject({
   taskId: z.string(),
   state: TaskStateEnum,
   cause: CauseSchema.optional(),

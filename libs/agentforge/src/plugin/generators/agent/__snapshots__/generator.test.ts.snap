@@ -390,7 +390,10 @@ import { z } from 'zod';
 
 /** What callers import to call the writer agent. */
 export const contract = {
-  Write: oc.meta(timeBudget(300)).input(z.object({})).output(z.object({})),
+  Write: oc
+    .meta(timeBudget(300))
+    .input(z.strictObject({}))
+    .output(z.strictObject({})),
 };
 "
 `;

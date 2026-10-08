@@ -6,7 +6,7 @@ import { TimeBudgetSecondsField } from './procedures.ts';
  * message. The runtime session id is not here: it is the transport's, and
  * reaches the container as AgentCore's session header.
  */
-export const EnvelopeSchema = z.object({
+export const EnvelopeSchema = z.strictObject({
   /** The procedure's path in the contract, dotted: `summarise` or `research.summarise`. */
   procedure: z.string().min(1),
   /** The hash of the contract the caller compiled against (§REQ104). */

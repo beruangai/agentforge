@@ -50,11 +50,30 @@ describe('awaitTask', () => {
   });
 });
 
+describe('createClient', () => {
+  it('refuses a contract that would drop undeclared keys, whichever procedure holds it', () => {
+    const transport = { call: vi.fn() };
+    expect(() =>
+      createClient(
+        {
+          kata: {
+            Write: oc
+              .input(z.strictObject({}))
+              .output(z.strictObject({ cases: z.array(z.object({})) })),
+          },
+        },
+        transport,
+      ),
+    ).toThrow(/kata\.Write\.output\.cases\[\] — z\.object/);
+    expect(transport.call).not.toHaveBeenCalled();
+  });
+});
+
 describe('GetTask', () => {
   const contract = {
     summarise: oc
-      .input(z.object({ text: z.string() }))
-      .output(z.object({ summary: z.string() })),
+      .input(z.strictObject({ text: z.string() }))
+      .output(z.strictObject({ summary: z.string() })),
   };
   const answering = (task: unknown) =>
     createClient(contract, { call: async () => task });

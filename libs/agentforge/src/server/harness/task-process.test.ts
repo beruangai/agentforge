@@ -9,21 +9,37 @@ import { result, scriptedQuery } from './__fixtures__/scripted-query.ts';
 import { executeProcedure, implementAgent } from './task-process.ts';
 
 const contract = {
-  summarise: oc.input(z.object({ text: z.string() })).output(
-    z.object({
+  summarise: oc.input(z.strictObject({ text: z.string() })).output(
+    z.strictObject({
       summary: z.string(),
       words: z.number(),
       sessionId: z.string(),
     }),
   ),
   nested: {
-    broken: oc.input(z.object({})).output(z.object({ ok: z.boolean() })),
-    failing: oc.input(z.object({})).output(z.object({ ok: z.boolean() })),
+    broken: oc
+      .input(z.strictObject({}))
+      .output(z.strictObject({ ok: z.boolean() })),
+    failing: oc
+      .input(z.strictObject({}))
+      .output(z.strictObject({ ok: z.boolean() })),
+    extra: oc
+      .input(z.strictObject({}))
+      .output(z.strictObject({ ok: z.boolean() })),
+    loose: oc
+      .input(z.strictObject({}))
+      .output(z.looseObject({ ok: z.boolean() })),
   },
   runs: {
-    twice: oc.input(z.object({})).output(z.object({ summaries: z.string() })),
-    none: oc.input(z.object({})).output(z.object({ ran: z.boolean() })),
-    afterCancel: oc.input(z.object({})).output(z.object({ ok: z.boolean() })),
+    twice: oc
+      .input(z.strictObject({}))
+      .output(z.strictObject({ summaries: z.string() })),
+    none: oc
+      .input(z.strictObject({}))
+      .output(z.strictObject({ ran: z.boolean() })),
+    afterCancel: oc
+      .input(z.strictObject({}))
+      .output(z.strictObject({ ok: z.boolean() })),
   },
 };
 
@@ -51,6 +67,12 @@ const router = os.router({
     failing: os.nested.failing.handler(async () => {
       throw new Error('the handler gave up');
     }),
+    // A spread compiles with a key the output does not declare.
+    extra: os.nested.extra.handler(async () => {
+      const computed = { ok: true, confidence: 0.9 };
+      return { ...computed };
+    }),
+    loose: os.nested.loose.handler(async () => ({ ok: true, confidence: 0.9 })),
   },
   runs: {
     twice: os.runs.twice.handler(async ({ context }) => {
@@ -109,6 +131,20 @@ function execute(
   });
 }
 
+describe('implementAgent', () => {
+  it('refuses a contract that would drop undeclared keys, naming where', () => {
+    expect(() =>
+      implementAgent({
+        Write: oc
+          .input(z.strictObject({}))
+          .output(z.object({ ok: z.boolean() })),
+      }),
+    ).toThrow(
+      /procedure contract refused \(§REQ103\)[\s\S]*Write\.output — z\.object/,
+    );
+  });
+});
+
 describe('executeProcedure', () => {
   it('completes with the outer output the procedure computed', async () => {
     expect(await execute(invocation())).toEqual({
@@ -157,6 +193,39 @@ describe('executeProcedure', () => {
         message: expect.stringMatching(/at ok/),
         payload: { ok: 'yes' },
       },
+    });
+  });
+
+  it('fails an output carrying a key its strict contract does not declare, with the payload', async () => {
+    const outcome = await execute(
+      invocation({
+        procedure: 'nested.extra',
+        contractHash: contractHash(contract.nested.extra),
+        input: {},
+      }),
+    );
+    expect(outcome).toMatchObject({
+      state: 'TASK_STATE_FAILED',
+      cause: {
+        code: 'OUTPUT_INVALID',
+        message: expect.stringMatching(/confidence/),
+        payload: { ok: true, confidence: 0.9 },
+      },
+    });
+  });
+
+  it('delivers a key a loose contract keeps', async () => {
+    expect(
+      await execute(
+        invocation({
+          procedure: 'nested.loose',
+          contractHash: contractHash(contract.nested.loose),
+          input: {},
+        }),
+      ),
+    ).toEqual({
+      state: 'TASK_STATE_COMPLETED',
+      output: { ok: true, confidence: 0.9 },
     });
   });
 

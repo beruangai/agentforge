@@ -16,6 +16,7 @@ import {
   inputSchemaOf,
   procedureAt,
 } from '#core/contract/procedures.ts';
+import { refuseStrippingObjects } from '#core/contract/strict-objects.ts';
 import {
   cause,
   type Outcome,
@@ -72,10 +73,15 @@ export interface TaskContext {
   >;
 }
 
-/** The oRPC implementer for a contract, with AgentForge's task context. */
+/**
+ * The oRPC implementer for a contract, with AgentForge's task context. A
+ * contract that would drop undeclared keys is refused (§REQ103), so the
+ * procedure module that calls this fails to load.
+ */
 export function implementAgent<Contract extends RouterContract>(
   contract: Contract,
 ) {
+  refuseStrippingObjects(contract);
   return implement(contract).$context<TaskContext>();
 }
 

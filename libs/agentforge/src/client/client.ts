@@ -15,6 +15,7 @@ import {
   procedureAt,
   timeBudgetOf,
 } from '#core/contract/procedures.ts';
+import { refuseStrippingObjects } from '#core/contract/strict-objects.ts';
 import {
   type Cause,
   outcomeOfArtifacts,
@@ -77,12 +78,16 @@ type ContractClient<Contract> =
 /**
  * The typed client for a contract (§REQ101): every procedure's `SendMessage`
  * and `GetTask`, and `CancelTask` at the root. Nothing is written per
- * procedure; a wrong name or shape is a compile error.
+ * procedure; a wrong name or shape is a compile error. A contract that would
+ * drop undeclared keys is refused here (§REQ103): the contract hash cannot
+ * tell a stripping object from a strict one.
  */
 export function createClient<Contract extends RouterContract>(
   contract: Contract,
   transport: Transport,
 ): AgentForgeClient<Contract> {
+  // Every procedure, eagerly: the proxy below builds each only when called.
+  refuseStrippingObjects(contract);
   const cancelTask = async (
     taskId: string,
     context: Routed,

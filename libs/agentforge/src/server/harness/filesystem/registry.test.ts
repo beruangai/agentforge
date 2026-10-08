@@ -13,7 +13,7 @@ import { ScriptedFilesystem } from './__fixtures__/scripted-filesystem.ts';
 import { FilesystemUnsynced } from './filesystem.ts';
 import { filesystems } from './registry.ts';
 
-const Mounted = z.object({
+const Mounted = z.strictObject({
   names: z.array(z.string()),
   pulled: z.boolean(),
   agentOptions: z.strictObject({
@@ -22,9 +22,9 @@ const Mounted = z.object({
   }),
 });
 const contract = {
-  added: oc.input(z.object({ fail: z.boolean() })).output(Mounted),
-  alone: oc.input(z.object({ fail: z.boolean() })).output(Mounted),
-  bare: oc.input(z.object({ fail: z.boolean() })).output(Mounted),
+  added: oc.input(z.strictObject({ fail: z.boolean() })).output(Mounted),
+  alone: oc.input(z.strictObject({ fail: z.boolean() })).output(Mounted),
+  bare: oc.input(z.strictObject({ fail: z.boolean() })).output(Mounted),
 };
 
 let root: string;

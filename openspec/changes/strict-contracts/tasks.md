@@ -11,14 +11,14 @@ Applied second in the A6 batch, after `glibc-base-image`. Group 1 is the check. 
   - a strict object merged with a `z.object` refused;
   - an unknown type throws;
   - a recursive lazy schema terminates.
-- [ ] 1.2 `implementAgent` and `createClient` call it first; `createClient` walks every procedure eagerly. Verified by unit tests:
+- [x] 1.2 `implementAgent` and `createClient` call it first; `createClient` walks every procedure eagerly. Verified by unit tests:
   - each refuses a contract with a stripping object;
   - a strict output whose handler returns an extra key fails `OUTPUT_INVALID` with the payload;
   - a loose output's extra key is delivered in the outcome.
 
 ## 2. What AgentForge owns
 
-- [ ] 2.1 `/contract`'s `CauseSchema`, `OutcomeSchema`'s branches, `RunRecordSchema`, `PriorAttemptSchema` and `EnvelopeSchema` become strict; the package's unit contracts become strict; the `agent` generator scaffolds `z.strictObject({})`. Verified by `nx run @beruangai/agentforge:test`, the snapshot updated.
+- [x] 2.1 `/contract`'s `CauseSchema`, `OutcomeSchema`'s branches, `RunRecordSchema`, `PriorAttemptSchema` and `EnvelopeSchema` become strict; the package's unit contracts become strict; the `agent` generator scaffolds `z.strictObject({})`. Verified by `nx run @beruangai/agentforge:test`, the snapshot updated.
 - [ ] 2.2 The integration contracts become strict: `integ/local/runtime/__fixtures__/contract.ts`, `integ/local/temporal-worker/__fixtures__/contract.ts`, and the inline contract in `integ/local/runtime/runtime.test.ts`. Verified by `nx run @beruangai/agentforge:integ --configuration=local`.
 
 ## 3. Examples
