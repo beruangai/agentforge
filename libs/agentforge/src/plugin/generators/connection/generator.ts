@@ -39,5 +39,8 @@ export default async function connectionGenerator(
   );
   const updated = readWorkflowProject(tree, project.name);
   await applyAndFormat(tree, [await workflowProjectRendering(tree, updated)]);
-  return () => installPackagesTask(tree);
+  // The connection adds a workspace dependency to the workflow project's own
+  // manifest, not the root's, which Nx alone would not install: the link to
+  // the agentic project would be missing until the next install.
+  return () => installPackagesTask(tree, true);
 }
