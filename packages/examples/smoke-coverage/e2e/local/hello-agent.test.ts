@@ -2,11 +2,12 @@
  * The whole path, locally: a caller, through the project client, to
  * hello-agent's container as `serve-hello-agent` runs it — server, task
  * process, harness, the Agent SDK and a real model — and back as a typed
- * outcome; an attach, a resumed session, a cancel mid-Bash, a procedure
- * that distills its documents in a run before answering in another, and
- * Python importing what the base layer installed.
+ * outcome, recording the image that ran it; an attach, a resumed session, a
+ * cancel mid-Bash, a procedure that distills its documents in a run before
+ * answering in another, and Python importing what the base layer installed.
  */
 import { randomUUIDv7 } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { awaitTask } from '@beruangai/agentforge/client';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -22,6 +23,12 @@ import {
   SMALL_CAP_TOKENS,
 } from '../__fixtures__/documents.ts';
 import { logs, servedUrl, untilServing } from './__fixtures__/served-agent.ts';
+
+/** The id `image-hello-agent` wrote, which `serve-hello-agent` runs by. */
+const IMAGE_ID_FILE = new URL(
+  '../../../../../dist/packages/examples/smoke-coverage/image/agents/hello-agent.id',
+  import.meta.url,
+);
 
 let helloAgent: SmokeCoverageClient['helloAgent'];
 const RUNTIME_SESSION_ID = `e2e-${randomUUIDv7()}`;
@@ -62,6 +69,7 @@ describe('hello-agent, locally', () => {
       );
     }
     expect(ended.output.summary.length).toBeGreaterThan(0);
+    expect(ended.image).toBe((await readFile(IMAGE_ID_FILE, 'utf8')).trim());
     expect(ended.output.words).toBe(
       ended.output.summary.split(/\s+/).filter(Boolean).length,
     );

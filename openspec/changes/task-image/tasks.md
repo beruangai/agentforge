@@ -17,7 +17,7 @@ Applied last in the A6 batch, after `project-infrastructure`. Group 1 is the pac
 
 ## 3. End to end
 
-- [ ] 3.1 `smoke-coverage-infra` outputs `HelloAgentImage`. The local suite asserts a task's `image` equals the agent's image id file, and the AgentCore suite asserts it equals `HelloAgentImage`. Verified by `nx run-many -t typecheck lint` for `smoke-coverage` and `nx run @beruangai/smoke-coverage-infra:synth`; the suites run in group 5.
+- [x] 3.1 `smoke-coverage-infra` outputs `HelloAgentImage`. The local suite asserts a task's `image` equals the agent's image id file, and the AgentCore suite asserts it equals `HelloAgentImage`. Verified by `nx run-many -t typecheck lint` for `smoke-coverage` and `nx run @beruangai/smoke-coverage-infra:synth`; the suites run in group 5.
 
 ## 4. Records
 

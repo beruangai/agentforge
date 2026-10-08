@@ -42,6 +42,8 @@ export class ApplicationStack extends Stack {
     new CfnOutput(this, 'HelloAgentRuntimeArn', {
       value: helloAgent.agentRuntimeArn,
     });
+    // What the smoke suite expects every task to record as its image.
+    new CfnOutput(this, 'HelloAgentImage', { value: helloAgent.image });
     new CfnOutput(this, 'SessionBucketName', {
       value: this.smokeCoverage.resources.sessionBucket.bucketName,
     });
