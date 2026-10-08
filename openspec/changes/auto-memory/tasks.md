@@ -20,7 +20,7 @@ Group 1 records the requirement. Group 2 is the package work, and group 3 runs i
 
 ## 3. Against a real model
 
-- [ ] 3.1 `integ/model/auto-memory/auto-memory.test.ts` through `runAgent`, in a sandbox, every run fenced (`blockReadsOutsideWorkingDirectories`) with the memory directory outside its working directories. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/auto-memory`:
+- [x] 3.1 `integ/model/auto-memory/auto-memory.test.ts` through `runAgent`, in a sandbox, every run fenced (`blockReadsOutsideWorkingDirectories`) with the memory directory outside its working directories. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/auto-memory`:
   - a run with a memory directory and `Read`, `Write` and `Edit`, told a fact to remember, leaves a topic file and a `MEMORY.md` line in the directory;
   - a second run with the same directory and no tools answers with the fact;
   - a run with no memory directory reports no `memory_paths.auto` in its `init`.

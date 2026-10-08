@@ -101,6 +101,8 @@ From [How Claude remembers your project](https://code.claude.com/docs/en/memory.
 - **An instruction fragment replaces the preset.** Spiked the same day: a custom `systemPrompt` (`string[]`) holding only a memory fragment, and the fragment after a procedure's own prompt. Both times the agent saved a topic file with the frontmatter the fragment describes and indexed it in `MEMORY.md`; a later run with the default prompt and no tools recalled it. The fragment names the directory, when to save, the file format and the index rule. The preset's memory section, like most of the preset, is for software development, and AgentForge does not use the preset.
 - A recall without `Read` sees only the index: a detail kept only in a topic file is missing.
 - Claude Code stamps each topic file's frontmatter with `node_type`, `originSessionId` and `modified`, whatever wrote it. The directory sits outside `CLAUDE_CONFIG_DIR`, so the config directory swapped on a run resumed from the store (above) does not affect it.
+- **`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` turns it off** — checked 2026-10-08, same SDK: without the variable, a run with no `autoMemoryDirectory` reports `memory_paths.auto` as `<CLAUDE_CONFIG_DIR>/projects/<cwd>/memory/`; with it, `memory_paths` is absent. The kernel sets it on every run that declares no memory directory; `integ/model/auto-memory/` re-verifies it.
+- **Under the read fence the memory directory stays readable and writable** though it is not a working directory — checked 2026-10-08: a fenced run saved to a directory outside its working directories, and a later fenced run recalled from it (`integ/model/auto-memory/`).
 
 ## Holding an answer back in-turn — spiked 2026-10-01 against `0.3.280` (CLI 2.1.284)
 
