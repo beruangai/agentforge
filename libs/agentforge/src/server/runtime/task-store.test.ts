@@ -2,6 +2,7 @@ import type { Message, Task } from '@a2a-js/sdk';
 import {
   type AttributeValue,
   GetItemCommand,
+  PutItemCommand,
   TransactionCanceledException,
   type TransactWriteItem,
   TransactWriteItemsCommand,
@@ -22,6 +23,11 @@ class FakeTable {
     if (command instanceof GetItemCommand) {
       const pk = command.input.Key?.pk?.S ?? '';
       return { Item: this.items.get(pk) };
+    }
+    if (command instanceof PutItemCommand) {
+      const item = command.input.Item ?? {};
+      this.items.set(item.pk?.S ?? '', item);
+      return {};
     }
     if (command instanceof TransactWriteItemsCommand) {
       const items = command.input.TransactItems ?? [];
@@ -47,6 +53,7 @@ class FakeTable {
       pk: { S: pk },
       task: values[':task'] as AttributeValue,
       state: values[':state'] as AttributeValue,
+      agent: values[':agent'] as AttributeValue,
       expiresAt: values[':expiresAt'] as AttributeValue,
       ...(values[':lease'] === undefined
         ? {}
@@ -55,8 +62,8 @@ class FakeTable {
   }
 }
 
-function store() {
-  const table = new FakeTable();
+/** One agent's store, over a table it may share with the project's other agents. */
+function store(agentName = 'writer', table = new FakeTable()) {
   const metrics = { count: vi.fn(), flush: async () => undefined };
   return {
     table,
@@ -64,9 +71,19 @@ function store() {
     store: new DynamoDBTaskStore(
       table as unknown as ConstructorParameters<typeof DynamoDBTaskStore>[0],
       'tasks',
+      agentName,
       metrics,
     ),
   };
+}
+
+/** Ages the stored task's lease past its expiry, as a dead container leaves it. */
+function lapse(table: FakeTable): void {
+  const stored = table.items.get('task#task');
+  table.items.set('task#task', {
+    ...stored,
+    leaseExpiresAt: { N: String(Date.now() - 1) },
+  });
 }
 
 const startMessage: Message = {
@@ -199,17 +216,14 @@ describe('the task store', () => {
   it('derives a lapsed task lost, writing its output with it', async () => {
     const { store: tasks, table, metrics } = store();
     await tasks.save(task('TASK_STATE_WORKING'));
-    const stored = table.items.get('task#task');
-    table.items.set('task#task', {
-      ...stored,
-      leaseExpiresAt: { N: String(Date.now() - 1) },
-    });
+    lapse(table);
     const lost = await tasks.load('task');
     expect(lost?.artifacts[0]?.parts[0]?.content).toMatchObject({
       value: { state: 'TASK_STATE_FAILED', cause: { code: 'LOST' } },
     });
     const derived = table.transactions.at(-1);
     expect(derived?.[0]?.Put?.Item?.derivedLost).toEqual({ BOOL: true });
+    expect(derived?.[0]?.Put?.Item?.agent).toEqual({ S: 'writer' });
     expect(derived?.[1]?.Put?.Item?.pk?.S).toBe('output#task');
     expect(metrics.count).toHaveBeenCalledOnce();
     // Read again: the output record answers, and nothing is written.
@@ -229,5 +243,46 @@ describe('the task store', () => {
       }),
     ).rejects.toThrow(/a live one none/);
     expect(table.send).not.toHaveBeenCalled();
+  });
+
+  it('records the agent on every task record it writes, and refuses to read one without it', async () => {
+    const { store: tasks, table } = store();
+    await tasks.save(task('TASK_STATE_SUBMITTED'));
+    expect(table.items.get('task#task')?.agent).toEqual({ S: 'writer' });
+    await tasks.save(completed);
+    expect(table.items.get('task#task')?.agent).toEqual({ S: 'writer' });
+
+    const { agent: _agent, ...unnamed } = table.items.get('task#task') ?? {};
+    table.items.set('task#task', unnamed);
+    await expect(tasks.load('task')).rejects.toThrow(
+      'task task is stored without its task, state or agent',
+    );
+  });
+
+  it("reads another agent's task as absent, and never writes it, not even to derive it lost", async () => {
+    const { store: writer, table } = store('writer');
+    const { store: grader } = store('grader', table);
+    await writer.save(task('TASK_STATE_WORKING'));
+    lapse(table);
+    const written = table.transactions.length;
+    expect(await grader.load('task')).toBeUndefined();
+    expect(table.transactions).toHaveLength(written);
+    expect(table.items.get('task#task')?.state).toEqual({
+      S: 'TASK_STATE_WORKING',
+    });
+  });
+
+  it('binds one idempotency key per agent, so two agents start two tasks under it', async () => {
+    const { store: writer, table } = store('writer');
+    const { store: grader } = store('grader', table);
+    await writer.bindKey('key', 'written', undefined);
+    expect(await grader.taskIdForKey('key')).toBeUndefined();
+    await grader.bindKey('key', 'graded', undefined);
+    expect(await writer.taskIdForKey('key')).toBe('written');
+    expect(await grader.taskIdForKey('key')).toBe('graded');
+    expect([...table.items.keys()].sort()).toEqual([
+      'key#grader#key',
+      'key#writer#key',
+    ]);
   });
 });

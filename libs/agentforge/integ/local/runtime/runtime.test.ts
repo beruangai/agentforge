@@ -28,7 +28,11 @@ import {
 import { RUNTIME_SESSION_HEADER } from '../../../src/core/contract/envelope.ts';
 import { startRefusalOf } from '../../../src/core/contract/start-refusal.ts';
 import { cause } from '../../../src/core/contract/task.ts';
-import { finishedTask, newTask } from '../../../src/server/runtime/a2a-task.ts';
+import {
+  finishedTask,
+  newTask,
+  stateOf,
+} from '../../../src/server/runtime/a2a-task.ts';
 import {
   type RunningServer,
   startServer,
@@ -384,12 +388,42 @@ describe('the runtime', () => {
 });
 
 describe('the task store', () => {
+  it("answers GetTask and CancelTask for another agent's task in the project's table as not found, and leaves it unwritten", async () => {
+    const other = new DynamoDBTaskStore(
+      dynamoDB.client,
+      tableName,
+      'another-agent',
+      { count: () => undefined, flush: async () => {} },
+    );
+    const task = newTask({
+      id: randomUUIDv7(),
+      contextId: randomUUIDv7(),
+      state: 'TASK_STATE_WORKING',
+      metadata: {},
+    });
+    await other.save(task);
+    const context = routed();
+    await expect(client.echo.GetTask(task.id, context)).rejects.toMatchObject({
+      code: -32001,
+    });
+    await expect(client.CancelTask(task.id, context)).rejects.toMatchObject({
+      code: -32001,
+    });
+    const stored = await other.load(task.id);
+    expect(stored && stateOf(stored)).toBe('TASK_STATE_WORKING');
+  });
+
   it('derives a task lost once its lease lapses, counts it once, and refuses a later write over it', async () => {
     const counted: string[] = [];
-    const store = new DynamoDBTaskStore(dynamoDB.client, tableName, {
-      count: (metric) => counted.push(metric),
-      flush: async () => {},
-    });
+    const store = new DynamoDBTaskStore(
+      dynamoDB.client,
+      tableName,
+      'runtime-integ',
+      {
+        count: (metric) => counted.push(metric),
+        flush: async () => {},
+      },
+    );
     const task = newTask({
       id: randomUUIDv7(),
       contextId: randomUUIDv7(),

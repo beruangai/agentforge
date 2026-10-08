@@ -130,7 +130,12 @@ export async function startServer(
     await createTaskTable(dynamoDB, config.tableName);
   }
   const metrics = createOperationalMetrics();
-  const store = new DynamoDBTaskStore(dynamoDB, config.tableName, metrics);
+  const store = new DynamoDBTaskStore(
+    dynamoDB,
+    config.tableName,
+    config.agentName,
+    metrics,
+  );
   const executor = new TaskProcessExecutor({
     taskCommand: [
       process.execPath,

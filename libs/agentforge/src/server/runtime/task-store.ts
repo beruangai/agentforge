@@ -50,6 +50,11 @@ const TRANSACTION_RETRY_MILLISECONDS = 50;
  * process lives, from which loss is derived at read time, and an index from
  * idempotency key to the latest attempt.
  *
+ * The table is a project's, shared by its agents, and a store is one agent's
+ * (ADR 0006): every task record it writes names its agent, a task another
+ * agent recorded reads as absent, and an idempotency key binds per agent. A
+ * task is keyed by its id alone.
+ *
  * A task is three records, so a large input or outcome cannot push it past
  * DynamoDB's 400 KB item: `task#id`, the task without its history or
  * artifacts, with its state and lease; `input#id`, the message that started
@@ -68,15 +73,18 @@ const TRANSACTION_RETRY_MILLISECONDS = 50;
 export class DynamoDBTaskStore implements TaskStore {
   readonly #client: DynamoDBClient;
   readonly #tableName: string;
-
+  readonly #agentName: string;
   readonly #metrics: OperationalMetrics;
+
   constructor(
     client: DynamoDBClient,
     tableName: string,
+    agentName: string,
     metrics: OperationalMetrics,
   ) {
     this.#client = client;
     this.#tableName = tableName;
+    this.#agentName = agentName;
     this.#metrics = metrics;
   }
 
@@ -95,8 +103,8 @@ export class DynamoDBTaskStore implements TaskStore {
           TableName: this.#tableName,
           Key: { pk: { S: taskKey(task.id) } },
           UpdateExpression: isTerminal(state)
-            ? 'SET #task = :task, #state = :state, expiresAt = :expiresAt REMOVE leaseExpiresAt'
-            : 'SET #task = :task, #state = :state, expiresAt = :expiresAt, leaseExpiresAt = :lease',
+            ? 'SET #task = :task, #state = :state, #agent = :agent, expiresAt = :expiresAt REMOVE leaseExpiresAt'
+            : 'SET #task = :task, #state = :state, #agent = :agent, expiresAt = :expiresAt, leaseExpiresAt = :lease',
           // A repeat of the same end is allowed: the executor saves the final
           // task itself, and the A2A SDK then saves its own copy of it. A
           // derived loss is never replaced, whatever the write.
@@ -104,11 +112,13 @@ export class DynamoDBTaskStore implements TaskStore {
           ExpressionAttributeNames: {
             '#task': 'task',
             '#state': 'state',
+            '#agent': AGENT_ATTRIBUTE,
             '#derivedLost': DERIVED_LOST_ATTRIBUTE,
           },
           ExpressionAttributeValues: {
             ':task': { S: taskRecordOf(task) },
             ':state': { S: state },
+            ':agent': { S: this.#agentName },
             ':expiresAt': expiresAt,
             ...(isTerminal(state)
               ? {}
@@ -182,6 +192,7 @@ export class DynamoDBTaskStore implements TaskStore {
               pk: { S: taskKey(taskId) },
               task: { S: taskRecordOf(lost) },
               state: { S: 'TASK_STATE_FAILED' },
+              [AGENT_ATTRIBUTE]: { S: this.#agentName },
               [DERIVED_LOST_ATTRIBUTE]: { BOOL: true },
               expiresAt,
             },
@@ -237,12 +248,12 @@ export class DynamoDBTaskStore implements TaskStore {
     }
   }
 
-  /** The latest task started under an idempotency key. */
+  /** The latest task this agent started under an idempotency key. */
   async taskIdForKey(idempotencyKey: string): Promise<string | undefined> {
     const response = await this.#client.send(
       new GetItemCommand({
         TableName: this.#tableName,
-        Key: { pk: { S: idempotencyKeyKey(idempotencyKey) } },
+        Key: { pk: { S: this.#idempotencyKeyKey(idempotencyKey) } },
         ConsistentRead: true,
       }),
     );
@@ -262,7 +273,7 @@ export class DynamoDBTaskStore implements TaskStore {
       new PutItemCommand({
         TableName: this.#tableName,
         Item: {
-          pk: { S: idempotencyKeyKey(idempotencyKey) },
+          pk: { S: this.#idempotencyKeyKey(idempotencyKey) },
           taskId: { S: taskId },
           expiresAt: {
             N: String(Math.floor(Date.now() / 1000) + RETENTION_SECONDS),
@@ -281,7 +292,10 @@ export class DynamoDBTaskStore implements TaskStore {
     );
   }
 
-  /** The task record, and for an ended task its output record's artifacts. */
+  /**
+   * The task record, and for an ended task its output record's artifacts;
+   * none for a task another agent of the project recorded.
+   */
   private async readTask(
     taskId: string,
   ): Promise<
@@ -292,9 +306,17 @@ export class DynamoDBTaskStore implements TaskStore {
     if (item === undefined) return undefined;
     const serialised = item.task?.S;
     const stateValue = item.state?.S;
-    if (serialised === undefined || stateValue === undefined) {
-      throw new Error(`task ${taskId} is stored without its task or state`);
+    const agentName = item[AGENT_ATTRIBUTE]?.S;
+    if (
+      serialised === undefined ||
+      stateValue === undefined ||
+      agentName === undefined
+    ) {
+      throw new Error(
+        `task ${taskId} is stored without its task, state or agent`,
+      );
     }
+    if (agentName !== this.#agentName) return undefined;
     const state = TaskStateEnum.parse(stateValue);
     const task = Task.fromJSON(JSON.parse(serialised));
     if (isTerminal(state)) {
@@ -316,6 +338,11 @@ export class DynamoDBTaskStore implements TaskStore {
           ? undefined
           : Number(item.leaseExpiresAt.N),
     };
+  }
+
+  /** An idempotency key's binding: one per agent, as it names one execution of the agent it was sent to. */
+  #idempotencyKeyKey(idempotencyKey: string): string {
+    return `key#${this.#agentName}#${idempotencyKey}`;
   }
 
   async #get(pk: string): Promise<Record<string, AttributeValue> | undefined> {
@@ -394,6 +421,9 @@ function cancelledFor(error: unknown, code: string): boolean {
   );
 }
 
+/** Names the agent whose task a task record is. */
+const AGENT_ATTRIBUTE = 'agent';
+
 /** Marks a loss derived by a reader, which no later write replaces. */
 const DERIVED_LOST_ATTRIBUTE = 'derivedLost';
 
@@ -417,10 +447,6 @@ function inputKey(taskId: string): string {
 
 function outputKey(taskId: string): string {
   return `output#${taskId}`;
-}
-
-function idempotencyKeyKey(idempotencyKey: string): string {
-  return `key#${idempotencyKey}`;
 }
 
 /**

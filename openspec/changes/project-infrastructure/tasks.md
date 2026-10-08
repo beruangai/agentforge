@@ -15,7 +15,7 @@ Applied third in the A6 batch, after `strict-contracts`; the example stacks were
 
 ## 2. Runtime and harness
 
-- [ ] 2.1 `DynamoDBTaskStore(client, tableName, agentName, metrics)`, constructed in `server.ts` from `config.agentName`. Every task-record write sets `agent`, the derived-`LOST` Put included; a record without `agent` throws; another agent's task is absent everywhere a task is read; keys bind as `key#<agent>#<idempotencyKey>`. Verified by its unit tests, against its fake table, and by `nx run @beruangai/agentforge:integ --configuration=local` against DynamoDB Local:
+- [x] 2.1 `DynamoDBTaskStore(client, tableName, agentName, metrics)`, constructed in `server.ts` from `config.agentName`. Every task-record write sets `agent`, the derived-`LOST` Put included; a record without `agent` throws; another agent's task is absent everywhere a task is read; keys bind as `key#<agent>#<idempotencyKey>`. Verified by its unit tests, against its fake table, and by `nx run @beruangai/agentforge:integ --configuration=local` against DynamoDB Local:
   - the record's agent, after `save` and after a derived `LOST`;
   - a record without `agent` throws;
   - another agent's task is not found by `load`, `GetTask` or `CancelTask`, and is not rewritten as `LOST`;
