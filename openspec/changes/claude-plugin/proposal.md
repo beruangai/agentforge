@@ -57,9 +57,7 @@ None. The package and the Nx plugin's generators are unchanged: enabling the plu
 ## Impact
 
 - **Repository root:** new `.claude-plugin/marketplace.json` and `claude-plugin/`, with the plugin's manifest, skill and references. No package code, entry point, export or bundle changes.
-- **Tests:** `libs/agentforge/integ/`:
-  - `local`: the marketplace and plugin validate, and every link in the skill resolves in the repository;
-  - `model`: the registration route loads the skill only where a project enables it.
+- **Tests:** `libs/agentforge/integ/local/claude-plugin/`: the marketplace and plugin validate, every link in the skill resolves in the repository, and the registration route loads the skill only where a project enables it.
 - **This repository:** `.claude/settings.json` enables `agentforge@agentforge`. The operator registers the marketplace once on this machine.
 - **Docs:**
   - the root README gains how to register and enable the plugin;

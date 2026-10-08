@@ -8,15 +8,12 @@ See proposal.md — Why. What holds today:
 - **Claude Code's marketplaces** ([install](https://code.claude.com/docs/en/plugins/install), [marketplace reference](https://code.claude.com/docs/en/plugins/marketplace-reference), read 2026-10-08):
   - A marketplace is a directory holding `.claude-plugin/marketplace.json`, its *root*. A plugin's relative source resolves from the root, starts with `./`, and may not contain `..`.
   - `claude plugin marketplace add <directory>` registers a local directory.
-  - `claude plugin validate <path>` checks a marketplace root or a plugin.
+  - `claude plugin validate <path>` checks a marketplace root or a plugin. It does not check that a relative plugin source exists (CLI 2.1.280, 2026-10-08).
 - **The research** (`docs/research/claude-code-plugin-distribution.md`, spiked 2026-10-01 on CLI 2.1.284):
   - A `directory` marketplace loads its plugins in place, so an edit reaches the next session.
   - A marketplace registered at user scope with `enabledPlugins: { "agentforge@agentforge": false }` beside it, and enabled by a project's `.claude/settings.json` or `.claude/settings.local.json`, loads in that project only. This held on a fresh config directory in a headless session, with no install step and no trust prompt.
 - **The CLI the tests can run.** The Agent SDK ships the `claude` binary in its platform package (`@anthropic-ai/claude-agent-sdk-<platform>`), at the version AgentForge pins.
-- **The test tiers** (`.claude/rules/testing.md`):
-  - `integ` dimensions are folders under `libs/agentforge/integ/`;
-  - `local` needs no credentials;
-  - `model` has the subscription token.
+- **The test tiers** (`.claude/rules/testing.md`): `integ` dimensions are folders under `libs/agentforge/integ/`, and a concept goes in the folder of the most expensive thing it needs. `local` needs no credentials. A session's `initialize` response lists the skills it loaded with no turn and no credential (`integ/local/capability-composition/`), so registration needs nothing more than `local`.
 
 ## Goals / Non-Goals
 
@@ -99,20 +96,13 @@ Then, in the user settings, `enabledPlugins: { "agentforge@agentforge": false }`
   - the image is Debian.
 - **The standing rule** goes in `CLAUDE.md` (Working rules): a change to what a consumer writes or runs updates the skill, and a breaking one adds its migration entry, in the same change.
 
-### The checks run with AgentForge's integration tests, on the CLI the SDK ships
+### The checks run with AgentForge's local integration tests, on the CLI the SDK ships
 
-Both run the `claude` binary from the SDK's platform package, so they test the CLI version AgentForge pins and need nothing on `PATH`.
+`integ/local/claude-plugin/` runs the `claude` binary from the SDK's platform package, so it tests the CLI version AgentForge pins and needs nothing on `PATH` and no credentials. It sits in `local`, not the unit tier, because it shells out to the CLI.
 
-- **`integ/local/claude-plugin/`:**
-  - `claude plugin validate` passes on the repository root and on `claude-plugin/`;
-  - every relative link in the skill and its references resolves to a file in the repository.
-
-  It needs no credentials. It sits in `local`, not the unit tier, because it shells out to the CLI.
-- **`integ/model/claude-plugin/`:**
-  - In an isolated config directory, the marketplace is registered at user scope from the repository root, with the plugin disabled there.
-  - A fixture project that enables the plugin reports the skill in its session's `init`.
-  - A fixture project that does not enable it does not report it.
-  - Reading `init` needs no inference beyond it.
+- `claude plugin validate` passes on the repository root and on `claude-plugin/`.
+- Every relative link in the skill and its references resolves to a file in the repository.
+- In an isolated config directory, the marketplace is registered at user scope from the repository root, with the plugin disabled there. A fixture project that enables the plugin lists the skill in its session's `initialize` response; one that does not, does not. No turn is sent and no credential is present.
 
 ### §REQ712, in the adoption category
 
@@ -124,15 +114,16 @@ It sits beside §REQ709 (adoption without wiring by hand), whose generated seams
 
 | Failure | When | Outcome |
 |---|---|---|
-| A manifest malformed, or naming a path that is not there | `integ` local | `claude plugin validate` fails, naming the field |
+| A manifest malformed | `integ` local | `claude plugin validate` fails, naming the field |
+| The marketplace's plugin source not there | `integ` local | the enabled fixture project does not list the skill (the validator does not check it) |
 | The skill links a file that does not exist | `integ` local | fails, naming the link |
 | The marketplace not registered on a machine | session start | the plugin is absent; the README's registration step says so |
 | A registered clone moves | session start | the marketplace is unresolved; the developer registers it again |
 
 ## What earns which test
 
-- **`integ` local:** the manifests validate and the skill's links resolve. Cheap, and it catches what an edit breaks.
-- **`integ` model:** the registration route — user scope disabled, enabled per project — loads the skill only where a project enables it. AgentForge relies on this, the research spiked it, and a CLI release can change it.
+- **`integ` local, the manifests and links:** they validate and resolve. Cheap, and it catches what an edit breaks.
+- **`integ` local, registration:** the route — user scope disabled, enabled per project — loads the skill only where a project enables it. AgentForge relies on this, the research spiked it, and a CLI release can change it.
 - **Settled once:** that a directory marketplace loads in place is documented and spiked (research note); no test.
 - **Operator check:** with this clone registered, a session in this repository lists the skill, and asked to add a procedure to an example agent, follows it.
 

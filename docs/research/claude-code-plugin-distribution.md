@@ -18,3 +18,7 @@ How a consumer's Claude Code picks up skills AgentForge ships inside `@beruangai
 - A project that sets `enabledPlugins: { "agentforge@agentforge": true }` in `.claude/settings.json` (committed) or `.claude/settings.local.json` (not) gets it. That held on a fresh config directory in a headless session, with no `install` step and no trust prompt.
 - It loads in place: an edit to the marketplace directory reached the next session.
 - The marketplace is one directory per machine, so every project on the machine gets the guidance of whichever AgentForge it points at, not each project's installed version.
+
+**Re-checked 2026-10-08 on the SDK's CLI 2.1.280, from the repository root as the marketplace.**
+- Registered at user scope with the plugin disabled there, a session started in a project that enables it lists `agentforge:agentforge` in its `initialize` response, and one in a project that does not, does not. This needs no credential and no turn (`integ/local/claude-plugin/`).
+- `claude plugin validate` does not check that a relative plugin source exists: a marketplace naming `./no-such-plugin` passes. The registration test is what catches it.

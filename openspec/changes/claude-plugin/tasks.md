@@ -1,6 +1,6 @@
 # Tasks
 
-Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide itself. Group 3 proves registration against a real session. Group 4 dogfoods it here. Group 5 closes the records and A6.
+Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide itself. Group 3 proves registration against a real session start. Group 4 dogfoods it here. Group 5 closes the records and A6.
 
 ## 1. The marketplace and the plugin
 
@@ -10,7 +10,7 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
   - `claude-plugin/skills/agentforge/SKILL.md`, with its frontmatter `name` and `description`, its body a placeholder until 2.1.
 
   Verified by `claude plugin validate .` and `claude plugin validate claude-plugin` passing.
-- [ ] 1.2 `libs/agentforge/integ/local/claude-plugin/`, running the `claude` binary from the SDK's platform package. It checks:
+- [x] 1.2 `libs/agentforge/integ/local/claude-plugin/`, running the `claude` binary from the SDK's platform package. It checks:
   - `claude plugin validate` passes on the repository root and on `claude-plugin/`;
   - every relative link in the skill and its references resolves to a file in the repository.
 
@@ -56,12 +56,12 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
 
 ## 3. Registration
 
-- [ ] 3.1 `libs/agentforge/integ/model/claude-plugin/`, on the SDK's `claude` binary, in an isolated config directory:
+- [ ] 3.1 `libs/agentforge/integ/local/claude-plugin/`, on the SDK's `claude` binary, in an isolated config directory with no credential and no turn:
   - the marketplace is registered at user scope from the repository root, with `enabledPlugins: { "agentforge@agentforge": false }`;
-  - a fixture project enabling the plugin in `.claude/settings.json` reports the skill in its session's `init`;
-  - a fixture project not enabling it does not report it.
+  - a fixture project enabling the plugin in `.claude/settings.json` lists the skill in its session's `initialize` response;
+  - a fixture project not enabling it does not list it.
 
-  Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/claude-plugin`.
+  Verified by `nx run @beruangai/agentforge:integ --configuration=local -- integ/local/claude-plugin`, and by the enabled case failing with the marketplace's source pointed at a missing directory before it is reverted.
 
 ## 4. Dogfood
 
