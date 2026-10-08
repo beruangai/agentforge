@@ -5,10 +5,10 @@ Applied third in the A6 batch, after `strict-contracts`; the example stacks were
 ## 1. Constructs
 
 - [x] 1.1 `AGENT_NAME_PATTERN` in `core/agent-name.ts`, and the plugin's `KebabNameField` built from it. Verified by `nx run @beruangai/agentforge:test`.
-- [ ] 1.2 `AgenticProjectResources` in `src/infra/agentic-project-resources.ts`, exported from `/infra`, owns the task table, the session bucket, the dashboard and the readiness probe, with their settings moved unchanged from `AgentRuntime`, and `addAgent`, which adds the agent's dashboard section, titled by its name, and its readiness check, and refuses a duplicate name. Verified by `nx run @beruangai/agentforge:test` (`Template` assertions):
+- [x] 1.2 `AgenticProjectResources` in `src/infra/agentic-project-resources.ts`, exported from `/infra`, owns the task table, the session bucket, the dashboard and the readiness probe, with their settings moved unchanged from `AgentRuntime`, and `addAgent`, which adds the agent's dashboard section, titled by its name, and its readiness check, and refuses a duplicate name. Verified by `nx run @beruangai/agentforge:test` (`Template` assertions):
   - one project with two agents has one table, one bucket, one dashboard with a section per agent, one probe Lambda and two readiness resources;
   - a duplicate agent name is refused.
-- [ ] 1.3 `AgentRuntime` takes `project` and `agentName`, and loses `removalPolicy`, `sessionRetention`, `taskTable`, `sessionBucket` and `dashboard`. It sets and owns `AGENTFORGE_AGENT_NAME`, grants the table, and grants the bucket under `<agentName>/` only. The integration fixture `agentforge-runtime-app.ts` deploys through `AgenticProjectResources`. Verified by unit tests:
+- [x] 1.3 `AgentRuntime` takes `project` and `agentName`, and loses `removalPolicy`, `sessionRetention`, `taskTable`, `sessionBucket` and `dashboard`. It sets and owns `AGENTFORGE_AGENT_NAME`, grants the table, and grants the bucket under `<agentName>/` only. The integration fixture `agentforge-runtime-app.ts` deploys through `AgenticProjectResources`. Verified by unit tests:
   - the runtime's environment names the project's table and bucket and the agent;
   - the bucket grant is prefix-scoped, including `s3:ListBucket`'s `s3:prefix` condition;
   - `AGENTFORGE_AGENT_NAME` set by the consumer is refused, as is a name not matching `AGENT_NAME_PATTERN`.

@@ -1,13 +1,10 @@
-import { App, Duration, Stack } from 'aws-cdk-lib';
+import { App, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import { describe, expect, it } from 'vitest';
-import {
-  TASK_TABLE_PARTITION_KEY,
-  TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
-} from '#core/task-table.ts';
 import { AgentRuntime, type AgentRuntimeProps } from './agent-runtime.ts';
+import { AgenticProjectResources } from './agentic-project-resources.ts';
 import { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
 
 const IMAGE = AgentRuntimeArtifact.fromImageUri(
@@ -23,6 +20,10 @@ function synthesize(
     env: { account: '123456789012', region: 'us-east-2' },
   });
   new AgentRuntime(stack, 'Agent', {
+    project: new AgenticProjectResources(stack, 'Project', {
+      projectName: 'smoke-coverage',
+    }),
+    agentName: 'hello-agent',
     agentRuntimeArtifact: IMAGE,
     secrets: {
       CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
@@ -37,7 +38,7 @@ function synthesize(
 }
 
 describe('AgentRuntime', () => {
-  it('runs on V2 over A2A, with A2A-Version and the task table added to what the consumer declares', () => {
+  it("runs on V2 over A2A, with A2A-Version, the project's table and bucket and the agent's name added to what the consumer declares", () => {
     const template = synthesize({
       environmentVariables: { AGENTFORGE_ADMISSION_LIMIT: '2' },
       requestHeaderConfiguration: { allowlistedHeaders: ['X-Trace'] },
@@ -50,6 +51,7 @@ describe('AgentRuntime', () => {
       },
       EnvironmentVariables: {
         AGENTFORGE_ADMISSION_LIMIT: '2',
+        AGENTFORGE_AGENT_NAME: 'hello-agent',
         AGENTFORGE_TABLE_NAME: { Ref: Match.stringLikeRegexp('TaskTable') },
         AGENTFORGE_SESSION_BUCKET: {
           Ref: Match.stringLikeRegexp('SessionBucket'),
@@ -59,68 +61,55 @@ describe('AgentRuntime', () => {
     });
   });
 
-  it("deploys the task table with the task store's own key and expiry", () => {
-    synthesize().hasResourceProperties('AWS::DynamoDB::Table', {
-      KeySchema: [{ AttributeName: TASK_TABLE_PARTITION_KEY, KeyType: 'HASH' }],
-      TimeToLiveSpecification: {
-        AttributeName: TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
-        Enabled: true,
-      },
-      BillingMode: 'PAY_PER_REQUEST',
-      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true },
-    });
-  });
-
-  it('persists session transcripts in a private, encrypted, versioned bucket it may read and write, expired after 30 days', () => {
+  it("may read and write the project's task table, and its transcripts under its own name alone", () => {
     const template = synthesize();
-    template.hasResourceProperties('AWS::S3::Bucket', {
-      BucketEncryption: {
-        ServerSideEncryptionConfiguration: [
-          { ServerSideEncryptionByDefault: { SSEAlgorithm: 'AES256' } },
-        ],
-      },
-      PublicAccessBlockConfiguration: {
-        BlockPublicAcls: true,
-        BlockPublicPolicy: true,
-        IgnorePublicAcls: true,
-        RestrictPublicBuckets: true,
-      },
-      VersioningConfiguration: { Status: 'Enabled' },
-      LifecycleConfiguration: {
-        Rules: [
-          {
-            ExpirationInDays: 30,
-            NoncurrentVersionExpiration: { NoncurrentDays: 1 },
-            Status: 'Enabled',
-          },
-          { ExpiredObjectDeleteMarker: true, Status: 'Enabled' },
-        ],
-      },
-    });
-    template.hasResource('AWS::S3::Bucket', {
-      DeletionPolicy: 'Retain',
-      Metadata: {
-        checkov: {
-          skip: [
-            { id: 'CKV_AWS_18', comment: Match.stringLikeRegexp('audit') },
-          ],
-        },
-      },
-    });
     template.hasResourceProperties('AWS::IAM::Policy', {
       PolicyDocument: {
         Statement: Match.arrayWith([
           Match.objectLike({
-            Action: Match.arrayWith(['s3:PutObject']),
+            Action: Match.arrayWith(['dynamodb:PutItem']),
             Resource: Match.arrayWith([
-              {
-                'Fn::GetAtt': [Match.stringLikeRegexp('SessionBucket'), 'Arn'],
-              },
+              { 'Fn::GetAtt': [Match.stringLikeRegexp('TaskTable'), 'Arn'] },
             ]),
           }),
+          {
+            Action: ['s3:GetObject', 's3:PutObject'],
+            Effect: 'Allow',
+            Resource: {
+              'Fn::Join': [
+                '',
+                [
+                  {
+                    'Fn::GetAtt': [
+                      Match.stringLikeRegexp('SessionBucket'),
+                      'Arn',
+                    ],
+                  },
+                  '/hello-agent/*',
+                ],
+              ],
+            },
+          },
+          {
+            Action: 's3:ListBucket',
+            Condition: { StringLike: { 's3:prefix': 'hello-agent/*' } },
+            Effect: 'Allow',
+            Resource: {
+              'Fn::GetAtt': [Match.stringLikeRegexp('SessionBucket'), 'Arn'],
+            },
+          },
         ]),
       },
     });
+    // No grant reaches the bucket's objects beyond the agent's prefix.
+    const statements = Object.values(
+      template.findResources('AWS::IAM::Policy'),
+    ).flatMap((policy) => policy.Properties.PolicyDocument.Statement);
+    expect(
+      statements.filter((statement) =>
+        JSON.stringify(statement.Resource).includes('SessionBucket'),
+      ),
+    ).toHaveLength(2);
   });
 
   it('counts per agent under its runtime name, may publish only to its namespace, and charts it beside AgentCore', () => {
@@ -149,17 +138,6 @@ describe('AgentRuntime', () => {
     );
     expect(body).toContain('TasksLost');
     expect(body).toContain('agent_runtime::DEFAULT');
-  });
-
-  it('keeps transcripts as long as the consumer chooses', () => {
-    synthesize({ sessionRetention: Duration.days(365) }).hasResourceProperties(
-      'AWS::S3::Bucket',
-      {
-        LifecycleConfiguration: {
-          Rules: Match.arrayWith([Match.objectLike({ ExpirationInDays: 365 })]),
-        },
-      },
-    );
   });
 
   it('probes the runtime at every new version, with leave to invoke it', () => {
@@ -268,10 +246,19 @@ describe('AgentRuntime', () => {
     );
   });
 
-  it('refuses a table name the consumer set, which the construct owns', () => {
+  it('refuses a table name or an agent name the consumer set, which the construct owns', () => {
     expect(() =>
       synthesize({ environmentVariables: { AGENTFORGE_TABLE_NAME: 'mine' } }),
     ).toThrow(/AGENTFORGE_TABLE_NAME/);
+    expect(() =>
+      synthesize({ environmentVariables: { AGENTFORGE_AGENT_NAME: 'other' } }),
+    ).toThrow(/AGENTFORGE_AGENT_NAME is set by AgentRuntime/);
+  });
+
+  it('refuses an agent name that is not kebab-case', () => {
+    expect(() => synthesize({ agentName: 'Hello_Agent' })).toThrow(
+      /agent name "Hello_Agent" must match/,
+    );
   });
 
   it('names its filesystem buckets to the harness, and may read and write each', () => {

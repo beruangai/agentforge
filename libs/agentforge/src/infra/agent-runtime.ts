@@ -1,12 +1,4 @@
-import { fileURLToPath } from 'node:url';
-import {
-  ArnFormat,
-  CustomResource,
-  Duration,
-  RemovalPolicy,
-  Stack,
-  Validations,
-} from 'aws-cdk-lib';
+import { ArnFormat, Stack, Validations } from 'aws-cdk-lib';
 import {
   type CfnRuntime,
   ProtocolType,
@@ -14,69 +6,29 @@ import {
   type RuntimeProps,
 } from 'aws-cdk-lib/aws-bedrockagentcore';
 import {
-  Dashboard,
-  GraphWidget,
-  Metric,
-  TextWidget,
-} from 'aws-cdk-lib/aws-cloudwatch';
-import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
-import {
   type Grant,
   type IGrantable,
   PolicyStatement,
 } from 'aws-cdk-lib/aws-iam';
-import {
-  Code,
-  Function as LambdaFunction,
-  Runtime as LambdaRuntime,
-  RuntimeFamily,
-} from 'aws-cdk-lib/aws-lambda';
-import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
-import {
-  BlockPublicAccess,
-  Bucket,
-  BucketEncryption,
-} from 'aws-cdk-lib/aws-s3';
 import type { ISecret } from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { A2A_VERSION_HEADER } from '#core/a2a-version.ts';
+import { AGENT_NAME_PATTERN, AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import {
   FILESYSTEM_BUCKETS_VARIABLE,
   FILESYSTEM_NAME_PATTERN,
 } from '#core/filesystem.ts';
-import {
-  METRICS_DIMENSION,
-  METRICS_NAMESPACE,
-  METRICS_VARIABLE,
-  OPERATIONAL_METRICS,
-} from '#core/metrics.ts';
+import { METRICS_NAMESPACE, METRICS_VARIABLE } from '#core/metrics.ts';
 import {
   REQUIRED_SECRETS,
   type RequiredSecret,
   SECRETS_VARIABLE,
 } from '#core/secrets.ts';
 import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
-import {
-  TASK_TABLE_NAME_VARIABLE,
-  TASK_TABLE_PARTITION_KEY,
-  TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
-} from '#core/task-table.ts';
+import { TASK_TABLE_NAME_VARIABLE } from '#core/task-table.ts';
 import { TELEMETRY_VARIABLE, type TelemetryLevel } from '#core/telemetry.ts';
-import { suppressRules } from './checkov.ts';
+import type { AgenticProjectResources } from './agentic-project-resources.ts';
 import type { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
-
-/**
- * How long the probe may wait for the runtime to serve: a V2 create takes
- * minutes while the snapshot is prepared (~184 s observed), and Lambda's
- * ceiling is fifteen.
- */
-const READINESS_TIMEOUT = Duration.minutes(14);
-/**
- * Lambda's Node.js 26 runtime, in public preview until its GA (targeted for
- * November 2026), before which the CDK has no member for it
- * (docs/research/agentcore-runtime.md). Node 26 gives the probe uuid7.
- */
-const NODEJS_26_X = new LambdaRuntime('nodejs26.x', RuntimeFamily.NODEJS);
 
 /** A secret as `AgentRuntime` reads it: its ARN, and read granted to the runtime's role. */
 export type AgentSecret = Pick<ISecret, 'secretArn' | 'grantRead'>;
@@ -100,20 +52,13 @@ export interface AgentRuntimeProps
     RuntimeProps,
     'protocolConfiguration' | 'authorizerConfiguration'
   > {
+  /** The project's shared resources, which this agent's tasks and transcripts live in. */
+  readonly project: AgenticProjectResources;
   /**
-   * What happens to the task table and the session bucket when the stack
-   * deletes them. `DESTROY` deletes the bucket only when it is empty, and
-   * fails the stack's deletion otherwise: emptying it would take a Lambda
-   * whose log group outlives the stack.
-   * @default RemovalPolicy.RETAIN
+   * The agent's name within its project, as its image names it; matches
+   * `AGENT_NAME_PATTERN`. Its tasks and transcripts are scoped by it.
    */
-  readonly removalPolicy?: RemovalPolicy;
-  /**
-   * How long a session's transcript is kept after it is written (§REQ402).
-   * Transcripts hold everything the agent was sent and read.
-   * @default Duration.days(30)
-   */
-  readonly sessionRetention?: Duration;
+  readonly agentName: string;
   /**
    * Whether the runtime delivers its service spans to AgentCore Observability.
    * @default true
@@ -142,31 +87,28 @@ export interface AgentRuntimeProps
 }
 
 /**
- * One deployed agent: an AgentCore runtime on platform version V2 serving the
- * agent's image over A2A, the DynamoDB table its tasks live in, and the S3
- * bucket its session transcripts persist in, so a session outlives its
- * container — encrypted, private, expired after `sessionRetention`. A deploy
- * completes only once the runtime serves: a readiness probe runs after every
- * change to the runtime, asking it for an unknown task until AgentForge's
- * server answers. Everything else a runtime takes — its image, role, network,
- * lifecycle, environment — is the consumer's, as the L2 `Runtime` takes it;
- * the A2A-Version header and the table's name are added to what it declares.
+ * One deployed agent of a project: an AgentCore runtime on platform version
+ * V2 serving the agent's image over A2A, pointed at the project's task table
+ * and session bucket — granted the table, and the bucket under its own name
+ * only — with its section on the project's dashboard. A deploy completes
+ * only once the runtime serves: the project's readiness probe runs after
+ * every change to the runtime, asking it for an unknown task until
+ * AgentForge's server answers. Everything else a runtime takes — its image,
+ * role, network, lifecycle, environment — is the consumer's, as the L2
+ * `Runtime` takes it; the A2A-Version header, the table's name and the
+ * agent's name are added to what it declares.
  * AgentCore Observability is on unless the consumer turns it off: the runtime
  * delivers its service spans, which needs CloudWatch Transaction Search in the
  * account (a one-time setup).
  */
 export class AgentRuntime extends Construct {
   readonly runtime: Runtime;
-  readonly taskTable: Table;
-  readonly sessionBucket: Bucket;
-  /** The agent's operational metrics beside what AgentCore reports of it (§REQ604). */
-  readonly dashboard: Dashboard;
 
   constructor(scope: Construct, id: string, props: AgentRuntimeProps) {
     super(scope, id);
     const {
-      removalPolicy = RemovalPolicy.RETAIN,
-      sessionRetention = Duration.days(30),
+      project,
+      agentName,
       tracingEnabled = true,
       secrets,
       telemetry = 'INFO',
@@ -175,7 +117,13 @@ export class AgentRuntime extends Construct {
       requestHeaderConfiguration,
       ...runtimeProps
     } = props;
+    if (!AGENT_NAME_PATTERN.test(agentName)) {
+      throw new Error(
+        `agent name "${agentName}" must match ${AGENT_NAME_PATTERN}`,
+      );
+    }
     for (const owned of [
+      AGENT_NAME_VARIABLE,
       TASK_TABLE_NAME_VARIABLE,
       SESSION_BUCKET_VARIABLE,
       METRICS_VARIABLE,
@@ -209,39 +157,6 @@ export class AgentRuntime extends Construct {
       }
     }
 
-    this.taskTable = new Table(this, 'TaskTable', {
-      partitionKey: {
-        name: TASK_TABLE_PARTITION_KEY,
-        type: AttributeType.STRING,
-      },
-      timeToLiveAttribute: TASK_TABLE_TIME_TO_LIVE_ATTRIBUTE,
-      billingMode: BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
-      removalPolicy,
-    });
-    this.sessionBucket = new Bucket(this, 'SessionBucket', {
-      encryption: BucketEncryption.S3_MANAGED,
-      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
-      enforceSSL: true,
-      versioned: true,
-      // A transcript is gone a day after it expires: versioning is an undo
-      // window, not a second retention.
-      lifecycleRules: [
-        {
-          expiration: sessionRetention,
-          noncurrentVersionExpiration: Duration.days(1),
-        },
-        // S3 refuses this beside an expiration, so it is a rule of its own.
-        { expiredObjectDeleteMarker: true },
-      ],
-      removalPolicy,
-    });
-    suppressRules(
-      this.sessionBucket,
-      ['CKV_AWS_18'],
-      "Only the agent's own role reads and writes transcripts; the run record and the task store are the audit, not S3 access logs.",
-    );
-
     const allowlistedHeaders =
       requestHeaderConfiguration?.allowlistedHeaders ?? [];
     this.runtime = new Runtime(this, 'Runtime', {
@@ -256,8 +171,9 @@ export class AgentRuntime extends Construct {
       },
       environmentVariables: {
         ...environmentVariables,
-        [TASK_TABLE_NAME_VARIABLE]: this.taskTable.tableName,
-        [SESSION_BUCKET_VARIABLE]: this.sessionBucket.bucketName,
+        [AGENT_NAME_VARIABLE]: agentName,
+        [TASK_TABLE_NAME_VARIABLE]: project.taskTable.tableName,
+        [SESSION_BUCKET_VARIABLE]: project.sessionBucket.bucketName,
         [TELEMETRY_VARIABLE]: telemetry,
         [SECRETS_VARIABLE]: Stack.of(this).toJsonString(
           Object.fromEntries(
@@ -295,8 +211,23 @@ export class AgentRuntime extends Construct {
       reason:
         "PlatformVersion is in CloudFormation's resource reference but not yet in the CDK's bundled schema",
     });
-    this.taskTable.grantReadWriteData(this.runtime);
-    this.sessionBucket.grantReadWrite(this.runtime);
+    // The whole table: the project's agents are trusted alike, and the task
+    // store reads only the agent's own tasks.
+    project.taskTable.grantReadWriteData(this.runtime);
+    // Transcripts under the agent's own name only, listing included.
+    this.runtime.role.addToPrincipalPolicy(
+      new PolicyStatement({
+        actions: ['s3:GetObject', 's3:PutObject'],
+        resources: [project.sessionBucket.arnForObjects(`${agentName}/*`)],
+      }),
+    );
+    this.runtime.role.addToPrincipalPolicy(
+      new PolicyStatement({
+        actions: ['s3:ListBucket'],
+        resources: [project.sessionBucket.bucketArn],
+        conditions: { StringLike: { 's3:prefix': `${agentName}/*` } },
+      }),
+    );
     for (const filesystem of Object.values(filesystems)) {
       filesystem.bucket.grantReadWrite(this.runtime);
     }
@@ -325,11 +256,6 @@ export class AgentRuntime extends Construct {
         },
       }),
     );
-    this.dashboard = operationalDashboard(
-      this,
-      this.runtime.agentRuntimeName,
-      this.runtime.agentRuntimeArn,
-    );
     for (const secret of Object.values(secrets)) {
       secret.grantRead(this.runtime);
     }
@@ -349,38 +275,7 @@ export class AgentRuntime extends Construct {
       }),
     );
 
-    const agentRuntimeVersion = this.runtime.agentRuntimeVersion;
-    if (agentRuntimeVersion === undefined) {
-      throw new Error('the L2 Runtime exposes no agentRuntimeVersion');
-    }
-    const probe = new LambdaFunction(this, 'ReadinessProbe', {
-      runtime: NODEJS_26_X,
-      handler: 'index.handler',
-      code: Code.fromAsset(
-        fileURLToPath(new URL('./readiness-probe/', import.meta.url)),
-      ),
-      timeout: READINESS_TIMEOUT,
-      // Owned by the stack, so a destroy leaves no log group behind.
-      logGroup: new LogGroup(this, 'ReadinessProbeLogs', {
-        retention: RetentionDays.ONE_MONTH,
-        removalPolicy: RemovalPolicy.DESTROY,
-      }),
-    });
-    const probeGrant = this.runtime.grantInvokeRuntime(probe);
-    // The probe is its own handler; a new version updates the resource, so
-    // every deploy that changes the runtime waits for it to serve again.
-    const readiness = new CustomResource(this, 'Readiness', {
-      serviceToken: probe.functionArn,
-      resourceType: 'Custom::AgentForgeReadiness',
-      // A probe that never answers — one that fails to load — fails the
-      // deploy once the probe's own timeout has passed, not after an hour.
-      serviceTimeout: READINESS_TIMEOUT.plus(Duration.minutes(1)),
-      properties: {
-        AgentRuntimeArn: this.runtime.agentRuntimeArn,
-        AgentRuntimeVersion: agentRuntimeVersion,
-      },
-    });
-    readiness.node.addDependency(probeGrant);
+    project.addAgent({ agentName, runtime: this.runtime, scope: this });
   }
 
   get agentRuntimeArn(): string {
@@ -391,93 +286,4 @@ export class AgentRuntime extends Construct {
   grantInvoke(grantee: IGrantable): Grant {
     return this.runtime.grantInvokeRuntime(grantee);
   }
-}
-
-/**
- * One dashboard per agent (§REQ604): what AgentForge counts, beside the
- * invocations, errors, latency, sessions and resources AgentCore reports of
- * the runtime's default endpoint.
- */
-function operationalDashboard(
-  scope: Construct,
-  runtimeName: string,
-  runtimeArn: string,
-): Dashboard {
-  const counted = (metricName: string): Metric =>
-    new Metric({
-      namespace: METRICS_NAMESPACE,
-      metricName,
-      dimensionsMap: { [METRICS_DIMENSION]: runtimeName },
-      statistic: 'Sum',
-      period: Duration.minutes(5),
-    });
-  const endpoint = `${runtimeName}::DEFAULT`;
-  const invocation = (metricName: string, statistic = 'Sum'): Metric =>
-    new Metric({
-      namespace: 'AWS/Bedrock-AgentCore',
-      metricName,
-      dimensionsMap: {
-        Resource: runtimeArn,
-        Operation: 'InvokeAgentRuntime',
-        Name: endpoint,
-      },
-      statistic,
-      period: Duration.minutes(5),
-    });
-  const usage = (metricName: string): Metric =>
-    new Metric({
-      namespace: 'AWS/Bedrock-AgentCore',
-      metricName,
-      dimensionsMap: {
-        Resource: runtimeArn,
-        Service: 'AgentCore.Runtime',
-        Name: endpoint,
-      },
-      statistic: 'Sum',
-      period: Duration.hours(1),
-    });
-  const dashboard = new Dashboard(scope, 'Dashboard');
-  dashboard.addWidgets(
-    new TextWidget({
-      markdown: `# ${runtimeName}\nWhat AgentForge cannot rule out, beside what AgentCore reports.`,
-      width: 24,
-      height: 2,
-    }),
-  );
-  dashboard.addWidgets(
-    new GraphWidget({
-      title: 'Tasks AgentForge could not settle',
-      left: Object.values(OPERATIONAL_METRICS).map(counted),
-      width: 12,
-    }),
-    new GraphWidget({
-      title: 'Invocations and errors',
-      left: [
-        invocation('Invocations'),
-        invocation('SystemErrors'),
-        invocation('UserErrors'),
-        invocation('Throttles'),
-      ],
-      width: 12,
-    }),
-  );
-  dashboard.addWidgets(
-    new GraphWidget({
-      title: 'Latency',
-      left: [invocation('Latency', 'Average'), invocation('Latency', 'p99')],
-      width: 8,
-    }),
-    new GraphWidget({
-      title: 'Sessions',
-      left: [invocation('Sessions')],
-      width: 8,
-    }),
-    new GraphWidget({
-      title: 'Resources',
-      left: [usage('MemoryUsed-GBHours')],
-      right: [usage('CPUUsed-vCPUHours')],
-      width: 8,
-    }),
-  );
-  return dashboard;
 }

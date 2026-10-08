@@ -5,6 +5,7 @@ import { BucketEncryption } from 'aws-cdk-lib/aws-s3';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import { describe, expect, it } from 'vitest';
 import { AgentRuntime } from './agent-runtime.ts';
+import { AgenticProjectResources } from './agentic-project-resources.ts';
 import { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
 
 describe('S3FilesystemBucket', () => {
@@ -13,8 +14,13 @@ describe('S3FilesystemBucket', () => {
       env: { account: '123456789012', region: 'us-east-2' },
     });
     const vault = new S3FilesystemBucket(stack, 'Vault');
+    const project = new AgenticProjectResources(stack, 'Project', {
+      projectName: 'agents',
+    });
     for (const name of ['One', 'Two']) {
       new AgentRuntime(stack, name, {
+        project,
+        agentName: name.toLowerCase(),
         agentRuntimeArtifact: AgentRuntimeArtifact.fromImageUri(
           '123456789012.dkr.ecr.us-east-2.amazonaws.com/agent:latest',
         ),

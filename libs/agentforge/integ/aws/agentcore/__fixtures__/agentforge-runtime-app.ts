@@ -1,13 +1,16 @@
 // The CDK app the AgentCore runtime test deploys: AgentForge's server, from
-// the staged fixture image, through the `AgentRuntime` construct exactly as a
-// consumer deploys an agent — with a declared secret and telemetry on, so the
+// the staged fixture image, through `AgenticProjectResources` and the
+// `AgentRuntime` construct exactly as a consumer deploys an agent — with a declared secret and telemetry on, so the
 // server's first request after a restore does what a real deployment's does.
 // Run by `cdk` with its inputs in the environment.
 import { App, CfnOutput, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
-import { AgentRuntime } from '../../../../src/infra/index.ts';
+import {
+  AgenticProjectResources,
+  AgentRuntime,
+} from '../../../../src/infra/index.ts';
 import { INTEG_TAG } from '../../__fixtures__/aws-account.ts';
 
 function required(name: string): string {
@@ -30,7 +33,13 @@ const stack = new Stack(app, required('AGENTFORGE_INTEG_STACK_NAME'), {
 const secret = new Secret(stack, 'DeclaredSecret', {
   removalPolicy: RemovalPolicy.DESTROY,
 });
+const project = new AgenticProjectResources(stack, 'Project', {
+  projectName: 'agentforge-integ',
+  removalPolicy: RemovalPolicy.DESTROY,
+});
 const agent = new AgentRuntime(stack, 'Agent', {
+  project,
+  agentName: 'integ-agent',
   // Named so the test role may read and delete the logs AgentCore creates.
   runtimeName: required('AGENTFORGE_INTEG_RUNTIME_NAME'),
   agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(
@@ -40,7 +49,6 @@ const agent = new AgentRuntime(stack, 'Agent', {
       buildArgs: { BASE_IMAGE: required('AGENTFORGE_INTEG_BASE_IMAGE') },
     },
   ),
-  removalPolicy: RemovalPolicy.DESTROY,
   secrets: { CLAUDE_CODE_OAUTH_TOKEN: secret },
 });
 new CfnOutput(stack, 'AgentRuntimeArn', { value: agent.agentRuntimeArn });

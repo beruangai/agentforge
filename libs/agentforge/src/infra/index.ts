@@ -8,6 +8,11 @@ export {
   type AgentSecrets,
 } from './agent-runtime.ts';
 export {
+  type AgenticProjectAgent,
+  AgenticProjectResources,
+  type AgenticProjectResourcesProps,
+} from './agentic-project-resources.ts';
+export {
   S3FilesystemBucket,
   type S3FilesystemBucketProps,
 } from './s3-filesystem-bucket.ts';
