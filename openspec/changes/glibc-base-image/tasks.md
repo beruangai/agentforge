@@ -4,7 +4,7 @@ Group 0 opens the batch of four A6 changes. Group 1 moves the base. Group 2 prov
 
 ## 0. Before the batch
 
-- [ ] 0.1 With the operator's approval for each, destroy the deployed example stacks — `nx run @beruangai/smoke-coverage-infra:destroy` and `nx run @beruangai/golden-kata-infra:destroy` — while their teardown scripts still match what is deployed. Verified by each destroy completing, and by its stack being gone from CloudFormation.
+- [x] 0.1 With the operator's approval for each, destroy the deployed example stacks — `nx run @beruangai/smoke-coverage-infra:destroy` and `nx run @beruangai/golden-kata-infra:destroy` — while their teardown scripts still match what is deployed. Verified by each destroy completing, and by its stack being gone from CloudFormation.
 
 ## 1. The Debian base
 
