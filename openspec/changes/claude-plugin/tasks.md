@@ -56,7 +56,7 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
 
 ## 3. Registration
 
-- [ ] 3.1 `libs/agentforge/integ/local/claude-plugin/`, on the SDK's `claude` binary, in an isolated config directory with no credential and no turn:
+- [x] 3.1 `libs/agentforge/integ/local/claude-plugin/`, on the SDK's `claude` binary, in an isolated config directory with no credential and no turn:
   - the marketplace is registered at user scope from the repository root, with `enabledPlugins: { "agentforge@agentforge": false }`;
   - a fixture project enabling the plugin in `.claude/settings.json` lists the skill in its session's `initialize` response;
   - a fixture project not enabling it does not list it.
