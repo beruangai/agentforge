@@ -34,7 +34,7 @@
 
 **Agent contract** — The Zod schema given to `runAgent` as `output`: what the model fills in. The handler builds the outer output from it.
 
-**Agent run** — One `context.runAgent({ prompt, output, options })`, recorded as a **run record**.
+**Agent run** — One `context.runAgent({ prompt, output, options, memoryDirectory? })`, recorded as a **run record**.
 
 **Structured output validation** — The kernel's `PreToolUse` hook on an agent run's `StructuredOutput` submission: the agent contract and every stop guard, all failures told to the agent at once, in its turn.
 
@@ -89,6 +89,12 @@
 **Filesystem** — Files AgentForge manages for a procedure, persistent or scratch: a kind (`S3Filesystem`, `ScratchFilesystem`, or a consumer's subclass) registered by name with the `filesystems()` middleware, mounted before the handler and unmounted once the outcome is known. To **mount** one is to pull its store into a local directory — not a runtime or container mount. Its operations are **pull** and **push**; `pushOn` lists the task states it pushes on — `TASK_STATE_COMPLETED`, `TASK_STATE_FAILED`, or both; never a cancel or a timeout, and absent it never pushes. A **checkpoint** is a push, while the task runs, of what has settled. Its **local root** is the absolute directory its mounts live under, and its **remote root** the partition of its store, absolute within it (`/` by default); its **scope** — the **subpath**, relative to both roots, and the `write` globs within it — is resolved per request, mounting `<localRoot>/<subpath>` from `<remoteRoot>/<subpath>`, and no two live tasks in a container share or nest a local directory; the handler receives its `localPath`, its **baseline permissions** — reading the whole mount, editing its write scope — and every mount's directory, to give a run as a working directory and decides what an agent gets ([ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)).
 
 **Read fence** — Claude Code's `permissions.blockReadsOutsideWorkingDirectories`, on in a generated project's base options: a run reads only its working directories — its cwd and its `additionalDirectories`, its mounts among them — even where an allow rule names another path. Not isolation from Bash that is not read-only.
+
+**Auto memory** — Claude Code's own memory: a `MEMORY.md` index and the topic files it lists, in one directory, the index loaded into the agent's context from the first turn. A run has it only in the `memoryDirectory` it declares (§REQ404); otherwise it is off. Never a `CLAUDE.md`.
+
+**Memory space** — One auto-memory directory an agent keeps across tasks: a subpath of the memories filesystem, chosen by its scope from the request, so tasks naming the same space recall what earlier ones saved.
+
+**System-prompt fragment** — Instructions AgentForge appends to a run's system prompt, after the procedure's own, when what the run declares calls for them; the first is auto memory's. Never the `claude_code` preset ([ADR 0017](../adr/0017-agentforge-adds-system-prompt-fragments-never-the-preset.md)).
 
 ## Delivery
 

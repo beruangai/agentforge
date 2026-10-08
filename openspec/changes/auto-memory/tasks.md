@@ -34,7 +34,7 @@ Group 1 records the requirement. Group 2 is the package work, and group 3 runs i
 
 ## 5. Docs
 
-- [ ] 5.1 Verify each doc by reading it against design.md:
+- [x] 5.1 Verify each doc by reading it against design.md:
   - **ARCHITECTURE §6:** the kernel composes the system prompt from the procedure's and the fragments a run calls for, never the preset, under [ADR 0017](../../../adr/0017-agentforge-adds-system-prompt-fragments-never-the-preset.md); `memoryDirectory`, the settings the kernel owns, and auto memory off without it;
   - **ARCHITECTURE §3, the filesystems paragraph:** memory as a filesystem, one memories bucket, a space as a subpath under the shared options' roots, one live task per space in a container, concurrency across containers and deletes the consumer's;
   - **GLOSSARY:** auto memory, memory space, system-prompt fragment.
