@@ -153,13 +153,13 @@ The per-agent buckets are `DESTROY` in the examples, but CloudFormation can dele
     - two agents produce one table, one bucket, one dashboard with two sections, one probe Lambda and two readiness resources;
     - the prefix-scoped bucket grant;
     - the refused owned variable, duplicate name and bad name.
-  - **The task store against DynamoDB Local**, as its tests run today:
+  - **The task store**, against its fake table as its tests run today:
     - the `agent` on the record;
     - another agent's task is absent, and is not written for `LOST`;
     - one key, two agents, two tasks.
   - **The session store:** the prefix, and the throw without a name.
   - **The plugin:** the project and agent construct templates' snapshots.
-- **Integration:** the `aws` AgentCore fixture is updated to deploy through `AgenticProjectResources`, and re-run. Nothing new is platform behaviour: prefix-conditioned S3 grants are documented IAM.
+- **Integration:** `integ` local re-runs the runtime against DynamoDB Local unchanged. The `aws` AgentCore fixture is updated to deploy through `AgenticProjectResources`, and re-run. Nothing new is platform behaviour: prefix-conditioned S3 grants are documented IAM.
 - **e2e:** both examples deploy fresh and pass `e2e-agentcore`, `golden-kata`'s two agents sharing one set of resources. Both pass locally too, which proves the key layout on DynamoDB Local.
 
 ## Risks / Trade-offs

@@ -14,7 +14,7 @@ Groups 1 and 2 are independent: the constructs, and the runtime and harness. Gro
 
 ## 2. Runtime and harness
 
-- [ ] 2.1 `DynamoDBTaskStore` takes the agent's name, set from `AGENTFORGE_AGENT_NAME` in `server.ts`. It writes `agent` on the task record, treats another agent's task as absent everywhere it reads one, and binds keys as `key#<agent>#<idempotencyKey>`. Verified by its tests against DynamoDB Local:
+- [ ] 2.1 `DynamoDBTaskStore` takes the agent's name, set from `AGENTFORGE_AGENT_NAME` in `server.ts`. It writes `agent` on the task record, treats another agent's task as absent everywhere it reads one, and binds keys as `key#<agent>#<idempotencyKey>`. Verified by its unit tests, and by `nx run @beruangai/agentforge:integ --configuration=local` against DynamoDB Local:
   - the record's agent;
   - another agent's task is not found by `load`, `GetTask` or `CancelTask`, and is not rewritten as `LOST`;
   - one key on two agents starts two tasks.
