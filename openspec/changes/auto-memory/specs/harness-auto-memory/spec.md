@@ -10,6 +10,10 @@ An agent run SHALL be able to declare a memory directory, an absolute path. Such
 - **WHEN** a run that declares a memory directory and may write files is told a fact to remember, and a later run that declares the same directory, with no tools, is asked for it
 - **THEN** the directory holds a memory file and a `MEMORY.md` line for it after the first run, and the second run answers with the fact
 
+#### Scenario: Memory under the read fence
+- **WHEN** a run that fences reads to its working directories declares a memory directory outside them, and saves a memory, and a later run fenced the same way declares the same directory
+- **THEN** the first run's memory is saved there, and the later run reads its `MEMORY.md` and recalls the fact
+
 #### Scenario: Memory outlives its container
 - **WHEN** a deployed agent's task saves a memory in a directory mounted from a persisted filesystem, its container is stopped, and a later task in another container mounts the same space and is asked for the fact
 - **THEN** the later task answers with the fact

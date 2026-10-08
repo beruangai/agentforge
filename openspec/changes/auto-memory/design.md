@@ -11,7 +11,8 @@ See proposal.md — Why. What holds today:
   - Saving needs instructions, which a fragment in a custom system prompt supplies; verified both alone and after a procedure's own prompt.
   - Writes there need no allow rule under `dontAsk`.
   - When unset, the directory defaults to `~/.claude/projects/<cwd>/memory/`, inside the container. Claude Code's `autoMemoryEnabled` setting and its `CLAUDE_CODE_DISABLE_AUTO_MEMORY` variable turn auto memory off.
-- **Filesystems** ([filesystem-lifecycle](../../specs/filesystem-lifecycle/spec.md)) give a handler `context.filesystems.<name>.localPath`, an absolute directory pulled before the handler and pushed on the states it declares. The deployment names a filesystem's bucket (`AgentRuntime`'s `filesystems`).
+- **Filesystems** ([filesystem-lifecycle](../../specs/filesystem-lifecycle/spec.md)) give a handler `context.filesystems.<name>.localPath`, an absolute directory pulled before the handler and pushed on the states it declares. It is the filesystem's `localRoot` joined with the `subpath` its scope resolves; the store's side is its `remoteRoot` joined with the same subpath. Shared defaults are the options without `scope`, spread by each procedure. In one container, a second live task on a held local directory is refused `FILESYSTEM_UNSYNCED`, retryable. The deployment names a filesystem's bucket (`AgentRuntime`'s `filesystems`).
+- **The read fence** is a generated project's default: `settings.permissions.blockReadsOutsideWorkingDirectories`, with a procedure passing `context.filesystemDirectories` as `additionalDirectories`. The auto-memory directory stays readable under the fence though it is not a working directory (research, "Reads outside the working directories", 2026-10-02).
 
 ## Goals / Non-Goals
 
@@ -32,7 +33,7 @@ export interface AgentRunSpec<Output> {
   // …as today
   /**
    * An absolute directory to keep Claude Code's auto memory in, usually a
-   * mounted filesystem's `localPath`: its `MEMORY.md` index is in context
+   * mounted filesystem's `localPath`, one memory space: its `MEMORY.md` index is in context
    * from the first turn, and the agent is told how to keep it (§REQ404).
    * Without it, auto memory is off.
    */
@@ -40,27 +41,37 @@ export interface AgentRunSpec<Output> {
 }
 ```
 
-A procedure declares durability where it already does, as a filesystem:
+A procedure declares durability where it already does, as a filesystem. The memory space's options are declared once — the bucket, both roots, and the scope that picks the space from the request — and a procedure that saves adds its push:
 
 ```ts
+/** One memories bucket; a space is the subpath under both roots its request names. */
+const MEMORIES = {
+  bucket: 'memories',
+  localRoot: '/workspace/memories',
+  remoteRoot: '/agents/hello-agent', // optional: a partition of the bucket
+  scope: ({ input }) => ({ subpath: `spaces/${SpaceInputSchema.parse(input).space}` }),
+} as const satisfies S3FilesystemOptions;
+
 Remember: os.Remember.use(
   filesystems({
-    memory: new S3Filesystem({
-      localPath: '/workspace/memory',
-      bucket: 'memories',
-      scope: ({ input }) => ({ remotePath: `spaces/${input.space}` }),
-      pushOn: ['TASK_STATE_COMPLETED'],
-    }),
+    memory: new S3Filesystem({ ...MEMORIES, pushOn: ['TASK_STATE_COMPLETED'] }),
   }),
 ).handler(async ({ input, context }) => {
   await context.runAgent({
     prompt: …,
     output: …,
     memoryDirectory: context.filesystems.memory.localPath,
-    options: { tools: ['Read', 'Write', 'Edit'], permissionMode: 'dontAsk' },
+    options: composeOptions(baseOptions(), {
+      tools: ['Read', 'Write', 'Edit'],
+      permissionMode: 'dontAsk',
+      additionalDirectories: [...context.filesystemDirectories],
+      allowedTools: [...context.filesystemPermissions.allow],
+    }),
   });
 })
 ```
+
+A space's local directory is the same in every task, `/workspace/memories/spaces/<space>`, so nothing the agent saves names a directory that changes. The procedure gives the run its mounts and their rules as it gives any filesystem's; the memory directory needs neither to be read under the fence, but passing every mount keeps one way of doing it.
 
 *Alternatives:*
 - **A `MountedFilesystem` instead of a path.** It would tie memory to a mount AgentForge made, but nothing in the kernel needs more than the path. A test, or a `ScratchFilesystem`, gives a directory the same way.
@@ -111,9 +122,9 @@ The refusal is the pattern `outputFormat` set: a capability the kernel provides 
 
 ### Persistence is the filesystem's
 
-Nothing in this change syncs memory. An `S3Filesystem` pulls the space before the handler and pushes on the states the procedure declares. A memory saved in a task that ends in an undeclared state is lost, as any filesystem's write would be.
+Nothing in this change syncs memory. An `S3Filesystem` pulls the space before the handler and pushes on the states the procedure declares. A memory saved in a task that ends in an undeclared state is lost, as any filesystem's write would be. Two live tasks on one space in one container never share it: the second is refused `FILESYSTEM_UNSYNCED`, retryable.
 
-The deployment declares one memories bucket through `S3FilesystemBucket`, passed to every agent that keeps memory as `filesystems: { memories }`. Spaces are prefixes the consumer's scope computes. The `smoke-coverage-infra` stack adds that bucket beside `notebook`, with its name among the stack's outputs and the buckets its destroy empties.
+The deployment declares one memories bucket through `S3FilesystemBucket`, passed to every agent that keeps memory as `filesystems: { memories }`. A space is the subpath the consumer's scope computes, under the `remoteRoot` the shared options may set to partition the bucket by project or agent. The `smoke-coverage-infra` stack adds that bucket beside `notebook`, with its name among the stack's outputs and the buckets its destroy empties.
 
 ## Error handling
 
@@ -131,9 +142,10 @@ Every refusal is thrown by the kernel before `query()` is called, as a `TaskFail
 ## What earns which test
 
 - **Model `integ`, because it can drift:** `integ/model/auto-memory/`, through `runAgent`. It checks that Claude Code still honours the directory and AgentForge's own instructions; both are undocumented as a combination and can change with a CLI release.
+  - Both runs are fenced, as a generated project's are, with the memory directory not among their working directories: Claude Code keeping it readable under the fence is what lets memory work in the house default, and it is undocumented.
   - A run with a memory directory, `Write` and `Edit`, told a fact to remember, leaves a topic file and a `MEMORY.md` line in the directory. A second run with the same directory and no tools answers with the fact.
   - A run with no memory directory reports no `memory_paths.auto` in its `init`. The variable's effect is documented, but AgentForge's §REQ403 claim rests on it, and the check costs no extra run: it is read from the second test's run of the cheapest model.
-- **e2e on AgentCore:** `smoke-coverage`'s `Remember` saves a fact in one task. The suite stops its container. `Recall` in a new runtime session, so another container, answers with it. Locally the example has no S3 (§ODO009), so the local suite does not cover it, as it does not cover the notebook.
+- **e2e on AgentCore:** `smoke-coverage`'s procedures run fenced, from its base options. `Remember` saves a fact in one task. The suite stops its container. `Recall` in a new runtime session, so another container, answers with it. Locally the example has no S3 (§ODO009), so the local suite does not cover it, as it does not cover the notebook.
 - **Unit:**
   - `composeSystemPrompt` for each form in the table, and with no fragment applying;
   - the kernel passing the settings or the variable, and each refusal in the table;
@@ -142,9 +154,10 @@ Every refusal is thrown by the kernel before `query()` is called, as a `TaskFail
 
 ## Risks / Trade-offs
 
-- [Two tasks write one space at once; the later push overwrites the earlier one's `MEMORY.md`, and a memory file is orphaned from the index] → Isolation is the consumer's. The documented way is a continuity key per space, which AgentForge already enforces as one live task.
+- [Two tasks in different containers write one space at once; the later push overwrites the earlier one's `MEMORY.md`, and a memory file is orphaned from the index] → In one container the second is refused. Across containers isolation is the consumer's; the documented way is a continuity key per space, or one runtime session per space so its tasks share a container and the claim refuses the overlap.
 - [The agent deletes a wrong memory, but with deletes off the next pull brings it back] → `dangerouslyEnableDeletes` on the memory filesystem propagates deletes, subject to the same concurrency caveat. The choice is the consumer's, and the docs say so.
 - [Claude Code changes how auto memory works, and the fragment's instructions go stale] → The model integ test notices on the next pre-publish run. The fragment lives in one place.
+- [A later Claude Code fences the memory directory too] → The model integ test runs fenced and notices; the procedure would then pass the memory directory among `additionalDirectories`, which it already does when the directory is a mount.
 - [Memory grows past the 200 lines or 25 KB of `MEMORY.md` Claude Code loads] → The fragment keeps the index to one line per memory, under 200 lines. Beyond that, Claude Code's own truncation applies.
 
 ## Migration Plan

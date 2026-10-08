@@ -20,7 +20,7 @@ Group 1 records the requirement. Group 2 is the package work, and group 3 runs i
 
 ## 3. Against a real model
 
-- [ ] 3.1 `integ/model/auto-memory/auto-memory.test.ts` through `runAgent`, in a sandbox. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/auto-memory`:
+- [ ] 3.1 `integ/model/auto-memory/auto-memory.test.ts` through `runAgent`, in a sandbox, every run fenced (`blockReadsOutsideWorkingDirectories`) with the memory directory outside its working directories. Verified by `nx run @beruangai/agentforge:integ --configuration=model -- integ/model/auto-memory`:
   - a run with a memory directory and `Read`, `Write` and `Edit`, told a fact to remember, leaves a topic file and a `MEMORY.md` line in the directory;
   - a second run with the same directory and no tools answers with the fact;
   - a run with no memory directory reports no `memory_paths.auto` in its `init`.
@@ -30,11 +30,11 @@ Group 1 records the requirement. Group 2 is the package work, and group 3 runs i
 ## 4. Examples
 
 - [ ] 4.1 `smoke-coverage-infra` declares a `Memories` bucket beside `Notebook`. It is passed to `hello-agent` as `filesystems: { memories }`, with its name a stack output and among the buckets `empty-buckets.ts` empties before destroy. Verified by `nx run @beruangai/smoke-coverage-infra:synth`.
-- [ ] 4.2 `hello-agent` gains `Remember` (a space and a fact in; it saves the fact to memory, with `Read`, `Write` and `Edit`) and `Recall` (a space and a question in; no tools; it answers from memory). Both mount the space from the `memories` bucket and declare its `localPath` as `memoryDirectory`; `Remember` pushes on `TASK_STATE_COMPLETED`. The AgentCore suite saves a fact, stops the container, then recalls it in a new runtime session. Verified by `nx run @beruangai/smoke-coverage:e2e-agentcore` after its deploy. The README's procedure table lists both.
+- [ ] 4.2 `hello-agent` gains `Remember` (a space and a fact in; it saves the fact to memory, with `Read`, `Write` and `Edit`) and `Recall` (a space and a question in; no tools; it answers from memory). Both mount the space from shared `MEMORIES` options (`bucket: 'memories'`, `localRoot: '/workspace/memories'`) with `subpath: spaces/<space>`, declare its `localPath` as `memoryDirectory`, and pass `context.filesystemDirectories` and `context.filesystemPermissions` as the other procedures do; `Remember` pushes on `TASK_STATE_COMPLETED`. They run fenced, from the base options. The AgentCore suite saves a fact, stops the container, then recalls it in a new runtime session. Verified by `nx run @beruangai/smoke-coverage:e2e-agentcore` after its deploy. The README's procedure table lists both.
 
 ## 5. Docs
 
 - [ ] 5.1 Verify each doc by reading it against design.md:
   - **ARCHITECTURE §6:** the kernel composes the system prompt from the procedure's and the fragments a run calls for, never the preset, under [ADR 0017](../../../adr/0017-agentforge-adds-system-prompt-fragments-never-the-preset.md); `memoryDirectory`, the settings the kernel owns, and auto memory off without it;
-  - **ARCHITECTURE §3, the filesystems paragraph:** memory as a filesystem, one memories bucket, spaces by scope, concurrency and deletes the consumer's;
+  - **ARCHITECTURE §3, the filesystems paragraph:** memory as a filesystem, one memories bucket, a space as a subpath under the shared options' roots, one live task per space in a container, concurrency across containers and deletes the consumer's;
   - **GLOSSARY:** auto memory, memory space, system-prompt fragment.
