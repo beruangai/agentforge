@@ -1,0 +1,12 @@
+{
+  "name": "agentforge",
+  "owner": { "name": "Jeremy Jonas" },
+  "description": "Guidance for developing agentic projects with AgentForge",
+  "plugins": [
+    {
+      "name": "agentforge",
+      "source": "./claude-plugin",
+      "description": "Developing agentic projects with AgentForge"
+    }
+  ]
+}

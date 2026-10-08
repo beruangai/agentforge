@@ -1,0 +1,5 @@
+{
+  "name": "agentforge",
+  "description": "Developing agentic projects with AgentForge: defining, implementing, consuming, running and migrating them",
+  "author": { "name": "Jeremy Jonas" }
+}

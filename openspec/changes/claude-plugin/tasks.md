@@ -4,7 +4,7 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
 
 ## 1. The marketplace and the plugin
 
-- [ ] 1.1 Add the marketplace and the plugin at the repository root:
+- [x] 1.1 Add the marketplace and the plugin at the repository root:
   - `.claude-plugin/marketplace.json`: the marketplace `agentforge`, listing the plugin `agentforge` at `./claude-plugin`;
   - `claude-plugin/.claude-plugin/plugin.json`;
   - `claude-plugin/skills/agentforge/SKILL.md`, with its frontmatter `name` and `description`, its body a placeholder until 2.1.
