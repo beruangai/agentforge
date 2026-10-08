@@ -9,6 +9,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
 
 const LOAD_CONCURRENCY = 16;
@@ -22,17 +23,31 @@ const LOAD_CONCURRENCY = 16;
  * loud: a line that is not JSON fails the load, and an entry the SDK
  * re-delivered on a retried batch is kept once, by its `uuid`.
  *
- * Each `append` is one part object,
- * `{projectKey}/{sessionId}[/{subpath}]/part-{epochMs13}-{rand6}.jsonl`;
+ * The bucket is the project's, and a store is one agent's: each `append` is
+ * one part object under the agent's name,
+ * `{agent}/{projectKey}/{sessionId}[/{subpath}]/part-{epochMs13}-{rand6}.jsonl`,
+ * so a session resumes only in the agent that started it;
  * `load` lists a key's parts, which sort chronologically, and concatenates.
  */
 export class S3SessionStore implements SessionStore {
   private readonly bucket: string;
+  /** The agent's name, under which its transcripts are kept. */
+  private readonly prefix: string;
   private readonly client: S3Client;
   private lastMilliseconds = 0;
 
-  constructor(options: { readonly bucket: string; readonly client: S3Client }) {
+  constructor(options: {
+    readonly bucket: string;
+    readonly prefix: string;
+    readonly client: S3Client;
+  }) {
+    if (options.prefix === '' || options.prefix.includes('/')) {
+      throw new Error(
+        `a session store's prefix is the agent's name, one non-empty path segment: "${options.prefix}"`,
+      );
+    }
     this.bucket = options.bucket;
+    this.prefix = options.prefix;
     this.client = options.client;
   }
 
@@ -41,7 +56,7 @@ export class S3SessionStore implements SessionStore {
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
-        Key: keyPrefix(key) + this.nextPartName(),
+        Key: this.keyPrefix(key) + this.nextPartName(),
         Body: `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`,
         ContentType: 'application/x-ndjson',
       }),
@@ -49,7 +64,7 @@ export class S3SessionStore implements SessionStore {
   }
 
   async load(key: SessionKey): Promise<SessionStoreEntry[] | null> {
-    const prefix = keyPrefix(key);
+    const prefix = this.keyPrefix(key);
     // A key's own parts only: its subpaths' parts sit one level deeper.
     const parts = (await this.listUnder(prefix, '/'))
       .filter((objectKey) => !objectKey.slice(prefix.length).includes('/'))
@@ -97,7 +112,7 @@ export class S3SessionStore implements SessionStore {
     projectKey: string;
     sessionId: string;
   }): Promise<string[]> {
-    const prefix = keyPrefix(key);
+    const prefix = this.keyPrefix(key);
     const subkeys = new Set<string>();
     for (const objectKey of await this.listUnder(prefix)) {
       const segments = objectKey.slice(prefix.length).split('/').slice(0, -1);
@@ -142,6 +157,10 @@ export class S3SessionStore implements SessionStore {
     return keys;
   }
 
+  private keyPrefix(key: SessionKey): string {
+    return `${[this.prefix, key.projectKey, key.sessionId, ...(key.subpath === undefined ? [] : [key.subpath])].join('/')}/`;
+  }
+
   /** Fixed-width epoch milliseconds, so lexical order is chronological. */
   private nextPartName(): string {
     const milliseconds = Math.max(Date.now(), this.lastMilliseconds + 1);
@@ -151,19 +170,21 @@ export class S3SessionStore implements SessionStore {
   }
 }
 
-function keyPrefix(key: SessionKey): string {
-  return `${[key.projectKey, key.sessionId, ...(key.subpath === undefined ? [] : [key.subpath])].join('/')}/`;
-}
-
 /**
- * The store the construct declares, for every run in this task process; none
- * where no bucket is named, as locally, where transcripts stay in the
- * container.
+ * The store the construct declares, for every run in this task process, under
+ * the agent's name the executor gives it; none where no bucket is named, as
+ * locally, where transcripts stay in the container.
  */
 export function sessionStoreFromEnvironment(
   environment: NodeJS.ProcessEnv = process.env,
 ): SessionStore | undefined {
   const bucket = environment[SESSION_BUCKET_VARIABLE];
   if (bucket === undefined || bucket === '') return undefined;
-  return new S3SessionStore({ bucket, client: new S3Client({}) });
+  const prefix = environment[AGENT_NAME_VARIABLE];
+  if (prefix === undefined || prefix === '') {
+    throw new Error(
+      `${SESSION_BUCKET_VARIABLE} names a session bucket, but ${AGENT_NAME_VARIABLE} is unset: transcripts are kept under the agent's name`,
+    );
+  }
+  return new S3SessionStore({ bucket, prefix, client: new S3Client({}) });
 }
