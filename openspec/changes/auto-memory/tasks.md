@@ -4,7 +4,7 @@ Group 1 records the requirement. Group 2 is the package work, and group 3 runs i
 
 ## 1. Records
 
-- [ ] 1.1 `docs/REQUIREMENTS.md` gains §REQ404 in "Identity and state". Verify by reading it against the spec delta. It says that an agent may keep Claude Code's auto memory — the `MEMORY.md` index and its files, never `CLAUDE.md` — in a directory a run declares, so a later task recalls it; that it is optional; and that a run declaring none keeps none.
+- [x] 1.1 `docs/REQUIREMENTS.md` gains §REQ404 in "Identity and state". Verify by reading it against the spec delta. It says that an agent may keep Claude Code's auto memory — the `MEMORY.md` index and its files, never `CLAUDE.md` — in a directory a run declares, so a later task recalls it; that it is optional; and that a run declaring none keeps none.
 
 ## 2. The kernel
 

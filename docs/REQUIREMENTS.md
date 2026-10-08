@@ -67,6 +67,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ401** | The consumer controls every identifier the platforms expose — isolation, conversation, transcript, working directory — with their distinct meanings intact, and AgentForge carries and records them without imposing a mapping |
 | **REQ402** | A session started in one container resumes in another |
 | **REQ403** | Nothing carries from one invocation to the next except state the consumer declared durable, and nothing an invocation started outlives it |
+| **REQ404** | An agent may keep Claude Code's auto memory — the `MEMORY.md` index and the files it lists, never a `CLAUDE.md` — in a directory its run declares, so a later task recalls what an earlier one saved. It is optional: a run that declares none keeps none |
 
 ### Failure — `REQ5xx`
 
