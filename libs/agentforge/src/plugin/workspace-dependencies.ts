@@ -1,5 +1,6 @@
-import { stripTypeScriptTypes } from 'node:module';
+import { join } from 'node:path';
 import { readJson, type Tree, updateJson } from '@nx/devkit';
+import { createJiti } from 'jiti';
 import { minVersion, satisfies, validRange } from 'semver';
 import { agentforgeManifest } from './container/container-inputs.ts';
 import { CONTAINER_ROOT_DEPENDENCIES } from './container/container-workspace.ts';
@@ -29,24 +30,33 @@ export function peerRange(name: string): string {
   return range;
 }
 
-/** `aws-nx-plugin.config.mts`'s default export, evaluated with its types stripped. */
+/**
+ * `aws-nx-plugin.config.mts`'s default export, evaluated from the tree as
+ * `@aws/nx-plugin` evaluates it — with jiti, which drops an import used only
+ * as a type, as the preset's own `import { AwsNxPluginConfig }` is, and
+ * resolves any other import from the workspace. `@aws/nx-plugin` does not
+ * export its own reader. The on-disk cache is off, as there: it is keyed by
+ * path, and a tree's content at one path changes as generators run.
+ */
 async function awsNxPluginConfig(
   tree: Tree,
 ): Promise<{ packageManager?: { catalogs?: boolean } } | undefined> {
   const source = tree.read(AWS_NX_PLUGIN_CONFIG, 'utf8');
   if (source === null) return undefined;
+  const jiti = createJiti(import.meta.filename, { fsCache: false });
   let module: { default?: unknown };
   try {
-    module = (await import(
-      `data:text/javascript,${encodeURIComponent(stripTypeScriptTypes(source))}`
-    )) as { default?: unknown };
+    module = jiti.evalModule(source, {
+      filename: join(tree.root, AWS_NX_PLUGIN_CONFIG),
+    }) as { default?: unknown };
   } catch (error) {
-    throw new Error(
-      `${AWS_NX_PLUGIN_CONFIG} cannot be read: AgentForge evaluates it on its own, so it may import only types`,
-      { cause: error },
-    );
+    throw new Error(`${AWS_NX_PLUGIN_CONFIG} cannot be read`, {
+      cause: error,
+    });
   }
-  return module.default as { packageManager?: { catalogs?: boolean } };
+  return (module.default ?? module) as {
+    packageManager?: { catalogs?: boolean };
+  };
 }
 
 /**

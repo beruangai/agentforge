@@ -55,6 +55,7 @@
   "generators": "./src/plugin/generators.json",
   "executors": "./src/plugin/executors.json",
   "dependencies": {
+    "jiti": "^2.7.0",
     "ohash": "^2.0.12",
     "picomatch": "^4.0.7",
     "semver": "^7.8.5",

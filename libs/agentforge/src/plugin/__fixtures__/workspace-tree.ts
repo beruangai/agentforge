@@ -14,7 +14,7 @@ export function workspaceTree(
   tree.write('bun.lock', '{}\n');
   tree.write(
     'aws-nx-plugin.config.mts',
-    `import type { AwsNxPluginConfig } from '@aws/nx-plugin';
+    `import { AwsNxPluginConfig } from '@aws/nx-plugin';
 
 export default {
   iac: { provider: 'cdk' },
