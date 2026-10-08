@@ -28,7 +28,7 @@ Applied last in the A6 batch, after `project-infrastructure`. Group 1 is the pac
   - **DESIGN_OPTIONS:** §ODO010 removed, its id spent;
   - **GLOSSARY:** the image on a task;
   - **README:** `TaskView`'s `image`, where the README shows what a caller reads;
-  - **ROADMAP:** the A6 item delivered.
+  - **ROADMAP:** the A6 item delivered — written in 5.5, once the joint verification passes.
 
 ## 5. The batch's joint verification
 
@@ -38,4 +38,4 @@ Run once, after `glibc-base-image`, `strict-contracts`, `project-infrastructure`
 - [ ] 5.2 `nx run @beruangai/smoke-coverage:e2e` and `nx run @beruangai/smoke-coverage:e2e-agentcore` pass: `ReportNautilusTraderVersion` answers `1.231.0`, `image` matches, transcripts are listed under `hello-agent/`, and everything the suites already covered holds.
 - [ ] 5.3 `nx run @beruangai/golden-kata:e2e` and `nx run @beruangai/golden-kata:e2e-agentcore` pass: two agents sharing one set of resources, with strict contracts.
 - [ ] 5.4 `nx run @beruangai/golden-kata-workflows:e2e` and `nx run @beruangai/golden-kata-workflows:e2e-agentcore` pass: the activities' clients on strict contracts, and the worker's image on its Debian dependency stage.
-- [ ] 5.5 `glibc-base-image` task 3.1 is ticked, citing 5.1–5.4.
+- [ ] 5.5 `glibc-base-image` task 3.1 is ticked, citing 5.1–5.4, and the ROADMAP moves the batch's four A6 items to delivered, each with its change and the date.

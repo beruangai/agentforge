@@ -109,7 +109,7 @@ Built to what the platforms document, with tests only where AgentForge relies on
 - **`dangerouslyEnableDeletes` deletes what is missing locally, not only what the task removed.** Off by default; when on, the final push removes every object in the write scope with no local file, including any another writer added since the pull. It needs a remote path — `remoteRoot` joined with `subpath` — other than `/`; what a delete may reach is the procedure's to scope.
 - **AgentForge gives an agent no filesystem permission.** The handler composes `context.agentOptions` (or its own rules and directories) into what it passes `runAgent`; Bash is not bounded by them, so a procedure lists the commands it allows.
 - **A generated project fences reads to a run's working directories.** Its base options refuse a read outside them, even one an allow rule grants, through the file tools and read-only Bash, so a run that is not given its mounts cannot read them. The fence does not bound Bash that is not read-only, such as an interpreter a procedure allows: that would take a sandbox or a container per task.
-- **Transcripts are kept 30 days by default** (`sessionRetention`), and hold everything the agent was sent and read.
+- **Transcripts are kept 30 days by default** (`sessionRetention`, the project's, for all its agents), and hold everything the agent was sent and read.
 - **Locally, sessions live in the container** and end with it; only a deployed agent persists them.
 
 ## Work in this repository

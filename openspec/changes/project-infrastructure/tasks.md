@@ -35,11 +35,11 @@ Applied third in the A6 batch, after `strict-contracts`; the example stacks were
 
 ## 5. Records
 
-- [ ] 5.1 Verify each record by reading it against design.md:
+- [x] 5.1 Verify each record by reading it against design.md:
   - **ADR 0006**, amended in place: one table per project, a task's agent on its record, keys bound per agent, IAM partitioning of the table rejected by the operator's choice;
   - **ADR 0011**, amended in place: one session bucket per project, an agent's transcripts under its name;
   - **ARCHITECTURE §7:** deploying is `AgenticProjectResources` for a project and `AgentRuntime` per agent, what each owns, one dashboard with a section per agent, the probe shared. **§2:** `sessionId` persists in the project's session bucket, and an idempotency key names one execution per agent. **§4 and §6:** a task records its agent, a key binds per agent, transcripts live under the agent's name. **§5:** a task process is given the agent's name. **§8:** `/infra`'s constructs;
   - **the root README's known limits:** `sessionRetention` is the project's;
   - **GLOSSARY:** project resources; "Session store" names the project's bucket and the agent's prefix;
-  - **ROADMAP:** the A6 item delivered;
+  - **ROADMAP:** the A6 item delivered — written in `task-image` 5.5, once the joint verification passes, since the roadmap records a change as verified;
   - **REQUIREMENTS:** unchanged — §REQ604's "one dashboard" is met per project.

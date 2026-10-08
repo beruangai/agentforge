@@ -84,7 +84,7 @@
 
 **Session** — The Agent SDK's: one transcript, started or resumed by id.
 
-**Session store** — The SDK's `SessionStore`: where a run's transcript is mirrored so a session resumes in another container. Deployed, AgentForge's is the agent's **session bucket**, an S3 bucket the construct provisions and names in `AGENTFORGE_SESSION_BUCKET`; a procedure may name its own.
+**Session store** — The SDK's `SessionStore`: where a run's transcript is mirrored so a session resumes in another container. Deployed, AgentForge's is the project's **session bucket**, an S3 bucket the **project resources** provide and the agent's construct names in `AGENTFORGE_SESSION_BUCKET`, each agent's transcripts under its name; a procedure may name its own.
 
 **`cwd`** — The SDK's working directory, and the capability root: which `.claude/` layers apply.
 
@@ -119,6 +119,8 @@
 **Runtime configuration** — `@aws/nx-plugin`'s `RuntimeConfig`: a stage's AppConfig application, where each agent's construct registers its ARN under namespace `agentcore`, `agentRuntimes.<key>`.
 
 **Project client** — An agentic project's `client.ts`: one client over its agents, typed by their contracts, built with `withTransports`, `local()` or `fromRuntimeConfig`.
+
+**Project resources** — `AgenticProjectResources`: what an agentic project's agents share on AWS — the task table, the session bucket, one dashboard with a section per agent, and the readiness probe. The project construct provisions them; each `AgentRuntime` takes them and its agent's name.
 
 **Project construct** — The CDK construct wrapping an agentic project's agent constructs; its `grantInvoke` grants a caller exactly those agents and the runtime configuration's read.
 
