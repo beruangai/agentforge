@@ -12,14 +12,14 @@ export const SOLUTION_FILE = 'solution.ts';
  * One case: arguments and expected result as JSON text, so the agent's
  * structured output stays a closed schema whatever the kata's types.
  */
-export const KataCaseSchema = z.object({
+export const KataCaseSchema = z.strictObject({
   arguments: z
     .string()
     .describe('A JSON array of the arguments the function is called with'),
   expected: z.string().describe('The JSON of the value the function returns'),
 });
 
-export const KataSchema = z.object({
+export const KataSchema = z.strictObject({
   title: z.string().min(1),
   description: z
     .string()
@@ -48,14 +48,24 @@ export const WrittenKataSchema = KataSchema.extend({
 });
 export type WrittenKata = z.infer<typeof WrittenKataSchema>;
 
-export const CaseResultSchema = z.object({
+/** The kata a solver reads, without what its writer adds: the difficulty and the reference solution. */
+export function kataOf(written: WrittenKata): Kata {
+  const {
+    difficulty: _difficulty,
+    referenceSolution: _referenceSolution,
+    ...kata
+  } = written;
+  return kata;
+}
+
+export const CaseResultSchema = z.strictObject({
   passed: z.boolean(),
   /** Why the case failed, or what it returned. */
   detail: z.string(),
 });
 
 /** How a solution fared against a kata's cases: computed, never asked of the model. */
-export const CaseResultsSchema = z.object({
+export const CaseResultsSchema = z.strictObject({
   passed: z.number().int(),
   total: z.number().int(),
   cases: z.array(CaseResultSchema),

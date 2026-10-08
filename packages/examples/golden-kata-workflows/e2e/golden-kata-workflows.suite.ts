@@ -12,12 +12,15 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { GradeSchema, RUBRIC_CRITERIA } from '@beruangai/golden-kata/grader';
+import {
+  GradeOutputSchema,
+  RUBRIC_CRITERIA,
+} from '@beruangai/golden-kata/grader';
 import {
   type CaseResults,
   CaseResultsSchema,
   KATA_FILE,
-  KataSchema,
+  kataOf,
   SOLUTION_FILE,
   type WrittenKata,
   WrittenKataSchema,
@@ -55,10 +58,7 @@ async function untilPolled(client: Client): Promise<void> {
 async function independentResults(kata: WrittenKata): Promise<CaseResults> {
   const directory = await mkdtemp(join(tmpdir(), 'golden-kata-workflows-e2e-'));
   try {
-    await writeFile(
-      join(directory, KATA_FILE),
-      JSON.stringify(KataSchema.parse(kata)),
-    );
+    await writeFile(join(directory, KATA_FILE), JSON.stringify(kataOf(kata)));
     await writeFile(join(directory, SOLUTION_FILE), kata.referenceSolution);
     return await runCases(directory);
   } finally {
@@ -98,7 +98,7 @@ export function goldenKataWorkflowsSuite(): void {
       expect(kata.difficulty).toBe('EASY');
       const results = await independentResults(kata);
       expect(CaseResultsSchema.parse(written.results)).toEqual(results);
-      const parsedGrade = GradeSchema.parse(grade);
+      const parsedGrade = GradeOutputSchema.parse(grade);
       expect(Object.keys(parsedGrade.scores).sort()).toEqual(
         [...RUBRIC_CRITERIA].sort(),
       );

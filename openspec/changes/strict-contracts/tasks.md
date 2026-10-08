@@ -23,7 +23,7 @@ Applied second in the A6 batch, after `glibc-base-image`. Group 1 is the check. 
 
 ## 3. Examples
 
-- [ ] 3.1 `golden-kata`'s and `smoke-coverage`'s contracts, and `golden-kata`'s `kata.ts`, use `z.strictObject`. The five places that parse to strip narrow explicitly, as design.md says: `kataOf` in `kata.ts` for the grader and both suites' `kata.json`, and the grader's exported output schema for both suites' grade. Verified by `nx run-many -t typecheck test` for `golden-kata`, `smoke-coverage` and `golden-kata-workflows`; their e2e runs in `task-image`'s last group.
+- [x] 3.1 `golden-kata`'s and `smoke-coverage`'s contracts, and `golden-kata`'s `kata.ts`, use `z.strictObject`. The five places that parse to strip narrow explicitly, as design.md says: `kataOf` in `kata.ts` for the grader and both suites' `kata.json`, and the grader's exported output schema for both suites' grade. Verified by `nx run-many -t typecheck test` for `golden-kata`, `smoke-coverage` and `golden-kata-workflows`; their e2e runs in `task-image`'s last group.
 
 ## 4. Records
 

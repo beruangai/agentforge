@@ -12,13 +12,13 @@ export const contract = {
   Write: oc
     .meta(timeBudget(180))
     .input(
-      z.object({
+      z.strictObject({
         topic: z.string().min(1).describe('What the kata is about'),
         difficulty: DifficultyEnum,
       }),
     )
     .output(
-      z.object({
+      z.strictObject({
         kata: WrittenKataSchema,
         /** The kata run against its reference solution: computed, never asked of the model (§REQ102). */
         results: CaseResultsSchema,

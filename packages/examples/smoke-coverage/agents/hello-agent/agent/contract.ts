@@ -16,13 +16,13 @@ export const contract = {
   /** Summarises a text — and continues a session when given one to resume. */
   Summarise: oc
     .input(
-      z.object({
+      z.strictObject({
         text: z.string().min(1),
         resumeSessionId: z.string().optional(),
       }),
     )
     .output(
-      z.object({
+      z.strictObject({
         summary: z.string(),
         /** Computed, never asked of the model (§REQ102). */
         words: z.number(),
@@ -32,10 +32,10 @@ export const contract = {
   /** Answers a question from documents, distilled first when they exceed the cap: two runs, or one. */
   DistillThenAnswer: oc
     .input(
-      z.object({
+      z.strictObject({
         documents: z
           .array(
-            z.object({
+            z.strictObject({
               source: z.string().min(1),
               content: z.string().min(1),
             }),
@@ -46,7 +46,7 @@ export const contract = {
       }),
     )
     .output(
-      z.object({
+      z.strictObject({
         answer: z.string(),
         /** Whether the documents were distilled: read from the context, never asked of the model. */
         distilled: z.boolean(),
@@ -55,34 +55,34 @@ export const contract = {
   /** Runs a shell command for a while before answering: something to cancel, or to lose. */
   SleepThenAnswer: oc
     .meta(timeBudget(300))
-    .input(z.object({ seconds: z.number().int().positive().max(600) }))
-    .output(z.object({ answer: z.string() })),
+    .input(z.strictObject({ seconds: z.number().int().positive().max(600) }))
+    .output(z.strictObject({ answer: z.string() })),
   /** Keeps a note in the notebook, an S3 filesystem, under a topic. */
   KeepNote: oc
-    .input(z.object({ topic: TopicField, note: z.string().min(1) }))
+    .input(z.strictObject({ topic: TopicField, note: z.string().min(1) }))
     .output(
-      z.object({
+      z.strictObject({
         /** Whether the file holds the note: read back, never asked of the model. */
         kept: z.boolean(),
       }),
     ),
   /** Reads back the note kept under a topic, whichever container kept it. */
   RecallNote: oc
-    .input(z.object({ topic: TopicField }))
-    .output(z.object({ note: z.string() })),
+    .input(z.strictObject({ topic: TopicField }))
+    .output(z.strictObject({ note: z.string() })),
   /** Saves a fact to the agent's auto memory in a space. */
   Remember: oc
-    .input(z.object({ space: SpaceField, fact: z.string().min(1) }))
+    .input(z.strictObject({ space: SpaceField, fact: z.string().min(1) }))
     .output(
-      z.object({
+      z.strictObject({
         /** Whether the space's `MEMORY.md` indexes a memory: read back, never asked of the model. */
         saved: z.boolean(),
       }),
     ),
   /** Answers a question from the agent's memory in a space, with no tools, whichever container saved it. */
   Recall: oc
-    .input(z.object({ space: SpaceField, question: z.string().min(1) }))
-    .output(z.object({ answer: z.string() })),
+    .input(z.strictObject({ space: SpaceField, question: z.string().min(1) }))
+    .output(z.strictObject({ answer: z.string() })),
   /** Runs Python importing NautilusTrader, which the base layer installs, and answers with its version. */
   ReportNautilusTraderVersion: oc
     .input(z.strictObject({}))

@@ -8,7 +8,7 @@ import {
 } from '@beruangai/agentforge/agent';
 import {
   KATA_FILE,
-  KataSchema,
+  kataOf,
   SOLUTION_FILE,
 } from '@beruangai/golden-kata-base/kata';
 import { baseOptions } from '@beruangai/golden-kata-base/options';
@@ -24,7 +24,7 @@ export const router = os.router({
       const directory = context.filesystems.kata.localPath;
       await writeFile(
         join(directory, KATA_FILE),
-        JSON.stringify(KataSchema.parse(input.kata), null, 2),
+        JSON.stringify(kataOf(input.kata), null, 2),
       );
       await writeFile(
         join(directory, SOLUTION_FILE),

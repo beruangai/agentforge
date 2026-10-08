@@ -15,7 +15,7 @@ import {
   type CaseResults,
   CaseResultsSchema,
   KATA_FILE,
-  KataSchema,
+  kataOf,
   SOLUTION_FILE,
   type WrittenKata,
   WrittenKataSchema,
@@ -23,7 +23,7 @@ import {
 import { runCases } from '@beruangai/golden-kata/run-cases';
 import { describe, expect, it } from 'vitest';
 import {
-  GradeSchema,
+  GradeOutputSchema,
   RUBRIC_CRITERIA,
 } from '../agents/grader/agent/contract.ts';
 import type { Client as GoldenKataClient } from '../client.ts';
@@ -38,10 +38,7 @@ const POLL_OPTIONS = {
 async function independentResults(kata: WrittenKata): Promise<CaseResults> {
   const directory = await mkdtemp(join(tmpdir(), 'golden-kata-e2e-'));
   try {
-    await writeFile(
-      join(directory, KATA_FILE),
-      JSON.stringify(KataSchema.parse(kata)),
-    );
+    await writeFile(join(directory, KATA_FILE), JSON.stringify(kataOf(kata)));
     await writeFile(join(directory, SOLUTION_FILE), kata.referenceSolution);
     return await runCases(directory);
   } finally {
@@ -101,7 +98,7 @@ export function goldenKataSuite(
         await awaitTask(grader.Grade, started, POLL_OPTIONS),
         logs,
       );
-      const grade = GradeSchema.parse(output);
+      const grade = GradeOutputSchema.parse(output);
       expect(Object.keys(grade.scores).sort()).toEqual(
         [...RUBRIC_CRITERIA].sort(),
       );
