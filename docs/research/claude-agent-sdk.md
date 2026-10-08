@@ -121,3 +121,8 @@ From [Configure permissions](https://code.claude.com/docs/en/permissions.md) ("W
 - **The fence overrides allow rules.** With it on, the path the `Read(/<allowed>/**)` rule named was refused: "is outside <the working directories>". Under the fence, a directory is readable only as a working directory.
 - **The auto-memory directory stays readable under the fence**, though it is not a working directory, and `init.memory_paths.auto` still names it.
 - **What this means for AgentForge:** procedures run in `dontAsk`, and a mount's baseline rules name only its own directory, so file tools and read-only Bash already cannot read another task's mount. The fence adds protection against a broad `Read` allow rule a procedure grants, and against a mode other than `dontAsk`. It does not constrain Bash that is not read-only, such as an interpreter a procedure allows. It would make a mount readable only as a working directory, and a working directory is readable whole, so a mount's narrower `read` scope would no longer bind.
+
+## Cache breakpoints in a prompt — observed 2026-10-08 against `0.3.280`
+
+- **Claude Code adds one-hour cache breakpoints of its own after the prompt AgentForge sends**, on the operator's subscription. A prompt block marked with a five-minute breakpoint (`ttl: '5m'`) failed the run before its first turn: API 400, "a ttl='1h' cache_control block must not come after a ttl='5m' cache_control block". Seen in golden-kata's e2e, the first run to mark a block.
+- **What this means for AgentForge:** `cache: true` and a command's cache markers render `ttl: '1h'`, which is valid before a breakpoint of either length. A procedure that asks for `5m` itself fails the same way, loudly.

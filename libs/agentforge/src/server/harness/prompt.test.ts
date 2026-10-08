@@ -137,7 +137,7 @@ describe('a command block', () => {
         data: Buffer.from('%PDF-1.7').toString('base64'),
       },
       title: 'Paper',
-      cache_control: { type: 'ephemeral', ttl: '5m' },
+      cache_control: { type: 'ephemeral', ttl: '1h' },
     });
   });
 
@@ -156,7 +156,7 @@ describe('a context block naming a file', () => {
   const inline = {
     type: 'text',
     text: '<protocol name="dates">\nDates are ISO 8601.\n</protocol>',
-    cache_control: { type: 'ephemeral', ttl: '5m' },
+    cache_control: { type: 'ephemeral', ttl: '1h' },
   };
 
   it('renders as the same block with the file inline, relative or absolute', async () => {

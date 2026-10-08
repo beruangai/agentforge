@@ -14,7 +14,11 @@ export type ContentBlock =
   | ImageBlockParam
   | DocumentBlockParam;
 
-/** `true` sets a default (5 minute) cache breakpoint on the block. */
+/**
+ * `true` sets a one-hour cache breakpoint on the block. Claude Code places
+ * one-hour breakpoints of its own after the prompt, and the API refuses a
+ * shorter one before a longer, so a `5m` breakpoint fails the run.
+ */
 export type CacheBreakpoint = boolean | CacheControlEphemeral;
 
 /**
@@ -299,7 +303,7 @@ async function contextBlockText(
 export const CACHE_MARKER_BLOCK: TextBlockParam = {
   type: 'text',
   text: '<!-- cache_marker -->',
-  cache_control: { type: 'ephemeral', ttl: '5m' },
+  cache_control: { type: 'ephemeral', ttl: '1h' },
 };
 
 export async function resolveCommandBlock(
@@ -363,7 +367,7 @@ function cacheControl(
 ): Pick<TextBlockParam, 'cache_control'> {
   if (!cache) return {};
   return {
-    cache_control: cache === true ? { type: 'ephemeral', ttl: '5m' } : cache,
+    cache_control: cache === true ? { type: 'ephemeral', ttl: '1h' } : cache,
   };
 }
 
