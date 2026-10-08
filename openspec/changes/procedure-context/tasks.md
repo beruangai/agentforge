@@ -4,7 +4,7 @@ Group 1 records the requirements. Groups 2 and 3 are the package work and are in
 
 ## 1. Requirements
 
-- [ ] 1.1 `docs/REQUIREMENTS.md` gains §REQ210 and §REQ211 in "Controlling the run", as the operator accepts them. Verify by reading them against the spec deltas:
+- [x] 1.1 `docs/REQUIREMENTS.md` gains §REQ210 and §REQ211 in "Controlling the run", as the operator accepts them. Verify by reading them against the spec deltas:
   - **§REQ210:** a procedure composes its agent's context from reusable, typed pieces — static content from files its layers carry, dynamic content from its inputs — into one function it calls. A missing input is caught at compile time; a missing file fails the run before it starts.
   - **§REQ211:** what AgentForge derives from a task for a run is given to the procedure as one set of run options it composes, never applied unless the procedure does.
 

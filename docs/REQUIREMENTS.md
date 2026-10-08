@@ -48,6 +48,8 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ207** | A procedure makes any number of agent runs, or none, in its one process, and each run is recorded on its task. How its runs relate — in sequence or at once, sharing a directory — is the procedure's |
 | **REQ208** | Structured output is validated in the agent's turn — against the agent contract, always, and by checks the procedure opts into — so the agent can fix what is wrong before the run ends, every failure told at once. Validation is bounded; structured output still failing when it ends fails the task, carrying why |
 | **REQ209** | A procedure can bring documents larger than a run should carry into its context within a bound it sets, distilled by a run of its own when they exceed it |
+| **REQ210** | A procedure composes its agent's context from reusable, typed pieces — static content from files its layers carry, dynamic content from its inputs — into one function it calls. A missing input is caught when the procedure compiles; a missing file fails the run before it starts |
+| **REQ211** | What AgentForge derives from a task for a run is given to the procedure as one set of run options it composes, and never applied unless the procedure does |
 
 ### Invoking, waiting, recovering — `REQ3xx`
 
