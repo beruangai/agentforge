@@ -292,8 +292,8 @@ describe('the runtime', () => {
     const drifted = createClient(
       {
         echo: oc
-          .input(z.object({ text: z.string(), extra: z.number() }))
-          .output(z.object({ text: z.string(), attempt: z.number() })),
+          .input(z.strictObject({ text: z.string(), extra: z.number() }))
+          .output(z.strictObject({ text: z.string(), attempt: z.number() })),
       },
       localTransport(server.url),
     );

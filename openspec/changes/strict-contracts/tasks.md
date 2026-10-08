@@ -19,7 +19,7 @@ Applied second in the A6 batch, after `glibc-base-image`. Group 1 is the check. 
 ## 2. What AgentForge owns
 
 - [x] 2.1 `/contract`'s `CauseSchema`, `OutcomeSchema`'s branches, `RunRecordSchema`, `PriorAttemptSchema` and `EnvelopeSchema` become strict; the package's unit contracts become strict; the `agent` generator scaffolds `z.strictObject({})`. Verified by `nx run @beruangai/agentforge:test`, the snapshot updated.
-- [ ] 2.2 The integration contracts become strict: `integ/local/runtime/__fixtures__/contract.ts`, `integ/local/temporal-worker/__fixtures__/contract.ts`, and the inline contract in `integ/local/runtime/runtime.test.ts`. Verified by `nx run @beruangai/agentforge:integ --configuration=local`.
+- [x] 2.2 The integration contracts become strict: `integ/local/runtime/__fixtures__/contract.ts`, `integ/local/temporal-worker/__fixtures__/contract.ts`, and the inline contract in `integ/local/runtime/runtime.test.ts`. Verified by `nx run @beruangai/agentforge:integ --configuration=local`.
 
 ## 3. Examples
 
