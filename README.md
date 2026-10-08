@@ -2,7 +2,7 @@
 
 Run a Claude Agent SDK procedure as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — and call it from anything, Temporal included.
 
-Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1–A4 delivered — the whole path runs locally and on AgentCore, with filesystems, against a real model, specified and audited — A5's baseline: the Nx plugin generates, syncs and deploys agentic projects, AgentForge's own [examples](packages/examples) among them — and A6, what must hold before the first live consumer ([roadmap](docs/ROADMAP.md)).
+Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1–A4 delivered — the whole path runs locally and on AgentCore, with filesystems, against a real model, specified and audited — A5's baseline: the Nx plugin generates, syncs and deploys agentic projects, AgentForge's own [examples](packages/examples) among them — and A6, what must hold before the first live consumer, but its Claude plugin ([roadmap](docs/ROADMAP.md)).
 
 ## Define, implement, consume
 
