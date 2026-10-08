@@ -86,11 +86,14 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 - **Auto memory, 2026-10-08** ([change](../openspec/changes/archive/2026-10-08-auto-memory/proposal.md)): a run that declares `memoryDirectory` keeps Claude Code's auto memory there, told how by a system-prompt fragment AgentForge appends, never the `claude_code` preset ([ADR 0017](../adr/0017-agentforge-adds-system-prompt-fragments-never-the-preset.md)); without one, memory is off. Durable as a memory space mounted from one memories bucket. `smoke-coverage` saves a fact in one container and recalls it in another (§REQ404)
 - **Procedure context, 2026-10-08** ([change](../openspec/changes/archive/2026-10-08-procedure-context/proposal.md)): a procedure composes its prompt from typed **context functions** with `composeContext`, a missing input a compile error (§REQ210); a context block may name a fragment file in its layer's `.claude/`, read when the run starts; `context.agentOptions` gives the run options derived from the task as one value to compose (§REQ211). A cache breakpoint is one hour, since Claude Code places its own after the prompt. `golden-kata`'s prompts are composites of fragments and dynamic functions
 
-Still open:
+**Scope settled 2026-10-08** with the operator, against the register's StrategyFoundry profile: several projects, resumable sessions, an S3 workspace and Temporal are met; what remains before it can adopt, each a change landing on an example first:
 
-- What StrategyFoundry needs before it can adopt — to be established with the operator — and the further built-in capabilities wanted before any consumer is live
-- What it needs enters [REQUIREMENTS.md](REQUIREMENTS.md) through the operator, and lands on an example first
-- The StrategyFoundry corrections doc, once A6's scope is settled
+- **A glibc base image** (§REQ704): the AgentForge image is Alpine, and NautilusTrader publishes only `manylinux_2_35` wheels, so a consumer's Python layer would build it from source. The base moves to Debian, and a consumer extending it with Python and NautilusTrader on ARM64 is proven
+- **Infrastructure per project**: the task table, session bucket, dashboard and readiness probe are one per agentic project, shared by its agents; a task is keyed by its id, its agent recorded on it, and an idempotency key binds per agent
+- **The version on a task's record** (§ODO010): which image ran a task is on its record, so a decision traces to the code that made it
+- **Strict contracts** (§ODO001, §REQ103): a contract with an object that would drop undeclared keys silently is refused
+
+Then the StrategyFoundry corrections doc, and A6 is delivered.
 
 ## A7 — StrategyFoundry, locally
 
