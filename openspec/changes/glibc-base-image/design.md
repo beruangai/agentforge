@@ -12,7 +12,7 @@ See proposal.md — Why. What holds today:
 - **The layers above it** (ARCHITECTURE §7):
   - The base layer's and each agent's Dockerfiles are maintained by the plugin.
   - The plugin's documentation already says: "Extend an image in its layer's `package.json` first; detach a `Dockerfile` only for what a manifest cannot say."
-  - ADR 0010 already names an agent "adding Python and NautilusTrader" as one whose layer extends the image (§REQ704).
+  - ADR 0008 puts "language runtimes a group of agents share" in a project's base layer. ADR 0010 says an agent adding Python and NautilusTrader belongs in a project of its own whose base extends the AgentForge image (§REQ704).
 - **The worker image** (`workflow-project.ts`, `workerDockerfile`): its dependency stage is `FROM` the same Alpine pin and runs `bun install`; its runtime stage is `node:…-slim`, which is Debian. The installed `node_modules`, including the Temporal core's native bridge, are copied from musl to glibc.
 - **The SDK's native CLI**: `@anthropic-ai/claude-agent-sdk` lists both `linux-arm64` and `linux-arm64-musl` packages, and picks between them at run time. The lock already holds both.
 - **Observed 2026-10-08:**
@@ -22,6 +22,11 @@ See proposal.md — Why. What holds today:
     - an sdist;
     - no musllinux wheel.
   - **`oven/bun:1.4.0-slim`** is Debian 13 (trixie) for `arm64` and `amd64`. It creates the `bun` user and group at uid and gid 1000, as the Alpine image does. Debian 13 ships glibc 2.41 and Python 3.13.
+  - The PyPI fact is dated in ADR 0018; the Debian facts go in `docs/research/working-directory-sync.md` (task 4.1), beside the musl note they replace.
+- **Where the image is exercised:**
+  - `integ` aws builds the AgentForge image (`integ/aws/__fixtures__/agentforge-base-image.ts`) and the AgentCore fixture on its Bun pin;
+  - `integ` local runs the server in-process and never touches an image;
+  - `golden-kata-workflows:e2e` runs the worker on the host from its `bundle`; only `golden-kata-workflows:e2e-agentcore`, which deploys `golden-kata-infra`, builds the worker's `container/Dockerfile`.
 
 ## Goals / Non-Goals
 
@@ -52,12 +57,9 @@ USER bun
 …   # unchanged
 ```
 
-`-slim` rather than `-debian`, because it carries nothing AgentForge or a run uses beyond what is listed. The `s7cmd` stage moves to the same pin, and `tar` is in Debian's base. `s7cmd` stays the static musl build: a static binary runs on either C library, and it is the build `integ/aws/filesystem-s3-sync` verified, so ADR 0015's pin holds unchanged. The reasoning for the distribution is [ADR 0018](../../../adr/0018-the-agentforge-image-is-debian.md), proposed: a future reader proposing Alpine for its size is the reader it is for.
+`-slim` rather than `-debian`, because it carries nothing AgentForge or a run uses beyond what is listed. The `s7cmd` stage moves to the same pin, and `tar` is in Debian's base. `s7cmd` stays the static musl build: a static binary runs on either C library, and it is the build `integ/aws/filesystem-s3-sync` verified, so ADR 0015's pin holds unchanged.
 
-*Alternatives:*
-- **Keep Alpine and let a consumer build from source.** That puts a Rust and Cython build of NautilusTrader in every image build, on ARM64, and it repeats for every library published only for glibc.
-- **Keep Alpine and install `gcompat`.** That shims only part of glibc's ABI; `manylinux` wheels are not supported on it, and pip refuses to install them.
-- **A per-consumer base image.** A second image chain to maintain, for a need every glibc-only library shares.
+The distribution, and the options rejected for it, are [ADR 0018](../../../adr/0018-the-agentforge-image-is-debian.md), proposed.
 
 ### The worker's dependency stage takes the same pin
 
@@ -87,14 +89,22 @@ COPY …   # the maintained lines, unchanged
 - The venv sidesteps Debian's externally managed system Python (PEP 668).
 - `ENV PATH` reaches the server, every task process and the CLI's Bash tool, which inherit the image's environment.
 
-The base layer is the place for it because ADR 0010 puts a project's shared capabilities there. An agent layer that alone needs a package detaches its own Dockerfile the same way.
+The base layer is the place for it because ADR 0008 puts the language runtimes a project's agents share there; `smoke-coverage` has one agent, so ADR 0010's project of its own for such an agent is met as it stands. An agent layer that alone needs a package detaches its own Dockerfile the same way.
+
+The image stays non-root by the route, not by a check: a detached Dockerfile is the consumer's, and AgentForge neither writes nor inspects its last `USER`. The documentation gives the route, and `smoke-coverage` proves it.
 
 *Alternative:* a plugin seam that keeps the Dockerfile maintained, such as a scaffolded install script the maintained file runs as root. It would keep AgentForge's updates flowing into the file, but it is a second route for a need with one consumer, and Docker has no include. If StrategyFoundry's detached file drifts painfully from what sync would write, that is the evidence for it.
 
-### `hello-agent`'s `Python` procedure
+### `hello-agent`'s `ReportNautilusTraderVersion` procedure
 
-- **The contract:** `Python` takes `{}` and returns `{ version: string }`.
-- **The run:** its agent runs `python -c "import nautilus_trader; print(nautilus_trader.__version__)"` with Bash and answers with what it printed. It has `tools: ['Bash']` and `allowedTools: ['Bash(python *)']`, in `dontAsk`, over the base options.
+```ts
+// agents/hello-agent/agent/contract.ts — strict from the start, as `strict-contracts` requires
+ReportNautilusTraderVersion: oc
+  .input(z.strictObject({}))
+  .output(z.strictObject({ version: z.string() })),
+```
+
+- **The run:** its agent runs Python importing NautilusTrader with Bash and answers with the version it printed. It has `tools: ['Bash']` and `allowedTools: ['Bash(python *)', 'Bash(python3 *)']` — the venv provides both names, and the model may pick either — in `dontAsk`, over the base options.
 - **The e2e:** it asserts the version is `1.231.0`, locally and on AgentCore.
 
 A procedure always runs an agent (REQUIREMENTS: settled), and an agent running Python through Bash is exactly the use the image serves. The fence does not bound Bash that is not read-only, which is already a known limit and unchanged.
@@ -108,16 +118,17 @@ A procedure always runs an agent (REQUIREMENTS: settled), and an agent running P
 | No wheel for the platform | building the base layer's image | the build fails, naming the package; nothing is compiled |
 | A Debian package missing | building the AgentForge image | the build fails |
 | Python or the library missing at run time | the agent's Bash call | the agent cannot answer the version; the e2e fails on its answer |
-| The image running as root | — | never: every Dockerfile ends on `USER bun`, and the CLI refuses unattended tools as root |
+| The image running as root | — | every Dockerfile AgentForge maintains ends on `USER bun`; a detached one is the consumer's, and the CLI refuses unattended tools as root |
 
 ## What earns which test
 
 - **No new unit test.** Nothing in the package's TypeScript changes, except the worker template's pin, which its snapshot covers.
-- **The integration tier, re-run as is:** `integ` local (the runtime, capability composition and the Temporal worker against the real image) and `integ` aws (the AgentCore fixture on the new pin; `filesystem-s3-sync` with `s7cmd` on Debian).
-- **e2e:**
-  - `smoke-coverage` locally and on AgentCore: the `Python` procedure, plus everything it already covers, on the new base;
+- **Inside the built images** (tasks 1.1 and 2.1): the tools run, and `id -u` is `1000` in the AgentForge image and in the extended `smoke-coverage` image.
+- **The integration tier:** `integ` aws — the AgentCore fixture on the new pin, and `filesystem-s3-sync` with `s7cmd` in the Debian image. `integ` local touches no image and is not evidence here.
+- **e2e, in the batch's joint verification** (`task-image`'s last group):
+  - `smoke-coverage` locally and on AgentCore: `ReportNautilusTraderVersion`, plus everything it already covers, on the new base;
   - `golden-kata` locally and on AgentCore;
-  - `golden-kata-workflows` locally, for the worker's dependency stage.
+  - `golden-kata-workflows:e2e-agentcore`, which builds and deploys the worker's image with its new dependency stage.
 - **Settled once, no test:** which wheels NautilusTrader publishes, and what Debian ships. The e2e's `--only-binary` build fails loudly if the wheel set ever drifts.
 
 ## Risks / Trade-offs

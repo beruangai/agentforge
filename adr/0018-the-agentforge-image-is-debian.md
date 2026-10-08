@@ -15,6 +15,7 @@ Every agent image is built on the AgentForge image, and a consumer extends it wi
 * **Alpine**, with a consumer building glibc-only libraries from source
 * **Alpine with `gcompat`**, a partial glibc compatibility shim
 * **Debian slim** (`oven/bun:<version>-slim`), glibc
+* **A base image per consumer**, Alpine for AgentForge and a glibc one where a consumer needs it
 
 ## Decision Outcome
 
@@ -41,3 +42,8 @@ Chosen option: **Debian slim.** The Bun image's own Debian variant is pinned by 
 ### Alpine with `gcompat`
 
 * Bad, because it shims only part of glibc's ABI, and pip installs no `manylinux` wheel on musl
+
+### A base image per consumer
+
+* Good, because AgentForge's own image stays smallest
+* Bad, because it is a second image chain to build, pin and keep in step, for a need every glibc-only library shares

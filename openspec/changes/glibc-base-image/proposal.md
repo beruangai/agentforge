@@ -13,8 +13,8 @@ A consumer extends the AgentForge image with what its procedures need (§REQ704)
 - **A layer extending its image beyond its manifest is proven on `smoke-coverage`.**
   - Its base layer's Dockerfile is detached, and adds Python and NautilusTrader from the prebuilt wheel only. A wheel missing for the platform fails the build rather than compiling from source.
   - The base layer is the place to do it: Python is shared by every agent in a project.
-  - A new `hello-agent` procedure has its agent run Python, importing NautilusTrader, and answer with its version. This is verified locally and on AgentCore (ARM64).
-  - The plugin's documentation says how a layer installs system packages: detach the layer's Dockerfile, install as `root`, and return to `bun`.
+  - A new `hello-agent` procedure, `ReportNautilusTraderVersion`, has its agent run Python, importing NautilusTrader, and answer with its version. This is verified locally and on AgentCore (ARM64).
+  - The plugin's documentation says how a layer installs system packages: detach the layer's Dockerfile, install as `root`, and return to `bun`. A detached Dockerfile is the consumer's, so staying non-root is its to keep; the documented route keeps it.
 - **Proposed ADR 0018:** the AgentForge image is Debian, for glibc.
 - **BREAKING** for a consumer that detached a Dockerfile and calls `apk`. There is none; no consumer is live.
 
@@ -35,12 +35,15 @@ None.
   - `smoke-coverage` detaches its base Dockerfile and gains a procedure.
   - Every example image rebuilds.
 - **Verification:**
-  - every tier that runs the image: `integ` local and aws, whose AgentCore fixture reads the pinned image;
+  - `integ` aws, whose AgentCore fixture builds on the pinned Bun image and whose S3 sync runs `s7cmd` in the AgentForge image;
   - both examples' e2e and e2e-agentcore;
-  - `golden-kata-workflows`' e2e for the worker.
+  - `golden-kata-workflows`' e2e-agentcore, the only target that builds and runs the worker's image.
+- **Batch:** this is the first of four A6 changes, applied in order with no deploy between them: `glibc-base-image`, `strict-contracts`, `project-infrastructure`, `task-image`. Their end-to-end verification runs once, after all four, in `task-image`'s last group. Before the batch starts, the example stacks are destroyed (task 0.1 here), while their teardown scripts still match what is deployed.
+  - `strict-contracts` also edits `hello-agent`'s contract; the new procedure is written strict from the start.
+  - `task-image` and `project-infrastructure` also edit `smoke-coverage`'s AgentCore suite and ARCHITECTURE §7, after this change.
 - **No change** to any protocol, the contract, the client, the runtime's or the harness's code, or the constructs.
 - **Requirements:**
-  - serves §REQ704;
+  - serves §REQ704; leaves none unmet;
   - keeps §REQ701: the same image locally and in the cloud;
   - keeps §REQ705.
 - **Open options:** none depended on.
