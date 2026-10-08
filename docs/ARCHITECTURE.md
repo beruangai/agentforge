@@ -223,6 +223,8 @@ One published package, `@beruangai/agentforge`, with an entry point per environm
 
 `/agent` and `/server` resolve only under the `agentforge-agent` export condition, so a worker's build cannot import them. The package is also the Nx plugin: its `generators` and `executors` manifests name the plugin's JavaScript in the bundle, and its source in this repository. Every entry also carries a `@beruangai/source` condition pointing at its source, for projects inside this workspace, and publishing strips it. What only one environment needs — the Agent SDK, the A2A SDK, Express, the AWS clients, Temporal — is an optional peer; `@orpc/contract` and Zod are required peers, so a consumer's schemas and AgentForge's are one copy. Peer ranges are caret for stable packages and exact for pre-1.0 and beta ones.
 
+**Before publication a consumer installs the package as an archive**: the `pack` target packs the bundle — what publishing would ship — into `dist/libs/agentforge/pack/beruangai-agentforge.tgz`, which a consumer adds by absolute path, and the plugin's generated manifests repeat that path. A link to the clone or the bundle would resolve AgentForge's peers from there, not from the consumer ([research](research/package-installation.md)). `integ/local/package-tarball/` installs the archive into a workspace created apart from this repository and generates, syncs, typechecks and builds from it.
+
 ```
 libs/agentforge/              @beruangai/agentforge — the one Nx project that publishes
   src/core/                   contract helpers, task shapes, task-process messages

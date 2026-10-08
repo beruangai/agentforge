@@ -24,8 +24,8 @@ Group 1 is the archive. Group 2 was a guard on a linked install, removed. Group 
 
 ## 4. Records
 
-- [ ] 4.1 `docs/research/package-installation.md`, dated 2026-10-08: the spike's table (link, `file:` directory, tarball; peers; Bun and Node versions), that a re-pack is re-read only after `bun remove` (re-adding the same path keeps the old archive), and Nx's daemon syncing against a stale graph after a generator. Verified by reading it against the spike in design.md.
-- [ ] 4.2 Correct every `bun link` record to the archive, and verify each by reading it:
+- [x] 4.1 `docs/research/package-installation.md`, dated 2026-10-08: the spike's table (link, `file:` directory, tarball; peers; Bun and Node versions), that a re-pack is re-read only after `bun remove` (re-adding the same path keeps the old archive), and Nx's daemon syncing against a stale graph after a generator. Verified by reading it against the spike in design.md.
+- [x] 4.2 Correct every `bun link` record to the archive, and verify each by reading it:
   - **the package README**, "The Nx plugin": adopting before publication (the archive by absolute path, `init`), taking a newer one (`pack`, `bun remove` then `bun add -d`, `nx sync`), the linked-install error's signature, and that a relative path is not supported;
   - **the root README**: the plugin section's line on `bun link`;
   - **ARCHITECTURE §8**: the `pack` target and the archive;

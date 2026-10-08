@@ -8,7 +8,7 @@ decision-makers: Jeremy Jonas
 
 ## Context and Problem Statement
 
-A consumer develops its agentic projects with Claude Code, which cannot see AgentForge's own docs. Guidance on developing with AgentForge has to reach that Claude Code (§REQ712) and stay current. How does it ship, and how does a project get it? The routes were spiked on 2026-10-01 ([research](../docs/research/claude-code-plugin-distribution.md)). A consumer links AgentForge from a clone of this repository with `bun link`, so a developer has one on the machine.
+A consumer develops its agentic projects with Claude Code, which cannot see AgentForge's own docs. Guidance on developing with AgentForge has to reach that Claude Code (§REQ712) and stay current. How does it ship, and how does a project get it? The routes were spiked on 2026-10-01 ([research](../docs/research/claude-code-plugin-distribution.md)). Until AgentForge is published, a consumer installs it from an archive packed in a clone of this repository, so a developer has one on the machine.
 
 ## Considered Options
 
@@ -24,7 +24,7 @@ Chosen option: **a plugin from a marketplace at the repository root, registered 
 ### Consequences
 
 * Good, because the package and its bundle are untouched: nothing is copied, and the guidance is maintained where it is read
-* Good, because the clone loads in place, so a pull updates the next session, and a project linked with `bun link` runs the same clone the guidance describes
+* Good, because the clone loads in place, so a pull updates the next session, and a project installing AgentForge's archive from that clone runs the AgentForge the guidance describes
 * Good, because the guidance is namespaced (`agentforge:`), and can grow commands, agents and hooks in the same plugin
 * Good, because a project opts in with one setting, committed or local, and nothing is generated into it
 * Bad, because a machine registers one clone, so every project on it gets that clone's guidance; the migrations reference carries a project built against an older AgentForge forward

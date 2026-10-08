@@ -124,4 +124,4 @@ No TypeScript surface changes. The surface is:
 
 ## Migration Plan
 
-None in code. In records, `bun link` becomes the archive everywhere it appears: ROADMAP A7, the root README, the package README, the skill, and StrategyFoundry's corrections doc §1 and §11. StrategyFoundry has not yet installed AgentForge, so nothing there migrates.
+None in code. In records, `bun link` becomes the archive everywhere it appears: ROADMAP A7 and A8, the root README, the package README, the skill, ADR 0019 (amended in place; no consumer depends on it), and StrategyFoundry's corrections doc §1 and §11. StrategyFoundry has not yet installed AgentForge, so nothing there migrates.

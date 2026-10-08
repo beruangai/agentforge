@@ -122,7 +122,7 @@ A project enables it in `.claude/settings.json`, shared with everyone who works 
 { "enabledPlugins": { "agentforge@agentforge": true } }
 ```
 
-A pull of the clone reaches the next session. A machine registers one clone, so every project on it gets that clone's guidance; projects linking AgentForge with `bun link` run the same clone. If the clone moves, register it again.
+A pull of the clone reaches the next session. A machine registers one clone, so every project on it gets that clone's guidance; projects installing AgentForge's archive from that clone run the same AgentForge it describes. If the clone moves, register it again.
 
 ## Known limits
 

@@ -19,6 +19,16 @@ For Claude Code, AgentForge's guide to developing with it is a plugin registered
 
 `nx add @beruangai/agentforge` runs `init`: an agentic project's dependencies at AgentForge's own peer ranges — in the root catalog when `aws-nx-plugin.config.mts` enables catalogs, otherwise the root manifest — and the plugin's sync attached to its `lock` and `image` tasks.
 
+### Before publication
+
+Until AgentForge is published, a consumer installs the archive its `pack` target writes, exactly the package publishing would ship, by its absolute path in the clone:
+
+```bash
+bunx nx add @beruangai/agentforge@/abs/path/to/agentforge/dist/libs/agentforge/pack/beruangai-agentforge.tgz
+```
+
+Every manifest the plugin generates repeats that path; a relative path is not supported. To take a newer AgentForge, run `nx run @beruangai/agentforge:pack` in the clone, then in the consumer `bun remove @beruangai/agentforge` and `bun add -d` the same path (adding the same path again keeps the old archive), then `nx sync`. Never `bun link` the clone or the bundle: a linked AgentForge resolves its peers from the clone, and fails with `Cannot find package '…' imported from …/dist/libs/agentforge/bundle/…` ([research](../../docs/research/package-installation.md)).
+
 | Generator | Creates |
 |---|---|
 | `agentic-project <name> [--directory packages]` | A project with a base layer and no agents, its targets, client and construct |

@@ -13,7 +13,7 @@ This skill loads from the developer's clone of the AgentForge repository. Its li
 
 | Step | What | Read |
 |---|---|---|
-| Adopt | `nx add @beruangai/agentforge`, with AgentForge linked from the clone (`bun link`) until it is published | [The Nx plugin](../../../libs/agentforge/README.md#the-nx-plugin) |
+| Adopt | `nx add @beruangai/agentforge@<absolute path to the clone's packed archive>` until it is published; never `bun link` | [Before publication](../../../libs/agentforge/README.md#before-publication) |
 | Generate | `agentic-project`, then `agent` per agent; `workflow-project` and `connection` for a Temporal caller | [The Nx plugin](../../../libs/agentforge/README.md#the-nx-plugin) |
 | Define | The agent's `contract.ts`: each procedure's input, output and time budget | [implementing.md](references/implementing.md) |
 | Implement | The agent's `procedures.ts`: context, options, runs, filesystems, memory, side effects | [implementing.md](references/implementing.md) |
