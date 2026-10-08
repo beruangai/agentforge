@@ -44,7 +44,11 @@
 
 **Distillation** — Documents over a token cap compacted by a utility run into one context block that cites its sources by line.
 
-**Task context** — What a handler receives beside its input: the ids, the attempt and prior attempt, metadata, the cancellation signal, `runAgent`, and the mounted `filesystems` with their merged `filesystemPermissions` and their `filesystemDirectories`.
+**Task context** — What a handler receives beside its input: the ids, the attempt and prior attempt, metadata, the cancellation signal, `runAgent`, the mounted `filesystems`, and the task's `agentOptions`.
+
+**Agent options** — `context.agentOptions`: the run options AgentForge derives from a task — every mount as an additional directory, every mount's baseline rules as allowed tools — which a handler composes into a run's own with `composeOptions`; `{}` without a mount. AgentForge never applies them itself.
+
+**Context function** — A `ContextBlockFunction`: typed input variables in, prompt content out — text, content blocks and context blocks, a context block's text inline or from a file. `composeContext` makes one from several; a procedure calls it for its prompt or a command's context.
 
 **Time budget** — How long a task may run; declared with `timeBudget(seconds)` in the contract's meta, overridable per call, enforced by the executor.
 

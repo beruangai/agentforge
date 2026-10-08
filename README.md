@@ -41,6 +41,31 @@ export const router = os.router({
 });
 ```
 
+A prompt is built from **context functions** — typed input variables in, prompt content out — and `composeContext` makes one from several: its input is every variable its parts need, checked when the procedure compiles, and its content theirs in order. A context block may name a file in its layer's `.claude/` instead of carrying its text; it is read against the run's `cwd` when the run starts, and one that cannot be read fails the run. A procedure with filesystems composes `context.agentOptions` — its mounts as `additionalDirectories` and their baseline rules — into the run's options.
+
+```ts
+const protocol: ContextBlockFunction = () => [
+  { tag: 'protocol', name: 'kata-files', filepath: '../.claude/fragments/kata-files.md', cache: true },
+];
+const request: ContextBlockFunction<{ topic: string }> = ({ topic }) => [{ tag: 'topic', context: topic }];
+const writeContext = composeContext(protocol, request);   // (input: { topic: string }) => Promise<…>
+
+await context.runAgent({
+  prompt: await writeContext({ topic: input.topic }),
+  output: KataSchema,
+  options: composeOptions(baseOptions(), context.agentOptions, { maxTurns: 20 }),
+});
+```
+
+| Static instructions | Where |
+|---|---|
+| Who the agent is; rules for every run of an agent or project | `CLAUDE.md` in the layer's `.claude/`, composed across layers |
+| Know-how needed only sometimes | A skill in the layer's `.claude/skills/` |
+| A procedure's role and standing instructions | Its `systemPrompt`; AgentForge appends its own fragments after it |
+| Protocols and contracts a prompt carries | File-backed context blocks, first in the prompt |
+
+What a run is about follows, from dynamic context functions. Static content first with a cache breakpoint on its last block keeps a prompt's stable prefix cached across runs. [`golden-kata`](packages/examples/golden-kata) composes its prompts this way.
+
 **3. Package it** — two entries, a `package.json` and its generated `bun.lock` (the container workspace's, up to this agent), and a Dockerfile `FROM agentforge/a2a-claude` that copies them to `/workspace/agentic/agent` and installs.
 
 ```ts
@@ -80,7 +105,7 @@ Built to what the platforms document, with tests only where AgentForge relies on
 - **Files do not follow a session.** A resumed session remembers what earlier runs wrote, but a new container does not have those files — only what a filesystem pushed.
 - **A filesystem's prefix is the consumer's to keep to one task at a time; its local directory is AgentForge's.** In one container, a task whose mount would share or nest another live task's local directory fails `FILESYSTEM_UNSYNCED`, retryable. Across containers AgentForge syncs what each task declares, and two tasks on one prefix at once overwrite each other file by file; a consumer's workflows prevent it — through `runtimeSessionId`, a continuity key, or a subpath per task.
 - **`dangerouslyEnableDeletes` deletes what is missing locally, not only what the task removed.** Off by default; when on, the final push removes every object in the write scope with no local file, including any another writer added since the pull. It needs a remote path — `remoteRoot` joined with `subpath` — other than `/`; what a delete may reach is the procedure's to scope.
-- **AgentForge gives an agent no filesystem permission.** The handler passes `context.filesystemPermissions` (or its own rules) and `context.filesystemDirectories`, as `additionalDirectories`, to `runAgent`; Bash is not bounded by them, so a procedure lists the commands it allows.
+- **AgentForge gives an agent no filesystem permission.** The handler composes `context.agentOptions` (or its own rules and directories) into what it passes `runAgent`; Bash is not bounded by them, so a procedure lists the commands it allows.
 - **A generated project fences reads to a run's working directories.** Its base options refuse a read outside them, even one an allow rule grants, through the file tools and read-only Bash, so a run that is not given its mounts cannot read them. The fence does not bound Bash that is not read-only, such as an interpreter a procedure allows: that would take a sandbox or a container per task.
 - **Transcripts are kept 30 days by default** (`sessionRetention`), and hold everything the agent was sent and read.
 - **Locally, sessions live in the container** and end with it; only a deployed agent persists them.

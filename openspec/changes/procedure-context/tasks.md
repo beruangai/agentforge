@@ -39,7 +39,7 @@ Group 1 records the requirements. Groups 2 and 3 are the package work and are in
 
 ## 5. Records
 
-- [ ] 5.1 Verify each record by reading it against design.md:
+- [x] 5.1 Verify each record by reading it against design.md:
   - **The root README, "Implement it":** context functions, `composeContext`, file-backed blocks, `composeOptions(baseOptions(), context.agentOptions, …)`, and where static instructions live, with the ordering for caching;
   - **ARCHITECTURE §3:** `context.agentOptions` in the filesystems paragraph and the task context;
   - **ARCHITECTURE §6:** context functions and file-backed blocks in the prompt;
