@@ -83,4 +83,8 @@ export const contract = {
   Recall: oc
     .input(z.object({ space: SpaceField, question: z.string().min(1) }))
     .output(z.object({ answer: z.string() })),
+  /** Runs Python importing NautilusTrader, which the base layer installs, and answers with its version. */
+  ReportNautilusTraderVersion: oc
+    .input(z.strictObject({}))
+    .output(z.strictObject({ version: z.string() })),
 };

@@ -176,4 +176,23 @@ export const router = os.router({
     });
     return { answer: run.output.answer };
   }),
+  ReportNautilusTraderVersion: os.ReportNautilusTraderVersion.handler(
+    async ({ context }) => {
+      const run = await context.runAgent({
+        prompt:
+          'Run `python -c "import nautilus_trader; print(nautilus_trader.__version__)"` with the Bash tool, and answer with the version it printed, exactly.',
+        output: z.object({
+          version: z.string().describe('The version the command printed'),
+        }),
+        // The venv the base layer installs provides both names; the model may pick either.
+        options: composeOptions(baseOptions(), {
+          maxTurns: 4,
+          tools: ['Bash'],
+          allowedTools: ['Bash(python *)', 'Bash(python3 *)'],
+          permissionMode: 'dontAsk',
+        }),
+      });
+      return { version: run.output.version };
+    },
+  ),
 });

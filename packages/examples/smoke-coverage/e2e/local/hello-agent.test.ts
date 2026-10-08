@@ -2,8 +2,9 @@
  * The whole path, locally: a caller, through the project client, to
  * hello-agent's container as `serve-hello-agent` runs it — server, task
  * process, harness, the Agent SDK and a real model — and back as a typed
- * outcome; an attach, a resumed session, a cancel mid-Bash, and a procedure
- * that distills its documents in a run before answering in another.
+ * outcome; an attach, a resumed session, a cancel mid-Bash, a procedure
+ * that distills its documents in a run before answering in another, and
+ * Python importing what the base layer installed.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { awaitTask } from '@beruangai/agentforge/client';
@@ -166,5 +167,23 @@ describe('hello-agent, locally', () => {
     expect(ended.output.distilled).toBe(false);
     expect(ended.output.answer).toMatch(ANSWER);
     expect(ended.runs).toHaveLength(1);
+  });
+
+  it('runs Python importing NautilusTrader, which its base layer installed from a glibc-only wheel', async () => {
+    const started = await helloAgent.ReportNautilusTraderVersion.SendMessage(
+      {},
+      { runtimeSessionId: RUNTIME_SESSION_ID, idempotencyKey: randomUUIDv7() },
+    );
+    const ended = await awaitTask(
+      helloAgent.ReportNautilusTraderVersion,
+      started,
+      POLL_OPTIONS,
+    );
+    if (ended.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(
+        `expected completion, got ${JSON.stringify(ended)}\n${logs()}`,
+      );
+    }
+    expect(ended.output.version).toBe('1.231.0');
   });
 });

@@ -8,7 +8,8 @@
  * ends `LOST`, its retry running as the next attempt; two tasks in one
  * container never share a mount's local directory; a memory saved in one
  * container is recalled in another; and a procedure's runs
- * — a distillation, then the answer — are each recorded on its task.
+ * — a distillation, then the answer — are each recorded on its task; and
+ * Python imports, on ARM64, what the base layer installed.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -407,5 +408,25 @@ describe('hello-agent, on AgentCore', () => {
       expect(ended.output.answer).toMatch(ANSWER);
       expect(ended.runs).toHaveLength(1);
     });
+  });
+
+  it('runs Python importing NautilusTrader on ARM64, which its base layer installed from a glibc-only wheel', async () => {
+    const context = {
+      runtimeSessionId: newRuntimeSessionId(),
+      idempotencyKey: randomUUIDv7(),
+    };
+    const started = await helloAgent.ReportNautilusTraderVersion.SendMessage(
+      {},
+      context,
+    );
+    const ended = await awaitTask(
+      helloAgent.ReportNautilusTraderVersion,
+      started,
+      { ...context, pollIntervalMilliseconds: POLL_INTERVAL_MILLISECONDS },
+    );
+    if (ended.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(`expected completion, got ${JSON.stringify(ended)}`);
+    }
+    expect(ended.output.version).toBe('1.231.0');
   });
 });

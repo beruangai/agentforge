@@ -17,7 +17,7 @@ Group 0 opens the batch of four A6 changes. Group 1 moves the base. Group 2 prov
 ## 2. Extending a layer
 
 - [x] 2.1 `smoke-coverage` detaches `base/Dockerfile` in its `project.json`, which installs Python 3 (and `libpython3.13`) in a venv at `/opt/python` and `nautilus_trader==1.231.0` with `--only-binary=:all:`, as root before the layer's own files, then returns to `bun` with the venv on `PATH`. Verified by `nx sync:check` passing with the detachment, by `nx run @beruangai/smoke-coverage:image-hello-agent` building on `linux/arm64`, and, inside the agent image, by `id -u` being `1000` and `python -c "import nautilus_trader"` succeeding.
-- [ ] 2.2 `hello-agent` gains `ReportNautilusTraderVersion` (`z.strictObject({})` in, `z.strictObject({ version })` out): its agent runs Python importing NautilusTrader, with `Bash(python *)` and `Bash(python3 *)` allowed, and answers with the version. Both of `smoke-coverage`'s e2e suites assert `1.231.0`. Verified by `nx run-many -t typecheck lint` for `smoke-coverage`; its e2e runs in the batch's joint verification.
+- [x] 2.2 `hello-agent` gains `ReportNautilusTraderVersion` (`z.strictObject({})` in, `z.strictObject({ version })` out): its agent runs Python importing NautilusTrader, with `Bash(python *)` and `Bash(python3 *)` allowed, and answers with the version. Both of `smoke-coverage`'s e2e suites assert `1.231.0`. Verified by `nx run-many -t typecheck lint` for `smoke-coverage`; its e2e runs in the batch's joint verification.
 
 ## 3. End to end, in the batch
 
