@@ -1,6 +1,5 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative } from 'node:path';
-import { workspaceRoot } from '@nx/devkit';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 /**
  * What the AgentForge image is built from, all inside AgentForge's own
@@ -43,37 +42,6 @@ function packageDirectoryAbove(directory: string): string {
       throw new Error(`no ${PACKAGE_NAME} package.json above ${directory}`);
     }
   }
-}
-
-/** Whether this code is AgentForge's source, in its own repository, rather than the installed package. */
-const runningFromSource = import.meta.filename.endsWith('.ts');
-
-/**
- * Requires an installed AgentForge to live inside the workspace running it. A
- * package linked in from elsewhere resolves its peers from where it really
- * lives, not from the workspace, so the two would hold separate copies of
- * each peer, or the package would find none.
- */
-export function requireInstalledInside(
-  packageDirectory: string,
-  workspaceDirectory: string,
-): void {
-  const installed = realpathSync(packageDirectory);
-  const fromWorkspace = relative(realpathSync(workspaceDirectory), installed);
-  if (fromWorkspace.startsWith('..') || isAbsolute(fromWorkspace)) {
-    throw new Error(
-      `${PACKAGE_NAME} is installed as a link to ${installed}, so its peers would resolve from there, not from this workspace. Install the archive instead: bun add ${PACKAGE_NAME}@<path to beruangai-agentforge.tgz>, which AgentForge's pack target writes`,
-    );
-  }
-}
-
-/** The directory of the AgentForge running this code: its source, or the installed package, which must be inside the workspace. */
-function runningPackageDirectory(): string {
-  const directory = packageDirectoryAbove(import.meta.dirname);
-  if (!runningFromSource) {
-    requireInstalledInside(directory, workspaceRoot);
-  }
-  return directory;
 }
 
 /**
@@ -129,7 +97,10 @@ export interface AgentforgeManifest {
 
 /** The manifest of the AgentForge running this code, source or installed. */
 export function agentforgeManifest(): AgentforgeManifest {
-  const manifest = join(runningPackageDirectory(), 'package.json');
+  const manifest = join(
+    packageDirectoryAbove(import.meta.dirname),
+    'package.json',
+  );
   const { name, version, peerDependencies } = JSON.parse(
     readFileSync(manifest, 'utf8'),
   ) as Partial<AgentforgeManifest>;
@@ -149,5 +120,8 @@ export function agentforgeManifest(): AgentforgeManifest {
  * generator writes names either.
  */
 export function agentforgeContainerInputs(): ContainerInputs {
-  return containerInputsOf(runningPackageDirectory(), runningFromSource);
+  return containerInputsOf(
+    packageDirectoryAbove(import.meta.dirname),
+    import.meta.filename.endsWith('.ts'),
+  );
 }

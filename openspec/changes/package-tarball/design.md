@@ -20,7 +20,7 @@ See proposal.md, Why. What holds today:
   |---|---|---|
   | `bun link` (a symlink to the bundle) | the bundle's real path under `dist/` | `Cannot find package 'zod'` |
   | `file:<bundle directory>` | the same: Bun installs a folder of per-file symlinks | the same |
-  | `bun pm pack`, then `bun add <tarball>` | the consumer's `node_modules` | one Zod instance under Bun and Node; a re-pack reached the consumer on `bun add` again |
+  | `bun pm pack`, then `bun add <tarball>` | the consumer's `node_modules` | one Zod instance under Bun and Node |
 
 - **A consumer workspace is `@aws/nx-plugin`'s preset**, created with `create-nx-workspace --preset=@aws/nx-plugin --pm=bun`, as this one was (`docs/research/aws-nx-plugin.md`).
 
@@ -29,7 +29,6 @@ See proposal.md, Why. What holds today:
 **Goals:**
 - One archive, built by Nx, that is exactly what publishing would ship.
 - A consumer installs it, and everything the plugin does works as it would for a published version, verified from a workspace outside this repository.
-- A linked install fails loudly instead of resolving the wrong peers.
 
 **Non-Goals:** as in proposal.md.
 
@@ -60,28 +59,24 @@ See proposal.md, Why. What holds today:
 ### A consumer depends on the archive by absolute path
 
 ```bash
-bun add @beruangai/agentforge@/abs/path/to/agentforge/dist/libs/agentforge/pack/beruangai-agentforge.tgz
+bunx nx add @beruangai/agentforge@/abs/path/to/agentforge/dist/libs/agentforge/pack/beruangai-agentforge.tgz
 ```
 
-```bash
-bunx nx g @beruangai/agentforge:init
-```
-
-- This is the same as `nx add @beruangai/agentforge`, which installs the package and runs `init`, but from the archive. Whether `nx add` itself accepts the path is checked in the test, and the docs give whichever works.
-- **To take a newer AgentForge:** run `pack` in AgentForge, run `bun add` with the same path in the consumer, then `nx sync`. `bun.lock` records the archive's integrity, so the lock changes with each pack. That is expected and committed.
+- `nx add` accepts the path: it installs the archive as a dev dependency and runs `init`, as it would for a published version (checked 2026-10-08, Nx 23.2.1).
+- **To take a newer AgentForge:** run `pack` in AgentForge, then in the consumer `bun remove @beruangai/agentforge` and `bun add -d` the same path, then `nx sync`. Adding the same path again, even with `--force`, kept the old archive while the lock held its integrity. Removing it first re-reads the archive (Bun 1.4.0). `bun.lock` records the archive's integrity, so the lock changes with each pack; that is expected and committed.
 - **An absolute path is the operator's choice for now.** Generated manifests repeat it, and it resolves from all of them. It names one machine's clone, as the plugin's registration already does. A relative path is a recorded limit, not handled.
 
-### A linked install fails loudly
+### A linked install fails at module resolution; no guard
 
-When the plugin runs installed (not from source), it requires its own package directory's real path to lie inside the workspace that runs it. Otherwise it throws, naming the link and the fix:
+A guard was built, then removed. It required an installed AgentForge's real path to be inside the workspace running it. Tried in the dogfood workspace, a link to the bundle never reached it: loading the plugin fails first, because its own imports resolve from `dist/`. The error reads `Cannot find package '@nx/devkit' imported from …/agentforge/dist/libs/agentforge/bundle/…`. That is loud, and it names the link's target.
 
-```
-AgentForge is installed as a link to /…/agentforge/dist/libs/agentforge/bundle, so its peers would resolve from there, not from this workspace. Install the archive instead: bun add @beruangai/agentforge@<path to beruangai-agentforge.tgz>
-```
+The silent case the guard was for needs AgentForge's peers to be reachable from `dist/`. This repository's isolated install never puts them there, and Bun is declared once. The docs name the error signature and its fix instead.
 
-- The check sits beside the source-or-installed decision in `container-inputs.ts`, so every generator, sync and image build hits it.
-- From source, in this repository, nothing changes.
-- This turns the spike's silent failure (the wrong copy of a peer, wherever one is reachable) into a failure at `init`.
+### What the dogfood workspace found, fixed here
+
+- **The preset's `aws-nx-plugin.config.mts` could not be read.** `@aws/nx-plugin` 1.0.6's preset writes `import { AwsNxPluginConfig }`, not `import type`. AgentForge evaluated the file with Node's type stripping, which keeps that import, so `init` failed in every fresh workspace. AgentForge now evaluates it with jiti, as `@aws/nx-plugin` does (its reader is not exported). jiti drops an import used only as a type. The unit fixture now writes the preset's own form. jiti, ^2.7.0 as `@aws/nx-plugin` pins it, becomes a dependency.
+- **`connection` did not install the link it adds.** Nx's `installPackagesTask` installs only when the root manifest changed. A connection adds a workspace dependency to the workflow project's own manifest, so the agentic project was never linked, and the workflow project's `typecheck` could not resolve its client. `connection` now always installs.
+- **Nx's daemon can sync against a stale graph** right after a generator, so `nx sync:check` failed once after `nx sync` succeeded. With `NX_DAEMON=false`, one `nx sync` converges. The test runs without the daemon. This is not AgentForge's to fix.
 
 ### The dogfood test builds a consumer from nothing
 
@@ -94,8 +89,8 @@ AgentForge is installed as a link to /…/agentforge/dist/libs/agentforge/bundle
 
 Then it asserts:
 - every generated manifest depends on AgentForge by the absolute path;
-- the installed package is a real directory, and a peer resolved from inside it lands in the consumer's `node_modules`;
-- with the package replaced by a link to the bundle, `init` fails naming the link.
+- a peer resolved from inside the installed package lands in the consumer's workspace;
+- with the package replaced by a link to the bundle, `init` fails, naming the bundle's path.
 
 `integ` gains `pack` in its `dependsOn`, so the archive is current when the test runs. The test needs Docker and the network: the preset and the images install from registries. It is the slowest in `local`, with a timeout to match. It removes the images it built and the temporary workspace afterwards.
 
@@ -103,7 +98,6 @@ Then it asserts:
 
 No TypeScript surface changes. The surface is:
 - **the `pack` target**, and the archive at `dist/libs/agentforge/pack/beruangai-agentforge.tgz`;
-- **the error** a linked install raises;
 - **the specifier a consumer writes**: an absolute path to the archive.
 
 ## Error handling
@@ -112,20 +106,21 @@ No TypeScript surface changes. The surface is:
 |---|---|---|
 | The bundle fails publint | `pack` | `bundle` fails first; nothing is packed |
 | The archive is not at the path | the consumer's `bun add` | Bun fails, naming the path |
-| AgentForge installed as a link | `init`, any generator, sync or image build | throws, naming the link and the archive to install |
+| AgentForge installed as a link | `init`, any generator, sync or image build | module resolution fails, naming the bundle path a peer was looked up from |
 | The installed package lacks the image's inputs | `image-agentforge` | fails, naming each missing path (today's behaviour, now tested installed) |
 
 ## What earns which test
 
 - **`integ` local, the dogfood test:** the installed package works end to end in another workspace. AgentForge relies on it for A7. Nothing has run it, and the bundle, the preset and Bun can each drift.
-- **Settled once, a dated research note:** how Bun and Node resolve peers through a link, a `file:` directory and a tarball, and that `bun add` again picks up a re-pack. That is the spike. The test's link scenario re-checks the part AgentForge guards.
+- **Settled once, a dated research note:** how Bun and Node resolve peers through a link, a `file:` directory and a tarball, and that a re-pack is re-read only after `bun remove`. That is the spike. The test's link scenario re-checks that a linked install fails.
 
 ## Risks / Trade-offs
 
 - **[The test is slow and needs the network]** → It runs only in `integ` `local`, before publishing, never on every commit. A registry outage fails it loudly; it never passes empty.
 - **[The archive path is machine-specific]** → One engineer, one machine, the same as the plugin's registration. A relative path or publishing (A8) removes it.
+- **[A consumer re-adds without removing]** → It keeps the old archive. The docs give `bun remove` first.
 - **[A consumer forgets to re-install after a pack]** → It runs the older AgentForge until it does. The docs give the three steps, and `nx sync:check` fails once it has re-installed and not synced.
-- **[The image tag is shared]** → A consumer and this repository both build `agentforge/a2a-claude:<version>` locally from the same bundle, so they produce the same image.
+- **[The image tag]** → A consumer tags the AgentForge image `agentforge/a2a-claude:<version>`, and this repository tags its own `:local`, so they don't collide.
 
 ## Migration Plan
 
