@@ -30,3 +30,4 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0016](0016-a-workflow-project-is-a-generated-caller.md) | A workflow project is a generated caller | accepted |
 | [0017](0017-agentforge-adds-system-prompt-fragments-never-the-preset.md) | AgentForge adds system-prompt fragments of its own, never the `claude_code` preset | accepted |
 | [0018](0018-the-agentforge-image-is-debian.md) | The AgentForge image is Debian, for glibc | accepted |
+| [0019](0019-claude-code-guidance-ships-as-a-plugin-in-the-package.md) | Claude Code guidance ships as a plugin in the package | proposed |
