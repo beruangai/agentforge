@@ -16,13 +16,13 @@ Group 1 records the requirements. Groups 2 and 3 are the package work and are in
 
 ## 3. Context composition
 
-- [ ] 3.1 In `server/harness/prompt.ts`: `ContextContent`, `ContextBlockFunction` and `composeContext`, exported from `/agent`. Verified by unit tests:
+- [x] 3.1 In `server/harness/prompt.ts`: `ContextContent`, `ContextBlockFunction` and `composeContext`, exported from `/agent`. Verified by unit tests:
   - the content of sync and async parts comes back in order;
   - composites nest;
   - an empty composition returns nothing.
 
   The type tests, which `nx run @beruangai/agentforge:typecheck` checks, cover the intersected input, a no-input part adding nothing, and a missing variable (`@ts-expect-error`).
-- [ ] 3.2 A `ContextBlock` takes `filepath` as the alternative to `context`. It is reserved, never an attribute, and read against the run's `cwd` at render time, at the top of the prompt and in a command's context. `CommandBlock.context` takes `ContextContent`. Verified by unit tests:
+- [x] 3.2 A `ContextBlock` takes `filepath` as the alternative to `context`. It is reserved, never an attribute, and read against the run's `cwd` at render time, at the top of the prompt and in a command's context. `CommandBlock.context` takes `ContextContent`. Verified by unit tests:
   - a relative and an absolute file render exactly as the same block inline, at the top and in a command's context;
   - a content block in a command's context renders in place;
   - an unreadable file, both keys and neither key each fail the run before `query()`, naming the file.

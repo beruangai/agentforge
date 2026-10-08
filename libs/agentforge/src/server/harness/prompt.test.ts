@@ -5,6 +5,9 @@ import { beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
 import {
   CACHE_MARKER_BLOCK,
   type ContextBlock,
+  type ContextBlockFunction,
+  type ContextContent,
+  composeContext,
   createStreamingInput,
   createUserMessage,
   documentBlock,
@@ -16,6 +19,7 @@ beforeAll(async () => {
   cwd = await mkdtemp(path.join(tmpdir(), 'agentforge-prompt-'));
   await writeFile(path.join(cwd, 'notes.md'), '# Notes');
   await writeFile(path.join(cwd, 'paper.PDF'), '%PDF-1.7');
+  await writeFile(path.join(cwd, 'dates.md'), 'Dates are ISO 8601.');
 });
 
 async function contentOf(
@@ -148,13 +152,168 @@ describe('a command block', () => {
   });
 });
 
-describe('resolveContextBlock', () => {
-  it('defaults the tag, and sets a cache breakpoint when asked', () => {
+describe('a context block naming a file', () => {
+  const inline = {
+    type: 'text',
+    text: '<protocol name="dates">\nDates are ISO 8601.\n</protocol>',
+    cache_control: { type: 'ephemeral', ttl: '5m' },
+  };
+
+  it('renders as the same block with the file inline, relative or absolute', async () => {
     expect(
-      resolveContextBlock({
-        context: 'x',
-        cache: { type: 'ephemeral', ttl: '1h' },
+      await contentOf([
+        { tag: 'protocol', name: 'dates', filepath: 'dates.md', cache: true },
+        {
+          tag: 'protocol',
+          name: 'dates',
+          filepath: path.join(cwd, 'dates.md'),
+          cache: true,
+        },
+      ]),
+    ).toEqual([inline, inline]);
+  });
+
+  it('renders the same in a command’s context', async () => {
+    expect(
+      await contentOf({
+        type: 'command',
+        command: 'kata',
+        context: [
+          { tag: 'protocol', name: 'dates', filepath: 'dates.md', cache: true },
+        ],
       }),
+    ).toEqual([{ type: 'text', text: '/kata' }, inline]);
+  });
+
+  it('fails the prompt when its file cannot be read, naming it', async () => {
+    await expect(contentOf({ filepath: 'missing.md' })).rejects.toThrow(
+      /context block file "missing.md" could not be read/,
+    );
+    await expect(
+      contentOf({
+        type: 'command',
+        command: 'kata',
+        context: { filepath: 'missing.md' },
+      }),
+    ).rejects.toThrow(/"missing.md" could not be read/);
+  });
+
+  it.each([
+    ['both keys', { context: 'x', filepath: 'dates.md' }],
+    ['neither key', { tag: 'protocol' }],
+  ])('refuses a block with %s', async (_, block) => {
+    await expect(contentOf(block as never)).rejects.toThrow(
+      /one of `context` or `filepath`/,
+    );
+  });
+
+  it('takes one of the two keys, never both', () => {
+    expectTypeOf({ filepath: 'a.md' }).toExtend<ContextBlock>();
+    expectTypeOf({
+      context: 'x',
+      filepath: 'a.md',
+    }).not.toExtend<ContextBlock>();
+  });
+});
+
+describe('a command’s context', () => {
+  it('places a content block where it stands', async () => {
+    const image = {
+      type: 'image',
+      source: { type: 'url', url: 'https://example.com/a.png' },
+    } as const;
+    expect(
+      await contentOf({
+        type: 'command',
+        command: 'look',
+        context: ['first', image, { tag: 'then', context: 'last' }],
+      }),
+    ).toEqual([
+      { type: 'text', text: '/look' },
+      { type: 'text', text: '<context>\nfirst\n</context>' },
+      image,
+      { type: 'text', text: '<then>\nlast\n</then>' },
+    ]);
+  });
+});
+
+describe('composeContext', () => {
+  const protocol: ContextBlockFunction = () => [
+    { tag: 'protocol', filepath: 'dates.md' },
+  ];
+  const directory: ContextBlockFunction<{ directory: string }> = async ({
+    directory,
+  }) => [{ tag: 'directory', context: directory }];
+  const topic: ContextBlockFunction<{ topic: string }> = ({ topic }) => [
+    `The topic is ${topic}.`,
+  ];
+
+  it('returns each part’s content in the order given, sync or not', async () => {
+    const context = composeContext(protocol, directory, topic);
+    expect(await context({ directory: '/k', topic: 'dates' })).toEqual([
+      { tag: 'protocol', filepath: 'dates.md' },
+      { tag: 'directory', context: '/k' },
+      'The topic is dates.',
+    ]);
+  });
+
+  it('nests, a composite composing like any other part', async () => {
+    const context = composeContext(
+      composeContext(protocol, directory),
+      topic,
+      () => ['closing'],
+    );
+    expect(await context({ directory: '/k', topic: 'dates' })).toEqual([
+      { tag: 'protocol', filepath: 'dates.md' },
+      { tag: 'directory', context: '/k' },
+      'The topic is dates.',
+      'closing',
+    ]);
+  });
+
+  it('returns nothing from nothing', async () => {
+    expect(await composeContext()({})).toEqual([]);
+  });
+
+  it('needs every input variable any part needs, and nothing for a part without', () => {
+    const context = composeContext(protocol, directory, topic);
+    expectTypeOf(context).parameter(0).toEqualTypeOf<{
+      directory: string;
+      topic: string;
+    }>();
+    expectTypeOf(composeContext(protocol, () => ['x']))
+      .parameter(0)
+      .toEqualTypeOf<Record<never, never>>();
+    expectTypeOf(context).returns.toEqualTypeOf<
+      Promise<readonly ContextContent[]>
+    >();
+    expectTypeOf(context).toExtend<
+      ContextBlockFunction<{ directory: string; topic: string }>
+    >();
+  });
+
+  it('does not compile without an input variable, or with a mistyped one', () => {
+    const context = composeContext(directory, topic);
+    // @ts-expect-error -- `topic` is missing
+    void context({ directory: '/k' });
+    // @ts-expect-error -- `topic` is a string
+    void context({ directory: '/k', topic: 1 });
+    const clashing = composeContext(
+      directory,
+      (_: { directory: number }) => [],
+    );
+    // @ts-expect-error -- `directory` cannot be a string and a number
+    void clashing({ directory: '/k' });
+  });
+});
+
+describe('resolveContextBlock', () => {
+  it('defaults the tag, and sets a cache breakpoint when asked', async () => {
+    expect(
+      await resolveContextBlock(
+        { context: 'x', cache: { type: 'ephemeral', ttl: '1h' } },
+        cwd,
+      ),
     ).toEqual({
       type: 'text',
       text: '<context>\nx\n</context>',

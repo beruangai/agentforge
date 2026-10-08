@@ -41,7 +41,10 @@ export {
   type CommandBlock,
   type ContentBlock,
   type ContextBlock,
+  type ContextBlockFunction,
+  type ContextContent,
   type ContextDocument,
+  composeContext,
   documentBlock,
   type PromptContent,
 } from './prompt.ts';

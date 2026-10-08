@@ -76,6 +76,21 @@ describe('runAgent', () => {
     expect(scripted.calls).toHaveLength(0);
   });
 
+  it('fails before the run when a context block’s file cannot be read, naming it', async () => {
+    const scripted = scriptedQuery([]);
+    await expect(
+      runAgent(
+        {
+          prompt: [{ tag: 'protocol', filepath: 'missing-fragment.md' }, 'q'],
+          output: OutputSchema,
+        },
+        { signal: new AbortController().signal, onRecord: () => undefined },
+        scripted.query,
+      ),
+    ).rejects.toThrow(/"missing-fragment.md" could not be read/);
+    expect(scripted.calls).toHaveLength(0);
+  });
+
   it('sends an opted-in non-object root wrapped, and returns it unwrapped', async () => {
     const scripted = scriptedQuery([
       result({ structured_output: { output: ['a', 'b'] } }),
