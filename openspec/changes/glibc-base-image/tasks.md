@@ -29,7 +29,7 @@ Group 0 opens the batch of four A6 changes. Group 1 moves the base. Group 2 prov
 
 ## 4. Records
 
-- [ ] 4.1 Verify each record by reading it against design.md:
+- [x] 4.1 Verify each record by reading it against design.md:
   - **ARCHITECTURE §7:** the AgentForge image's row names Debian slim and `apt`;
   - **the package README's plugin section:** how a layer adds system packages — detach its Dockerfile, install as `root` before the layer's own files, return to `bun` — and that staying non-root is then the consumer's;
   - **`docs/research/working-directory-sync.md`:** a dated note that the base is now Debian 13 (glibc 2.41, Python 3.13, `bun` at uid 1000), and that the musl `s7cmd` still runs as a static binary;

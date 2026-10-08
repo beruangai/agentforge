@@ -6,7 +6,9 @@ The working-directory design — since filesystems ([ADR 0015](../../adr/0015-fi
 
 ## It runs in the base image, and it is static
 
-The risk the note did not name is **musl**: the AgentForge base is Alpine, and a Rust binary built against glibc would not run in it.
+The risk the note did not name is **musl**: the AgentForge base was Alpine, and a Rust binary built against glibc would not run in it.
+
+**2026-10-08:** the base is now Debian 13 (`oven/bun:1.4.0-slim`: glibc 2.41, Python 3.13, `bun` at uid 1000; [ADR 0018](../../adr/0018-the-agentforge-image-is-debian.md)). The pinned musl `s7cmd` 1.8.5 is unchanged and runs there as any static binary does (`s7cmd 1.8.5 (… aarch64-unknown-linux-musl)` in the built `linux/arm64` image).
 
 | | |
 |---|---|
