@@ -19,7 +19,7 @@ beforeAll(async () => {
   cwd = await mkdtemp(path.join(tmpdir(), 'agentforge-prompt-'));
   await writeFile(path.join(cwd, 'notes.md'), '# Notes');
   await writeFile(path.join(cwd, 'paper.PDF'), '%PDF-1.7');
-  await writeFile(path.join(cwd, 'dates.md'), 'Dates are ISO 8601.');
+  await writeFile(path.join(cwd, 'dates.md'), 'Dates are ISO 8601.\n');
 });
 
 async function contentOf(

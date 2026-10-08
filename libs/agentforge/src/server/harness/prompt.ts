@@ -272,7 +272,7 @@ export async function resolveContextBlock(
   };
 }
 
-/** A context block's text: its own, or its file's. */
+/** A context block's text: its own, or its file's without the file's final newline. */
 async function contextBlockText(
   block: ContextBlock,
   cwd: string,
@@ -285,7 +285,8 @@ async function contextBlockText(
     );
   }
   try {
-    return await readFile(path.resolve(cwd, filepath), 'utf8');
+    const text = await readFile(path.resolve(cwd, filepath), 'utf8');
+    return text.replace(/\r?\n$/, '');
   } catch (error) {
     throw new Error(
       `the prompt's context block file "${filepath}" could not be read`,
