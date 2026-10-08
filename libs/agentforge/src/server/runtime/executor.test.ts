@@ -26,6 +26,7 @@ function executor(overrides: Partial<ExecutorConfig> = {}) {
   const metrics = { count: vi.fn(), flush: async () => undefined };
   const config: ExecutorConfig = {
     taskCommand: [process.execPath, SCRIPTED_TASK_PROCESS],
+    agentName: 'hello-agent',
     defaultTimeBudgetSeconds: 60,
     graceMilliseconds: 300,
     store,
@@ -108,6 +109,15 @@ describe('TaskProcessExecutor', () => {
     });
     expect(store.save.mock.lastCall?.[0].metadata?.runs).toHaveLength(1);
     expect(target.liveCount).toBe(0);
+  });
+
+  it("gives every task process the agent's name from its config", async () => {
+    const { executor: target, store } = executor();
+    await start(target, 'REPORT_AGENT_NAME').done;
+    expect(savedOutcome(store)).toEqual({
+      state: 'TASK_STATE_COMPLETED',
+      output: { agentName: 'hello-agent' },
+    });
   });
 
   it('keeps an outcome reported before a stop: the stop only ends the process', async () => {

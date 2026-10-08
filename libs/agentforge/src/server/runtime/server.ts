@@ -144,6 +144,7 @@ export async function startServer(
         ? fileURLToPath(config.taskEntry)
         : config.taskEntry,
     ],
+    agentName: config.agentName,
     defaultTimeBudgetSeconds: config.defaultTimeBudgetSeconds,
     graceMilliseconds: GRACE_MILLISECONDS,
     store,

@@ -45,6 +45,10 @@ process.on('message', async (message: ScriptedMessage) => {
       await send(completed({ reported: true }));
       process.exit(0);
       break;
+    case 'REPORT_AGENT_NAME':
+      await send(completed({ agentName: process.env.AGENTFORGE_AGENT_NAME }));
+      process.exit(0);
+      break;
     case 'REPORT_THEN_LINGER':
       // Ignores any cancel, and exits on its own a moment after reporting.
       await send(completed({ reported: true }));

@@ -20,7 +20,7 @@ Applied third in the A6 batch, after `strict-contracts`; the example stacks were
   - a record without `agent` throws;
   - another agent's task is not found by `load`, `GetTask` or `CancelTask`, and is not rewritten as `LOST`;
   - one key on two agents starts two tasks.
-- [ ] 2.2 `ExecutorConfig` takes `agentName`, and each task process is spawned with `AGENTFORGE_AGENT_NAME` set from it. Verified by a unit test of the task process's environment.
+- [x] 2.2 `ExecutorConfig` takes `agentName`, and each task process is spawned with `AGENTFORGE_AGENT_NAME` set from it. Verified by a unit test of the task process's environment.
 - [ ] 2.3 `S3SessionStore({ bucket, prefix, client })`, and `sessionStoreFromEnvironment` passes `AGENTFORGE_AGENT_NAME`, throwing when the bucket is set without it. Verified by unit tests:
   - parts are written and loaded under `<agent>/`;
   - a store from an environment with a bucket and no name throws, naming the variable.

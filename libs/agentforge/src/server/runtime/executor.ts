@@ -7,6 +7,7 @@ import {
   type RequestContext,
 } from '@a2a-js/sdk/server';
 import { z } from 'zod';
+import { AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import type { Envelope } from '#core/contract/envelope.ts';
 import {
   cause,
@@ -42,6 +43,12 @@ export const CONTAINER_STOPPING_REASON =
 export interface ExecutorConfig {
   /** The command that starts a task process: the runtime, its flags, the consumer's task entry. */
   readonly taskCommand: readonly string[];
+  /**
+   * The agent's name, from the server's config, given to every task process
+   * as `AGENTFORGE_AGENT_NAME` whether the server read it from its options or
+   * its environment: the session store keys transcripts by it.
+   */
+  readonly agentName: string;
   readonly defaultTimeBudgetSeconds: number;
   /** How long a stopping task process gets before its process group is killed. */
   readonly graceMilliseconds: number;
@@ -194,7 +201,11 @@ export class TaskProcessExecutor implements AgentExecutor {
       stdio: ['ignore', 'inherit', 'pipe', 'ipc'],
       detached: true,
       serialization: 'json',
-      env: { ...process.env, [TASK_PROCESS_ENVIRONMENT_VARIABLE]: '1' },
+      env: {
+        ...process.env,
+        [TASK_PROCESS_ENVIRONMENT_VARIABLE]: '1',
+        [AGENT_NAME_VARIABLE]: this.#config.agentName,
+      },
     });
     const live: LiveTask = {
       child,
