@@ -49,6 +49,8 @@ export interface ExecutorConfig {
    * its environment: the session store keys transcripts by it.
    */
   readonly agentName: string;
+  /** The image this server runs in, from its config, recorded on every task it admits. */
+  readonly image: string;
   readonly defaultTimeBudgetSeconds: number;
   /** How long a stopping task process gets before its process group is killed. */
   readonly graceMilliseconds: number;
@@ -156,7 +158,7 @@ export class TaskProcessExecutor implements AgentExecutor {
       id: taskId,
       contextId,
       state: 'TASK_STATE_SUBMITTED',
-      metadata: taskMetadata(envelope, admission),
+      metadata: taskMetadata(envelope, admission, this.#config.image),
     });
     // Published before the first await: `returnImmediately` resolves on it.
     eventBus.publish(AgentEvent.task(submitted));
@@ -462,10 +464,14 @@ function statusOf(task: Task): NonNullable<Task['status']> {
   return task.status;
 }
 
-/** What a task records of its start; `runs` fills as it ends. */
+/**
+ * What a task records of its start, with the image that admitted it;
+ * `runs` fills as it ends.
+ */
 export function taskMetadata(
   envelope: Envelope,
   admission: Admission,
+  image: string,
 ): Record<string, unknown> {
   return {
     procedure: envelope.procedure,
@@ -481,6 +487,7 @@ export function taskMetadata(
       : { continuityKey: envelope.continuityKey }),
     metadata: envelope.metadata ?? {},
     tags: envelope.tags ?? {},
+    image,
     runs: [],
   };
 }

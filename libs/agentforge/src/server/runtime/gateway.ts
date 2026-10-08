@@ -42,6 +42,8 @@ export interface GatewayConfig {
   readonly store: DynamoDBTaskStore;
   /** Tasks this container runs at once; a start beyond it is refused, never queued. */
   readonly admissionLimit: number;
+  /** The image this server runs in, recorded on a start rejected here as on any task. */
+  readonly image: string;
 }
 
 /**
@@ -155,6 +157,7 @@ export function createGateway(config: GatewayConfig): A2ARequestHandler {
             metadata: taskMetadata(
               { ...envelope, metadata: undefined, tags: undefined },
               admission,
+              config.image,
             ),
           }),
           {

@@ -27,6 +27,7 @@ function executor(overrides: Partial<ExecutorConfig> = {}) {
   const config: ExecutorConfig = {
     taskCommand: [process.execPath, SCRIPTED_TASK_PROCESS],
     agentName: 'hello-agent',
+    image: 'hello-agent-image',
     defaultTimeBudgetSeconds: 60,
     graceMilliseconds: 300,
     store,
@@ -109,6 +110,17 @@ describe('TaskProcessExecutor', () => {
     });
     expect(store.save.mock.lastCall?.[0].metadata?.runs).toHaveLength(1);
     expect(target.liveCount).toBe(0);
+  });
+
+  it('records on the task the image that admitted it', async () => {
+    const { executor: target, store } = executor();
+    await start(target, 'REPORT').done;
+    expect(store.save.mock.calls[0]?.[0].metadata?.image).toBe(
+      'hello-agent-image',
+    );
+    expect(store.save.mock.lastCall?.[0].metadata?.image).toBe(
+      'hello-agent-image',
+    );
   });
 
   it("gives every task process the agent's name from its config", async () => {

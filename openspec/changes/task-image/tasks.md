@@ -4,7 +4,7 @@ Applied last in the A6 batch, after `project-infrastructure`. Group 1 is the pac
 
 ## 1. Recording and reading
 
-- [ ] 1.1 `AGENT_IMAGE_VARIABLE` in `core/agent-image.ts`; `ServerConfig.image`, from the option or the variable, required; `ExecutorConfig` and `GatewayConfig` take it from the config, and `taskMetadata` takes it as a parameter at both call sites. Verified by unit tests:
+- [x] 1.1 `AGENT_IMAGE_VARIABLE` in `core/agent-image.ts`; `ServerConfig.image`, from the option or the variable, required; `ExecutorConfig` and `GatewayConfig` take it from the config, and `taskMetadata` takes it as a parameter at both call sites. Verified by unit tests:
   - the metadata carries `image`;
   - a start the gateway rejects for its size carries `image`;
   - the server refuses to start without it, naming the variable.

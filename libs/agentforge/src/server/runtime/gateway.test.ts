@@ -65,6 +65,7 @@ function gateway(
     executor: executor as unknown as TaskProcessExecutor,
     store: store as unknown as DynamoDBTaskStore,
     admissionLimit: 4,
+    image: 'agent-image',
   });
   return { handler, store, executor, inner };
 }
@@ -283,7 +284,11 @@ describe('the gateway', () => {
       ),
     });
     const saved = store.save.mock.lastCall as unknown as [Task];
-    expect(saved[0].metadata).toMatchObject({ metadata: {}, tags: {} });
+    expect(saved[0].metadata).toMatchObject({
+      metadata: {},
+      tags: {},
+      image: 'agent-image',
+    });
     expect(saved[0].history).toEqual([]);
   });
 

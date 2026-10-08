@@ -8,6 +8,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import express from 'express';
 import { z } from 'zod';
 import { A2A_PROTOCOL_VERSION } from '#core/a2a-version.ts';
+import { AGENT_IMAGE_VARIABLE } from '#core/agent-image.ts';
 import { AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import { RUNTIME_SESSION_HEADER } from '#core/contract/envelope.ts';
 import { TimeBudgetSecondsField } from '#core/contract/procedures.ts';
@@ -23,6 +24,11 @@ import { startTelemetry, type Telemetry } from './telemetry.ts';
 export interface ServerConfig {
   /** The agent's name, on its card and in its records. */
   readonly agentName: string;
+  /**
+   * The image this server runs in, recorded on every task it admits:
+   * deployed, its container URI; served locally, its image id.
+   */
+  readonly image: string;
   /**
    * The consumer's task entry: the module that calls `runTaskProcess`, run
    * once per task by this same runtime with the same flags, so its export
@@ -60,7 +66,7 @@ export type ServerOptions = Pick<
  * environment, which is how a container gets it. A missing required value
  * fails here, loudly, rather than at first use.
  */
-function serverConfig(
+export function serverConfig(
   options: ServerOptions,
   environment: NodeJS.ProcessEnv = process.env,
 ): ServerConfig {
@@ -86,6 +92,7 @@ function serverConfig(
     taskEntry: options.taskEntry,
     requiredSecrets: z.array(SecretNameSchema).parse(options.requiredSecrets),
     agentName: options.agentName ?? required(AGENT_NAME_VARIABLE),
+    image: options.image ?? required(AGENT_IMAGE_VARIABLE),
     tableName: options.tableName ?? required(TASK_TABLE_NAME_VARIABLE),
     ...(endpoint === undefined || endpoint === ''
       ? {}
@@ -145,6 +152,7 @@ export async function startServer(
         : config.taskEntry,
     ],
     agentName: config.agentName,
+    image: config.image,
     defaultTimeBudgetSeconds: config.defaultTimeBudgetSeconds,
     graceMilliseconds: GRACE_MILLISECONDS,
     store,
@@ -172,6 +180,7 @@ export async function startServer(
     executor,
     store,
     admissionLimit: config.admissionLimit,
+    image: config.image,
   });
   app.get('/.well-known/agent-card.json', (_request, response) => {
     response.json(card);
