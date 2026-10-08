@@ -6,7 +6,7 @@ AgentForge's test deployment of [smoke-coverage](../smoke-coverage/README.md), g
 nx g @aws/nx-plugin:ts#infra smoke-coverage-infra --directory packages/examples
 ```
 
-Its stack declares `SmokeCoverage` — hello-agent as its own AgentCore runtime registered in the stage's runtime configuration, with the subscription token from the `agentforge/claude-code-oauth-token` secret the operator creates — and the `notebook` filesystem's `S3FilesystemBucket`. It outputs what the smoke suite needs beyond the runtime configuration: the runtime's ARN, to stop a container, and its session bucket, to find a transcript. The stage is `agentforge-example-smoke-coverage`, in `us-east-2`, removed on `destroy`.
+Its stack declares `SmokeCoverage` — hello-agent as its own AgentCore runtime registered in the stage's runtime configuration, with the subscription token from the `agentforge/claude-code-oauth-token` secret the operator creates — and the `notebook` filesystem's `S3FilesystemBucket`. It outputs what the smoke suite needs beyond the runtime configuration: the runtime's ARN, to stop a container, and the project's session bucket (`SessionBucketName`), to find a transcript under `hello-agent/`. `destroy` empties it and the filesystem buckets first. The stage is `agentforge-example-smoke-coverage`, in `us-east-2`, removed on `destroy`.
 
 ```bash
 nx run @beruangai/smoke-coverage-infra:deploy

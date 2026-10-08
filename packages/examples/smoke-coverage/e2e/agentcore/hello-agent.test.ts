@@ -44,7 +44,7 @@ const OutputsSchema = z.object({
   [STACK_NAME]: z.object({
     RuntimeConfigApplicationId: z.string(),
     HelloAgentRuntimeArn: z.string(),
-    HelloAgentSessionBucketName: z.string(),
+    SessionBucketName: z.string(),
   }),
 });
 
@@ -134,9 +134,13 @@ describe('hello-agent, on AgentCore', () => {
     const { sessionId } = ended.output;
     await stopContainer(first.runtimeSessionId);
 
-    // The container is gone; the transcript is not.
+    // The container is gone; the transcript is not, kept under the agent's
+    // name in the project's bucket.
     const listed = await new S3Client({}).send(
-      new ListObjectsV2Command({ Bucket: outputs.HelloAgentSessionBucketName }),
+      new ListObjectsV2Command({
+        Bucket: outputs.SessionBucketName,
+        Prefix: 'hello-agent/',
+      }),
     );
     expect(
       (listed.Contents ?? []).some(({ Key }) =>

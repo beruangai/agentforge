@@ -31,7 +31,7 @@ Applied third in the A6 batch, after `strict-contracts`; the example stacks were
 
 ## 4. Examples
 
-- [ ] 4.1 Both examples' infrastructure stacks set `removalPolicy` on the project and output one `SessionBucketName`; each `scripts/empty-buckets.ts` empties it, and each infrastructure README says so. `smoke-coverage`'s AgentCore suite lists transcripts under `hello-agent/`. Verified by `nx run-many -t synth test` for both infrastructure projects; the deploys run in `task-image`'s last group.
+- [x] 4.1 Both examples' infrastructure stacks set `removalPolicy` on the project and output one `SessionBucketName`; each `scripts/empty-buckets.ts` empties it, and each infrastructure README says so. `smoke-coverage`'s AgentCore suite lists transcripts under `hello-agent/`. Verified by `nx run-many -t synth test` for both infrastructure projects; the deploys run in `task-image`'s last group.
 
 ## 5. Records
 

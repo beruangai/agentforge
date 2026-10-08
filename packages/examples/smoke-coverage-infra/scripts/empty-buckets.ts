@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 const STACK_NAME = 'agentforge-example-smoke-coverage-Application';
 const BUCKET_OUTPUTS = [
-  'HelloAgentSessionBucketName',
+  'SessionBucketName',
   'NotebookBucketName',
   'MemoriesBucketName',
 ] as const;
@@ -23,7 +23,7 @@ if (outputsPath === undefined) {
 }
 const OutputsSchema = z.object({
   [STACK_NAME]: z.object({
-    HelloAgentSessionBucketName: z.string(),
+    SessionBucketName: z.string(),
     NotebookBucketName: z.string(),
     MemoriesBucketName: z.string(),
   }),

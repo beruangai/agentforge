@@ -22,7 +22,7 @@ const readline = createInterface({
 // Ctrl+C or Ctrl+D aborts the question: that is a no, like any other answer.
 const answer = await readline
   .question(
-    `This empties ${stage}'s session buckets and deletes every stack in it. Type ${stage} to destroy it: `,
+    `This empties ${stage}'s session bucket and deletes every stack in it. Type ${stage} to destroy it: `,
   )
   .catch(() => undefined);
 readline.close();

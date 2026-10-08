@@ -57,11 +57,9 @@ export class ApplicationStack extends Stack {
       'TemporalApiKey',
       'agentforge/temporal-api-key',
     );
-    const agent = {
-      removalPolicy,
-      secrets: { CLAUDE_CODE_OAUTH_TOKEN: subscriptionToken },
-    };
+    const agent = { secrets: { CLAUDE_CODE_OAUTH_TOKEN: subscriptionToken } };
     this.goldenKata = new GoldenKata(this, 'GoldenKata', {
+      removalPolicy,
       agents: { writer: agent, grader: agent },
     });
 
@@ -86,11 +84,8 @@ export class ApplicationStack extends Stack {
       removalPolicy,
     });
 
-    new CfnOutput(this, 'WriterSessionBucketName', {
-      value: this.goldenKata.agents.writer.sessionBucket.bucketName,
-    });
-    new CfnOutput(this, 'GraderSessionBucketName', {
-      value: this.goldenKata.agents.grader.sessionBucket.bucketName,
+    new CfnOutput(this, 'SessionBucketName', {
+      value: this.goldenKata.resources.sessionBucket.bucketName,
     });
   }
 }

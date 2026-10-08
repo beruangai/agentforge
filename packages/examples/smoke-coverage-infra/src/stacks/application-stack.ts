@@ -21,9 +21,9 @@ export class ApplicationStack extends Stack {
       removalPolicy,
     });
     this.smokeCoverage = new SmokeCoverage(this, 'SmokeCoverage', {
+      removalPolicy,
       agents: {
         helloAgent: {
-          removalPolicy,
           filesystems: { notebook, memories },
           // The operator creates this secret and sets its value.
           secrets: {
@@ -42,8 +42,8 @@ export class ApplicationStack extends Stack {
     new CfnOutput(this, 'HelloAgentRuntimeArn', {
       value: helloAgent.agentRuntimeArn,
     });
-    new CfnOutput(this, 'HelloAgentSessionBucketName', {
-      value: helloAgent.sessionBucket.bucketName,
+    new CfnOutput(this, 'SessionBucketName', {
+      value: this.smokeCoverage.resources.sessionBucket.bucketName,
     });
     new CfnOutput(this, 'NotebookBucketName', {
       value: notebook.bucket.bucketName,

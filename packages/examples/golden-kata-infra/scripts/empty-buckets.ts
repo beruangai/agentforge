@@ -1,4 +1,4 @@
-// Empties golden-kata's versioned buckets — every version and delete marker —
+// Empties golden-kata's versioned session bucket — every version and delete marker —
 // so `destroy` can delete them: CloudFormation deletes only an empty bucket.
 // Reads the bucket names from the outputs the last `deploy` wrote. A bucket an
 // earlier, interrupted `destroy` already deleted is reported and passed over.
@@ -13,10 +13,7 @@ import {
 import { z } from 'zod';
 
 const STACK_NAME = 'agentforge-example-golden-kata-Application';
-const BUCKET_OUTPUTS = [
-  'WriterSessionBucketName',
-  'GraderSessionBucketName',
-] as const;
+const BUCKET_OUTPUTS = ['SessionBucketName'] as const;
 
 const outputsPath = process.argv[2];
 if (outputsPath === undefined) {
@@ -24,8 +21,7 @@ if (outputsPath === undefined) {
 }
 const OutputsSchema = z.object({
   [STACK_NAME]: z.object({
-    WriterSessionBucketName: z.string(),
-    GraderSessionBucketName: z.string(),
+    SessionBucketName: z.string(),
   }),
 });
 const outputs = OutputsSchema.safeParse(
@@ -33,7 +29,7 @@ const outputs = OutputsSchema.safeParse(
 );
 if (!outputs.success) {
   throw new Error(
-    `${outputsPath} does not name ${BUCKET_OUTPUTS.join(' and ')}; redeploy first: ${z.prettifyError(outputs.error)}`,
+    `${outputsPath} does not name ${BUCKET_OUTPUTS.join(', ')}; redeploy first: ${z.prettifyError(outputs.error)}`,
   );
 }
 const stackOutputs = outputs.data[STACK_NAME];
