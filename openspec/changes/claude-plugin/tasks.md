@@ -87,4 +87,4 @@ Group 1 is the marketplace, the plugin and the local check. Group 2 is the guide
   - **the root README:** points to the plugin for the guide;
   - **`CLAUDE.md`, Working rules:** a change to what a consumer writes or runs updates the skill, and a breaking one adds its migration entry;
   - **ROADMAP:** the plugin delivered, and A6 delivered.
-- [ ] 5.2 StrategyFoundry's `docs/AGENTFORGE_CORRECTIONS.md` gains a section on enabling the plugin — registration and the project setting — as the only edit there. Verified by reading it.
+- [x] 5.2 StrategyFoundry's `docs/AGENTFORGE_CORRECTIONS.md` gains a section on enabling the plugin — registration and the project setting — as the only edit there. Verified by reading it.
