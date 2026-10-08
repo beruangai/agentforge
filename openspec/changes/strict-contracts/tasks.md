@@ -4,7 +4,7 @@ Applied second in the A6 batch, after `glibc-base-image`. Group 1 is the check. 
 
 ## 1. The check
 
-- [ ] 1.1 `refuseStrippingObjects(contract)` in `core/contract/strict-objects.ts`, walking every procedure's input and output as design.md's table says, throwing on a type it does not know, and naming every offending place and the fix in one error, a line each. Verified by unit tests:
+- [x] 1.1 `refuseStrippingObjects(contract)` in `core/contract/strict-objects.ts`, walking every procedure's input and output as design.md's table says, throwing on a type it does not know, and naming every offending place and the fix in one error, a line each. Verified by unit tests:
   - a stripping object at the root and nested in an array, a union, an optional and a lazy schema, each with its path;
   - several at once;
   - `strictObject`, `looseObject`, `.strict()` and `.extend` of a strict object accepted;
