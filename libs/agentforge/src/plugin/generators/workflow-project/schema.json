@@ -23,8 +23,6 @@
       "description": "The project's folder within the directory; its name by default"
     }
   },
-  "required": [
-    "name"
-  ],
+  "required": ["name"],
   "additionalProperties": false
 }

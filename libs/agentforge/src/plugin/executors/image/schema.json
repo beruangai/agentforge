@@ -20,8 +20,6 @@
       }
     }
   },
-  "required": [
-    "layer"
-  ],
+  "required": ["layer"],
   "additionalProperties": false
 }
