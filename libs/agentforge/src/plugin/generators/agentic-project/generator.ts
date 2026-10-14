@@ -27,6 +27,8 @@ export interface AgenticProjectGeneratorSchema {
   readonly name: string;
   /** Where the project is created; `packages` by default. */
   readonly directory?: string;
+  /** The project's folder within `directory`; its name by default. */
+  readonly subDirectory?: string;
 }
 
 /** What the host package depends on for its agents' code and its client to typecheck. */
@@ -62,7 +64,7 @@ export default async function agenticProjectGenerator(
   options: AgenticProjectGeneratorSchema,
 ): Promise<GeneratorCallback> {
   const name = parseName(KebabNameField, 'agentic project name', options.name);
-  const root = `${options.directory ?? 'packages'}/${name}`;
+  const root = `${options.directory ?? 'packages'}/${options.subDirectory ?? name}`;
   const { name: rootPackage } = readJson<{ name?: string }>(
     tree,
     'package.json',

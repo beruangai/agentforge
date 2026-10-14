@@ -33,6 +33,8 @@ export interface WorkflowProjectGeneratorSchema {
   readonly name: string;
   /** Where the project is created; `packages` by default. */
   readonly directory?: string;
+  /** The project's folder within `directory`; its name by default. */
+  readonly subDirectory?: string;
 }
 
 /** What the shared constructs generator must be told it may add. */
@@ -58,7 +60,7 @@ export default async function workflowProjectGenerator(
   options: WorkflowProjectGeneratorSchema,
 ): Promise<GeneratorCallback> {
   const name = parseName(KebabNameField, 'workflow project name', options.name);
-  const root = `${options.directory ?? 'packages'}/${name}`;
+  const root = `${options.directory ?? 'packages'}/${options.subDirectory ?? name}`;
   const { name: rootPackage } = readJson<{ name?: string }>(
     tree,
     'package.json',

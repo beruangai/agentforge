@@ -1,6 +1,8 @@
-import { type Tree, writeJson } from '@nx/devkit';
+import { readProjectConfiguration, type Tree, writeJson } from '@nx/devkit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { treeFiles, workspaceTree } from '../../__fixtures__/workspace-tree.ts';
+import agentGenerator from '../agent/generator.ts';
+import syncGenerator from '../sync/generator.ts';
 import agenticProjectGenerator from './generator.ts';
 
 vi.mock(
@@ -31,6 +33,24 @@ describe('agentic-project', () => {
         'utf8',
       ),
     ).toMatchSnapshot('project construct');
+  });
+
+  it('places the project in the sub directory given, apart from its name, and keeps it synced there', async () => {
+    await agenticProjectGenerator(tree, {
+      name: 'rnd',
+      directory: 'apps/rnd',
+      subDirectory: 'agentic',
+    });
+    await agentGenerator(tree, { project: 'rnd', name: 'researcher' });
+    expect(readProjectConfiguration(tree, '@proj/rnd').root).toBe(
+      'apps/rnd/agentic',
+    );
+    expect(tree.exists('apps/rnd/agentic/agents/researcher/Dockerfile')).toBe(
+      true,
+    );
+    const before = treeFiles(tree);
+    await syncGenerator(tree);
+    expect(treeFiles(tree)).toEqual(before);
   });
 
   it('changes nothing when generated again', async () => {

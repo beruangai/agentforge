@@ -14,7 +14,7 @@ This skill loads from the developer's clone of the AgentForge repository. Its li
 | Step | What | Read |
 |---|---|---|
 | Adopt | `nx run @beruangai/agentforge:pack` in the clone, then `nx add @beruangai/agentforge@<absolute path to the packed archive>` until it is published; never `bun link`. The workspace's `nx` and `@aws/nx-plugin` must be within AgentForge's peer ranges first (`init` refuses them otherwise) | [Before publication](../../../libs/agentforge/README.md#before-publication) |
-| Generate | `agentic-project`, then `agent` per agent; `workflow-project` and `connection` for a Temporal caller | [The Nx plugin](../../../libs/agentforge/README.md#the-nx-plugin) |
+| Generate | `agentic-project`, then `agent` per agent; `workflow-project` and `connection` for a Temporal caller. A project goes to `<--directory, packages>/<--subDirectory, its name>`; the first agentic project adds `packages/common/constructs` | [The Nx plugin](../../../libs/agentforge/README.md#the-nx-plugin) |
 | Define | The agent's `contract.ts`: each procedure's input, output and time budget | [implementing.md](references/implementing.md) |
 | Implement | The agent's `procedures.ts`: context, options, runs, filesystems, memory, side effects | [implementing.md](references/implementing.md) |
 | Consume | The project client from any process, or the generated activities from a workflow | [consuming.md](references/consuming.md) |

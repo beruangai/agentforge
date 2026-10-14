@@ -62,6 +62,20 @@ describe('workflow-project', () => {
     ).toEqual({ dependsOn: ['@proj/golden-kata-workflows:assemble'] });
   });
 
+  it('places the project in the sub directory given, apart from its name', async () => {
+    await workflowProjectGenerator(tree, {
+      name: 'rnd-workflows',
+      directory: 'apps/rnd',
+      subDirectory: 'worker',
+    });
+    expect(readProjectConfiguration(tree, '@proj/rnd-workflows').root).toBe(
+      'apps/rnd/worker',
+    );
+    const before = treeFiles(tree);
+    await syncGenerator(tree);
+    expect(treeFiles(tree)).toEqual(before);
+  });
+
   it("declares the Temporal packages and vitest in the workspace's catalog", async () => {
     await generate();
     expect(readJson(tree, 'package.json').catalog).toMatchObject({

@@ -31,10 +31,12 @@ Every manifest the plugin generates repeats that path; a relative path is not su
 
 | Generator | Creates |
 |---|---|
-| `agentic-project <name> [--directory packages]` | A project with a base layer and no agents, its targets, client and construct |
+| `agentic-project <name> [--directory packages] [--subDirectory <name>]` | A project with a base layer and no agents, its targets, client and construct, at `<directory>/<subDirectory>`; the first also creates `@aws/nx-plugin`'s shared constructs at `packages/common/constructs` |
 | `agent --project <project> <name> [--procedure Run]` | An agent in the project, recorded as a component; `base` is reserved |
-| `workflow-project <name> [--directory packages]` | A workflow project: a placeholder workflow and activity, a test of the workflow, one worker, no connections; the Temporal packages declared at AgentForge's ranges |
+| `workflow-project <name> [--directory packages] [--subDirectory <name>]` | A workflow project at `<directory>/<subDirectory>`: a placeholder workflow and activity, a test of the workflow, one worker, no connections; the Temporal packages declared at AgentForge's ranges |
 | `connection --project <workflow project> --agenticProject <agentic project>` | The workflow project's workflows call the agentic project's agents, recorded as a component of the workflow project |
+
+A project's name is its package name and must be unique in the workspace; `--subDirectory`, as in `@aws/nx-plugin`'s generators, places it in a folder of another name (`--directory apps/rnd --subDirectory worker`). The workspace's globs must include the project's folder and `packages/common/constructs`.
 
 Every artifact spanning a project's agents — or a workflow project's connections — is rendered from `metadata.components` in its `project.json`. Remove an agent's or a connection's record and sync drops it from those artifacts; an agent's folder stays.
 
