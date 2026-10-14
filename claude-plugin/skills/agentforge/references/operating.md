@@ -47,7 +47,7 @@ An infra project (`@aws/nx-plugin`'s `ts#infra`) instantiates each agentic proje
 import { GoldenKata } from '@<scope>/common-constructs';
 const goldenKata = new GoldenKata(this, 'GoldenKata', {
   agents: { writer: { secrets }, grader: { secrets } },
-  // removalPolicy (RETAIN by default) and sessionRetention (30 days) are the project's, for all its agents
+  // removalPolicy (RETAIN), sessionRetention (forever) and sessionArchiveAfter (90 days to Glacier IR) are the project's, for all its agents
 });
 goldenKata.grantInvoke(callerRole);
 ```

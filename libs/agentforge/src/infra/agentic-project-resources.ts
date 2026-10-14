@@ -19,6 +19,7 @@ import {
   BlockPublicAccess,
   Bucket,
   BucketEncryption,
+  StorageClass,
 } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { AGENT_NAME_PATTERN } from '#core/agent-name.ts';
@@ -60,10 +61,17 @@ export interface AgenticProjectResourcesProps {
   /**
    * How long a session's transcript is kept after it is written (§REQ402),
    * for every agent of the project. Transcripts hold everything the agent was
-   * sent and read.
-   * @default Duration.days(30)
+   * sent and read, and reconstruct what it decided.
+   * @default kept forever
    */
   readonly sessionRetention?: Duration;
+  /**
+   * When a transcript moves to S3 Glacier Instant Retrieval, which still
+   * reads it at once, so a session resumes and its transcript is read as
+   * before. S3 moves no object under 128 KB.
+   * @default Duration.days(90)
+   */
+  readonly sessionArchiveAfter?: Duration;
 }
 
 /** An agent of the project, as `AgentRuntime` adds it. */
@@ -101,7 +109,8 @@ export class AgenticProjectResources extends Construct {
     const {
       projectName,
       removalPolicy = RemovalPolicy.RETAIN,
-      sessionRetention = Duration.days(30),
+      sessionRetention,
+      sessionArchiveAfter = Duration.days(90),
     } = props;
 
     this.taskTable = new Table(this, 'TaskTable', {
@@ -119,11 +128,19 @@ export class AgenticProjectResources extends Construct {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
       versioned: true,
-      // A transcript is gone a day after it expires: versioning is an undo
-      // window, not a second retention.
+      // A replaced or expired transcript is gone a day later: versioning is
+      // an undo window, not a second retention.
       lifecycleRules: [
         {
-          expiration: sessionRetention,
+          transitions: [
+            {
+              storageClass: StorageClass.GLACIER_INSTANT_RETRIEVAL,
+              transitionAfter: sessionArchiveAfter,
+            },
+          ],
+          ...(sessionRetention !== undefined && {
+            expiration: sessionRetention,
+          }),
           noncurrentVersionExpiration: Duration.days(1),
         },
         // S3 refuses this beside an expiration, so it is a rule of its own.

@@ -48,11 +48,11 @@ A deployed agent SHALL read only the secrets it declares, into its environment b
 - **THEN** it may invoke that agent and no other
 
 ### Requirement: Session transcripts are private and kept as long as the consumer chooses
-A project's session transcripts SHALL be stored privately — encrypted, never public, reachable only over TLS — and kept for a retention the consumer chooses for the project, 30 days by default.
+A project's session transcripts SHALL be stored privately — encrypted, never public, reachable only over TLS — and kept for a retention the consumer chooses for the project, forever by default. After an archive age the consumer chooses, 90 days by default, they SHALL move to a storage class that still reads them at once.
 
 #### Scenario: The default retention
 - **WHEN** a consumer deploys a project without choosing a retention
-- **THEN** its agents' transcripts are private and expire after 30 days
+- **THEN** its agents' transcripts are private, never expire, and are archived after 90 days, where a session still resumes
 
 #### Scenario: A chosen retention
 - **WHEN** a consumer chooses a retention for a project

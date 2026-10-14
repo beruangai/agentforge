@@ -74,7 +74,7 @@ describe('AgenticProjectResources', () => {
     });
   });
 
-  it('persists session transcripts in a private, encrypted, versioned, retained bucket, expired after 30 days', () => {
+  it('persists session transcripts in a private, encrypted, versioned, retained bucket, forever, archived after 90 days', () => {
     const template = synthesize();
     template.hasResourceProperties('AWS::S3::Bucket', {
       BucketEncryption: {
@@ -92,7 +92,9 @@ describe('AgenticProjectResources', () => {
       LifecycleConfiguration: {
         Rules: [
           {
-            ExpirationInDays: 30,
+            Transitions: [
+              { StorageClass: 'GLACIER_IR', TransitionInDays: 90 },
+            ],
             NoncurrentVersionExpiration: { NoncurrentDays: 1 },
             Status: 'Enabled',
           },
@@ -115,13 +117,21 @@ describe('AgenticProjectResources', () => {
   it('keeps every agent’s transcripts as long as the consumer chooses for the project, and removes as it says', () => {
     const template = synthesize(['writer'], {
       sessionRetention: Duration.days(365),
+      sessionArchiveAfter: Duration.days(30),
       removalPolicy: RemovalPolicy.DESTROY,
     });
     template.hasResource('AWS::S3::Bucket', {
       DeletionPolicy: 'Delete',
       Properties: Match.objectLike({
         LifecycleConfiguration: {
-          Rules: Match.arrayWith([Match.objectLike({ ExpirationInDays: 365 })]),
+          Rules: Match.arrayWith([
+            Match.objectLike({
+              ExpirationInDays: 365,
+              Transitions: [
+                { StorageClass: 'GLACIER_IR', TransitionInDays: 30 },
+              ],
+            }),
+          ]),
         },
       }),
     });
