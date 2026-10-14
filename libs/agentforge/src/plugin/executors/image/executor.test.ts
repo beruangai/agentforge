@@ -74,4 +74,22 @@ describe('imageBuild', () => {
       'layer "top" is not agentforge, base or agents/<agent>',
     );
   });
+
+  it("adds a project layer's named build contexts, from the workspace root, and refuses them for AgentForge's", () => {
+    expect(
+      imageBuild(GOLDEN_KATA, 'agents/grader', INPUTS, '/workspace', {
+        validation: 'dist/packages/rnd/validation',
+      }).args,
+    ).toEqual(
+      expect.arrayContaining([
+        '--build-context',
+        'validation=/workspace/dist/packages/rnd/validation',
+      ]),
+    );
+    expect(() =>
+      imageBuild(GOLDEN_KATA, 'agentforge', INPUTS, '/workspace', {
+        validation: 'dist',
+      }),
+    ).toThrow(/AgentForge's/);
+  });
 });

@@ -20,6 +20,12 @@ import { executorProject } from '../executor-project.ts';
 export interface ImageExecutorOptions {
   /** `agentforge`, `base`, or `agents/<agent>`. */
   readonly layer: string;
+  /**
+   * Further named build contexts for a project's layer, by name, each a
+   * workspace-relative directory its Dockerfile copies from with
+   * `COPY --from=<name>`: a host project's build output, say.
+   */
+  readonly buildContexts?: Readonly<Record<string, string>>;
 }
 
 export interface ImageBuild {
@@ -39,8 +45,18 @@ export function imageBuild(
     'packageDirectory' | 'dockerfile' | 'containerDirectory' | 'version'
   >,
   workspaceRoot: string,
+  buildContexts: Readonly<Record<string, string>> = {},
 ): ImageBuild {
   const agentName = agentOfLayer(project, layer);
+  if (layer === 'agentforge' && Object.keys(buildContexts).length > 0) {
+    throw new Error(
+      "the AgentForge image is AgentForge's; build contexts extend a project's layer",
+    );
+  }
+  const contexts = Object.entries(buildContexts).flatMap(([name, path]) => [
+    '--build-context',
+    `${name}=${join(workspaceRoot, path)}`,
+  ]);
   const idFile = join(workspaceRoot, imageIdFile(project.root, layer as Layer));
   const build = (tag: string, context: string, options: string[]) => ({
     args: [
@@ -69,13 +85,17 @@ export function imageBuild(
     return build(
       agenticImage(project),
       join(workspaceRoot, project.root, 'base'),
-      ['--build-arg', `BASE_IMAGE=${agentforgeImage(inputs.version)}`],
+      [
+        '--build-arg',
+        `BASE_IMAGE=${agentforgeImage(inputs.version)}`,
+        ...contexts,
+      ],
     );
   }
   return build(
     agentImage(project, agentName),
     join(workspaceRoot, project.root, 'agents', agentName),
-    ['--build-arg', `BASE_IMAGE=${agenticImage(project)}`],
+    ['--build-arg', `BASE_IMAGE=${agenticImage(project)}`, ...contexts],
   );
 }
 
@@ -88,6 +108,7 @@ export default async function imageExecutor(
     options.layer,
     agentforgeContainerInputs(),
     context.root,
+    options.buildContexts,
   );
   mkdirSync(dirname(build.idFile), { recursive: true });
   const result = spawnSync('docker', build.args, { stdio: 'inherit' });

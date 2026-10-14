@@ -8,8 +8,20 @@
       "type": "string",
       "description": "agentforge, base, or agents/<agent>",
       "pattern": "^(agentforge|base|agents/[a-z][a-z0-9-]*)$"
+    },
+    "buildContexts": {
+      "type": "object",
+      "description": "Further named build contexts for a project's layer: name to a workspace-relative directory, which its Dockerfile copies from with COPY --from=<name>",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
-  "required": ["layer"],
+  "required": [
+    "layer"
+  ],
   "additionalProperties": false
 }

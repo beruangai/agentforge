@@ -102,3 +102,24 @@ To own a maintained file or target, name it in the project's `project.json`:
 Sync then leaves it as you wrote it, and its updates are yours. Sync fails on an entry that names nothing maintained. Extend an image in its layer's `package.json` first; detach a `Dockerfile` only for what a manifest cannot say.
 
 **System packages and native libraries** are what a manifest cannot say. The AgentForge image is Debian (glibc), so a library published prebuilt only for glibc installs without building from source. Detach the layer's `Dockerfile` — the base layer's for what every agent in the project shares, an agent's for what only it needs — and, before the layer's own `COPY` lines so it is cached across their changes, switch to `USER root`, install, and end on `USER bun`: the CLI refuses unattended tools as root, and a detached file is yours, so staying non-root is yours to keep. Install Python packages into a venv, since Debian's system Python is externally managed, and put it on `PATH` with `ENV`, which the server, every task and the CLI's Bash tool inherit. [`smoke-coverage`](../../packages/examples/smoke-coverage/base/Dockerfile)'s base layer does this for Python and NautilusTrader.
+
+**A host project in an image** — the workspace's own Python package, say — is outside the layer's build context, which is the layer's folder. Detach the layer's image target (`image` for the base layer, `image-<agent>` for an agent's) and its `Dockerfile`. In the target, add the host project's build to `dependsOn` and name its output in `buildContexts`, and in the `Dockerfile` copy from that name:
+
+```jsonc
+"image-researcher": {
+  "executor": "@beruangai/agentforge:image",
+  "cache": false,
+  "dependsOn": ["lock-researcher", "image", "@my-scope/validation:build"],
+  "options": {
+    "layer": "agents/researcher",
+    "buildContexts": { "validation": "dist/packages/rnd/validation" }   // workspace-relative
+  }
+}
+```
+
+```dockerfile
+COPY --from=validation *.whl /tmp/wheels/
+RUN /opt/python/bin/pip install /tmp/wheels/*.whl && rm -rf /tmp/wheels
+```
+
+Nx rebuilds the image when the host project changes, and an agent whose layer does not carry it keeps its image.
