@@ -7,7 +7,10 @@ import {
   type Tree,
   updateNxJson,
 } from '@nx/devkit';
-import { declareAgenticProjectDependencies } from '../../workspace-dependencies.ts';
+import {
+  declareAgenticProjectDependencies,
+  refuseToolingOutOfRange,
+} from '../../workspace-dependencies.ts';
 
 export const SYNC_GENERATOR = '@beruangai/agentforge:sync';
 /** The executors whose tasks run the sync generator first. */
@@ -35,7 +38,8 @@ function withSync(value: TargetDefault | undefined): TargetDefault {
 }
 
 /**
- * What `nx add @beruangai/agentforge` runs: declares the dependencies an
+ * What `nx add @beruangai/agentforge` runs: refuses tooling below
+ * AgentForge's peer ranges, declares the dependencies an
  * agentic project needs at AgentForge's peer ranges, and attaches the sync
  * generator to the plugin's lock and image tasks, so a stale project is
  * brought current before one runs and `nx sync:check` fails while it is not.
@@ -43,6 +47,7 @@ function withSync(value: TargetDefault | undefined): TargetDefault {
 export default async function initGenerator(
   tree: Tree,
 ): Promise<GeneratorCallback> {
+  refuseToolingOutOfRange(tree);
   await declareAgenticProjectDependencies(tree);
   const nxJson = readNxJson(tree);
   if (nxJson === null) throw new Error('the workspace has no nx.json');

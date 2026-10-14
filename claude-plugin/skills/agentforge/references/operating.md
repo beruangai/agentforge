@@ -13,7 +13,7 @@ A generated agentic project has these maintained targets. Nx owns their order, s
 | `serve-<agent>` | Runs the agent's container locally with DynamoDB Local, continuous |
 | `assemble` | Builds every agent's image, for the shared constructs' deploy |
 
-Run `nx sync` after changing an agent, a connection or AgentForge's version. `nx sync:check` fails while a maintained file differs. A dependency an image needs goes in its layer's `package.json`, followed by `lock`.
+Run `nx sync` after changing an agent, a connection or AgentForge's version. `nx sync:check` fails while a maintained file differs. Right after a generator, Nx's daemon can sync against a stale project graph; if `sync:check` still fails after `nx sync`, run it again with `NX_DAEMON=false`. A dependency an image needs goes in its layer's `package.json`, followed by `lock`.
 
 **Extending an image with system packages** (Python, a native library) is the one reason to detach a layer's `Dockerfile`. The image is Debian (glibc). Install with `apt-get` as `USER root`, return to `USER bun`, put a Python venv on `PATH` with `ENV`, and do it before the layer's own `COPY` lines. Follow the [package README](../../../../libs/agentforge/README.md#detaching) and `smoke-coverage`'s [base layer](../../../../packages/examples/smoke-coverage/base/Dockerfile).
 

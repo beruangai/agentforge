@@ -21,7 +21,7 @@ For Claude Code, AgentForge's guide to developing with it is a plugin registered
 
 ### Before publication
 
-Until AgentForge is published, a consumer installs the archive its `pack` target writes, exactly the package publishing would ship, by its absolute path in the clone:
+Until AgentForge is published, a consumer installs the archive its `pack` target writes (`nx run @beruangai/agentforge:pack` in the clone), exactly the package publishing would ship, by its absolute path in the clone. The workspace's `nx` and `@aws/nx-plugin` must be within AgentForge's peer ranges: `init` refuses them otherwise, naming each, so raise them first with `nx migrate`.
 
 ```bash
 bunx nx add @beruangai/agentforge@/abs/path/to/agentforge/dist/libs/agentforge/pack/beruangai-agentforge.tgz

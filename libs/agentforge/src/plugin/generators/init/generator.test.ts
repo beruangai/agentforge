@@ -32,7 +32,7 @@ describe('init', () => {
       'package.json',
       JSON.stringify({
         ...readJson(tree, 'package.json'),
-        catalog: { zod: '4.9.0' },
+        catalog: { ...readJson(tree, 'package.json').catalog, zod: '4.9.0' },
       }),
     );
     await initGenerator(tree);
@@ -41,11 +41,26 @@ describe('init', () => {
       'package.json',
       JSON.stringify({
         ...readJson(tree, 'package.json'),
-        catalog: { zod: '3.25.0' },
+        catalog: { ...readJson(tree, 'package.json').catalog, zod: '3.25.0' },
       }),
     );
     await expect(initGenerator(tree)).rejects.toThrow(
       `zod@3.25.0 (AgentForge needs ${peerRange('zod')})`,
+    );
+  });
+
+  it('refuses Nx or @aws/nx-plugin below its peer range, or undeclared, naming each', async () => {
+    const manifest = readJson(tree, 'package.json');
+    tree.write(
+      'package.json',
+      JSON.stringify({
+        ...manifest,
+        devDependencies: { nx: 'catalog:' },
+        catalog: { nx: '23.2.0' },
+      }),
+    );
+    await expect(initGenerator(tree)).rejects.toThrow(
+      `nx@23.2.0 (AgentForge needs ${peerRange('nx')}), @aws/nx-plugin (undeclared; AgentForge needs ${peerRange('@aws/nx-plugin')})`,
     );
   });
 

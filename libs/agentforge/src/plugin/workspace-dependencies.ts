@@ -122,6 +122,44 @@ export async function declareDependencies(
   });
 }
 
+/** The tooling AgentForge's plugin runs under, which the workspace declares itself. */
+const TOOLING = ['nx', '@aws/nx-plugin'] as const;
+
+/**
+ * Refuses a workspace whose Nx or `@aws/nx-plugin` is undeclared or below
+ * AgentForge's peer ranges, naming each: a package manager only warns of an
+ * unmet peer, and the plugin would load and fail later.
+ */
+export function refuseToolingOutOfRange(tree: Tree): void {
+  const manifest = readJson<{
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    catalog?: Record<string, string>;
+    catalogs?: Record<string, Record<string, string>>;
+  }>(tree, 'package.json');
+  const refused: string[] = [];
+  for (const name of TOOLING) {
+    const specifier =
+      manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
+    const version =
+      specifier === 'catalog:'
+        ? manifest.catalog?.[name]
+        : specifier?.startsWith('catalog:')
+          ? manifest.catalogs?.[specifier.slice('catalog:'.length)]?.[name]
+          : specifier;
+    if (version === undefined) {
+      refused.push(`${name} (undeclared; AgentForge needs ${peerRange(name)})`);
+    } else if (!withinRange(version, peerRange(name))) {
+      refused.push(`${name}@${version} (AgentForge needs ${peerRange(name)})`);
+    }
+  }
+  if (refused.length > 0) {
+    throw new Error(
+      `the workspace's tooling is outside AgentForge's peer ranges: ${refused.join(', ')}; raise it first, with nx migrate`,
+    );
+  }
+}
+
 /**
  * The version a dependency is declared at for the whole workspace: the root
  * catalog's entry when the workspace keeps one, else the root manifest's.

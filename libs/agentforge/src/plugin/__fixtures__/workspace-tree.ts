@@ -3,12 +3,13 @@ import { type Tree, updateJson } from '@nx/devkit';
 
 /**
  * A workspace as `@aws/nx-plugin`'s preset lays one out, with Bun, catalogs,
- * and AgentForge added to its root — as `nx add @beruangai/agentforge` leaves
- * a consumer's.
+ * its tooling at AgentForge's peer floors, and AgentForge added to its root —
+ * as `nx add @beruangai/agentforge` leaves a consumer's.
  */
 export function workspaceTree(
   options: { readonly catalogs?: boolean } = {},
 ): Tree {
+  const catalogs = options.catalogs ?? true;
   const tree = createTreeUsingTsSolutionSetup();
   tree.delete('pnpm-workspace.yaml');
   tree.write('bun.lock', '{}\n');
@@ -18,16 +19,21 @@ export function workspaceTree(
 
 export default {
   iac: { provider: 'cdk' },
-  packageManager: { catalogs: ${options.catalogs ?? true} },
+  packageManager: { catalogs: ${catalogs} },
 } satisfies AwsNxPluginConfig;
 `,
   );
+  const tooling = { nx: '23.2.1', '@aws/nx-plugin': '1.0.3' };
   updateJson(tree, 'package.json', (manifest) => ({
     ...manifest,
     devDependencies: {
       ...manifest.devDependencies,
+      ...(catalogs
+        ? { nx: 'catalog:', '@aws/nx-plugin': 'catalog:' }
+        : tooling),
       '@beruangai/agentforge': '^1.0.0',
     },
+    ...(catalogs && { catalog: tooling }),
   }));
   return tree;
 }
