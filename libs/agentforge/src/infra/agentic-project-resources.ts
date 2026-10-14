@@ -8,6 +8,7 @@ import {
   TextWidget,
 } from 'aws-cdk-lib/aws-cloudwatch';
 import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
+import type { Grant, IGrantable } from 'aws-cdk-lib/aws-iam';
 import {
   Code,
   Function as LambdaFunction,
@@ -176,6 +177,14 @@ export class AgenticProjectResources extends Construct {
         removalPolicy: RemovalPolicy.DESTROY,
       }),
     });
+  }
+
+  /**
+   * Lets a caller read the project's transcripts — every agent's — with
+   * `readTranscript`, and write none (§REQ601).
+   */
+  grantReadTranscripts(grantee: IGrantable): Grant {
+    return this.sessionBucket.grantRead(grantee);
   }
 
   /**

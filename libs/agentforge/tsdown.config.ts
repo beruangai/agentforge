@@ -65,6 +65,12 @@ export default defineConfig({
       to: BUNDLE_DIRECTORY,
       flatten: false,
     },
+    // The shared local store's compose project, beside its executor.
+    {
+      from: 'src/plugin/executors/local-store/compose/**',
+      to: BUNDLE_DIRECTORY,
+      flatten: false,
+    },
     // The plugin's option schemas, beside the implementations its manifests name.
     {
       from: 'src/plugin/**/schema.json',

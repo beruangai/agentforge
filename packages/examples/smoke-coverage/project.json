@@ -100,7 +100,7 @@
     "serve-hello-agent": {
       "executor": "@beruangai/agentforge:serve",
       "continuous": true,
-      "dependsOn": ["image-hello-agent"],
+      "dependsOn": ["image-hello-agent", "local-store"],
       "defaultConfiguration": "serve",
       "options": {
         "agent": "hello-agent"
@@ -131,6 +131,17 @@
         "command": "vitest run --config vitest.e2e.mts --project agentcore",
         "cwd": "{projectRoot}",
         "envFile": "{workspaceRoot}/.env.integ"
+      }
+    },
+    "local-store": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false
+    },
+    "local-store-stop": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false,
+      "options": {
+        "stop": true
       }
     }
   }

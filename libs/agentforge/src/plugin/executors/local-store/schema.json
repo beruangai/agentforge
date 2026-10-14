@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Starts the local store every project shares — DynamoDB Local and an S3-compatible server — if it is not running; or stops it",
+  "type": "object",
+  "properties": {
+    "stop": {
+      "type": "boolean",
+      "description": "Stops the shared store, keeping its data, instead of starting it"
+    }
+  },
+  "additionalProperties": false
+}

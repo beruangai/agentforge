@@ -17,6 +17,7 @@ export {
   agentCoreTransportsFromRuntimeConfig,
   type RuntimeConfigSource,
 } from './runtime-config.ts';
+export { readTranscript } from './transcript.ts';
 export {
   AgentForgeRequestError,
   agentCoreTransport,

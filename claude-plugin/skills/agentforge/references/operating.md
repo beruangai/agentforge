@@ -10,7 +10,8 @@ A generated agentic project has these maintained targets. Nx owns their order, s
 |---|---|
 | `lock`, `lock-<agent>` | Writes a layer's `bun.lock`, for the whole container workspace up to it. Commit it |
 | `image`, `image-<agent>` | Builds the project's image and each agent's, each `FROM` the one below |
-| `serve-<agent>` | Runs the agent's container locally with DynamoDB Local, continuous |
+| `serve-<agent>` | Runs the agent's container locally against the local store, continuous |
+| `local-store`, `local-store-stop` | Starts the store every project on the machine shares (DynamoDB Local, SeaweedFS's S3, named volumes), or stops it keeping its data |
 | `assemble` | Builds every agent's image, for the shared constructs' deploy |
 
 Run `nx sync` after changing an agent, a connection or AgentForge's version. `nx sync:check` fails while a maintained file differs. Right after a generator, Nx's daemon can sync against a stale project graph; if `sync:check` still fails after `nx sync`, run it again with `NX_DAEMON=false`. A dependency an image needs goes in its layer's `package.json`, followed by `lock`.
@@ -63,4 +64,4 @@ Read the root README's [known limits](../../../../README.md#known-limits) before
 
 - A resumed session doesn't bring its files to a new container. Only what a filesystem pushed is there.
 - Two tasks on one S3 prefix at once overwrite each other. Keep a prefix to one task at a time.
-- Locally, sessions live in the container and end with it.
+- Locally, tasks, transcripts, filesystems and memory persist in the local store, across containers and restarts. Declare a filesystem's buckets to `serve` in the project's committed `.env.serve`: `AGENTFORGE_FILESYSTEM_BUCKETS={"notebook":"my-notebook"}`. A local worker reads the store's S3 at `http://127.0.0.1:8333`, path-style.

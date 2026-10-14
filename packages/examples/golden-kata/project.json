@@ -107,7 +107,7 @@
     "serve-writer": {
       "executor": "@beruangai/agentforge:serve",
       "continuous": true,
-      "dependsOn": ["image-writer"],
+      "dependsOn": ["image-writer", "local-store"],
       "defaultConfiguration": "serve",
       "options": {
         "agent": "writer"
@@ -151,7 +151,7 @@
     "serve-grader": {
       "executor": "@beruangai/agentforge:serve",
       "continuous": true,
-      "dependsOn": ["image-grader"],
+      "dependsOn": ["image-grader", "local-store"],
       "defaultConfiguration": "serve",
       "options": {
         "agent": "grader"
@@ -201,6 +201,17 @@
         "command": "vitest run --config vitest.e2e.mts --project agentcore",
         "cwd": "{projectRoot}",
         "envFile": "{workspaceRoot}/.env.integ"
+      }
+    },
+    "local-store": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false
+    },
+    "local-store-stop": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false,
+      "options": {
+        "stop": true
       }
     }
   }

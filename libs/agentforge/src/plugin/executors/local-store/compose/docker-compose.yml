@@ -1,0 +1,62 @@
+# The local store every project on the machine shares, run by
+# `@beruangai/agentforge:local-store` under one compose project name: DynamoDB
+# Local for task state and SeaweedFS for S3 — session transcripts and
+# filesystems — each in a named volume, so state survives a restart. Agents
+# reach it on the `agentforge-store` network as `dynamodb:8000` and `s3:8333`;
+# the host, on the loopback address, at the same ports.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:3.1.0@sha256:7ef4a2c45b58c2901e70a4f28e0953a422c2c631baaaf5e2c15e0805740c7752
+    command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-dbPath', '/home/dynamodblocal/data']
+    # A named volume is created owned by root.
+    user: root
+    working_dir: /home/dynamodblocal
+    volumes:
+      - dynamodb:/home/dynamodblocal/data
+    ports:
+      - 127.0.0.1:8000:8000
+    healthcheck:
+      # Any HTTP answer, even a 400, means it is listening.
+      test: ['CMD-SHELL', 'curl -s -o /dev/null http://localhost:8000/']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  s3:
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    # Each bucket takes seven volumes of its own, and by default the count
+    # is the disk's free space over a 30 GB volume: a laptop runs out after
+    # two or three buckets. Volumes are not preallocated, so a high count
+    # reserves no space.
+    command:
+      [
+        'server',
+        '-s3',
+        '-dir=/data',
+        '-ip.bind=0.0.0.0',
+        '-master.volumeSizeLimitMB=1024',
+        '-volume.max=1000',
+      ]
+    volumes:
+      - s3:/data
+    ports:
+      - 127.0.0.1:8333:8333
+    healthcheck:
+      # Serving only once the volume server has registered with the master:
+      # before that, a stored object reads as an internal error.
+      test:
+        [
+          'CMD-SHELL',
+          'curl -sf -o /dev/null http://localhost:8333/healthz && curl -sf http://localhost:9333/dir/status | grep -q DataNodes',
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+networks:
+  default:
+    name: agentforge-store
+
+volumes:
+  dynamodb:
+  s3:

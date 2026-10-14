@@ -5,45 +5,63 @@ import { pathToFileURL } from 'node:url';
 import type { ExecutorContext } from '@nx/devkit';
 import { z } from 'zod';
 import { AGENT_IMAGE_VARIABLE } from '#core/agent-image.ts';
+import {
+  FILESYSTEM_BUCKETS_VARIABLE,
+  parseDeclaredBuckets,
+} from '#core/filesystem.ts';
+import { S3_ENDPOINT_VARIABLE } from '#core/s3-endpoint.ts';
 import { REQUIRED_SECRETS, SecretNameSchema } from '#core/secrets.ts';
+import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
 import { agentSecretsFile, baseSecretsFile } from '../../artifacts/layers.ts';
 import { imageIdFile } from '../../container/images.ts';
+import { scopeOf } from '../../names.ts';
 import type { AgenticProject } from '../../project-record.ts';
 import { executorProject } from '../executor-project.ts';
+import {
+  LOCAL_STORE_ENDPOINTS,
+  LOCAL_STORE_HOST_ENDPOINTS,
+  LOCAL_STORE_NETWORK,
+} from '../local-store/executor.ts';
 
 export interface ServeExecutorOptions {
   readonly agent: string;
 }
-const DYNAMODB_LOCAL_IMAGE =
-  'amazon/dynamodb-local:3.1.0@sha256:7ef4a2c45b58c2901e70a4f28e0953a422c2c631baaaf5e2c15e0805740c7752';
 /** The agent's contract port inside its container. */
 const AGENT_PORT = 9000;
-const DYNAMODB_PORT = 8000;
-const TABLE_NAME = 'agentforge-tasks';
 
 /**
- * What serving one agent starts: a private network, DynamoDB Local, and the
- * agent under its container name, run by its image's id, with each secret it
- * requires passed by name from the executor's environment.
+ * What serving one agent starts: the agent under its container name, on the
+ * local store's network, run by its image's id, with each secret it requires
+ * passed by name from the executor's environment; its project's task table
+ * and session bucket in the store, and the filesystem buckets the
+ * environment declares.
  */
 export interface ServePlan {
-  readonly network: string;
-  readonly dynamoDB: string;
   readonly agent: string;
   /** The id the agent's image build wrote, which the container runs by and every task records. */
   readonly image: string;
   readonly secrets: readonly string[];
+  readonly tableName: string;
+  readonly sessionBucket: string;
+  readonly filesystemBuckets: Readonly<Record<string, string>>;
+}
+
+/** `@proj/golden-kata` → `proj-golden-kata`: what the project's table and bucket in the local store are named by. */
+function storeName(packageName: string): string {
+  return `${scopeOf(packageName)}-${packageName.slice(packageName.indexOf('/') + 1)}`;
 }
 
 /**
  * The agent's secrets: AgentForge's own, then `declared` — its layers'
- * `REQUIRED_SECRETS`; `image` is the id its image build wrote.
+ * `REQUIRED_SECRETS`; `image` is the id its image build wrote; `environment`
+ * may declare filesystem buckets, as `AGENTFORGE_FILESYSTEM_BUCKETS`.
  */
 export function servePlan(
   project: AgenticProject,
   agentName: string,
   declared: readonly string[],
   image: string,
+  environment: NodeJS.ProcessEnv = {},
 ): ServePlan {
   const agent = project.agents.find((recorded) => recorded.name === agentName);
   if (agent === undefined) {
@@ -53,12 +71,16 @@ export function servePlan(
       }`,
     );
   }
+  const name = storeName(project.name);
   return {
-    network: agent.containerName,
-    dynamoDB: `${agent.containerName}-dynamodb`,
     agent: agent.containerName,
     image,
     secrets: [...new Set([...REQUIRED_SECRETS, ...declared])],
+    tableName: `${name}-tasks`,
+    sessionBucket: `${name}-sessions`,
+    filesystemBuckets: parseDeclaredBuckets(
+      environment[FILESYSTEM_BUCKETS_VARIABLE],
+    ),
   };
 }
 
@@ -136,64 +158,67 @@ export function serveRefusal(
   return undefined;
 }
 
-/** The `docker` commands that start DynamoDB Local, then the agent. */
-export function startCommands(plan: ServePlan): {
-  readonly network: readonly string[];
-  readonly dynamoDB: readonly string[];
-  readonly agent: readonly string[];
-} {
-  return {
-    network: ['network', 'create', plan.network],
-    dynamoDB: [
-      'run',
-      '--detach',
-      '--name',
-      plan.dynamoDB,
-      '--network',
-      plan.network,
-      '--publish',
-      `127.0.0.1::${DYNAMODB_PORT}`,
-      DYNAMODB_LOCAL_IMAGE,
-      '-jar',
-      'DynamoDBLocal.jar',
-      '-inMemory',
-      '-sharedDb',
-    ],
-    agent: [
-      'run',
-      '--detach',
-      '--name',
-      plan.agent,
-      '--network',
-      plan.network,
-      '--publish',
-      `127.0.0.1::${AGENT_PORT}`,
-      ...plan.secrets.flatMap((name) => ['--env', name]),
-      '--env',
-      `AGENTFORGE_TABLE_NAME=${TABLE_NAME}`,
-      '--env',
-      `AGENTFORGE_DYNAMODB_ENDPOINT=http://${plan.dynamoDB}:${DYNAMODB_PORT}`,
-      '--env',
-      'AWS_ACCESS_KEY_ID=local',
-      '--env',
-      'AWS_SECRET_ACCESS_KEY=local',
-      '--env',
-      'AWS_REGION=us-east-2',
-      '--env',
-      `${AGENT_IMAGE_VARIABLE}=${plan.image}`,
-      plan.image,
-    ],
-  };
+/** The buckets the agent needs in the local store: its project's sessions, and each filesystem's. */
+export function storeBuckets(plan: ServePlan): readonly string[] {
+  return [
+    ...new Set([plan.sessionBucket, ...Object.values(plan.filesystemBuckets)]),
+  ];
 }
 
-/** The `docker` commands that remove everything serving started. */
-export function cleanupCommands(
-  plan: ServePlan,
-): readonly (readonly string[])[] {
+/** The `docker` command that starts the agent against the local store. */
+export function startCommand(plan: ServePlan): readonly string[] {
   return [
-    ['rm', '--force', plan.agent, plan.dynamoDB],
-    ['network', 'rm', plan.network],
+    'run',
+    '--detach',
+    '--name',
+    plan.agent,
+    '--network',
+    LOCAL_STORE_NETWORK,
+    '--publish',
+    `127.0.0.1::${AGENT_PORT}`,
+    ...plan.secrets.flatMap((name) => ['--env', name]),
+    '--env',
+    `AGENTFORGE_TABLE_NAME=${plan.tableName}`,
+    '--env',
+    `AGENTFORGE_DYNAMODB_ENDPOINT=${LOCAL_STORE_ENDPOINTS.dynamoDB}`,
+    '--env',
+    `${S3_ENDPOINT_VARIABLE}=${LOCAL_STORE_ENDPOINTS.s3}`,
+    '--env',
+    `${SESSION_BUCKET_VARIABLE}=${plan.sessionBucket}`,
+    ...(Object.keys(plan.filesystemBuckets).length === 0
+      ? []
+      : [
+          '--env',
+          `${FILESYSTEM_BUCKETS_VARIABLE}=${JSON.stringify(plan.filesystemBuckets)}`,
+        ]),
+    '--env',
+    'AWS_ACCESS_KEY_ID=local',
+    '--env',
+    'AWS_SECRET_ACCESS_KEY=local',
+    '--env',
+    'AWS_REGION=us-east-2',
+    '--env',
+    `${AGENT_IMAGE_VARIABLE}=${plan.image}`,
+    plan.image,
   ];
+}
+
+/** The `docker` command that removes the agent's container; the store keeps its data. */
+export function cleanupCommand(plan: ServePlan): readonly string[] {
+  return ['rm', '--force', plan.agent];
+}
+
+/** Creates a bucket in the local store, which keeps one that exists. */
+async function createStoreBucket(bucket: string): Promise<void> {
+  const response = await fetch(
+    new URL(`/${bucket}`, LOCAL_STORE_HOST_ENDPOINTS.s3),
+    { method: 'PUT' },
+  );
+  if (!response.ok && response.status !== 409) {
+    throw new Error(
+      `the local store refused bucket ${bucket}: ${response.status} ${await response.text()}`,
+    );
+  }
 }
 
 function docker(args: readonly string[]): string {
@@ -242,10 +267,11 @@ const answers = (url: string, ok: (response: Response) => boolean) => () =>
   fetch(url).then(ok, () => false);
 
 /**
- * Serves an agent's image locally until stopped: DynamoDB Local beside it on
- * a private network, the agent under its container name on a port the host
- * assigns, its logs followed. Continuous: ready once the agent answers
- * `/ping`, and removing its containers and network when stopped or when the
+ * Serves an agent's image locally until stopped, against the local store the
+ * `local-store` target starts: its buckets created there, the agent under its
+ * container name on the store's network, on a port the host assigns, its
+ * logs followed. Continuous: ready once the agent answers `/ping`, and
+ * removing its container — never the store's data — when stopped or when the
  * agent exits.
  */
 export default async function* serveExecutor(
@@ -258,13 +284,12 @@ export default async function* serveExecutor(
     options.agent,
     await declaredSecrets(context.root, project, options.agent),
     builtImageId(context.root, project, options.agent),
+    process.env,
   );
   const refusal = serveRefusal(plan, process.env, containerState);
   if (refusal !== undefined) throw new Error(refusal);
   const cleanup = () => {
-    for (const args of cleanupCommands(plan)) {
-      spawnSync('docker', args, { stdio: 'ignore' });
-    }
+    spawnSync('docker', cleanupCommand(plan), { stdio: 'ignore' });
   };
   const stop = () => {
     cleanup();
@@ -274,17 +299,9 @@ export default async function* serveExecutor(
   process.once('SIGTERM', stop);
   process.once('exit', cleanup);
   try {
-    const commands = startCommands(plan);
-    docker(commands.network);
-    docker(commands.dynamoDB);
-    // The server creates its table as it starts, so DynamoDB Local must be
-    // listening first. Any HTTP answer, even a 400, means it is.
-    await until(
-      'DynamoDB Local',
-      30_000,
-      answers(publishedUrl(plan.dynamoDB, DYNAMODB_PORT), () => true),
-    );
-    docker(commands.agent);
+    // The local-store target has the store up; the server creates its table.
+    for (const bucket of storeBuckets(plan)) await createStoreBucket(bucket);
+    docker(startCommand(plan));
     const url = publishedUrl(plan.agent, AGENT_PORT);
     await until(
       `${plan.agent} to answer /ping`,

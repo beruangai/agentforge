@@ -45,3 +45,20 @@ export function logs(): string {
   const result = spawnSync('docker', ['logs', CONTAINER], { encoding: 'utf8' });
   return `${result.stdout}${result.stderr}`;
 }
+
+/**
+ * Removes the transcripts the container keeps of its own, so a resume can
+ * only load the session from the local store.
+ */
+export function removeLocalTranscripts(): void {
+  const result = spawnSync(
+    'docker',
+    ['exec', CONTAINER, 'sh', '-c', 'rm -rf "$HOME/.claude/projects"'],
+    { encoding: 'utf8' },
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `could not remove ${CONTAINER}'s transcripts: ${result.stderr}`,
+    );
+  }
+}

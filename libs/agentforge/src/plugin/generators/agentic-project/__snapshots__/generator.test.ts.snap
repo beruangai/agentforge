@@ -247,6 +247,17 @@ exports[`agentic-project > generates a base layer, its targets, client and const
     "assemble": {
       "executor": "nx:noop",
       "dependsOn": []
+    },
+    "local-store": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false
+    },
+    "local-store-stop": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false,
+      "options": {
+        "stop": true
+      }
     }
   }
 }

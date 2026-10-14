@@ -1,6 +1,7 @@
 import { App, Duration, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
+import { Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import { describe, expect, it } from 'vitest';
 import {
@@ -92,9 +93,7 @@ describe('AgenticProjectResources', () => {
       LifecycleConfiguration: {
         Rules: [
           {
-            Transitions: [
-              { StorageClass: 'GLACIER_IR', TransitionInDays: 90 },
-            ],
+            Transitions: [{ StorageClass: 'GLACIER_IR', TransitionInDays: 90 }],
             NoncurrentVersionExpiration: { NoncurrentDays: 1 },
             Status: 'Enabled',
           },
@@ -136,6 +135,23 @@ describe('AgenticProjectResources', () => {
       }),
     });
     template.hasResource('AWS::DynamoDB::Table', { DeletionPolicy: 'Delete' });
+  });
+
+  it("grants a caller read of the project's transcripts, and no write", () => {
+    const stack = new Stack(new App(), 'Readers');
+    const resources = new AgenticProjectResources(stack, 'Project', {
+      projectName: 'golden-kata',
+    });
+    const reader = new Role(stack, 'Reader', {
+      assumedBy: new ServicePrincipal('lambda.amazonaws.com'),
+    });
+    resources.grantReadTranscripts(reader);
+    const statements = JSON.stringify(
+      Template.fromStack(stack).findResources('AWS::IAM::Policy'),
+    );
+    expect(statements).toContain('s3:GetObject*');
+    expect(statements).toContain('s3:List*');
+    expect(statements).not.toContain('s3:PutObject');
   });
 
   it('refuses two agents under one name', () => {

@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
 import picomatch from 'picomatch';
-import { z } from 'zod';
 import {
   FILESYSTEM_BUCKETS_VARIABLE,
   FILESYSTEM_NAME_PATTERN,
+  parseDeclaredBuckets,
 } from '#core/filesystem.ts';
+import { s3Endpoint } from '#core/s3-endpoint.ts';
 import {
   Filesystem,
   type FilesystemOptions,
@@ -124,7 +125,14 @@ export class S3Filesystem extends Filesystem {
   }
 
   protected pull(mount: Mount): Promise<void> {
-    return this.#sync([this.#remoteUrl(mount), `${mount.localPath}/`], []);
+    return this.#sync(
+      [
+        ...this.#endpointArguments('source'),
+        this.#remoteUrl(mount),
+        `${mount.localPath}/`,
+      ],
+      [],
+    );
   }
 
   protected push(
@@ -133,6 +141,7 @@ export class S3Filesystem extends Filesystem {
   ): Promise<void> {
     return this.#sync(
       [
+        ...this.#endpointArguments('target'),
         '--check-etag',
         // A checkpoint never deletes: whether s7cmd would delete the remote
         // copy of a file its mtime filter skips is unverified.
@@ -146,6 +155,14 @@ export class S3Filesystem extends Filesystem {
       ],
       outsideWriteScope(mount.write),
     );
+  }
+
+  /** Where the bucket is served, when not by S3 itself: the local store. */
+  #endpointArguments(side: 'source' | 'target'): readonly string[] {
+    const endpoint = s3Endpoint(this.#environment);
+    return endpoint === undefined
+      ? []
+      : [`--${side}-endpoint-url`, endpoint, `--${side}-force-path-style`];
   }
 
   #remoteUrl(mount: Mount): string {
@@ -188,30 +205,6 @@ export class S3Filesystem extends Filesystem {
     }
     throw new FilesystemUnsynced(`s7cmd exited ${exitCode}: ${stderr.trim()}`);
   }
-}
-
-const DeclaredBucketsSchema = z.record(z.string(), z.string().min(3));
-
-/** The deployment's `{ name: bucket }`; none when it declares none. A malformed value names the variable. */
-function parseDeclaredBuckets(
-  value: string | undefined,
-): Readonly<Record<string, string>> {
-  if (value === undefined) return {};
-  let json: unknown;
-  try {
-    json = JSON.parse(value);
-  } catch (error) {
-    throw new Error(`${FILESYSTEM_BUCKETS_VARIABLE} is not JSON`, {
-      cause: error,
-    });
-  }
-  const parsed = DeclaredBucketsSchema.safeParse(json);
-  if (!parsed.success) {
-    throw new Error(
-      `${FILESYSTEM_BUCKETS_VARIABLE} is not a JSON object of bucket names: ${z.prettifyError(parsed.error)}`,
-    );
-  }
-  return parsed.data;
 }
 
 /** A pattern matching every path outside the write scope; none when the scope is everything. */

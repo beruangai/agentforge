@@ -10,7 +10,13 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import { hash as ohash } from 'ohash';
 import { z } from 'zod';
-import { type Cause, cause, type RunRecord } from '#core/contract/task.ts';
+import {
+  type Cause,
+  cause,
+  type RunRecord,
+  type TranscriptLocation,
+} from '#core/contract/task.ts';
+import { S3SessionStore } from '#core/s3-session-store.ts';
 import { autoMemoryOptions } from './auto-memory.ts';
 import {
   type AgentPrompt,
@@ -280,6 +286,13 @@ export async function runAgent<Output>(
     ...(observed.sessionId === undefined
       ? {}
       : { sessionId: observed.sessionId }),
+    ...transcriptOf(
+      spec.options?.sessionStore === undefined
+        ? context.sessionStore
+        : undefined,
+      mirror?.projectKeys,
+      observed.sessionId,
+    ),
     durationMilliseconds: Date.now() - startedAt,
     ...(result === undefined
       ? {}
@@ -445,13 +458,20 @@ function observe(message: SDKMessage, observed: Observed): void {
 function recordingStore(store: SessionStore): {
   store: SessionStore;
   mirrored: Set<string>;
+  /** Each session's project key, as its main transcript was appended under it. */
+  projectKeys: Map<string, string>;
 } {
   const mirrored = new Set<string>();
+  const projectKeys = new Map<string, string>();
   return {
     mirrored,
+    projectKeys,
     store: {
       append: async (key, entries) => {
         await store.append(key, entries);
+        if (key.subpath === undefined) {
+          projectKeys.set(key.sessionId, key.projectKey);
+        }
         for (const entry of entries) {
           const uuid = (entry as { uuid?: unknown }).uuid;
           if (typeof uuid === 'string') mirrored.add(uuid);
@@ -468,6 +488,23 @@ function recordingStore(store: SessionStore): {
       ...(store.listSubkeys && { listSubkeys: store.listSubkeys.bind(store) }),
     },
   };
+}
+
+/**
+ * Where the run's transcript is, when the deployment's store kept it — a
+ * procedure's own store is its to locate.
+ */
+function transcriptOf(
+  deploymentStore: SessionStore | undefined,
+  projectKeys: ReadonlyMap<string, string> | undefined,
+  sessionId: string | undefined,
+): { transcript?: TranscriptLocation } {
+  if (!(deploymentStore instanceof S3SessionStore) || sessionId === undefined)
+    return {};
+  const projectKey = projectKeys?.get(sessionId);
+  return projectKey === undefined
+    ? {}
+    : { transcript: deploymentStore.location({ projectKey, sessionId }) };
 }
 
 /** The next message, or `'timed-out'` once a deadline has passed. */

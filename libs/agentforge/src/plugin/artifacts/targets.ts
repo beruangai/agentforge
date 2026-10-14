@@ -80,7 +80,7 @@ export function projectTargets(
     targets[`serve-${agent.name}`] = {
       executor: `${EXECUTOR}:serve`,
       continuous: true,
-      dependsOn: [`image-${agent.name}`],
+      dependsOn: [`image-${agent.name}`, 'local-store'],
       // In the key order Nx writes targets in, so a sync that changes
       // nothing rewrites nothing.
       defaultConfiguration: 'serve',
@@ -91,6 +91,17 @@ export function projectTargets(
   targets.assemble = {
     executor: 'nx:noop',
     dependsOn: project.agents.map((agent) => `image-${agent.name}`),
+  };
+  // The machine's shared local store, started unless running: what a served
+  // agent's tasks, transcripts and filesystems persist in.
+  targets['local-store'] = {
+    executor: `${EXECUTOR}:local-store`,
+    cache: false,
+  };
+  targets['local-store-stop'] = {
+    executor: `${EXECUTOR}:local-store`,
+    cache: false,
+    options: { stop: true },
   };
   return targets;
 }

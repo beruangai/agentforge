@@ -2,13 +2,18 @@
  * The whole path, locally: a caller, through the project client, to
  * hello-agent's container as `serve-hello-agent` runs it — server, task
  * process, harness, the Agent SDK and a real model — and back as a typed
- * outcome, recording the image that ran it; an attach, a resumed session, a
- * cancel mid-Bash, a procedure that distills its documents in a run before
- * answering in another, and Python importing what the base layer installed.
+ * outcome, recording the image that ran it and where its transcript is,
+ * read back through the client; an attach; a session resumed
+ * from its transcript in the local store; a note in an S3 filesystem and a
+ * memory, each read back by a later task from the store, since a mount's
+ * directory goes with its task; a cancel mid-Bash; a procedure that distills
+ * its documents in a run before answering in another; and Python importing
+ * what the base layer installed.
  */
 import { randomUUIDv7 } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { awaitTask } from '@beruangai/agentforge/client';
+import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { awaitTask, readTranscript } from '@beruangai/agentforge/client';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   type Client as SmokeCoverageClient,
@@ -22,13 +27,27 @@ import {
   QUESTION,
   SMALL_CAP_TOKENS,
 } from '../__fixtures__/documents.ts';
-import { logs, servedUrl, untilServing } from './__fixtures__/served-agent.ts';
+import {
+  logs,
+  removeLocalTranscripts,
+  servedUrl,
+  untilServing,
+} from './__fixtures__/served-agent.ts';
 
 /** The id `image-hello-agent` wrote, which `serve-hello-agent` runs by. */
 const IMAGE_ID_FILE = new URL(
   '../../../../../dist/packages/examples/smoke-coverage/image/agents/hello-agent.id',
   import.meta.url,
 );
+
+/** The local store's S3, as the host reaches it, and the project's session bucket in it. */
+const LOCAL_STORE = new S3Client({
+  endpoint: 'http://127.0.0.1:8333',
+  forcePathStyle: true,
+  region: 'us-east-2',
+  credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
+});
+const SESSION_BUCKET = 'beruangai-smoke-coverage-sessions';
 
 let helloAgent: SmokeCoverageClient['helloAgent'];
 const RUNTIME_SESSION_ID = `e2e-${randomUUIDv7()}`;
@@ -77,6 +96,16 @@ describe('hello-agent, locally', () => {
     const [run] = ended.runs;
     expect(run?.sessionId).toBe(firstSessionId);
     expect(run?.totalCostUsd).toBeGreaterThan(0);
+    // The record says where the transcript is, and the store gives it back.
+    expect(run?.transcript).toMatchObject({
+      bucket: SESSION_BUCKET,
+      agent: 'hello-agent',
+    });
+    if (run === undefined) throw new Error('the task records no run');
+    const transcript = await readTranscript(run, { client: LOCAL_STORE });
+    expect(transcript.some((message) => message.type === 'assistant')).toBe(
+      true,
+    );
     // The record carries the prompt's hash; the container log, the prompt whole.
     expect(run?.promptBytes).toBeGreaterThan(0);
     const logged = logs()
@@ -97,7 +126,19 @@ describe('hello-agent, locally', () => {
     );
   });
 
-  it('resumes the session it started', async () => {
+  it('resumes the session it started from its transcript in the local store', async () => {
+    const listed = await LOCAL_STORE.send(
+      new ListObjectsV2Command({
+        Bucket: SESSION_BUCKET,
+        Prefix: 'hello-agent/',
+      }),
+    );
+    expect(
+      (listed.Contents ?? []).some(({ Key }) =>
+        Key?.includes(`/${firstSessionId}/part-`),
+      ),
+    ).toBe(true);
+    removeLocalTranscripts();
     const started = await helloAgent.Summarise.SendMessage(
       {
         text: 'Now summarise the same text again, more briefly.',
@@ -112,6 +153,87 @@ describe('hello-agent, locally', () => {
       );
     }
     expect(ended.output.sessionId).toBe(firstSessionId);
+  });
+
+  it('keeps a note in an S3 filesystem, and a later task reads it back from the store', async () => {
+    const topic = `e2e-${randomUUIDv7()}`;
+    const note = `The notebook outlives the task that wrote ${topic}.`;
+    const kept = await awaitTask(
+      helloAgent.KeepNote,
+      await helloAgent.KeepNote.SendMessage(
+        { topic, note },
+        {
+          runtimeSessionId: RUNTIME_SESSION_ID,
+          idempotencyKey: randomUUIDv7(),
+        },
+      ),
+      POLL_OPTIONS,
+    );
+    if (kept.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(
+        `expected completion, got ${JSON.stringify(kept)}\n${logs()}`,
+      );
+    }
+    expect(kept.output.kept).toBe(true);
+    const recalled = await awaitTask(
+      helloAgent.RecallNote,
+      await helloAgent.RecallNote.SendMessage(
+        { topic },
+        {
+          runtimeSessionId: RUNTIME_SESSION_ID,
+          idempotencyKey: randomUUIDv7(),
+        },
+      ),
+      POLL_OPTIONS,
+    );
+    if (recalled.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(
+        `expected completion, got ${JSON.stringify(recalled)}\n${logs()}`,
+      );
+    }
+    expect(recalled.output.note.trim()).toBe(note);
+  });
+
+  it('remembers a fact, and a later task recalls it from its memory space in the store', async () => {
+    const space = `e2e-${randomUUIDv7()}`;
+    const codename = `HERON-${randomUUIDv7().slice(-8).toUpperCase()}`;
+    const remembered = await awaitTask(
+      helloAgent.Remember,
+      await helloAgent.Remember.SendMessage(
+        {
+          space,
+          fact: `The deploy codename for this project is ${codename}, chosen because the release team names deploys after birds.`,
+        },
+        {
+          runtimeSessionId: RUNTIME_SESSION_ID,
+          idempotencyKey: randomUUIDv7(),
+        },
+      ),
+      POLL_OPTIONS,
+    );
+    if (remembered.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(
+        `expected completion, got ${JSON.stringify(remembered)}\n${logs()}`,
+      );
+    }
+    expect(remembered.output.saved).toBe(true);
+    const recalled = await awaitTask(
+      helloAgent.Recall,
+      await helloAgent.Recall.SendMessage(
+        { space, question: 'What is the deploy codename for this project?' },
+        {
+          runtimeSessionId: RUNTIME_SESSION_ID,
+          idempotencyKey: randomUUIDv7(),
+        },
+      ),
+      POLL_OPTIONS,
+    );
+    if (recalled.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(
+        `expected completion, got ${JSON.stringify(recalled)}\n${logs()}`,
+      );
+    }
+    expect(recalled.output.answer).toContain(codename);
   });
 
   it('cancels a run mid-Bash, and the container is idle again', async () => {

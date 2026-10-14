@@ -6,9 +6,12 @@ import type {
   SessionStore,
   SessionStoreEntry,
 } from '@anthropic-ai/claude-agent-sdk';
+import type { S3Client } from '@aws-sdk/client-s3';
 import { hash as ohash } from 'ohash';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import type { RunRecord } from '#core/contract/task.ts';
+import { S3SessionStore } from '#core/s3-session-store.ts';
 import { init, result, scriptedQuery } from './__fixtures__/scripted-query.ts';
 import { AUTO_MEMORY_FRAGMENT } from './auto-memory.ts';
 import {
@@ -324,6 +327,38 @@ describe('runAgent', () => {
       );
       expect(own).toEqual([ENTRIES]);
       expect(deployed).toHaveLength(1);
+    });
+
+    it("records where the deployment's store keeps the transcript, and nothing for a procedure's own", async () => {
+      const records: RunRecord[] = [];
+      const deployed = new S3SessionStore({
+        bucket: 'sessions',
+        prefix: 'writer',
+        client: { send: async () => ({}) } as unknown as S3Client,
+      });
+      const context = {
+        signal: new AbortController().signal,
+        onRecord: (record: RunRecord) => records.push(record),
+        sessionStore: deployed,
+      };
+      await runAgent(
+        { prompt: 'q', output: OutputSchema },
+        context,
+        mirroring(answered(), ENTRIES),
+      );
+      await runAgent(
+        {
+          prompt: 'q',
+          output: OutputSchema,
+          options: { sessionStore: storeOf([]) },
+        },
+        context,
+        mirroring(answered(), ENTRIES),
+      );
+      expect(records.map((record) => record.transcript)).toEqual([
+        { bucket: 'sessions', agent: 'writer', projectKey: 'project' },
+        undefined,
+      ]);
     });
 
     it('fails the run when an assistant message never reached the store', async () => {

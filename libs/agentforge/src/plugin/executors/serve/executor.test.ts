@@ -6,10 +6,11 @@ import { GOLDEN_KATA } from '../../__fixtures__/golden-kata.ts';
 import {
   builtImageId,
   type ContainerState,
-  cleanupCommands,
+  cleanupCommand,
   servePlan,
   serveRefusal,
-  startCommands,
+  startCommand,
+  storeBuckets,
 } from './executor.ts';
 
 const IMAGE_ID = 'sha256:0123abcd';
@@ -18,14 +19,38 @@ const TOKEN = { CLAUDE_CODE_OAUTH_TOKEN: 'token' };
 const stateIs = (state: ContainerState) => () => state;
 
 describe('servePlan', () => {
-  it("serves the agent's image under its container name", () => {
+  it("serves the agent's image under its container name, with its project's table and session bucket in the local store", () => {
     expect(PLAN).toEqual({
-      network: 'proj-golden-kata-writer',
-      dynamoDB: 'proj-golden-kata-writer-dynamodb',
       agent: 'proj-golden-kata-writer',
       image: IMAGE_ID,
       secrets: ['CLAUDE_CODE_OAUTH_TOKEN'],
+      tableName: 'proj-golden-kata-tasks',
+      sessionBucket: 'proj-golden-kata-sessions',
+      filesystemBuckets: {},
     });
+    expect(storeBuckets(PLAN)).toEqual(['proj-golden-kata-sessions']);
+  });
+
+  it('declares the filesystem buckets the environment names, and creates each in the store', () => {
+    const plan = servePlan(GOLDEN_KATA, 'writer', [], IMAGE_ID, {
+      AGENTFORGE_FILESYSTEM_BUCKETS: JSON.stringify({
+        notebook: 'kata-notebook',
+        memories: 'kata-memories',
+      }),
+    });
+    expect(storeBuckets(plan)).toEqual([
+      'proj-golden-kata-sessions',
+      'kata-notebook',
+      'kata-memories',
+    ]);
+    expect(startCommand(plan)).toContain(
+      'AGENTFORGE_FILESYSTEM_BUCKETS={"notebook":"kata-notebook","memories":"kata-memories"}',
+    );
+    expect(() =>
+      servePlan(GOLDEN_KATA, 'writer', [], IMAGE_ID, {
+        AGENTFORGE_FILESYSTEM_BUCKETS: 'notebook',
+      }),
+    ).toThrow(/AGENTFORGE_FILESYSTEM_BUCKETS is not JSON/);
   });
 
   it("requires AgentForge's secrets, then its layers', once each", () => {
@@ -94,8 +119,8 @@ describe('serveRefusal', () => {
 });
 
 describe('the docker commands', () => {
-  it('passes each secret by name, never its value, on a host-assigned port', () => {
-    const { agent } = startCommands(
+  it('passes each secret by name, never its value, on a host-assigned port, against the local store', () => {
+    const agent = startCommand(
       servePlan(GOLDEN_KATA, 'writer', ['KATA_API_KEY'], IMAGE_ID),
     );
     expect(agent.join(' ')).toContain(
@@ -103,24 +128,27 @@ describe('the docker commands', () => {
     );
     expect(agent).toContain('127.0.0.1::9000');
     expect(agent.join(' ')).not.toContain('token=');
-    expect(agent).toContain(
-      'AGENTFORGE_DYNAMODB_ENDPOINT=http://proj-golden-kata-writer-dynamodb:8000',
+    expect(agent.join(' ')).toContain('--network agentforge-store');
+    expect(agent).toEqual(
+      expect.arrayContaining([
+        'AGENTFORGE_TABLE_NAME=proj-golden-kata-tasks',
+        'AGENTFORGE_DYNAMODB_ENDPOINT=http://dynamodb:8000',
+        'AGENTFORGE_S3_ENDPOINT=http://s3:8333',
+        'AGENTFORGE_SESSION_BUCKET=proj-golden-kata-sessions',
+      ]),
     );
+    expect(agent.join(' ')).not.toContain('AGENTFORGE_FILESYSTEM_BUCKETS');
     expect(agent.join(' ')).toContain(
       `--env AGENTFORGE_AGENT_IMAGE=${IMAGE_ID} ${IMAGE_ID}`,
     );
     expect(agent.at(-1)).toBe(IMAGE_ID);
   });
 
-  it('removes both containers and the network on stop', () => {
-    expect(cleanupCommands(PLAN)).toEqual([
-      [
-        'rm',
-        '--force',
-        'proj-golden-kata-writer',
-        'proj-golden-kata-writer-dynamodb',
-      ],
-      ['network', 'rm', 'proj-golden-kata-writer'],
+  it("removes only the agent's container on stop", () => {
+    expect(cleanupCommand(PLAN)).toEqual([
+      'rm',
+      '--force',
+      'proj-golden-kata-writer',
     ]);
   });
 });

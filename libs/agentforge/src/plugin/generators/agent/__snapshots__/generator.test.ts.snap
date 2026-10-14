@@ -628,6 +628,17 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
       "layer": "agents/writer",
     },
   },
+  "local-store": {
+    "cache": false,
+    "executor": "@beruangai/agentforge:local-store",
+  },
+  "local-store-stop": {
+    "cache": false,
+    "executor": "@beruangai/agentforge:local-store",
+    "options": {
+      "stop": true,
+    },
+  },
   "lock": {
     "cache": true,
     "dependsOn": [
@@ -691,6 +702,7 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
     "defaultConfiguration": "serve",
     "dependsOn": [
       "image-writer",
+      "local-store",
     ],
     "executor": "@beruangai/agentforge:serve",
     "options": {

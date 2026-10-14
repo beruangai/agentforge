@@ -25,6 +25,7 @@ afterEach(() => {
 function s3(
   options: Partial<S3FilesystemOptions> = {},
   exits: S7cmdResult[] = [],
+  environment: NodeJS.ProcessEnv = {},
 ) {
   const calls: (readonly string[])[] = [];
   const filesystem = new S3Filesystem(
@@ -44,6 +45,7 @@ function s3(
         AGENTFORGE_FILESYSTEM_BUCKETS: JSON.stringify({
           vault: 'vault-bucket',
         }),
+        ...environment,
       },
     },
   );
@@ -84,6 +86,27 @@ describe('S3Filesystem', () => {
         's3://vault-bucket/topics/a/',
       ],
     ]);
+  });
+
+  it('syncs with the local store when the deployment names its endpoint, path-style', async () => {
+    const { calls, mount } = s3({}, [], {
+      AGENTFORGE_S3_ENDPOINT: 'http://s3:8333',
+    });
+    await (await mount()).unmount('TASK_STATE_COMPLETED');
+    expect(calls[0]).toEqual(
+      expect.arrayContaining([
+        '--source-endpoint-url',
+        'http://s3:8333',
+        '--source-force-path-style',
+      ]),
+    );
+    expect(calls[1]).toEqual(
+      expect.arrayContaining([
+        '--target-endpoint-url',
+        'http://s3:8333',
+        '--target-force-path-style',
+      ]),
+    );
   });
 
   it('excludes by glob relative to the mount, and always a climbing path', async () => {

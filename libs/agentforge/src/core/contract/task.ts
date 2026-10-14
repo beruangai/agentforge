@@ -195,6 +195,17 @@ export function outcomeOfArtifacts(artifacts: unknown): Outcome | undefined {
   return OutcomeSchema.parse(part.data);
 }
 
+/**
+ * Where a session's transcript is kept: the session bucket, and its keys'
+ * agent and project parts (`<agent>/<projectKey>/<sessionId>/`).
+ */
+export const TranscriptLocationSchema = z.strictObject({
+  bucket: z.string(),
+  agent: z.string(),
+  projectKey: z.string(),
+});
+export type TranscriptLocation = z.infer<typeof TranscriptLocationSchema>;
+
 /** What one agent run recorded (§REQ601). */
 export const RunRecordSchema = z.strictObject({
   /** The prompt as sent, hashed; the container log and the transcript hold it whole. */
@@ -202,6 +213,8 @@ export const RunRecordSchema = z.strictObject({
   promptBytes: z.number(),
   options: z.record(z.string(), z.unknown()),
   sessionId: z.string().optional(),
+  /** Where the run's transcript is, when the deployment's store kept it; `readTranscript` reads it. */
+  transcript: TranscriptLocationSchema.optional(),
   numberOfTurns: z.number().optional(),
   totalCostUsd: z.number().optional(),
   modelUsage: z.record(z.string(), z.unknown()).optional(),

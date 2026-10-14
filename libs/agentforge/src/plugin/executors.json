@@ -13,7 +13,7 @@
     "serve": {
       "implementation": "./executors/serve/executor.ts",
       "schema": "./executors/serve/schema.json",
-      "description": "Serves an agent's image locally, beside DynamoDB Local, until stopped"
+      "description": "Serves an agent's image locally, against the shared local store, until stopped"
     },
     "bundle-workflows": {
       "implementation": "./executors/bundle-workflows/executor.ts",
@@ -29,6 +29,11 @@
       "implementation": "./executors/temporal-server/executor.ts",
       "schema": "./executors/temporal-server/schema.json",
       "description": "Starts the local Temporal server every project shares, if it is not running, and registers TEMPORAL_NAMESPACE on it; or stops it"
+    },
+    "local-store": {
+      "implementation": "./executors/local-store/executor.ts",
+      "schema": "./executors/local-store/schema.json",
+      "description": "Starts the local store every project shares \u2014 DynamoDB Local and an S3-compatible server \u2014 if it is not running; or stops it"
     }
   }
 }

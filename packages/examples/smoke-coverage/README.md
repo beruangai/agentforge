@@ -24,7 +24,7 @@ What is maintained, scaffolded and detachable is listed in [AgentForge's README]
 
 | Suite | Asserts |
 |---|---|
-| `e2e/local/hello-agent.test.ts` | A typed output, an attach under the same key, the run's record and its logged prompt; a resumed session; a cancel mid-Bash leaving the container idle; NautilusTrader's version |
+| `e2e/local/hello-agent.test.ts` | Against the local store: a typed output, an attach under the same key, the run's record and its logged prompt; a session resumed from its transcript in the store once the container's own copy is gone; the notebook and a memory read back by a later task from the store; a cancel mid-Bash leaving the container idle; NautilusTrader's version |
 | `e2e/local/temporal-activity.test.ts` | The Temporal activity returning the typed output while heartbeating, and cancelling its task when cancelled |
 | `e2e/agentcore/hello-agent.test.ts` | On AgentCore: an attach to a completed task; a session resumed in another container from its transcript in S3; the notebook across containers; a memory across containers; a container stopped mid-Bash ending the task `LOST`, its retry running as attempt 2; NautilusTrader's version on ARM64 |
 
@@ -38,4 +38,4 @@ nx run @beruangai/smoke-coverage:e2e
 nx run @beruangai/smoke-coverage:e2e-agentcore
 ```
 
-`e2e` serves hello-agent locally through `serve-hello-agent`, with the subscription token from `.env.serve.local`, and runs the `local` project. `e2e-agentcore` deploys [smoke-coverage-infra](../smoke-coverage-infra/README.md) first and runs the `agentcore` project as the test role, resolving the agent from the deployment's runtime configuration.
+`e2e` serves hello-agent locally through `serve-hello-agent`, against the machine's local store, with the subscription token from `.env.serve.local` and its filesystems' buckets from the committed `.env.serve`, and runs the `local` project. `e2e-agentcore` deploys [smoke-coverage-infra](../smoke-coverage-infra/README.md) first and runs the `agentcore` project as the test role, resolving the agent from the deployment's runtime configuration.
