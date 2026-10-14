@@ -27,7 +27,7 @@ Until AgentForge is published, a consumer installs the archive its `pack` target
 bunx nx add @beruangai/agentforge@/abs/path/to/agentforge/dist/libs/agentforge/pack/beruangai-agentforge.tgz
 ```
 
-Every manifest the plugin generates repeats that path; a relative path is not supported. To take a newer AgentForge, run `nx run @beruangai/agentforge:pack` in the clone, then in the consumer `bun remove @beruangai/agentforge` and `bun add -d` the same path (adding the same path again keeps the old archive), then `nx sync`. Never `bun link` the clone or the bundle: a linked AgentForge resolves its peers from the clone, and fails with `Cannot find package '…' imported from …/dist/libs/agentforge/bundle/…` ([research](../../docs/research/package-installation.md)).
+Every manifest the plugin generates repeats that path; a relative path is not supported. To take a newer AgentForge, run `nx run @beruangai/agentforge:pack` in the clone, then in the consumer `bun install --force`, which re-reads the archive (adding the same path again, or removing and re-adding it once generated manifests repeat it, keeps the old one), then `nx sync`. Never `bun link` the clone or the bundle: a linked AgentForge resolves its peers from the clone, and fails with `Cannot find package '…' imported from …/dist/libs/agentforge/bundle/…` ([research](../../docs/research/package-installation.md)).
 
 | Generator | Creates |
 |---|---|
