@@ -1,14 +1,16 @@
 schema: spec-driven
 
 context: |
-  AgentForge: a procedure wrapper for the Claude Agent SDK, built for StrategyFoundry and
-  TrendBot, not for public use.
+  AgentForge: a procedure wrapper for agent frameworks — each agentic project chooses one;
+  `claude`, the Claude Agent SDK, is the only one provided (ADR 0021) — built for StrategyFoundry
+  and TrendBot, not for public use.
   Tech stack: TypeScript on Bun, one Nx project (libs/agentforge) on @aws/nx-plugin, Vitest, Zod, oRPC, AWS CDK.
 
   Four layers with a contract at every boundary (docs/ARCHITECTURE.md §1):
   1 runtime (A2A server and client, gateway, executor, durable task store),
-  2 harness (implementAgent, the task process, the runAgent kernel, filesystems), 3 consumer,
-  4 Claude Agent SDK. Layers 1 and 2 never import each other; they share only the task protocol
+  2 harness (the task process, filesystems, the framework interface), 3 consumer,
+  4 the framework's agent SDK. Each framework is one folder, src/framework/<name>/, with its own
+  part of each layer; claude's harness part is the runAgent kernel. Layers 1 and 2 never import each other; they share only the task protocol
   and the procedure contract. Only two crossings are protocols: the A2A wire, and Node IPC to a task process.
 
   A2A — version 1.0 only — is the contract between a caller and the runtime; the client is
@@ -22,7 +24,7 @@ context: |
   Nx tasks, and only the leaf agent image reaches ECR. Nx owns the build graph; AgentForge
   writes no second dependency graph, content hash or digest comparison.
 
-  How a consumer relates runtime sessions, A2A contexts, Claude sessions, cwd and
+  How a consumer relates runtime sessions, A2A contexts, agent sessions, cwd and
   filesystems is the consumer's, never AgentForge's.
 
   docs/REQUIREMENTS.md is the register AgentForge answers to. It is AgentForge's own — ids are

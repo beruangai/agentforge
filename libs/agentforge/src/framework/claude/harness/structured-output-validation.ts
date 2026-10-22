@@ -3,15 +3,8 @@ import type {
   HookCallbackMatcher,
 } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
+import type { StopGuard } from '../../../server/harness/stop-guard.ts';
 import { unwrapStructuredOutput } from './structured-output.ts';
-
-/** A check that must pass before the agent's structured output is accepted; the agent contract is always validated beside it. */
-export type StopGuard = () => Promise<StopGuardDenial | undefined>;
-
-export interface StopGuardDenial {
-  /** Told to the agent, in its turn: what is wrong and what to do. */
-  readonly reason: string;
-}
 
 /** The tool the agent submits its structured output through, advertised in `init.tools`. */
 export const STRUCTURED_OUTPUT_TOOL = 'StructuredOutput';

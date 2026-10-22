@@ -3,13 +3,15 @@
 // project.json metadata.agentforge.detached.files.
 //
 // The container's entry: AgentForge's server, running `task.ts` once per task
-// and requiring the secrets this project's layers declare. Everything else
-// comes from the environment.
+// under the claude framework, and requiring the secrets it and this
+// project's layers declare. Everything else comes from the environment.
+import { framework } from '@beruangai/agentforge/claude/server';
 import { startServer } from '@beruangai/agentforge/server';
 import { REQUIRED_SECRETS as PROJECT_SECRETS } from '@beruangai/smoke-coverage-base/secrets';
 import { REQUIRED_SECRETS as AGENT_SECRETS } from './secrets.ts';
 
 await startServer({
   taskEntry: new URL('./task.ts', import.meta.url),
+  framework,
   requiredSecrets: [...PROJECT_SECRETS, ...AGENT_SECRETS],
 });

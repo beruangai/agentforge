@@ -10,6 +10,12 @@ import {
   writeJson,
 } from '@nx/devkit';
 import {
+  FRAMEWORK_NAMES,
+  type FrameworkName,
+  FrameworkNameEnum,
+} from '#core/contract/framework.ts';
+import { frameworkPlugin } from '#framework/registry.ts';
+import {
   agenticProjectRendering,
   applyAndFormat,
 } from '../../artifacts/project-artifacts.ts';
@@ -21,7 +27,11 @@ import {
   isAgenticProject,
   readAgenticProject,
 } from '../../project-record.ts';
-import { dependencySpecifier } from '../../workspace-dependencies.ts';
+import {
+  declareDependencies,
+  dependencySpecifier,
+  peerRange,
+} from '../../workspace-dependencies.ts';
 
 export interface AgenticProjectGeneratorSchema {
   readonly name: string;
@@ -29,14 +39,27 @@ export interface AgenticProjectGeneratorSchema {
   readonly directory?: string;
   /** The project's folder within `directory`; its name by default. */
   readonly subDirectory?: string;
+  /** The agent framework its runs go through; `claude` by default (ADR 0021). */
+  readonly framework?: FrameworkName;
 }
 
-/** What the host package depends on for its agents' code and its client to typecheck. */
+/** What the host package depends on for its agents' code and its client to typecheck, beside its framework's peers. */
 const HOST_DEPENDENCIES = [
   ...CONTAINER_ROOT_DEPENDENCIES,
   '@aws-sdk/client-bedrock-agentcore',
   '@aws-sdk/client-appconfigdata',
 ] as const;
+
+/** The framework named, refused unless AgentForge provides it, before anything is written. */
+function frameworkOf(options: AgenticProjectGeneratorSchema): FrameworkName {
+  const parsed = FrameworkNameEnum.safeParse(options.framework ?? 'claude');
+  if (!parsed.success) {
+    throw new Error(
+      `framework "${options.framework}" is not one AgentForge provides: ${FRAMEWORK_NAMES.join(', ')}`,
+    );
+  }
+  return parsed.data;
+}
 
 /** What the shared constructs generator must be told it may add. */
 const SHARED_CONSTRUCTS_DECLARATION = {
@@ -53,9 +76,10 @@ function writeIfAbsent(tree: Tree, path: string, content: string): void {
 }
 
 /**
- * An agentic project: a host package holding the base layer every agent
- * shares — modules, options, Claude configuration, dependencies — its image
- * targets, its client and its construct, and no agents. Generating one that
+ * An agentic project for one framework: a host package holding the base
+ * layer every agent shares — modules, options, the framework's
+ * configuration, dependencies — its image targets, its client and its
+ * construct, and no agents. Generating one that
  * exists changes nothing in a synced workspace; a different project where it
  * would go is refused before anything is written.
  */
@@ -64,6 +88,7 @@ export default async function agenticProjectGenerator(
   options: AgenticProjectGeneratorSchema,
 ): Promise<GeneratorCallback> {
   const name = parseName(KebabNameField, 'agentic project name', options.name);
+  const framework = frameworkOf(options);
   const root = `${options.directory ?? 'packages'}/${options.subDirectory ?? name}`;
   const { name: rootPackage } = readJson<{ name?: string }>(
     tree,
@@ -94,8 +119,15 @@ export default async function agenticProjectGenerator(
         `${root} exists and is not a project; the agentic project ${packageName} would collide with it`,
       );
     }
+    // The framework's peers, declared in the workspace here rather than by
+    // init, so a workspace without the framework's projects never holds them.
+    const { containerPeers } = frameworkPlugin(framework);
+    await declareDependencies(
+      tree,
+      Object.fromEntries(containerPeers.map((peer) => [peer, peerRange(peer)])),
+    );
     const dependencies: Record<string, string> = {};
-    for (const dependency of HOST_DEPENDENCIES) {
+    for (const dependency of [...containerPeers, ...HOST_DEPENDENCIES]) {
       dependencies[dependency] = await dependencySpecifier(tree, dependency);
     }
     tree.write(
@@ -140,12 +172,17 @@ export default async function agenticProjectGenerator(
       metadata: {
         generator: AGENTIC_PROJECT_GENERATOR,
         components: [],
-        agentforge: { detached: { files: [], targets: [] } },
+        agentforge: { framework, detached: { files: [], targets: [] } },
       },
       targets: {},
     });
   }
   const project = readAgenticProject(tree, packageName);
+  if (project.framework !== framework) {
+    throw new Error(
+      `${packageName} runs on the ${project.framework} framework, not ${framework}: a project's framework is chosen when it is generated`,
+    );
+  }
   for (const file of baseScaffolds(project)) {
     writeIfAbsent(tree, file.path, file.content);
   }

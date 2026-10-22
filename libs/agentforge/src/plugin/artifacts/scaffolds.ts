@@ -1,3 +1,4 @@
+import { frameworkPlugin } from '#framework/registry.ts';
 import type { AgentComponent, AgenticProject } from '../project-record.ts';
 import {
   agentDirectory,
@@ -8,33 +9,23 @@ import {
 } from './layers.ts';
 import type { ScaffoldedFile } from './maintained.ts';
 
-const CLAUDE_SETTINGS = `${JSON.stringify(
-  { $schema: 'https://json.schemastore.org/claude-code-settings.json' },
-  null,
-  2,
-)}\n`;
-
-/** The Claude configuration a layer starts with: settings, and empty `skills/` and `agents/`. */
-function claudePlaceholders(directory: string): ScaffoldedFile[] {
-  return [
-    { path: `${directory}/$claude/settings.json`, content: CLAUDE_SETTINGS },
-    { path: `${directory}/$claude/skills/.gitkeep`, content: '' },
-    { path: `${directory}/$claude/agents/.gitkeep`, content: '' },
-  ];
-}
-
 /**
  * A layer's `secrets.ts`: the secrets it requires, by the environment
  * variable each becomes. The agent's construct requires a secret for each,
  * `serve` passes each by name, and the agent's server fails a request while
  * one is unset.
  */
-function secretsScaffold(path: string, requiredBy: string): ScaffoldedFile {
+function secretsScaffold(
+  project: AgenticProject,
+  path: string,
+  requiredBy: string,
+): ScaffoldedFile {
+  const own = frameworkPlugin(project.framework).requiredSecrets.join(', ');
   return {
     path,
     content: `/**
  * The secrets ${requiredBy} requires, by the environment variable each
- * becomes — beside AgentForge's own, CLAUDE_CODE_OAUTH_TOKEN. The agent's
+ * becomes — beside its framework's own, ${own}. The agent's
  * construct requires a secret for each, \`serve\` passes each from
  * .env.serve.local, and the agent's server fails a request while one is unset.
  */
@@ -43,51 +34,26 @@ export const REQUIRED_SECRETS = [] as const satisfies readonly string[];
   };
 }
 
-/** The base layer's scaffolds: its shared options, its secrets and its Claude configuration. */
+/** The base layer's scaffolds: its secrets, and its framework's shared options and configuration. */
 export function baseScaffolds(project: AgenticProject): ScaffoldedFile[] {
-  const agentic = `${baseDirectory(project)}/agentic`;
   return [
-    {
-      path: `${agentic}/options.ts`,
-      content: `import type { AgentOptions } from '@beruangai/agentforge/agent';
-
-/**
- * What every agent in ${project.projectName} runs with, composed under each agent's own
- * options with \`composeOptions\`. An agent's cwd is its own directory, so the
- * \`project\` setting source composes this layer's \`.claude/\` from the parent.
- * Reads outside a run's working directories are refused, so a procedure
- * composes \`context.agentOptions\` — its mounts as \`additionalDirectories\`
- * and their baseline rules — into a run's own; one that must read more turns
- * the fence off in its own options. Agents import it as
- * \`${basePackageName(project)}/options\`.
- */
-export function baseOptions(): AgentOptions {
-  return {
-    settingSources: ['project'],
-    settings: { permissions: { blockReadsOutsideWorkingDirectories: true } },
-  };
-}
-`,
-    },
-    {
-      path: `${agentic}/$claude/CLAUDE.md`,
-      content: `# ${project.projectName}
-
-What every agent in this project is told. Replace this placeholder.
-`,
-    },
+    ...frameworkPlugin(project.framework).baseScaffolds({
+      directory: `${baseDirectory(project)}/agentic`,
+      projectName: project.projectName,
+      basePackageName: basePackageName(project),
+    }),
     secretsScaffold(
+      project,
       baseSecretsFile(project),
       `every agent in ${project.projectName}`,
     ),
-    ...claudePlaceholders(agentic),
   ];
 }
 
 /**
  * An agent's scaffolds: its contract with one stub procedure, the
  * procedure's handler failing its task until implemented, its secrets and
- * its Claude configuration.
+ * its framework's configuration.
  */
 export function agentScaffolds(
   project: AgenticProject,
@@ -95,6 +61,7 @@ export function agentScaffolds(
   procedure: string,
 ): ScaffoldedFile[] {
   const directory = `${agentDirectory(project, agent)}/agent`;
+  const framework = frameworkPlugin(project.framework);
   return [
     {
       path: `${directory}/contract.ts`,
@@ -113,7 +80,7 @@ export const contract = {
     },
     {
       path: `${directory}/procedures.ts`,
-      content: `import { implementAgent } from '@beruangai/agentforge/agent';
+      content: `import { implementAgent } from '${framework.imports.agent}';
 import { contract } from './contract.ts';
 
 const os = implementAgent(contract);
@@ -132,9 +99,14 @@ export const router = os.router({
 `,
     },
     secretsScaffold(
+      project,
       agentSecretsFile(project, agent),
       `the ${agent.name} agent`,
     ),
-    ...claudePlaceholders(directory),
+    ...framework.agentScaffolds({
+      directory,
+      projectName: project.projectName,
+      basePackageName: basePackageName(project),
+    }),
   ];
 }

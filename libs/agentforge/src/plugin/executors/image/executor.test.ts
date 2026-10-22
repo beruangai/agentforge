@@ -7,10 +7,18 @@ const INPUTS = {
   dockerfile: '/installed/agentforge/Dockerfile',
   containerDirectory: '/installed/agentforge/container',
   version: '1.2.3',
+  frameworks: {
+    claude: {
+      dockerfile: '/installed/agentforge/claude/Dockerfile',
+      containerDirectory: '/installed/agentforge/claude/container',
+      rootManifest: '/installed/agentforge/claude/container/package.json',
+      rootLock: '/installed/agentforge/claude/container/bun.lock',
+    },
+  },
 };
 
 describe('imageBuild', () => {
-  it('builds the AgentForge image from the installed package', () => {
+  it('builds the AgentForge base image from the installed package', () => {
     expect(imageBuild(GOLDEN_KATA, 'agentforge', INPUTS, '/workspace')).toEqual(
       {
         args: [
@@ -22,18 +30,43 @@ describe('imageBuild', () => {
           '--build-context',
           'container=/installed/agentforge/container',
           '--tag',
-          'agentforge/a2a-claude:1.2.3',
+          'agentforge/a2a:1.2.3',
           '--iidfile',
           '/workspace/dist/packages/golden-kata/image/agentforge.id',
           '/installed/agentforge',
         ],
-        tag: 'agentforge/a2a-claude:1.2.3',
+        tag: 'agentforge/a2a:1.2.3',
         idFile: '/workspace/dist/packages/golden-kata/image/agentforge.id',
       },
     );
   });
 
-  it('builds the agentic image from the base layer, on the AgentForge image', () => {
+  it("builds the project's framework image from the installed package, on the base image", () => {
+    expect(
+      imageBuild(GOLDEN_KATA, 'agentforge-claude', INPUTS, '/workspace'),
+    ).toEqual({
+      args: [
+        'build',
+        '--platform',
+        'linux/arm64',
+        '--file',
+        '/installed/agentforge/claude/Dockerfile',
+        '--build-arg',
+        'BASE_IMAGE=agentforge/a2a:1.2.3',
+        '--build-context',
+        'container=/installed/agentforge/claude/container',
+        '--tag',
+        'agentforge/a2a-claude:1.2.3',
+        '--iidfile',
+        '/workspace/dist/packages/golden-kata/image/agentforge-claude.id',
+        '/installed/agentforge/claude/container',
+      ],
+      tag: 'agentforge/a2a-claude:1.2.3',
+      idFile: '/workspace/dist/packages/golden-kata/image/agentforge-claude.id',
+    });
+  });
+
+  it('builds the agentic image from the base layer, on the framework image', () => {
     expect(imageBuild(GOLDEN_KATA, 'base', INPUTS, '/workspace').args).toEqual([
       'build',
       '--platform',
@@ -71,7 +104,7 @@ describe('imageBuild', () => {
 
   it('refuses a layer that is not one', () => {
     expect(() => imageBuild(GOLDEN_KATA, 'top', INPUTS, '/workspace')).toThrow(
-      'layer "top" is not agentforge, base or agents/<agent>',
+      'layer "top" is not agentforge, agentforge-claude, base or agents/<agent>',
     );
   });
 
@@ -88,6 +121,11 @@ describe('imageBuild', () => {
     );
     expect(() =>
       imageBuild(GOLDEN_KATA, 'agentforge', INPUTS, '/workspace', {
+        validation: 'dist',
+      }),
+    ).toThrow(/AgentForge's/);
+    expect(() =>
+      imageBuild(GOLDEN_KATA, 'agentforge-claude', INPUTS, '/workspace', {
         validation: 'dist',
       }),
     ).toThrow(/AgentForge's/);

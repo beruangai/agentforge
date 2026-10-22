@@ -1,6 +1,6 @@
 # AgentForge
 
-Run a Claude Agent SDK procedure as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — and call it from anything, Temporal included.
+Run an agent procedure — through the agent framework its project chooses, the Claude Agent SDK today — as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — and call it from anything, Temporal included.
 
 Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1–A4 delivered — the whole path runs locally and on AgentCore, with filesystems, against a real model, specified and audited — A5's baseline: the Nx plugin generates, syncs and deploys agentic projects, AgentForge's own [examples](packages/examples) among them — and A6, what must hold before the first live consumer, with the [Claude Code plugin](#claude-code-plugin) ([roadmap](docs/ROADMAP.md)).
 
@@ -23,11 +23,11 @@ export const contract = {
 
 Every object in a contract is `z.strictObject` or `z.looseObject`: `z.object` drops an undeclared key silently, so a contract holding one is refused (§REQ103).
 
-**2. Implement it** — a handler per procedure. `context.runAgent` is one Claude run with structured output; everything around it is ordinary code.
+**2. Implement it** — a handler per procedure. `context.runAgent` is one run through the project's framework, here `claude`, with structured output; everything around it is ordinary code.
 
 ```ts
 // procedures.ts
-import { implementAgent } from '@beruangai/agentforge/agent';
+import { implementAgent } from '@beruangai/agentforge/claude/agent';   // the project's framework's entry; shared pieces come from /agent
 
 const os = implementAgent(contract);
 export const router = os.router({
@@ -43,7 +43,7 @@ export const router = os.router({
 });
 ```
 
-A prompt is built from **context functions** — typed input variables in, prompt content out — and `composeContext` makes one from several: its input is every variable its parts need, checked when the procedure compiles, and its content theirs in order. A context block may name a file in its layer's `.claude/` instead of carrying its text; it is read against the run's `cwd` when the run starts, and one that cannot be read fails the run. A procedure with filesystems composes `context.agentOptions` — its mounts as `additionalDirectories` and their baseline rules — into the run's options.
+A prompt is built from **context functions** — typed input variables in, prompt content out — and `composeContext` makes one from several: its input is every variable its parts need, checked when the procedure compiles, and its content theirs in order. A context block may name a file in its layer's `.claude/` instead of carrying its text; it is read against the run's `cwd` when the run starts, and one that cannot be read fails the run. A procedure with filesystems composes `context.agentOptions` — the options its framework derives from the mounts: for `claude`, `additionalDirectories` and `Read`/`Edit` rules from their permissions — into the run's options.
 
 ```ts
 const protocol: ContextBlockFunction = () => [
@@ -68,13 +68,13 @@ await context.runAgent({
 
 What a run is about follows, from dynamic context functions. Static content first with a cache breakpoint on its last block keeps a prompt's stable prefix cached across runs. [`golden-kata`](packages/examples/golden-kata) composes its prompts this way.
 
-**3. Package it** — two entries, a `package.json` and its generated `bun.lock` (the container workspace's, up to this agent), and a Dockerfile `FROM agentforge/a2a-claude` that copies them to `/workspace/agentic/agent` and installs.
+**3. Package it** — two entries, a `package.json` and its generated `bun.lock` (the container workspace's, up to this agent), and a Dockerfile `FROM` its framework's AgentForge image, `agentforge/a2a-claude` (itself on the base `agentforge/a2a`), that copies them to `/workspace/agentic/agent` and installs.
 
 ```ts
 // task.ts — run by the server, once per task
 runTaskProcess({ contract, router });
-// server.ts — the container's entry; names the task entry and the secrets its layers require, the rest from the environment
-await startServer({ taskEntry: new URL('./task.ts', import.meta.url), requiredSecrets });
+// server.ts — the container's entry; names the task entry, its framework's server part and the secrets its layers require, the rest from the environment
+await startServer({ taskEntry: new URL('./task.ts', import.meta.url), framework, requiredSecrets });
 ```
 
 **4. Consume it** — from any process, or as a Temporal activity.

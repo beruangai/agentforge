@@ -188,6 +188,7 @@ import {
   type AgentRuntimeProps,
   type AgentSecrets,
 } from '@beruangai/agentforge/infra';
+import { REQUIRED_SECRETS as FRAMEWORK_SECRETS } from '@beruangai/agentforge/claude/infra';
 import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/golden-kata/secrets';
 import type { REQUIRED_SECRETS as AGENT_SECRETS } from '@proj/golden-kata/writer/secrets';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
@@ -221,15 +222,17 @@ function parentImageId(): string {
 
 /**
  * The writer agent's secrets, by the environment variable each becomes:
- * AgentForge's own, the base layer's and the agent's \`REQUIRED_SECRETS\`.
+ * its framework's, the base layer's and the agent's \`REQUIRED_SECRETS\`.
  */
 export type Secrets = AgentSecrets<
-  (typeof PROJECT_SECRETS)[number] | (typeof AGENT_SECRETS)[number]
+  | (typeof FRAMEWORK_SECRETS)[number]
+  | (typeof PROJECT_SECRETS)[number]
+  | (typeof AGENT_SECRETS)[number]
 >;
 
 export type AgentProps = Omit<
   AgentRuntimeProps,
-  'agentRuntimeArtifact' | 'secrets' | 'agentName'
+  'agentRuntimeArtifact' | 'secrets' | 'requiredSecrets' | 'agentName'
 > & {
   readonly secrets: Secrets;
 };
@@ -243,6 +246,7 @@ export class Agent extends AgentRuntime {
     super(scope, id, {
       ...props,
       agentName: 'writer',
+      requiredSecrets: FRAMEWORK_SECRETS,
       agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
         platform: Platform.LINUX_ARM64,
         buildArgs: { BASE_IMAGE: 'proj/golden-kata:local' },
@@ -445,7 +449,7 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
 `;
 
 exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/procedures.ts 1`] = `
-"import { implementAgent } from '@beruangai/agentforge/agent';
+"import { implementAgent } from '@beruangai/agentforge/claude/agent';
 import { contract } from './contract.ts';
 
 const os = implementAgent(contract);
@@ -467,7 +471,7 @@ export const router = os.router({
 exports[`agent > generates the agent's folder, record, image, entries and construct > packages/examples/golden-kata/agents/writer/agent/secrets.ts 1`] = `
 "/**
  * The secrets the writer agent requires, by the environment variable each
- * becomes — beside AgentForge's own, CLAUDE_CODE_OAUTH_TOKEN. The agent's
+ * becomes — beside its framework's own, CLAUDE_CODE_OAUTH_TOKEN. The agent's
  * construct requires a secret for each, \`serve\` passes each from
  * .env.serve.local, and the agent's server fails a request while one is unset.
  */
@@ -481,14 +485,16 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
 // project.json metadata.agentforge.detached.files.
 //
 // The container's entry: AgentForge's server, running \`task.ts\` once per task
-// and requiring the secrets this project's layers declare. Everything else
-// comes from the environment.
+// under the claude framework, and requiring the secrets it and this
+// project's layers declare. Everything else comes from the environment.
+import { framework } from '@beruangai/agentforge/claude/server';
 import { startServer } from '@beruangai/agentforge/server';
 import { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/golden-kata-base/secrets';
 import { REQUIRED_SECRETS as AGENT_SECRETS } from './secrets.ts';
 
 await startServer({
   taskEntry: new URL('./task.ts', import.meta.url),
+  framework,
   requiredSecrets: [...PROJECT_SECRETS, ...AGENT_SECRETS],
 });
 "
@@ -500,7 +506,7 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
 // project.json metadata.agentforge.detached.files.
 //
 // The task entry: the one place the harness and this agent's procedures meet.
-import { runTaskProcess } from '@beruangai/agentforge/agent';
+import { runTaskProcess } from '@beruangai/agentforge/claude/agent';
 import { contract } from './contract.ts';
 import { router } from './procedures.ts';
 
@@ -600,7 +606,7 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
     "cache": false,
     "dependsOn": [
       "lock",
-      "image-agentforge",
+      "image-agentforge-claude",
     ],
     "executor": "@beruangai/agentforge:image",
     "options": {
@@ -615,6 +621,16 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
     "executor": "@beruangai/agentforge:image",
     "options": {
       "layer": "agentforge",
+    },
+  },
+  "image-agentforge-claude": {
+    "cache": false,
+    "dependsOn": [
+      "image-agentforge",
+    ],
+    "executor": "@beruangai/agentforge:image",
+    "options": {
+      "layer": "agentforge-claude",
     },
   },
   "image-writer": {

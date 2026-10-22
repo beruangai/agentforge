@@ -2,10 +2,13 @@ import { oc } from '@orpc/contract';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { contractHash } from '#core/contract/procedures.ts';
-import type { RunRecord } from '#core/contract/task.ts';
+import { cause, type RunRecord } from '#core/contract/task.ts';
 import type { TaskInvocation } from '#core/task-protocol/messages.ts';
 import { TASK_OUTPUT_CAP_BYTES } from '#core/task-table.ts';
-import { result, scriptedQuery } from './__fixtures__/scripted-query.ts';
+import {
+  type ScriptedRun,
+  testFramework,
+} from './__fixtures__/test-framework.ts';
 import { executeProcedure, implementAgent } from './task-process.ts';
 
 const contract = {
@@ -48,7 +51,8 @@ let betweenRuns: () => void = () => undefined;
 
 const SUMMARY = z.object({ summary: z.string() });
 
-const os = implementAgent(contract);
+const { framework } = testFramework([]);
+const os = implementAgent(framework, contract);
 const router = os.router({
   summarise: os.summarise.handler(async ({ input, context }) => {
     const run = await context.runAgent({
@@ -116,25 +120,25 @@ function invocation(
 
 function execute(
   task: TaskInvocation,
-  scripted = scriptedQuery([
-    result({ structured_output: { summary: 'short and sweet' } }),
-  ]),
+  script: readonly ScriptedRun[] = [{ output: { summary: 'short and sweet' } }],
   signal = new AbortController().signal,
 ) {
+  const scripted = testFramework(script);
   return executeProcedure({
     contract,
     router,
     invocation: task,
     signal,
     onRecord: () => undefined,
-    query: scripted.query,
+    framework: scripted.framework,
+    runner: scripted.runner,
   });
 }
 
 describe('implementAgent', () => {
   it('refuses a contract that would drop undeclared keys, naming where', () => {
     expect(() =>
-      implementAgent({
+      implementAgent(framework, {
         Write: oc
           .input(z.strictObject({}))
           .output(z.object({ ok: z.boolean() })),
@@ -167,11 +171,10 @@ describe('executeProcedure', () => {
     );
   });
 
-  it('carries the kernel’s cause through oRPC', async () => {
-    const outcome = await execute(
-      invocation(),
-      scriptedQuery([result({ subtype: 'error_max_turns', is_error: true })]),
-    );
+  it('carries the framework’s cause through oRPC', async () => {
+    const outcome = await execute(invocation(), [
+      { failure: cause('BUDGET_EXHAUSTED', 'maxTurns was reached') },
+    ]);
     expect(outcome).toMatchObject({
       state: 'TASK_STATE_FAILED',
       cause: { code: 'BUDGET_EXHAUSTED' },
@@ -230,14 +233,9 @@ describe('executeProcedure', () => {
   });
 
   it('fails an output over the cap', async () => {
-    const outcome = await execute(
-      invocation(),
-      scriptedQuery([
-        result({
-          structured_output: { summary: 'x'.repeat(TASK_OUTPUT_CAP_BYTES) },
-        }),
-      ]),
-    );
+    const outcome = await execute(invocation(), [
+      { output: { summary: 'x'.repeat(TASK_OUTPUT_CAP_BYTES) } },
+    ]);
     expect(outcome).toMatchObject({
       state: 'TASK_STATE_FAILED',
       cause: {
@@ -250,10 +248,13 @@ describe('executeProcedure', () => {
   it('drops the payload of a cause over the cap, logging it whole', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const padding = 'x'.repeat(TASK_OUTPUT_CAP_BYTES);
-    const outcome = await execute(
-      invocation(),
-      scriptedQuery([result({ structured_output: { summary: 3, padding } })]),
-    );
+    const outcome = await execute(invocation(), [
+      {
+        failure: cause('OUTPUT_INVALID', 'summary is not a string', {
+          payload: { summary: 3, padding },
+        }),
+      },
+    ]);
     expect(outcome).toMatchObject({
       state: 'TASK_STATE_FAILED',
       cause: {
@@ -307,9 +308,7 @@ describe('a procedure’s runs', () => {
     controller = new AbortController(),
   ) {
     const records: RunRecord[] = [];
-    const scripted = scriptedQuery([
-      result({ structured_output: { summary: 'short' } }),
-    ]);
+    const scripted = testFramework([{ output: { summary: 'short' } }]);
     const outcome = executeProcedure({
       contract,
       router,
@@ -320,7 +319,8 @@ describe('a procedure’s runs', () => {
       }),
       signal: controller.signal,
       onRecord: (record) => records.push(record),
-      query: scripted.query,
+      framework: scripted.framework,
+      runner: scripted.runner,
     });
     return { outcome, records, scripted };
   }

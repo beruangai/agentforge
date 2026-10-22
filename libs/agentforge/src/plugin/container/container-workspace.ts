@@ -4,13 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /**
- * What the container workspace's root depends on: the peers AgentForge's
- * server and harness import at run time, which every layer above shares and
- * declares as peers. The client's and the constructs' peers are not.
+ * What the base image's workspace root depends on: the peers AgentForge's
+ * server and shared harness import at run time, which every layer above
+ * shares and declares as peers. A framework's image adds its own
+ * (`FrameworkPlugin.containerPeers`); the client's and the constructs' peers
+ * are not.
  */
 export const CONTAINER_ROOT_DEPENDENCIES = [
-  '@anthropic-ai/claude-agent-sdk',
-  '@anthropic-ai/sdk',
   '@a2a-js/sdk',
   '@aws-sdk/client-cloudwatch',
   '@aws-sdk/client-dynamodb',

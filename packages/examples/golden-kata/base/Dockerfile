@@ -4,9 +4,10 @@
 # project.json metadata.agentforge.detached.files.
 #
 # The agentic image: the project's base layer at /workspace/agentic, on the
-# AgentForge image. `agentic/$claude/` becomes its `.claude/`, which every
-# agent's session composes from its cwd below. The layer's lock is the whole
-# workspace's up to it, so the install adds only what this layer adds.
+# claude framework's AgentForge image. `agentic/$claude/` becomes its
+# `.claude/`, which every agent's session composes from its cwd below. The
+# layer's lock is the whole workspace's up to it, so the install adds only
+# what this layer adds.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 COPY --chown=bun --exclude=bun.lock --exclude=\$claude agentic/ /workspace/agentic/

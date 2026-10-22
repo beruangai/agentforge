@@ -1,4 +1,4 @@
-import type { AgentOptions } from '@beruangai/agentforge/agent';
+import type { AgentOptions } from '@beruangai/agentforge/claude/agent';
 import { kataServer, RUN_CASES_TOOL } from './kata-server.ts';
 
 /**

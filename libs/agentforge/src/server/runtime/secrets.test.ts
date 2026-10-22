@@ -62,18 +62,23 @@ describe('resolveDeclaredSecrets', () => {
 });
 
 describe('requireSecrets', () => {
-  it("passes when AgentForge's and every declared secret are set", () => {
+  it('passes when every required secret is set', () => {
     expect(() =>
-      requireSecrets(['KATA_API_KEY'], {
+      requireSecrets(['CLAUDE_CODE_OAUTH_TOKEN', 'KATA_API_KEY'], {
         CLAUDE_CODE_OAUTH_TOKEN: 'the-token',
         KATA_API_KEY: 'the-key',
       }),
     ).not.toThrow();
   });
 
-  it("names every secret that is unset or empty, AgentForge's included", () => {
+  it('names every secret that is unset or empty, once', () => {
     expect(() =>
-      requireSecrets(['KATA_API_KEY', 'KATA_API_KEY'], { KATA_API_KEY: '' }),
+      requireSecrets(
+        ['CLAUDE_CODE_OAUTH_TOKEN', 'KATA_API_KEY', 'KATA_API_KEY'],
+        {
+          KATA_API_KEY: '',
+        },
+      ),
     ).toThrow(
       'the agent requires secrets that are not set: CLAUDE_CODE_OAUTH_TOKEN, KATA_API_KEY',
     );

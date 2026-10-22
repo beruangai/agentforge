@@ -8,7 +8,7 @@ import {
   type ContainerWorkspaceLock,
   lockContainerWorkspace,
 } from '../../container/container-workspace.ts';
-import { agentOfLayer } from '../../container/images.ts';
+import { agentOfLayer, frameworkOfLayer } from '../../container/images.ts';
 import type { AgenticProject, WorkflowProject } from '../../project-record.ts';
 import {
   executorProject,
@@ -47,25 +47,24 @@ export function workerLock(
 }
 
 /**
- * A layer's lock of the container workspace: the base layer's is seeded with
- * AgentForge's root lock, an agent's with the base layer's, and each is
- * written beside its layer's `package.json`.
+ * A layer's lock of the container workspace, over the project's framework's
+ * root manifest: the base layer's is seeded with the framework's root lock,
+ * an agent's with the base layer's, and each is written beside its layer's
+ * `package.json`.
  */
 export function layerLock(
   project: AgenticProject,
   layer: string,
-  inputs: Pick<
-    ContainerInputs,
-    'packageDirectory' | 'rootManifest' | 'rootLock'
-  >,
+  inputs: Pick<ContainerInputs, 'packageDirectory' | 'frameworks'>,
   workspaceRoot: string,
 ): ContainerWorkspaceLock {
   const agentName = agentOfLayer(project, layer);
-  if (layer === 'agentforge') {
+  if (layer === 'agentforge' || frameworkOfLayer(layer) !== undefined) {
     throw new Error(
-      "the agentforge layer's lock ships in AgentForge's package; lock base or agents/<agent>",
+      `the ${layer} layer's lock ships in AgentForge's package; lock base or agents/<agent>`,
     );
   }
+  const { rootManifest, rootLock } = inputs.frameworks[project.framework];
   const base = join(workspaceRoot, project.root, 'base', 'agentic');
   const members = [
     {
@@ -76,15 +75,15 @@ export function layerLock(
   ] as const;
   if (agentName === undefined) {
     return {
-      rootManifest: inputs.rootManifest,
+      rootManifest,
       members,
-      seed: inputs.rootLock,
+      seed: rootLock,
       out: join(base, 'bun.lock'),
     };
   }
   const agent = join(workspaceRoot, project.root, 'agents', agentName, 'agent');
   return {
-    rootManifest: inputs.rootManifest,
+    rootManifest,
     members: [
       ...members,
       { containerPath: 'agentic/agent', manifest: join(agent, 'package.json') },

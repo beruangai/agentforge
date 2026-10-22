@@ -1,11 +1,29 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import {
+  FRAMEWORK_NAMES,
+  type FrameworkName,
+} from '#core/contract/framework.ts';
+import { frameworkPlugin } from '#framework/registry.ts';
 
 /**
- * What the AgentForge image is built from, all inside AgentForge's own
- * package: the published bundle (the image's build context, which becomes the
- * container workspace's `agentforge` member), its Dockerfile, and the
- * container workspace's root manifest and lock under `container/`.
+ * What a framework's AgentForge image is built from, inside AgentForge's own
+ * package: its Dockerfile, and its `container` build context — the container
+ * workspace's root manifest, extended with the framework's peers, and its lock.
+ */
+export interface FrameworkContainerInputs {
+  readonly dockerfile: string;
+  readonly containerDirectory: string;
+  readonly rootManifest: string;
+  readonly rootLock: string;
+}
+
+/**
+ * What the AgentForge images are built from, all inside AgentForge's own
+ * package: the published bundle (the base image's build context, which
+ * becomes the container workspace's `agentforge` member), its Dockerfile, the
+ * container workspace's root manifest and lock under `container/`, and each
+ * provided framework's.
  */
 export interface ContainerInputs {
   /** The build context, and the `agentforge` member's directory. */
@@ -15,8 +33,12 @@ export interface ContainerInputs {
   readonly containerDirectory: string;
   readonly rootManifest: string;
   readonly rootLock: string;
-  /** AgentForge's version, which tags its image. */
+  /** AgentForge's version, which tags its images. */
   readonly version: string;
+  /** Each provided framework's image inputs. */
+  readonly frameworks: Readonly<
+    Record<FrameworkName, FrameworkContainerInputs>
+  >;
 }
 
 const PACKAGE_NAME = '@beruangai/agentforge';
@@ -63,12 +85,32 @@ export function containerInputsOf(
     rootManifest: join(published, 'container', 'package.json'),
     rootLock: join(published, 'container', 'bun.lock'),
   };
+  const frameworks = Object.fromEntries(
+    FRAMEWORK_NAMES.map((name) => {
+      const { image } = frameworkPlugin(name);
+      const containerDirectory = join(published, image.containerDirectory);
+      return [
+        name,
+        {
+          dockerfile: join(published, image.dockerfile),
+          containerDirectory,
+          rootManifest: join(containerDirectory, 'package.json'),
+          rootLock: join(containerDirectory, 'bun.lock'),
+        },
+      ];
+    }),
+  ) as Record<FrameworkName, FrameworkContainerInputs>;
   const manifest = join(published, 'package.json');
   const missing = [
     manifest,
     inputs.dockerfile,
     inputs.rootManifest,
     inputs.rootLock,
+    ...Object.values(frameworks).flatMap((framework) => [
+      framework.dockerfile,
+      framework.rootManifest,
+      framework.rootLock,
+    ]),
   ].filter((path) => !existsSync(path));
   if (missing.length > 0) {
     throw new Error(
@@ -85,7 +127,7 @@ export function containerInputsOf(
   if (typeof version !== 'string') {
     throw new Error(`${manifest} declares no version`);
   }
-  return { ...inputs, version };
+  return { ...inputs, version, frameworks };
 }
 
 /** What the generators read from AgentForge's own manifest. */

@@ -10,8 +10,9 @@ import {
   parseDeclaredBuckets,
 } from '#core/filesystem.ts';
 import { S3_ENDPOINT_VARIABLE } from '#core/s3-endpoint.ts';
-import { REQUIRED_SECRETS, SecretNameSchema } from '#core/secrets.ts';
+import { SecretNameSchema } from '#core/secrets.ts';
 import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
+import { frameworkPlugin } from '#framework/registry.ts';
 import { agentSecretsFile, baseSecretsFile } from '../../artifacts/layers.ts';
 import { imageIdFile } from '../../container/images.ts';
 import { scopeOf } from '../../names.ts';
@@ -52,7 +53,7 @@ function storeName(packageName: string): string {
 }
 
 /**
- * The agent's secrets: AgentForge's own, then `declared` — its layers'
+ * The agent's secrets: its framework's, then `declared` — its layers'
  * `REQUIRED_SECRETS`; `image` is the id its image build wrote; `environment`
  * may declare filesystem buckets, as `AGENTFORGE_FILESYSTEM_BUCKETS`.
  */
@@ -75,7 +76,12 @@ export function servePlan(
   return {
     agent: agent.containerName,
     image,
-    secrets: [...new Set([...REQUIRED_SECRETS, ...declared])],
+    secrets: [
+      ...new Set([
+        ...frameworkPlugin(project.framework).requiredSecrets,
+        ...declared,
+      ]),
+    ],
     tableName: `${name}-tasks`,
     sessionBucket: `${name}-sessions`,
     filesystemBuckets: parseDeclaredBuckets(

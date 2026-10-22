@@ -13,7 +13,8 @@
 import { randomUUIDv7 } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
-import { awaitTask, readTranscript } from '@beruangai/agentforge/client';
+import { readTranscript } from '@beruangai/agentforge/claude/client';
+import { awaitTask } from '@beruangai/agentforge/client';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   type Client as SmokeCoverageClient,

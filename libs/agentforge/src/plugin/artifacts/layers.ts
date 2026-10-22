@@ -1,3 +1,4 @@
+import { frameworkPlugin } from '#framework/registry.ts';
 import { camelCase } from '../names.ts';
 import type { AgentComponent, AgenticProject } from '../project-record.ts';
 import {
@@ -73,25 +74,34 @@ export function agentKey(agent: Pick<AgentComponent, 'name'>): string {
  */
 const DOCKERFILE_DIRECTIVE = '# check=skip=InvalidDefaultArgInFrom';
 
-/** The agentic image: the base layer on the AgentForge image. */
+/** The agentic image: the base layer on the project's framework image. */
 export function baseDockerfile(project: AgenticProject): MaintainedFile {
+  const { source, target } = frameworkPlugin(
+    project.framework,
+  ).configurationDirectory;
   return {
     path: `${baseDirectory(project)}/Dockerfile`,
     render: () => `${DOCKERFILE_DIRECTIVE}
 ${maintainedHeader('#')}
 #
 # The agentic image: the project's base layer at /workspace/agentic, on the
-# AgentForge image. \`agentic/$claude/\` becomes its \`.claude/\`, which every
-# agent's session composes from its cwd below. The layer's lock is the whole
-# workspace's up to it, so the install adds only what this layer adds.
+# ${project.framework} framework's AgentForge image. \`agentic/${source}/\` becomes its
+# \`${target}/\`, which every agent's session composes from its cwd below. The
+# layer's lock is the whole workspace's up to it, so the install adds only
+# what this layer adds.
 ARG BASE_IMAGE
 FROM \${BASE_IMAGE}
-COPY --chown=bun --exclude=bun.lock --exclude=\\$claude agentic/ /workspace/agentic/
-COPY --chown=bun agentic/\\$claude/ /workspace/agentic/.claude/
+COPY --chown=bun --exclude=bun.lock --exclude=${escaped(source)} agentic/ /workspace/agentic/
+COPY --chown=bun agentic/${escaped(source)}/ /workspace/agentic/${target}/
 COPY --chown=bun agentic/bun.lock /workspace/bun.lock
 RUN bun install --cwd /workspace --frozen-lockfile --production
 `,
   };
+}
+
+/** A path as a Dockerfile line takes it: `$` escaped, so it is not a variable. */
+function escaped(path: string): string {
+  return path.replaceAll('$', '\\$');
 }
 
 /** An agent's image: its layer at /workspace/agentic/agent, its cwd, on the agentic image. */
@@ -99,18 +109,21 @@ export function agentDockerfile(
   project: AgenticProject,
   agent: AgentComponent,
 ): MaintainedFile {
+  const { source, target } = frameworkPlugin(
+    project.framework,
+  ).configurationDirectory;
   return {
     path: `${agentDirectory(project, agent)}/Dockerfile`,
     render: () => `${DOCKERFILE_DIRECTIVE}
 ${maintainedHeader('#')}
 #
 # The ${agent.name} agent's image: its layer at /workspace/agentic/agent — every
-# run's cwd — on the project's agentic image. \`agent/$claude/\` becomes its
-# \`.claude/\`, the one place a session reads \`settings.json\` and hooks from.
+# run's cwd — on the project's agentic image. \`agent/${source}/\` becomes its
+# \`${target}/\`, the one place a session reads \`settings.json\` and hooks from.
 ARG BASE_IMAGE
 FROM \${BASE_IMAGE}
-COPY --chown=bun --exclude=bun.lock --exclude=\\$claude agent/ /workspace/agentic/agent/
-COPY --chown=bun agent/\\$claude/ /workspace/agentic/agent/.claude/
+COPY --chown=bun --exclude=bun.lock --exclude=${escaped(source)} agent/ /workspace/agentic/agent/
+COPY --chown=bun agent/${escaped(source)}/ /workspace/agentic/agent/${target}/
 COPY --chown=bun agent/bun.lock /workspace/bun.lock
 RUN bun install --cwd /workspace --frozen-lockfile --production
 ENV AGENTFORGE_AGENT_NAME=${agent.name}
@@ -121,7 +134,8 @@ CMD ["bun", "--conditions=${AGENT_CONDITION}", "server.ts"]
 
 /**
  * The container's entry: AgentForge's server, running `task.ts` once per
- * task and requiring the secrets the base layer and the agent declare.
+ * task under the project's framework, and requiring the secrets the
+ * framework, the base layer and the agent declare.
  */
 export function serverEntry(
   project: AgenticProject,
@@ -132,14 +146,16 @@ export function serverEntry(
     render: () => `${maintainedHeader('//')}
 //
 // The container's entry: AgentForge's server, running \`task.ts\` once per task
-// and requiring the secrets this project's layers declare. Everything else
-// comes from the environment.
+// under the ${project.framework} framework, and requiring the secrets it and this
+// project's layers declare. Everything else comes from the environment.
+import { framework } from '${frameworkPlugin(project.framework).imports.server}';
 import { startServer } from '@beruangai/agentforge/server';
 import { REQUIRED_SECRETS as PROJECT_SECRETS } from '${basePackageName(project)}/secrets';
 import { REQUIRED_SECRETS as AGENT_SECRETS } from './secrets.ts';
 
 await startServer({
   taskEntry: new URL('./task.ts', import.meta.url),
+  framework,
   requiredSecrets: [...PROJECT_SECRETS, ...AGENT_SECRETS],
 });
 `,
@@ -156,7 +172,7 @@ export function taskEntry(
     render: () => `${maintainedHeader('//')}
 //
 // The task entry: the one place the harness and this agent's procedures meet.
-import { runTaskProcess } from '@beruangai/agentforge/agent';
+import { runTaskProcess } from '${frameworkPlugin(project.framework).imports.agent}';
 import { contract } from './contract.ts';
 import { router } from './procedures.ts';
 

@@ -20,11 +20,7 @@ import {
   FILESYSTEM_NAME_PATTERN,
 } from '#core/filesystem.ts';
 import { METRICS_NAMESPACE, METRICS_VARIABLE } from '#core/metrics.ts';
-import {
-  REQUIRED_SECRETS,
-  type RequiredSecret,
-  SECRETS_VARIABLE,
-} from '#core/secrets.ts';
+import { SECRETS_VARIABLE } from '#core/secrets.ts';
 import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
 import { TASK_TABLE_NAME_VARIABLE } from '#core/task-table.ts';
 import { TELEMETRY_VARIABLE, type TelemetryLevel } from '#core/telemetry.ts';
@@ -35,12 +31,12 @@ import type { S3FilesystemBucket } from './s3-filesystem-bucket.ts';
 export type AgentSecret = Pick<ISecret, 'secretArn' | 'grantRead'>;
 
 /**
- * An agent's secrets, by the environment variable each becomes: AgentForge's
- * own, the subscription token, and each of `Declared`. An agent's generated
- * construct declares its project's and its own.
+ * An agent's secrets, by the environment variable each becomes: each of
+ * `Declared`. An agent's generated construct declares its framework's, its
+ * project's and its own.
  */
 export type AgentSecrets<Declared extends string = never> = Readonly<
-  Record<RequiredSecret | Declared, AgentSecret>
+  Record<Declared, AgentSecret>
 >;
 
 /**
@@ -66,14 +62,20 @@ export interface AgentRuntimeProps
    */
   readonly tracingEnabled?: boolean;
   /**
-   * Secrets the agent reads, by the environment variable each becomes: the
-   * subscription token as `CLAUDE_CODE_OAUTH_TOKEN`, and any the agent's
-   * layers require. The runtime may read these and no others (§REQ705); the
-   * server reads them on its first request.
+   * The secrets the agent's framework requires, by the environment variable
+   * each becomes — `REQUIRED_SECRETS` from its entry, such as
+   * `/claude/infra`. Each must be in `secrets`.
    */
-  readonly secrets: AgentSecrets & Readonly<Record<string, AgentSecret>>;
+  readonly requiredSecrets: readonly string[];
   /**
-   * How much of the Claude CLI's telemetry the agent exports to CloudWatch,
+   * Secrets the agent reads, by the environment variable each becomes: its
+   * framework's, such as the subscription token as `CLAUDE_CODE_OAUTH_TOKEN`,
+   * and any the agent's layers require. The runtime may read these and no
+   * others; the server reads them on its first request.
+   */
+  readonly secrets: Readonly<Record<string, AgentSecret>>;
+  /**
+   * How much telemetry the agent's runs export to CloudWatch,
    * as a log level: `WARN`, metrics and error events; `INFO`, every event
    * and trace, no content; `DEBUG`, prompts and tool content too; `ALL`, the
    * raw API bodies too.
@@ -116,6 +118,7 @@ export class AgentRuntime extends Construct {
       project,
       agentName,
       tracingEnabled = true,
+      requiredSecrets,
       secrets,
       telemetry = 'INFO',
       filesystems = {},
@@ -151,7 +154,7 @@ export class AgentRuntime extends Construct {
         );
       }
     }
-    for (const name of REQUIRED_SECRETS) {
+    for (const name of requiredSecrets) {
       if (secrets[name] === undefined) {
         throw new Error(`${name} is required: declare it in secrets`);
       }

@@ -7,6 +7,7 @@ import {
   type Tree,
   updateProjectConfiguration,
 } from '@nx/devkit';
+import { frameworkPlugin } from '#framework/registry.ts';
 import { CONTAINER_ROOT_DEPENDENCIES } from '../container/container-workspace.ts';
 import type { AgenticProject, Detached } from '../project-record.ts';
 import { agentforgeSpecifier, peerRange } from '../workspace-dependencies.ts';
@@ -47,7 +48,10 @@ export function renderContext(
     project,
     agentforgeSpecifier: agentforgeSpecifier(tree),
     runtimePeers: Object.fromEntries(
-      CONTAINER_ROOT_DEPENDENCIES.map((name) => [name, peerRange(name)]),
+      [
+        ...frameworkPlugin(project.framework).containerPeers,
+        ...CONTAINER_ROOT_DEPENDENCIES,
+      ].map((name) => [name, peerRange(name)]),
     ),
     esm: root.type === 'module',
     baseConditions: base.compilerOptions?.customConditions ?? [],

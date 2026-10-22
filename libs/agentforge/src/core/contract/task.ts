@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FrameworkNameEnum } from './framework.ts';
 
 /**
  * A task's state is A2A 1.0's, verbatim. AgentForge adds no state of its own;
@@ -95,14 +96,14 @@ const SUGGESTED_ACTION_BY_CODE: Record<CauseCode, string> = {
   OUTPUT_TOO_LARGE:
     "Keep the outer contract to what the caller branches on — identifiers, verdicts, references. Write bulk results where the caller can read them (a file, object storage) and return a reference; never the agent's whole output (§REQ102, ADR 0006).",
   BUDGET_EXHAUSTED:
-    'Raise `maxTurns` or `maxBudgetUsd` for the procedure, or narrow what the prompt asks for.',
+    "Raise the run's turn or spend limit, or narrow what the prompt asks for.",
   TIMED_OUT:
     "Raise the procedure's time budget — `timeBudget(seconds)` in its contract, or per call — or narrow what the prompt asks for (§REQ202).",
   LOST: 'Reconcile any side effects the attempt may have made, then retry under the same idempotency key; the next attempt receives this one as `priorAttempt` (§REQ303, §REQ503).',
   USAGE_LIMITED:
-    "Retry after `retryAfter`, when the subscription's usage limit resets.",
+    "Retry after `retryAfter`, when the provider's usage limit resets.",
   CREDENTIAL_EXPIRED:
-    "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ705).",
+    "An operator renews the framework's credential and updates the agent's secret; a retry cannot succeed before that.",
   PROVIDER_TRANSIENT: 'Retry with backoff.',
   FILESYSTEM_UNSYNCED:
     "Retry: the filesystem's store failed or disagreed. A push may have landed part of this attempt's files; the next attempt receives this one as `priorAttempt` (ADR 0015).",
@@ -206,20 +207,36 @@ export const TranscriptLocationSchema = z.strictObject({
 });
 export type TranscriptLocation = z.infer<typeof TranscriptLocationSchema>;
 
+/** Token usage every framework reports for a run. */
+export const RunUsageSchema = z.strictObject({
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadInputTokens: z.number(),
+  cacheCreationInputTokens: z.number(),
+});
+export type RunUsage = z.infer<typeof RunUsageSchema>;
+
 /** What one agent run recorded (§REQ601). */
 export const RunRecordSchema = z.strictObject({
+  /** The framework the run went through: by type, and by its SDK and version (ADR 0021). */
+  framework: z.strictObject({ name: FrameworkNameEnum, fullName: z.string() }),
   /** The prompt as sent, hashed; the container log and the transcript hold it whole. */
   promptHash: z.string(),
   promptBytes: z.number(),
+  /** The framework's options, as recorded. */
   options: z.record(z.string(), z.unknown()),
   sessionId: z.string().optional(),
   /** Where the run's transcript is, when the deployment's store kept it; `readTranscript` reads it. */
   transcript: TranscriptLocationSchema.optional(),
   numberOfTurns: z.number().optional(),
-  totalCostUsd: z.number().optional(),
-  modelUsage: z.record(z.string(), z.unknown()).optional(),
   durationMilliseconds: z.number().optional(),
   terminalReason: z.string().optional(),
+  /** Absent only on a run that never reached the model. */
+  usage: RunUsageSchema.optional(),
+  /** The framework's own usage result, as it reported it. */
+  rawUsage: z.unknown().optional(),
+  /** Only where the framework reports it; never estimated. */
+  totalCostUsd: z.number().optional(),
 });
 export type RunRecord = z.infer<typeof RunRecordSchema>;
 

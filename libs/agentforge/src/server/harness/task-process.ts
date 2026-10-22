@@ -1,5 +1,4 @@
 import { inspect } from 'node:util';
-import type { SessionStore } from '@anthropic-ai/claude-agent-sdk';
 import type { RouterContract } from '@orpc/contract';
 import {
   call,
@@ -17,84 +16,47 @@ import {
   procedureAt,
 } from '#core/contract/procedures.ts';
 import { refuseStrippingObjects } from '#core/contract/strict-objects.ts';
-import {
-  cause,
-  type Outcome,
-  type PriorAttempt,
-  type RunRecord,
-} from '#core/contract/task.ts';
+import { cause, type Outcome, type RunRecord } from '#core/contract/task.ts';
 import {
   ExecutorMessageSchema,
   type TaskInvocation,
   type TaskProcessMessage,
 } from '#core/task-protocol/messages.ts';
 import { TASK_OUTPUT_CAP_BYTES } from '#core/task-table.ts';
-import type {
-  MountedFilesystem,
-  MountLifecycle,
-} from './filesystem/filesystem.ts';
+import type { MountLifecycle } from './filesystem/filesystem.ts';
 import { mountRegisteredFilesystems } from './filesystem/registry.ts';
-import {
-  type AgentOptions,
-  type AgentRun,
-  type AgentRunSpec,
-  type QueryFunction,
-  runAgent,
-  TaskCanceled,
-  TaskFailure,
-} from './kernel.ts';
-import { sessionStoreFromEnvironment } from './session-store.ts';
-
-/** What every procedure handler receives as its oRPC context. */
-export interface TaskContext {
-  readonly taskId: string;
-  readonly contextId: string;
-  readonly runtimeSessionId: string;
-  readonly idempotencyKey: string;
-  /** 1 for the first attempt under this idempotency key. */
-  readonly attempt: number;
-  /** How the previous attempt under this key ended, for reconciling its side effects. */
-  readonly priorAttempt: PriorAttempt | undefined;
-  readonly metadata: Readonly<Record<string, string>>;
-  /** Aborted when the task is cancelled or times out. */
-  readonly signal: AbortSignal;
-  /** Runs the agent to a settled, typed answer. Throws to fail or cancel the task. */
-  runAgent<Output>(spec: AgentRunSpec<Output>): Promise<AgentRun<Output>>;
-  /** The filesystems mounted for this procedure, by the name it registered each under (ADR 0015). */
-  readonly filesystems: Readonly<Record<string, MountedFilesystem>>;
-  /**
-   * The run options AgentForge derives from this task — every mount as an
-   * additional directory, every mount's baseline rules as allowed tools — to
-   * compose into a run's own. Empty without mounts. AgentForge applies none
-   * of it: the handler decides (ADR 0015).
-   */
-  readonly agentOptions: Readonly<
-    Pick<AgentOptions, 'additionalDirectories' | 'allowedTools'>
-  >;
-}
+import type {
+  Framework,
+  FrameworkRunner,
+  FrameworkTypes,
+  TaskContext,
+} from './framework.ts';
+import { TaskCanceled, TaskFailure } from './task-failure.ts';
 
 /**
- * The oRPC implementer for a contract, with AgentForge's task context. A
- * contract that would drop undeclared keys is refused (§REQ103), so the
- * procedure module that calls this fails to load.
+ * The oRPC implementer for a contract, with AgentForge's task context under
+ * `framework`. A contract that would drop undeclared keys is refused
+ * (§REQ103), so the procedure module that calls this fails to load. Each
+ * framework's entry binds it.
  */
-export function implementAgent<Contract extends RouterContract>(
-  contract: Contract,
-) {
+export function implementAgent<
+  F extends FrameworkTypes,
+  Contract extends RouterContract,
+>(_framework: Framework<F>, contract: Contract) {
   refuseStrippingObjects(contract);
-  return implement(contract).$context<TaskContext>();
+  return implement(contract).$context<TaskContext<F>>();
 }
 
-export interface ExecuteOptions {
+export interface ExecuteOptions<F extends FrameworkTypes> {
   readonly contract: RouterContract;
-  readonly router: Router<TaskContext>;
+  readonly router: Router<TaskContext<F>>;
   readonly invocation: TaskInvocation;
   readonly signal: AbortSignal;
   readonly onRecord: (record: RunRecord) => void;
-  /** Where every run's transcript is mirrored, when the deployment declares it. */
-  readonly sessionStore?: SessionStore;
-  /** A test seam: replaces the SDK call inside the kernel. */
-  readonly query?: QueryFunction;
+  /** Its options middleware runs after the mounts. */
+  readonly framework: Framework<F>;
+  /** What the framework prepared for this task process. */
+  readonly runner: FrameworkRunner<F>;
 }
 
 /**
@@ -102,8 +64,8 @@ export interface ExecuteOptions {
  * mounted before the handler and unmounted once the outcome is known. Never
  * throws: every way it can end is an outcome.
  */
-export async function executeProcedure(
-  options: ExecuteOptions,
+export async function executeProcedure<F extends FrameworkTypes>(
+  options: ExecuteOptions<F>,
 ): Promise<Outcome> {
   const lifecycles: MountLifecycle[] = [];
   const outcome = await runProcedure(options, lifecycles);
@@ -178,8 +140,8 @@ async function unmountAll(
   };
 }
 
-async function runProcedure(
-  options: ExecuteOptions,
+async function runProcedure<F extends FrameworkTypes>(
+  options: ExecuteOptions<F>,
   lifecycles: MountLifecycle[],
 ): Promise<Outcome> {
   const { envelope } = options.invocation;
@@ -206,7 +168,7 @@ async function runProcedure(
     };
   }
 
-  const context: TaskContext = {
+  const context: TaskContext<F> = {
     taskId: options.invocation.taskId,
     contextId: options.invocation.contextId,
     runtimeSessionId: options.invocation.runtimeSessionId,
@@ -216,27 +178,22 @@ async function runProcedure(
     metadata: envelope.metadata ?? {},
     signal: options.signal,
     runAgent: (spec) =>
-      runAgent(
-        spec,
-        {
-          signal: options.signal,
-          onRecord: options.onRecord,
-          ...(options.sessionStore === undefined
-            ? {}
-            : { sessionStore: options.sessionStore }),
-        },
-        options.query,
-      ),
-    // Set by the lifecycle middleware, which runs just before the handler.
+      options.runner.runAgent(spec, {
+        signal: options.signal,
+        onRecord: options.onRecord,
+      }),
+    // Set by the mount and options middlewares, which run just before the handler.
     filesystems: {},
-    agentOptions: {},
+    // Empty is a partial of any framework's options; TypeScript cannot see it of a generic one.
+    agentOptions: {} as Readonly<Partial<F['options']>>,
   };
-  // Appended last, so it runs innermost: after every registration.
+  // Appended last, so they run innermost: after every registration, the
+  // mounts, then the framework's options from them.
   try {
     const { default: leaf } = await unlazy(registered);
-    const procedure = new DecoratedProcedure(leaf['~orpc']).use(
-      mountRegisteredFilesystems(lifecycles),
-    );
+    const procedure = new DecoratedProcedure(leaf['~orpc'])
+      .use(mountRegisteredFilesystems(lifecycles))
+      .use(options.framework.agentOptionsMiddleware);
     const output: unknown = await call(procedure, input.data, {
       context,
       signal: options.signal,
@@ -312,8 +269,8 @@ function outcomeOf(error: unknown, signal: AbortSignal): Outcome {
   };
 }
 
-function lookup(
-  router: Router<TaskContext>,
+function lookup<F extends FrameworkTypes>(
+  router: Router<TaskContext<F>>,
   path: string,
 ): Parameters<typeof call>[0] | undefined {
   let node: unknown = router;
@@ -331,9 +288,10 @@ function lookup(
  * it, reports the outcome, and exits. Called from the consumer's task entry,
  * the one place the harness and the consumer's procedures meet.
  */
-export function runTaskProcess(options: {
+export function runTaskProcess<F extends FrameworkTypes>(options: {
+  readonly framework: Framework<F>;
   readonly contract: RouterContract;
-  readonly router: Router<TaskContext>;
+  readonly router: Router<TaskContext<F>>;
 }): void {
   const send = process.send?.bind(process);
   if (send === undefined) {
@@ -348,7 +306,7 @@ export function runTaskProcess(options: {
       ),
     );
   const controller = new AbortController();
-  const sessionStore = sessionStoreFromEnvironment();
+  const runner = options.framework.prepare();
   let started = false;
   process.on('message', (received: unknown) => {
     const parsed = ExecutorMessageSchema.safeParse(received);
@@ -375,6 +333,8 @@ export function runTaskProcess(options: {
     void executeProcedure({
       contract: options.contract,
       router: options.router,
+      framework: options.framework,
+      runner,
       invocation: message.invocation,
       signal: controller.signal,
       onRecord: (record) => {
@@ -385,7 +345,6 @@ export function runTaskProcess(options: {
           );
         });
       },
-      ...(sessionStore === undefined ? {} : { sessionStore }),
     })
       .then((outcome) => emit({ type: 'outcome', outcome }))
       .then(

@@ -13,8 +13,10 @@ An agent's `contract.ts` is what callers import, so it holds no Agent SDK code: 
 
 ## 2. The handler
 
+A procedure imports from two entry points: `@beruangai/agentforge/agent` for what every framework shares — `filesystems` and the filesystem kinds, `composeContext` and `ContextBlockFunction`, `StopGuard`, `TaskFailure` — and its project's framework's, `@beruangai/agentforge/claude/agent`, for `implementAgent`, `composeOptions`, `distill`, `documentBlock` and the Claude prompt and run types. A procedure written for one framework does not compile against another.
+
 ```ts
-const os = implementAgent(contract);
+const os = implementAgent(contract); // from @beruangai/agentforge/claude/agent
 export const router = os.router({
   Write: os.Write.handler(async ({ input, context }) => {
     const run = await context.runAgent({ prompt, output: AgentSchema, options });
@@ -31,7 +33,7 @@ A handler is ordinary code. It runs before the agent, calls `context.runAgent` a
 
 ### Options
 
-Options are the Agent SDK's own `Options`, minus `outputFormat` and `abortController`, which the kernel owns. Compose them with `composeOptions`. Never spread them by hand.
+Options are the framework's. For `claude` they are the Agent SDK's own `Options`, minus `outputFormat` and `abortController`, which the kernel owns. Compose them with `composeOptions`. Never spread them by hand.
 
 ```ts
 options: composeOptions(baseOptions(directory), context.agentOptions, {
@@ -41,7 +43,7 @@ options: composeOptions(baseOptions(directory), context.agentOptions, {
 ```
 
 - `baseOptions` comes from the base layer's scaffolded `options.ts`, which the project owns: model, `settingSources: ['project']`, MCP servers, base tools, `permissionMode: 'dontAsk'`, and the read fence.
-- `context.agentOptions` holds the run options AgentForge derives from the task: each mount as an additional directory, and its baseline allow rules. AgentForge applies none of it. Compose it in.
+- `context.agentOptions` holds the run options the framework derives from the mounts. For `claude`: each mount as an additional directory, and `Read` and `Edit` allow rules from its permissions. AgentForge applies none of it. Compose it in.
 - Later parts win for scalars, objects merge, and **lists accumulate**. A narrower part cannot remove a hook or a tool rule a broader one set. An MCP server named twice throws.
 - Keep `cwd` the agent's directory, the default, so the layers' `.claude/` compose. A resume must run from the same `cwd` as the session it resumes.
 
@@ -58,7 +60,7 @@ export const writeContext = composeContext(instructions, request);
 // prompt: await writeContext({ topic: input.topic })
 ```
 
-- Static content goes first, with `cache: true` on its last block, then what this run is about.
+- Static content goes first, with `cache: true` (an hour) or `cache: { ttl: '5m' }` on its last block, then what this run is about.
 - A block with `filepath` is read from the layer's `.claude/` against the run's `cwd` when the run starts. One that can't be read fails the run.
 - Who the agent is goes in `CLAUDE.md`, occasional know-how in a skill in the layer's `.claude/skills/`, and a procedure's role in its `systemPrompt`. AgentForge appends its own fragments after the system prompt. Never use the `claude_code` preset.
 
@@ -81,7 +83,8 @@ A procedure declares the files it works on, as middleware, and gets each mount o
 ```ts
 Write: os.Write.use(filesystems({ kata: new ScratchFilesystem() })).handler(async ({ input, context }) => {
   const { kata } = context.filesystems;
-  // kata.localPath; kata.path('a.md') resolves inside the mount; kata.writablePath('a.md') also inside the write scope
+  // kata.localPath; kata.permissions: read on '**', edit on each write glob, relative to the mount
+  // kata.path('a.md') resolves inside the mount; kata.writablePath('a.md') also inside the write scope
 }),
 ```
 

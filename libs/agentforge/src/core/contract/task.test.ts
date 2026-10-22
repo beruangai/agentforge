@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { EnvelopeSchema } from './envelope.ts';
 import { MAX_TIME_BUDGET_SECONDS } from './procedures.ts';
-import { CauseSchema, cause, outcomeOfArtifacts } from './task.ts';
+import {
+  CauseSchema,
+  cause,
+  outcomeOfArtifacts,
+  RunRecordSchema,
+} from './task.ts';
 
 describe('the outcome artifact', () => {
   it('carries the outcome as its one data part', () => {
@@ -33,6 +38,46 @@ describe('a cause', () => {
     expect(
       CauseSchema.safeParse({ ...limited, retryAfter: 'after lunch' }).success,
     ).toBe(false);
+  });
+
+  it('suggests an action that names no framework, unless one is given', () => {
+    expect(cause('CREDENTIAL_EXPIRED', 'expired').suggestedAction).toBe(
+      "An operator renews the framework's credential and updates the agent's secret; a retry cannot succeed before that.",
+    );
+    expect(
+      cause('CREDENTIAL_EXPIRED', 'expired', { suggestedAction: 'Renew it.' })
+        .suggestedAction,
+    ).toBe('Renew it.');
+  });
+});
+
+describe('a run record', () => {
+  const record = {
+    framework: { name: 'claude', fullName: 'sdk@1' },
+    promptHash: 'hash',
+    promptBytes: 1,
+    options: {},
+    usage: {
+      inputTokens: 1,
+      outputTokens: 1,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+    },
+  };
+
+  it('parses without a cost, as from a framework that reports none', () => {
+    expect(RunRecordSchema.parse(record)).toEqual(record);
+  });
+
+  it('names a provided framework, and no other', () => {
+    expect(
+      RunRecordSchema.safeParse({
+        ...record,
+        framework: { name: 'strands', fullName: 'sdk@1' },
+      }).success,
+    ).toBe(false);
+    const { framework: _, ...nameless } = record;
+    expect(RunRecordSchema.safeParse(nameless).success).toBe(false);
   });
 });
 

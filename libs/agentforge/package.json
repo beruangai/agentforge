@@ -8,7 +8,8 @@
     "node": ">=26"
   },
   "imports": {
-    "#core/*": "./src/core/*"
+    "#core/*": "./src/core/*",
+    "#framework/*": "./src/framework/*"
   },
   "exports": {
     "./contract": {
@@ -49,6 +50,30 @@
       "@beruangai/source": "./src/infra/index.ts",
       "types": "./infra.d.ts",
       "default": "./infra.js"
+    },
+    "./claude/agent": {
+      "agentforge-agent": {
+        "@beruangai/source": "./src/framework/claude/harness/index.ts",
+        "types": "./claude/agent.d.ts",
+        "default": "./claude/agent.js"
+      }
+    },
+    "./claude/server": {
+      "agentforge-agent": {
+        "@beruangai/source": "./src/framework/claude/server/index.ts",
+        "types": "./claude/server.d.ts",
+        "default": "./claude/server.js"
+      }
+    },
+    "./claude/client": {
+      "@beruangai/source": "./src/framework/claude/client/index.ts",
+      "types": "./claude/client.d.ts",
+      "default": "./claude/client.js"
+    },
+    "./claude/infra": {
+      "@beruangai/source": "./src/framework/claude/infra/index.ts",
+      "types": "./claude/infra.d.ts",
+      "default": "./claude/infra.js"
     },
     "./package.json": "./package.json"
   },

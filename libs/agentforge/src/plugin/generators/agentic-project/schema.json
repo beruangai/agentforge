@@ -21,6 +21,12 @@
     "subDirectory": {
       "type": "string",
       "description": "The project's folder within the directory; its name by default"
+    },
+    "framework": {
+      "type": "string",
+      "description": "The agent framework the project's runs go through",
+      "enum": ["claude"],
+      "default": "claude"
     }
   },
   "required": ["name"],

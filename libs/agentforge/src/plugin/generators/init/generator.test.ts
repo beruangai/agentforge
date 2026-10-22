@@ -19,6 +19,14 @@ describe('init', () => {
     expect(catalog['aws-cdk-lib']).toBe(peerRange('aws-cdk-lib'));
   });
 
+  it("declares no framework's peers, which an agentic project for that framework adds", async () => {
+    await initGenerator(tree);
+    const { catalog } = readJson(tree, 'package.json');
+    expect(
+      Object.keys(catalog).filter((name) => name.startsWith('@anthropic-ai/')),
+    ).toEqual([]);
+  });
+
   it('declares them in the root manifest when the workspace keeps no catalog', async () => {
     tree = workspaceTree({ catalogs: false });
     await initGenerator(tree);

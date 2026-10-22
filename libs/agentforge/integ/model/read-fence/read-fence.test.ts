@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import type { HookCallback } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
-import { runAgent } from '../../../src/server/harness/kernel.ts';
+import { runAgent } from '#framework/claude/harness/kernel.ts';
 import {
   createSandbox,
   createSubscriptionEnvironment,

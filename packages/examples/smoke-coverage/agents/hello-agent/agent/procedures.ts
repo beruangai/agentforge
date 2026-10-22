@@ -1,13 +1,15 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import {
-  composeOptions,
-  distill,
   filesystems,
-  implementAgent,
   S3Filesystem,
   type S3FilesystemOptions,
 } from '@beruangai/agentforge/agent';
+import {
+  composeOptions,
+  distill,
+  implementAgent,
+} from '@beruangai/agentforge/claude/agent';
 import { baseOptions } from '@beruangai/smoke-coverage-base/options';
 import { z } from 'zod';
 import { contract, SpaceField, TopicField } from './contract.ts';

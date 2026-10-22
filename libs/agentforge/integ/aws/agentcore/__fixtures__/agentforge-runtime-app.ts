@@ -7,6 +7,7 @@ import { App, CfnOutput, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
+import { REQUIRED_SECRETS } from '#framework/claude/infra/index.ts';
 import {
   AgenticProjectResources,
   AgentRuntime,
@@ -49,6 +50,7 @@ const agent = new AgentRuntime(stack, 'Agent', {
       buildArgs: { BASE_IMAGE: required('AGENTFORGE_INTEG_BASE_IMAGE') },
     },
   ),
+  requiredSecrets: REQUIRED_SECRETS,
   secrets: { CLAUDE_CODE_OAUTH_TOKEN: secret },
 });
 new CfnOutput(stack, 'AgentRuntimeArn', { value: agent.agentRuntimeArn });

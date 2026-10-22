@@ -24,6 +24,7 @@ describe('S3FilesystemBucket', () => {
         agentRuntimeArtifact: AgentRuntimeArtifact.fromImageUri(
           '123456789012.dkr.ecr.us-east-2.amazonaws.com/agent:latest',
         ),
+        requiredSecrets: ['CLAUDE_CODE_OAUTH_TOKEN'],
         secrets: {
           CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
             stack,

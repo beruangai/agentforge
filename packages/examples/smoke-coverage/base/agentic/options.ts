@@ -1,4 +1,4 @@
-import type { AgentOptions } from '@beruangai/agentforge/agent';
+import type { AgentOptions } from '@beruangai/agentforge/claude/agent';
 
 /**
  * What every agent in smoke-coverage runs with, composed under each agent's own

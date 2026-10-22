@@ -3,6 +3,7 @@
  * AgentCore's contract, a process per task, task state in DynamoDB. Started
  * by the consumer's server entry; it never loads a procedure itself.
  */
+export type { FrameworkServer } from './framework-server.ts';
 export {
   type RunningServer,
   type ServerConfig,

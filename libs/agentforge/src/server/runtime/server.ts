@@ -15,6 +15,7 @@ import { TimeBudgetSecondsField } from '#core/contract/procedures.ts';
 import { SecretNameSchema } from '#core/secrets.ts';
 import { TASK_TABLE_NAME_VARIABLE } from '#core/task-table.ts';
 import { TaskProcessExecutor } from './executor.ts';
+import type { FrameworkServer } from './framework-server.ts';
 import { createGateway } from './gateway.ts';
 import { createOperationalMetrics } from './metrics.ts';
 import { requireSecrets, resolveDeclaredSecrets } from './secrets.ts';
@@ -35,9 +36,11 @@ export interface ServerConfig {
    * conditions carry over. `new URL('./task.ts', import.meta.url)`.
    */
   readonly taskEntry: string | URL;
+  /** The project's framework's server part: `framework` from its entry, such as `/claude/server`. */
+  readonly framework: FrameworkServer;
   /**
    * The secrets the agent's layers require, by the environment variable each
-   * becomes, beside AgentForge's own: the base layer's and the agent's
+   * becomes, beside its framework's: the base layer's and the agent's
    * `REQUIRED_SECRETS`. A request fails while one is unset.
    */
   readonly requiredSecrets: readonly string[];
@@ -54,10 +57,10 @@ export interface ServerConfig {
   readonly host: string;
 }
 
-/** The task entry, the required secrets, and anything else the environment should not decide. */
+/** The task entry, the framework, the required secrets, and anything else the environment should not decide. */
 export type ServerOptions = Pick<
   ServerConfig,
-  'taskEntry' | 'requiredSecrets'
+  'taskEntry' | 'framework' | 'requiredSecrets'
 > &
   Partial<ServerConfig>;
 
@@ -90,6 +93,7 @@ export function serverConfig(
     options.dynamoDBEndpoint ?? environment.AGENTFORGE_DYNAMODB_ENDPOINT;
   return {
     taskEntry: options.taskEntry,
+    framework: options.framework,
     requiredSecrets: z.array(SecretNameSchema).parse(options.requiredSecrets),
     agentName: options.agentName ?? required(AGENT_NAME_VARIABLE),
     image: options.image ?? required(AGENT_IMAGE_VARIABLE),
@@ -197,10 +201,14 @@ export async function startServer(
       // Before the secrets, so the collector's environment holds none.
       telemetry = await startTelemetry({
         agentName: config.agentName,
+        framework: config.framework,
         ...(runtimeSessionId === undefined ? {} : { runtimeSessionId }),
       });
       await resolveDeclaredSecrets();
-      requireSecrets(config.requiredSecrets);
+      requireSecrets([
+        ...config.framework.requiredSecrets,
+        ...config.requiredSecrets,
+      ]);
     })();
     return prepared;
   };

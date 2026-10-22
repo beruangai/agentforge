@@ -53,7 +53,7 @@ describe('servePlan', () => {
     ).toThrow(/AGENTFORGE_FILESYSTEM_BUCKETS is not JSON/);
   });
 
-  it("requires AgentForge's secrets, then its layers', once each", () => {
+  it("requires its framework's secrets, then its layers', once each", () => {
     expect(
       servePlan(
         GOLDEN_KATA,

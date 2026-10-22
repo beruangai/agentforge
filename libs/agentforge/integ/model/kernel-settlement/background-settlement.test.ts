@@ -25,7 +25,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
-import { structuredOutputJsonSchema } from '../../../src/server/harness/structured-output.ts';
+import { structuredOutputJsonSchema } from '#framework/claude/harness/structured-output.ts';
 import {
   CARRIER_TOOL_NAME,
   createSandbox,

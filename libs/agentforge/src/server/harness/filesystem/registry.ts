@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { os } from '@orpc/server';
 import { FILESYSTEM_NAME_PATTERN } from '#core/filesystem.ts';
-import type { TaskContext } from '../task-process.ts';
+import type { FrameworkTypes, TaskContext } from '../framework.ts';
 import type {
   Filesystem,
   Mount,
@@ -54,14 +54,14 @@ export function filesystems(
 }
 
 /**
- * The innermost middleware, appended by the harness to the procedure it
- * calls: mounts every registered filesystem and hands the handler their
- * paths, baseline permissions and directories. Each mount joins `lifecycles` as it
+ * Appended by the harness to the procedure it calls, just before the
+ * framework's options middleware: mounts every registered filesystem and
+ * hands the handler their paths and baseline permissions. Each mount joins `lifecycles` as it
  * succeeds, for the harness to unmount once the outcome is known.
  */
 export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
   return os
-    .$context<TaskContext & RegistryContext>()
+    .$context<TaskContext<FrameworkTypes> & RegistryContext>()
     .middleware(async ({ context, next }, input) => {
       // Every scope resolves first, so a clash is refused before anything mounts.
       const resolved = Object.entries(context[FILESYSTEM_REGISTRY] ?? {}).map(
@@ -82,27 +82,7 @@ export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
         lifecycles.push(lifecycle);
         filesystems[mount.name] = lifecycle.mounted;
       }
-      const mounted = Object.values(filesystems);
-      return next({
-        context: {
-          filesystems,
-          agentOptions:
-            mounted.length === 0
-              ? {}
-              : {
-                  additionalDirectories: mounted.map(
-                    (filesystem) => filesystem.localPath,
-                  ),
-                  allowedTools: [
-                    ...new Set(
-                      mounted.flatMap(
-                        (filesystem) => filesystem.permissions.allow,
-                      ),
-                    ),
-                  ],
-                },
-        },
-      });
+      return next({ context: { filesystems } });
     });
 }
 

@@ -1,10 +1,10 @@
 import type { HookCallback, HookInput } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import type { StopGuard } from '../../../server/harness/stop-guard.ts';
 import { STRUCTURED_OUTPUT_WRAPPER_KEY } from './structured-output.ts';
 import {
   STRUCTURED_OUTPUT_TOOL,
-  type StopGuard,
   structuredOutputValidation,
 } from './structured-output-validation.ts';
 

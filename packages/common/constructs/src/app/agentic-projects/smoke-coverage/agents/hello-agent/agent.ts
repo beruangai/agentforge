@@ -9,6 +9,7 @@ import {
   type AgentRuntimeProps,
   type AgentSecrets,
 } from '@beruangai/agentforge/infra';
+import { REQUIRED_SECRETS as FRAMEWORK_SECRETS } from '@beruangai/agentforge/claude/infra';
 import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '@beruangai/smoke-coverage/secrets';
 import type { REQUIRED_SECRETS as AGENT_SECRETS } from '@beruangai/smoke-coverage/hello-agent/secrets';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
@@ -42,15 +43,17 @@ function parentImageId(): string {
 
 /**
  * The hello-agent agent's secrets, by the environment variable each becomes:
- * AgentForge's own, the base layer's and the agent's `REQUIRED_SECRETS`.
+ * its framework's, the base layer's and the agent's `REQUIRED_SECRETS`.
  */
 export type Secrets = AgentSecrets<
-  (typeof PROJECT_SECRETS)[number] | (typeof AGENT_SECRETS)[number]
+  | (typeof FRAMEWORK_SECRETS)[number]
+  | (typeof PROJECT_SECRETS)[number]
+  | (typeof AGENT_SECRETS)[number]
 >;
 
 export type AgentProps = Omit<
   AgentRuntimeProps,
-  'agentRuntimeArtifact' | 'secrets' | 'agentName'
+  'agentRuntimeArtifact' | 'secrets' | 'requiredSecrets' | 'agentName'
 > & {
   readonly secrets: Secrets;
 };
@@ -64,6 +67,7 @@ export class Agent extends AgentRuntime {
     super(scope, id, {
       ...props,
       agentName: 'hello-agent',
+      requiredSecrets: FRAMEWORK_SECRETS,
       agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
         platform: Platform.LINUX_ARM64,
         buildArgs: { BASE_IMAGE: 'beruangai/smoke-coverage:local' },

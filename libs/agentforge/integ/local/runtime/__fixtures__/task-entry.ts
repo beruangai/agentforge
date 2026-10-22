@@ -1,12 +1,12 @@
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import { cause } from '../../../../src/core/contract/task.ts';
-import { TaskFailure } from '../../../../src/server/harness/kernel.ts';
 import {
   implementAgent,
   runTaskProcess,
-} from '../../../../src/server/harness/task-process.ts';
+} from '#framework/claude/harness/index.ts';
+import { cause } from '../../../../src/core/contract/task.ts';
+import { TaskFailure } from '../../../../src/server/harness/task-failure.ts';
 import { runtimeContract } from './contract.ts';
 
 const os = implementAgent(runtimeContract);

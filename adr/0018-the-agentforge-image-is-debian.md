@@ -19,7 +19,7 @@ Every agent image is built on the AgentForge image, and a consumer extends it wi
 
 ## Decision Outcome
 
-Chosen option: **Debian slim.** The Bun image's own Debian variant is pinned by digest, as the Alpine one was. It provides the same `bun` user at uid 1000, and installs bash, git, ca-certificates and ripgrep with `apt`. Static binaries the image copies in — the collector and `s7cmd` — are unaffected.
+Chosen option: **Debian slim.** The Bun image's own Debian variant is pinned by digest, as the Alpine one was. It provides the same `bun` user at uid 1000, and installs ca-certificates with `apt`; the `claude` framework's image, built on it, installs bash, git and ripgrep, which the Claude CLI's tools need. *(Amended 2026-10-22: the one image installed all four, [ADR 0021](0021-an-agentic-project-chooses-its-framework.md).)* Static binaries the image copies in — the collector and `s7cmd` — are unaffected.
 
 ### Consequences
 

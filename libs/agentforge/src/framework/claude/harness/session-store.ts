@@ -2,8 +2,8 @@ import type { SessionStore } from '@anthropic-ai/claude-agent-sdk';
 import { S3Client } from '@aws-sdk/client-s3';
 import { AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import { s3ClientConfiguration } from '#core/s3-endpoint.ts';
-import { S3SessionStore } from '#core/s3-session-store.ts';
 import { SESSION_BUCKET_VARIABLE } from '#core/session-store.ts';
+import { S3SessionStore } from '../core/s3-session-store.ts';
 
 /**
  * The store the deployment declares — the construct's bucket, or the local

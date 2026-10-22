@@ -8,7 +8,7 @@ AgentForge is that plumbing, owned in one place and shared. Its consumers are St
 
 ## What AgentForge is
 
-**A procedure wrapper for the Claude Agent SDK.** A consumer declares a **procedure**: its public contract, the agent's own contract and how one becomes the other, the prompt the agent starts from, its SDK configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** — on Bedrock AgentCore Runtime, or locally in Docker — and returns a typed, validated outcome to whatever called it.
+**A procedure wrapper for agent frameworks** — the Claude Agent SDK today, each agentic project choosing its own (§REQ713, [ADR 0021](../adr/0021-an-agentic-project-chooses-its-framework.md)). A consumer declares a **procedure**: its public contract, the agent's own contract and how one becomes the other, the prompt the agent starts from, its framework's configuration, and the side effects around the run. AgentForge runs it as an asynchronous **task** — on Bedrock AgentCore Runtime, or locally in Docker — and returns a typed, validated outcome to whatever called it.
 
 It is not a pure agent wrapper. The contract a workflow depends on and the contract an agent fills in usually differ, and marshalling between them type-safely is a core concern rather than a consumer's afterthought.
 
@@ -37,7 +37,6 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 - Agent discovery and agent-to-agent orchestration; the agent card is generated and otherwise unused. Resolving a deployment's own agents by name from the runtime configuration it registers (§REQ707) is resolution, not discovery
 - Streaming a run's progress, and blocking sends — polling is the only way to wait until a procedure's latency warrants more
 - Model providers other than Anthropic
-- Supporting agent frameworks other than the Claude Agent SDK
 - **Procedures that invoke no agent** — AgentForge runs agents. A consumer's plain work belongs in the consumer, whatever its reason for wanting it co-located; this is settled and not reopened
 - Cloud infrastructure beyond what an agent needs — accounts, networking, secret storage and pipelines are the consumer's. Mounted filesystems and the VPC they require are tabled: state persists through APIs, and a consumer that wants a mount configures it itself. Keeping a credential out of anything AgentForge emits is not ours to skip (§REQ603)
 - Multi-tenancy — one operator per deployment

@@ -40,7 +40,12 @@ process.on('message', async (message: ScriptedMessage) => {
     case 'REPORT':
       await send({
         type: 'record',
-        record: { promptHash: 'hash', promptBytes: 1, options: {} },
+        record: {
+          framework: { name: 'claude', fullName: 'scripted' },
+          promptHash: 'hash',
+          promptBytes: 1,
+          options: {},
+        },
       });
       await send(completed({ reported: true }));
       process.exit(0);

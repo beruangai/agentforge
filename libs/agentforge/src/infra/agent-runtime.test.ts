@@ -26,6 +26,7 @@ function synthesize(
     }),
     agentName: 'hello-agent',
     agentRuntimeArtifact: IMAGE,
+    requiredSecrets: ['CLAUDE_CODE_OAUTH_TOKEN'],
     secrets: {
       CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
         stack,
@@ -241,8 +242,8 @@ describe('AgentRuntime', () => {
     ).toThrow(/both as a secret/);
   });
 
-  it('refuses secrets without the subscription token AgentForge requires', () => {
-    expect(() => synthesize({ secrets: {} as never })).toThrow(
+  it('refuses secrets without one its framework requires, naming it', () => {
+    expect(() => synthesize({ secrets: {} })).toThrow(
       'CLAUDE_CODE_OAUTH_TOKEN is required: declare it in secrets',
     );
   });

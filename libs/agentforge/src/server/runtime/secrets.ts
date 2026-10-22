@@ -3,11 +3,7 @@ import {
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 import { z } from 'zod';
-import {
-  REQUIRED_SECRETS,
-  SECRETS_VARIABLE,
-  SecretNameSchema,
-} from '#core/secrets.ts';
+import { SECRETS_VARIABLE, SecretNameSchema } from '#core/secrets.ts';
 
 const DeclaredSecretsSchema = z.record(SecretNameSchema, z.string().min(1));
 
@@ -43,8 +39,8 @@ export async function resolveDeclaredSecrets(
 }
 
 /**
- * Fails unless every secret the agent requires is set: AgentForge's own and
- * each its layers declare, `required`. Run once the declared secrets are
+ * Fails unless every secret the agent requires is set, `required`: its
+ * framework's and each its layers declare. Run once the declared secrets are
  * resolved, so it holds wherever the value came from — a deployment's
  * secret, or the environment a local container is served with.
  */
@@ -52,7 +48,7 @@ export function requireSecrets(
   required: readonly string[],
   environment: NodeJS.ProcessEnv = process.env,
 ): void {
-  const missing = [...REQUIRED_SECRETS, ...required].filter(
+  const missing = required.filter(
     (name) => environment[name] === undefined || environment[name] === '',
   );
   if (missing.length > 0) {

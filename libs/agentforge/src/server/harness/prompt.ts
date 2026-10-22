@@ -1,25 +1,10 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import type {
-  CacheControlEphemeral,
-  DocumentBlockParam,
-  ImageBlockParam,
-  TextBlockParam,
-} from '@anthropic-ai/sdk/resources/messages';
-
-/** A block the Messages API takes as it is. */
-export type ContentBlock =
-  | TextBlockParam
-  | ImageBlockParam
-  | DocumentBlockParam;
-
 /**
- * `true` sets a one-hour cache breakpoint on the block. Claude Code places
+ * A cache breakpoint on a block: `true` is one hour, or a TTL named. Each
+ * framework renders it in its own terms; under `claude`, Claude Code places
  * one-hour breakpoints of its own after the prompt, and the API refuses a
  * shorter one before a longer, so a `5m` breakpoint fails the run.
  */
-export type CacheBreakpoint = boolean | CacheControlEphemeral;
+export type CacheBreakpoint = boolean | { readonly ttl: '5m' | '1h' };
 
 /**
  * A fragment of context, rendered as its own tagged text block so distinct
@@ -31,7 +16,7 @@ export type CacheBreakpoint = boolean | CacheControlEphemeral;
  * `cache` is an attribute.
  */
 export type ContextBlock = {
-  /** Never an attribute: a `type` makes the object a content block or a command. */
+  /** Never an attribute: a `type` makes the object a framework's own content. */
   readonly type?: never;
   /** The tag wrapping the block; `context` when omitted. */
   readonly tag?: string;
@@ -47,70 +32,49 @@ export type ContextBlock = {
     }
 );
 
-/** A file read into the prompt as a document: a PDF by its extension, otherwise text. */
-export interface ContextDocument {
-  /** Absolute, or relative to the run's `cwd`. A file that cannot be read fails the run. */
-  readonly filepath: string;
-  /** The file path when omitted. */
-  readonly title?: string;
-  readonly context?: string;
-  readonly cache?: CacheBreakpoint;
-}
-
-/** A slash command, with its arguments and what it should read. */
-export interface CommandBlock {
-  readonly type: 'command';
-  /** The command; the leading `/` is added when missing. */
-  readonly command: string;
-  /** Each is quoted into the command line, as its `$ARGUMENTS`; one containing `"` is refused. */
-  readonly args?: readonly string[];
-  /** Each entry follows the command in order: a string as a `context` block, the rest as at the top of a prompt. */
-  readonly context?: ContextContent | readonly ContextContent[];
-  readonly documents?: readonly ContextDocument[];
-  /** Where cache breakpoints go around the command's blocks. */
-  readonly cache?: 'BEFORE' | 'AFTER' | 'BEFORE_AND_AFTER';
-}
-
-export type PromptContent = string | ContentBlock | ContextBlock | CommandBlock;
-
-/** What the agent is asked: one piece of content, or several in order. */
-export type AgentPrompt = PromptContent | readonly PromptContent[];
-
-/** Content that may stand in a prompt or in a command's context. */
-export type ContextContent = string | ContentBlock | ContextBlock;
+/** Content every framework takes in a prompt or a context function's output. */
+export type ContextContent = string | ContextBlock;
 
 /**
- * A piece of an agent's context: input variables in, prompt content out.
- * One without input takes none: `const rules: ContextBlockFunction = () => […]`.
+ * A piece of an agent's context: input variables in, prompt content out — the
+ * shared content, or `Content` of a framework's own. One without input takes
+ * none: `const rules: ContextBlockFunction = () => […]`.
  */
-export type ContextBlockFunction<Input extends object = Record<never, never>> =
-  (
-    input: Input,
-  ) => readonly ContextContent[] | Promise<readonly ContextContent[]>;
+export type ContextBlockFunction<
+  Input extends object = Record<never, never>,
+  Content = never,
+> = (
+  input: Input,
+) =>
+  | readonly (ContextContent | Content)[]
+  | Promise<readonly (ContextContent | Content)[]>;
 
 /** Every input variable a list of context functions needs, as one object type. */
 export type ComposedInput<
-  Functions extends readonly ContextBlockFunction<never>[],
+  Functions extends readonly ContextBlockFunction<never, unknown>[],
 > = [Functions[number]] extends [never]
   ? Record<never, never>
   : Flatten<UnionToIntersection<InputOf<Functions[number]>>>;
 
 /**
  * One context function from several: its input is every input variable any of
- * them needs, its output each one's content in the order given. The parts are
- * evaluated concurrently, and a composite composes again.
+ * them needs, its output each one's content in the order given, of whatever
+ * content types they return. The parts are evaluated concurrently, and a
+ * composite composes again.
  */
 export function composeContext<
-  const Functions extends readonly ContextBlockFunction<never>[],
+  const Functions extends readonly ContextBlockFunction<never, unknown>[],
 >(
   ...functions: Functions
-): (input: ComposedInput<Functions>) => Promise<readonly ContextContent[]> {
+): (
+  input: ComposedInput<Functions>,
+) => Promise<readonly ContentOf<Functions[number]>[]> {
   return async (input) =>
     (
       await Promise.all(
         functions.map((contextFunction) => contextFunction(input as never)),
       )
-    ).flat();
+    ).flat() as readonly ContentOf<Functions[number]>[];
 }
 
 /** A function's input; none when it declares no parameter. */
@@ -118,6 +82,13 @@ type InputOf<Function> = Function extends (input: infer Input) => unknown
   ? unknown extends Input
     ? Record<never, never>
     : Input
+  : never;
+
+/** The content a context function returns. */
+type ContentOf<Function> = Function extends (input: never) => infer Returned
+  ? Awaited<Returned> extends readonly (infer Content)[]
+    ? Content
+    : never
   : never;
 
 type UnionToIntersection<Union> = (
@@ -130,254 +101,3 @@ type UnionToIntersection<Union> = (
 
 /** An intersection shown as the one object type it is. */
 type Flatten<Type> = { [Key in keyof Type]: Type[Key] };
-
-/** An inline text document. */
-export function documentBlock(
-  title: string,
-  content: string,
-  context?: string,
-): DocumentBlockParam {
-  return {
-    type: 'document',
-    source: { type: 'text', media_type: 'text/plain', data: content },
-    title,
-    ...(context === undefined ? {} : { context }),
-  };
-}
-
-/** The prompt as the one user message the run starts from. */
-export async function createUserMessage(
-  prompt: AgentPrompt,
-  cwd: string,
-): Promise<SDKUserMessage> {
-  const contents: readonly PromptContent[] = isArray(prompt)
-    ? prompt
-    : [prompt];
-  const blocks = await Promise.all(
-    contents.map((content) => resolveContent(content, cwd)),
-  );
-  return {
-    type: 'user',
-    message: { role: 'user', content: blocks.flat() },
-    parent_tool_use_id: null,
-    priority: 'now',
-  };
-}
-
-/**
- * Streaming input — what `interrupt()` and hooks need — holding the input
- * open until `holdOpenUntil` settles, so the session is not ended under a
- * run still in progress.
- */
-export async function* createStreamingInput(
-  message: SDKUserMessage,
-  holdOpenUntil: Promise<void>,
-): AsyncGenerator<SDKUserMessage> {
-  yield message;
-  await holdOpenUntil;
-}
-
-const CONTENT_BLOCK_TYPES = new Set(['text', 'image', 'document']);
-
-async function resolveContent(
-  content: PromptContent,
-  cwd: string,
-): Promise<ContentBlock[]> {
-  if (typeof content === 'string') return [{ type: 'text', text: content }];
-  if (content.type === 'command') {
-    return resolveCommandBlock(content as CommandBlock, cwd);
-  }
-  if (
-    typeof content.type === 'string' &&
-    CONTENT_BLOCK_TYPES.has(content.type)
-  ) {
-    return [content as ContentBlock];
-  }
-  if (content.type === undefined) {
-    return [await resolveContextBlock(content as ContextBlock, cwd)];
-  }
-  throw new Error(
-    `prompt content is none of a string, a content block, a context block or a command: ${JSON.stringify(content)}`,
-  );
-}
-
-export async function resolveContextDocument(
-  document: ContextDocument,
-  cwd: string,
-): Promise<DocumentBlockParam> {
-  const { filepath } = document;
-  let buffer: Buffer;
-  try {
-    buffer = await readFile(path.resolve(cwd, filepath));
-  } catch (error) {
-    throw new Error(`the prompt's document "${filepath}" could not be read`, {
-      cause: error,
-    });
-  }
-  const source: DocumentBlockParam['source'] =
-    path.extname(filepath).toLowerCase() === '.pdf'
-      ? {
-          type: 'base64',
-          media_type: 'application/pdf',
-          data: buffer.toString('base64'),
-        }
-      : {
-          type: 'text',
-          media_type: 'text/plain',
-          data: buffer.toString('utf8'),
-        };
-  const context = [`<filepath>${filepath}</filepath>`];
-  if (document.context) context.push(document.context);
-  return {
-    type: 'document',
-    source,
-    title: document.title ?? filepath,
-    context: context.join('\n'),
-    ...cacheControl(document.cache),
-  };
-}
-
-const RESERVED_CONTEXT_KEYS = new Set([
-  'tag',
-  'description',
-  'context',
-  'filepath',
-  'cache',
-]);
-
-export async function resolveContextBlock(
-  block: ContextBlock,
-  cwd: string,
-): Promise<TextBlockParam> {
-  const { tag = 'context', description } = block;
-  const context = await contextBlockText(block, cwd);
-  const attributes: string[] = [];
-  if (description) attributes.push(attribute('description', description));
-  for (const [key, value] of Object.entries(block)) {
-    if (
-      RESERVED_CONTEXT_KEYS.has(key) ||
-      value === undefined ||
-      value === null
-    ) {
-      continue;
-    }
-    attributes.push(
-      attribute(
-        key,
-        typeof value === 'object' ? JSON.stringify(value) : String(value),
-      ),
-    );
-  }
-  const opening = [tag, ...attributes].join(' ');
-  return {
-    type: 'text',
-    text: `<${opening}>\n${context}\n</${tag}>`,
-    ...cacheControl(block.cache),
-  };
-}
-
-/** A context block's text: its own, or its file's without the file's final newline. */
-async function contextBlockText(
-  block: ContextBlock,
-  cwd: string,
-): Promise<string> {
-  const { context, filepath } = block;
-  if (typeof context === 'string' && filepath === undefined) return context;
-  if (typeof filepath !== 'string' || context !== undefined) {
-    throw new Error(
-      `a context block takes its text from one of \`context\` or \`filepath\`: ${JSON.stringify(block)}`,
-    );
-  }
-  try {
-    const text = await readFile(path.resolve(cwd, filepath), 'utf8');
-    return text.replace(/\r?\n$/, '');
-  } catch (error) {
-    throw new Error(
-      `the prompt's context block file "${filepath}" could not be read`,
-      { cause: error },
-    );
-  }
-}
-
-/** A text block carrying only a cache breakpoint. */
-export const CACHE_MARKER_BLOCK: TextBlockParam = {
-  type: 'text',
-  text: '<!-- cache_marker -->',
-  cache_control: { type: 'ephemeral', ttl: '1h' },
-};
-
-export async function resolveCommandBlock(
-  block: CommandBlock,
-  cwd: string,
-): Promise<ContentBlock[]> {
-  let command = block.command.startsWith('/')
-    ? block.command
-    : `/${block.command}`;
-  if (block.args?.length) {
-    for (const argument of block.args) {
-      if (argument.includes('"')) {
-        throw new Error(
-          `command "${command}": an argument containing '"' would split its arguments differently: ${JSON.stringify(argument)}`,
-        );
-      }
-    }
-    command += ` ${block.args.map((argument) => `"${argument}"`).join(' ')}`;
-  }
-  const context =
-    block.context === undefined
-      ? []
-      : isArray(block.context)
-        ? block.context
-        : [block.context];
-  const blocks: ContentBlock[] = [
-    { type: 'text', text: command },
-    ...(
-      await Promise.all(
-        context
-          .filter((entry) => entry !== '')
-          .map((entry) =>
-            typeof entry === 'string'
-              ? [
-                  {
-                    type: 'text',
-                    text: `<context>\n${entry}\n</context>`,
-                  } as const,
-                ]
-              : resolveContent(entry, cwd),
-          ),
-      )
-    ).flat(),
-    ...(await Promise.all(
-      (block.documents ?? []).map((document) =>
-        resolveContextDocument(document, cwd),
-      ),
-    )),
-  ];
-  if (block.cache === 'BEFORE' || block.cache === 'BEFORE_AND_AFTER') {
-    blocks.unshift(CACHE_MARKER_BLOCK);
-  }
-  if (block.cache === 'AFTER' || block.cache === 'BEFORE_AND_AFTER') {
-    blocks.push(CACHE_MARKER_BLOCK);
-  }
-  return blocks;
-}
-
-function cacheControl(
-  cache: CacheBreakpoint | undefined,
-): Pick<TextBlockParam, 'cache_control'> {
-  if (!cache) return {};
-  return {
-    cache_control: cache === true ? { type: 'ephemeral', ttl: '1h' } : cache,
-  };
-}
-
-function attribute(key: string, value: string): string {
-  return `${key}="${value.replaceAll('"', '&quot;')}"`;
-}
-
-/** `Array.isArray` narrowed for readonly arrays, which it does not narrow. */
-function isArray<Item>(
-  value: Item | readonly Item[],
-): value is readonly Item[] {
-  return Array.isArray(value);
-}

@@ -1,5 +1,13 @@
 import type { TargetConfiguration } from '@nx/devkit';
+import { FRAMEWORK_NAMES } from '#core/contract/framework.ts';
+import { frameworkLayer } from '../container/images.ts';
 import type { AgenticProject } from '../project-record.ts';
+
+/** The targets that build AgentForge's own images: the base, and each provided framework's. */
+const AGENTFORGE_IMAGE_TARGETS = new Set([
+  'image-agentforge',
+  ...FRAMEWORK_NAMES.map((framework) => `image-${frameworkLayer(framework)}`),
+]);
 
 const EXECUTOR = '@beruangai/agentforge';
 
@@ -10,7 +18,7 @@ export function isAgentTarget(
 ): boolean {
   return (
     /^(lock|image|serve)-.+$/.test(name) &&
-    name !== 'image-agentforge' &&
+    !AGENTFORGE_IMAGE_TARGETS.has(name) &&
     target.executor?.startsWith(`${EXECUTOR}:`) === true
   );
 }
@@ -30,12 +38,19 @@ export function projectTargets(
     { dependentTasksOutputFiles: '**/bun.lock', transitive: true },
     { runtime: 'bun --version' },
   ];
+  const framework = frameworkLayer(project.framework);
   const targets: Record<string, TargetConfiguration> = {
     'image-agentforge': {
       executor: `${EXECUTOR}:image`,
       cache: false,
       dependsOn: ['^bundle'],
       options: { layer: 'agentforge' },
+    },
+    [`image-${framework}`]: {
+      executor: `${EXECUTOR}:image`,
+      cache: false,
+      dependsOn: ['image-agentforge'],
+      options: { layer: framework },
     },
     lock: {
       executor: `${EXECUTOR}:lock`,
@@ -51,7 +66,7 @@ export function projectTargets(
     image: {
       executor: `${EXECUTOR}:image`,
       cache: false,
-      dependsOn: ['lock', 'image-agentforge'],
+      dependsOn: ['lock', `image-${framework}`],
       options: { layer: 'base' },
     },
   };

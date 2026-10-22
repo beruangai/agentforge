@@ -1,19 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RunRecord } from '#core/contract/task.ts';
+import { TaskFailure } from '../../../server/harness/task-failure.ts';
 import { DISTILL_OVERAGE_ALLOWANCE, distill } from './distill.ts';
-import { type AgentRunSpec, TaskFailure } from './kernel.ts';
+import type { AgentRun, AgentRunSpec } from './kernel.ts';
+
+const USAGE = {
+  inputTokens: 1,
+  outputTokens: 1,
+  cacheReadInputTokens: 0,
+  cacheCreationInputTokens: 0,
+};
 
 function runAgentAnswering(distillation: string) {
   return vi.fn(async (spec: AgentRunSpec<unknown>) => ({
     output: spec.output.parse({ distillation }),
     sessionId: 'session-1',
+    usage: USAGE,
+    rawUsage: {},
     record: {} as RunRecord,
   })) as unknown as ReturnType<typeof vi.fn> &
-    (<Output>(spec: AgentRunSpec<Output>) => Promise<{
-      output: Output;
-      sessionId: string;
-      record: RunRecord;
-    }>);
+    (<Output>(spec: AgentRunSpec<Output>) => Promise<AgentRun<Output>>);
 }
 
 const SMALL = [

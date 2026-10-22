@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { oc } from '@orpc/contract';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { framework } from '#framework/claude/server/index.ts';
 import {
   awaitTask,
   createClient,
@@ -127,6 +128,7 @@ beforeAll(async () => {
     agentName: 'runtime-integ',
     image: 'runtime-integ',
     taskEntry: join(import.meta.dirname, '__fixtures__', 'task-entry.ts'),
+    framework,
     requiredSecrets: [],
     tableName,
     dynamoDBEndpoint: dynamoDB.endpoint,

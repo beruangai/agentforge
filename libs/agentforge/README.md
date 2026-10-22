@@ -50,7 +50,7 @@ Every artifact spanning a project's agents — or a workflow project's connectio
 - `agents/<agent>/agent/server.ts`, `agents/<agent>/agent/task.ts`
 - `client.ts`
 - in the shared constructs, `src/app/agentic-projects/<project>/project.ts`, `src/app/agentic-projects/<project>/agents/<agent>/agent.ts`, and `src/app/agentic-projects/<project>/index.ts`, which exports them under the project's names
-- the project's targets: `image-agentforge`, `lock`, `image`, `lock-<agent>`, `image-<agent>`, `serve-<agent>`, `assemble`, `local-store`, `local-store-stop`
+- the project's targets: `image-agentforge`, `image-agentforge-<framework>`, `lock`, `image`, `lock-<agent>`, `image-<agent>`, `serve-<agent>`, `assemble`, `local-store`, `local-store-stop`
 
 **Maintained keys** — only these are rewritten; every other key in the file is yours:
 

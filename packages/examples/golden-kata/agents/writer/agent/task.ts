@@ -3,7 +3,7 @@
 // project.json metadata.agentforge.detached.files.
 //
 // The task entry: the one place the harness and this agent's procedures meet.
-import { runTaskProcess } from '@beruangai/agentforge/agent';
+import { runTaskProcess } from '@beruangai/agentforge/claude/agent';
 import { contract } from './contract.ts';
 import { router } from './procedures.ts';
 

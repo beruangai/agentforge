@@ -7,9 +7,10 @@ exports[`agentic-project > generates a base layer, its targets, client and const
 # project.json metadata.agentforge.detached.files.
 #
 # The agentic image: the project's base layer at /workspace/agentic, on the
-# AgentForge image. \`agentic/$claude/\` becomes its \`.claude/\`, which every
-# agent's session composes from its cwd below. The layer's lock is the whole
-# workspace's up to it, so the install adds only what this layer adds.
+# claude framework's AgentForge image. \`agentic/$claude/\` becomes its
+# \`.claude/\`, which every agent's session composes from its cwd below. The
+# layer's lock is the whole workspace's up to it, so the install adds only
+# what this layer adds.
 ARG BASE_IMAGE
 FROM \${BASE_IMAGE}
 COPY --chown=bun --exclude=bun.lock --exclude=\\$claude agentic/ /workspace/agentic/
@@ -38,7 +39,7 @@ exports[`agentic-project > generates a base layer, its targets, client and const
 exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/$claude/skills/.gitkeep 1`] = `""`;
 
 exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/options.ts 1`] = `
-"import type { AgentOptions } from '@beruangai/agentforge/agent';
+"import type { AgentOptions } from '@beruangai/agentforge/claude/agent';
 
 /**
  * What every agent in golden-kata runs with, composed under each agent's own
@@ -90,7 +91,7 @@ exports[`agentic-project > generates a base layer, its targets, client and const
 exports[`agentic-project > generates a base layer, its targets, client and construct, and no agents > packages/examples/golden-kata/base/agentic/secrets.ts 1`] = `
 "/**
  * The secrets every agent in golden-kata requires, by the environment variable each
- * becomes — beside AgentForge's own, CLAUDE_CODE_OAUTH_TOKEN. The agent's
+ * becomes — beside its framework's own, CLAUDE_CODE_OAUTH_TOKEN. The agent's
  * construct requires a secret for each, \`serve\` passes each from
  * .env.serve.local, and the agent's server fails a request while one is unset.
  */
@@ -198,6 +199,7 @@ exports[`agentic-project > generates a base layer, its targets, client and const
     "generator": "@beruangai/agentforge:agentic-project",
     "components": [],
     "agentforge": {
+      "framework": "claude",
       "detached": {
         "files": [],
         "targets": []
@@ -211,6 +213,14 @@ exports[`agentic-project > generates a base layer, its targets, client and const
       "dependsOn": ["^bundle"],
       "options": {
         "layer": "agentforge"
+      }
+    },
+    "image-agentforge-claude": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["image-agentforge"],
+      "options": {
+        "layer": "agentforge-claude"
       }
     },
     "lock": {
@@ -239,7 +249,7 @@ exports[`agentic-project > generates a base layer, its targets, client and const
     "image": {
       "executor": "@beruangai/agentforge:image",
       "cache": false,
-      "dependsOn": ["lock", "image-agentforge"],
+      "dependsOn": ["lock", "image-agentforge-claude"],
       "options": {
         "layer": "base"
       }

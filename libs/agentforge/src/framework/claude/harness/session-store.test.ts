@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { S3SessionStore } from '#core/s3-session-store.ts';
+import { S3SessionStore } from '../core/s3-session-store.ts';
 import { sessionStoreFromEnvironment } from './session-store.ts';
 
 describe('sessionStoreFromEnvironment', () => {

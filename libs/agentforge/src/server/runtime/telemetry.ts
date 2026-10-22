@@ -3,11 +3,8 @@ import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
-import {
-  TELEMETRY_VARIABLE,
-  type TelemetryLevel,
-  TelemetryLevelEnum,
-} from '#core/telemetry.ts';
+import { TELEMETRY_VARIABLE, TelemetryLevelEnum } from '#core/telemetry.ts';
+import type { FrameworkServer } from './framework-server.ts';
 
 /** Where the base image installs the ADOT collector. */
 const COLLECTOR_BINARY = '/usr/local/bin/aws-otel-collector';
@@ -16,42 +13,6 @@ const COLLECTOR_HEALTH_URL = 'http://127.0.0.1:13133/';
 const COLLECTOR_START_TIMEOUT_MILLISECONDS = 10_000;
 /** AgentCore's own destination for OTLP logs, set in every runtime. */
 const AGENTCORE_LOGS_HEADERS_VARIABLE = 'OTEL_EXPORTER_OTLP_LOGS_HEADERS';
-
-/**
- * What the Claude CLI exports at each level (§REQ602). Every level exports
- * metrics and events to the collector, surfaces export errors on stderr,
- * and exports often, so little is lost when a container stops; per-session
- * metric series are left out, as each is billed.
- */
-export function cliTelemetryEnvironment(
-  level: TelemetryLevel,
-): Record<string, string> {
-  const atLeast = (floor: TelemetryLevel): boolean =>
-    TelemetryLevelEnum.options.indexOf(level) >=
-    TelemetryLevelEnum.options.indexOf(floor);
-  return {
-    CLAUDE_CODE_ENABLE_TELEMETRY: '1',
-    OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
-    OTEL_EXPORTER_OTLP_ENDPOINT: COLLECTOR_OTLP_ENDPOINT,
-    OTEL_METRICS_EXPORTER: 'otlp',
-    OTEL_LOGS_EXPORTER: 'otlp',
-    OTEL_METRIC_EXPORT_INTERVAL: '10000',
-    OTEL_LOGS_EXPORT_INTERVAL: '1000',
-    OTEL_TRACES_EXPORT_INTERVAL: '1000',
-    OTEL_METRICS_INCLUDE_SESSION_ID: 'false',
-    CLAUDE_CODE_OTEL_DIAG_STDERR: '1',
-    ...(atLeast('INFO') && {
-      OTEL_TRACES_EXPORTER: 'otlp',
-      CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
-    }),
-    ...(atLeast('DEBUG') && {
-      OTEL_LOG_USER_PROMPTS: '1',
-      OTEL_LOG_TOOL_DETAILS: '1',
-      OTEL_LOG_TOOL_CONTENT: '1',
-    }),
-    ...(atLeast('ALL') && { OTEL_LOG_RAW_API_BODIES: '1' }),
-  };
-}
 
 /** The log group and stream AgentCore names for OTLP logs. */
 export function agentCoreLogDestination(environment: NodeJS.ProcessEnv): {
@@ -79,19 +40,28 @@ export interface Telemetry {
 }
 
 /**
- * At the level the construct sets, starts the collector and points the CLI
- * of every task at it, through the environment tasks inherit. Nothing set,
+ * At the level the construct sets, starts the collector with the framework's
+ * configuration, and points every task at it through the environment tasks
+ * inherit, as the framework says. Nothing set,
  * nothing started — locally there is no role to sign with. A collector that
  * does not come up fails the request that prepared the container. The
  * container serves one runtime session, which the collector stamps on every
- * span as `session.id`, so the CLI's spans join AgentCore's session; the
+ * span as `session.id`, so the tasks' spans join AgentCore's session; the
  * agent's name becomes `gen_ai.agent.name`.
  */
 export async function startTelemetry(
   {
     agentName,
     runtimeSessionId,
-  }: { readonly agentName: string; readonly runtimeSessionId?: string },
+    framework,
+  }: {
+    readonly agentName: string;
+    readonly runtimeSessionId?: string;
+    readonly framework: Pick<
+      FrameworkServer,
+      'telemetryEnvironment' | 'collectorConfig'
+    >;
+  },
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<Telemetry | undefined> {
   const declared = environment[TELEMETRY_VARIABLE];
@@ -104,12 +74,8 @@ export async function startTelemetry(
   }
   const { logGroup, logStream } = agentCoreLogDestination(environment);
 
-  const configs = [
-    'collector.yaml',
-    ...(level === 'WARN' ? ['warn.yaml'] : []),
-  ].map(
-    (name) =>
-      `--config=${fileURLToPath(new URL(`./collector/${name}`, import.meta.url))}`,
+  const configs = framework.collectorConfig[level].map(
+    (config) => `--config=${fileURLToPath(config)}`,
   );
   const collector = spawn(COLLECTOR_BINARY, configs, {
     env: {
@@ -124,7 +90,10 @@ export async function startTelemetry(
     stdio: ['ignore', 'inherit', 'inherit'],
   });
   await waitUntilHealthy(collector);
-  Object.assign(environment, cliTelemetryEnvironment(level));
+  Object.assign(
+    environment,
+    framework.telemetryEnvironment(level, COLLECTOR_OTLP_ENDPOINT),
+  );
   console.log(
     JSON.stringify({ event: 'agentforge.telemetry', level, logGroup }),
   );

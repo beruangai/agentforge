@@ -1,46 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import {
-  agentCoreLogDestination,
-  cliTelemetryEnvironment,
-  startTelemetry,
-} from './telemetry.ts';
+import { agentCoreLogDestination, startTelemetry } from './telemetry.ts';
+
+/** A framework whose tasks export nothing; the collector never starts in these tests. */
+const FRAMEWORK = {
+  telemetryEnvironment: () => ({}),
+  collectorConfig: { WARN: [], INFO: [], DEBUG: [], ALL: [] },
+};
 
 const AGENTCORE_LOGS_HEADERS =
   'x-aws-log-group=/aws/bedrock-agentcore/runtimes/agent-abc-DEFAULT,x-aws-log-stream=otel-rt-logs,x-aws-metric-namespace=bedrock-agentcore';
-
-describe('cliTelemetryEnvironment', () => {
-  it('exports metrics and events at WARN, and no traces or content', () => {
-    const environment = cliTelemetryEnvironment('WARN');
-    expect(environment).toMatchObject({
-      CLAUDE_CODE_ENABLE_TELEMETRY: '1',
-      OTEL_METRICS_EXPORTER: 'otlp',
-      OTEL_LOGS_EXPORTER: 'otlp',
-      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
-      CLAUDE_CODE_OTEL_DIAG_STDERR: '1',
-    });
-    expect(environment.OTEL_TRACES_EXPORTER).toBeUndefined();
-    expect(environment.OTEL_LOG_USER_PROMPTS).toBeUndefined();
-  });
-
-  it('adds traces at INFO, content at DEBUG and raw bodies at ALL', () => {
-    expect(cliTelemetryEnvironment('INFO')).toMatchObject({
-      OTEL_TRACES_EXPORTER: 'otlp',
-      CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
-    });
-    expect(
-      cliTelemetryEnvironment('INFO').OTEL_LOG_TOOL_CONTENT,
-    ).toBeUndefined();
-    expect(cliTelemetryEnvironment('DEBUG')).toMatchObject({
-      OTEL_LOG_USER_PROMPTS: '1',
-      OTEL_LOG_TOOL_DETAILS: '1',
-      OTEL_LOG_TOOL_CONTENT: '1',
-    });
-    expect(
-      cliTelemetryEnvironment('DEBUG').OTEL_LOG_RAW_API_BODIES,
-    ).toBeUndefined();
-    expect(cliTelemetryEnvironment('ALL').OTEL_LOG_RAW_API_BODIES).toBe('1');
-  });
-});
 
 describe('agentCoreLogDestination', () => {
   it('reads the log group and stream AgentCore names for OTLP logs', () => {
@@ -62,14 +30,18 @@ describe('agentCoreLogDestination', () => {
 describe('startTelemetry', () => {
   it('starts nothing when no level is set', async () => {
     await expect(
-      startTelemetry({ agentName: 'agent' }, {}),
+      startTelemetry({ agentName: 'agent', framework: FRAMEWORK }, {}),
     ).resolves.toBeUndefined();
   });
 
   it('refuses a level it does not know', async () => {
     await expect(
       startTelemetry(
-        { agentName: 'agent', runtimeSessionId: 'session' },
+        {
+          agentName: 'agent',
+          runtimeSessionId: 'session',
+          framework: FRAMEWORK,
+        },
         { AGENTFORGE_TELEMETRY: 'VERBOSE' },
       ),
     ).rejects.toThrow();
@@ -78,7 +50,7 @@ describe('startTelemetry', () => {
   it('refuses to start without the runtime session to stamp on its spans', async () => {
     await expect(
       startTelemetry(
-        { agentName: 'agent' },
+        { agentName: 'agent', framework: FRAMEWORK },
         {
           AGENTFORGE_TELEMETRY: 'INFO',
           AWS_REGION: 'us-east-2',

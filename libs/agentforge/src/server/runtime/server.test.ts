@@ -6,7 +6,16 @@ const ENVIRONMENT = {
   AGENTFORGE_AGENT_IMAGE: 'hello-agent-image',
   AGENTFORGE_TABLE_NAME: 'tasks',
 };
-const OPTIONS = { taskEntry: 'task.ts', requiredSecrets: [] };
+const OPTIONS = {
+  taskEntry: 'task.ts',
+  framework: {
+    name: 'test',
+    requiredSecrets: [],
+    telemetryEnvironment: () => ({}),
+    collectorConfig: { WARN: [], INFO: [], DEBUG: [], ALL: [] },
+  },
+  requiredSecrets: [],
+};
 
 describe('the server config', () => {
   it('takes the image from the environment, or the option over it', () => {

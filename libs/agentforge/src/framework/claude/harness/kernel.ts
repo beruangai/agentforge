@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { inspect } from 'node:util';
 import {
+  type ModelUsage,
   type Options,
   type SDKAssistantMessageError,
   type SDKMessage,
@@ -11,15 +12,28 @@ import {
 import { hash as ohash } from 'ohash';
 import { z } from 'zod';
 import {
-  type Cause,
+  type CauseCode,
   cause,
   type RunRecord,
+  type RunUsage,
   type TranscriptLocation,
 } from '#core/contract/task.ts';
-import { S3SessionStore } from '#core/s3-session-store.ts';
+import type {
+  RunEnvironment,
+  AgentRun as SharedAgentRun,
+  AgentRunSpec as SharedAgentRunSpec,
+  TaskContext as SharedTaskContext,
+} from '../../../server/harness/framework.ts';
+import {
+  TaskCanceled,
+  TaskFailure,
+} from '../../../server/harness/task-failure.ts';
+import { S3SessionStore } from '../core/s3-session-store.ts';
+import { CLAUDE_AGENT_SDK_FULL_NAME } from '../core/sdk-version.ts';
 import { autoMemoryOptions } from './auto-memory.ts';
 import {
-  type AgentPrompt,
+  type CommandBlock,
+  type ContentBlock,
   createStreamingInput,
   createUserMessage,
 } from './prompt.ts';
@@ -27,72 +41,41 @@ import {
   structuredOutputWireSchema,
   unwrapStructuredOutput,
 } from './structured-output.ts';
-import {
-  type StopGuard,
-  structuredOutputValidation,
-} from './structured-output-validation.ts';
+import { structuredOutputValidation } from './structured-output-validation.ts';
 import { composeSystemPrompt } from './system-prompt.ts';
 
 /** The SDK options a procedure may set; the kernel owns the rest. */
 export type AgentOptions = Omit<Options, 'outputFormat' | 'abortController'>;
 
-export interface AgentRunSpec<Output> {
-  /** What the agent is asked: text, content blocks, context blocks and commands. */
-  readonly prompt: AgentPrompt;
-  /** The agent contract: what the agent itself fills in (§REQ102). Its root must be an object. */
-  readonly output: z.ZodType<Output>;
-  /**
-   * Opts in to sending a contract whose root is not an object nested under
-   * one property, unwrapped before it is parsed. Off by default: such a root
-   * is usually a contract to rewrite, not to wrap.
-   */
-  readonly wrapNonObjectOutput?: boolean;
-  readonly options?: AgentOptions;
-  /**
-   * Checks the structured output must pass, beside the agent contract,
-   * before it is accepted: run on each submission, every failure told to the agent at
-   * once, in its turn (§REQ208).
-   */
-  readonly guardrails?: {
-    readonly stop?: readonly StopGuard[];
+/** What the `claude` framework fixes for its procedures' types. */
+export type ClaudeTypes = {
+  readonly content: ContentBlock | CommandBlock;
+  readonly options: AgentOptions;
+  readonly extras: {
+    /**
+     * An absolute directory to keep Claude Code's auto memory in, usually a
+     * mounted filesystem's `localPath`, one memory space: its `MEMORY.md` index
+     * is in context from the first turn, and the agent is told how to keep it
+     * (§REQ404). Without it, auto memory is off.
+     */
+    readonly memoryDirectory?: string;
   };
-  /**
-   * An absolute directory to keep Claude Code's auto memory in, usually a
-   * mounted filesystem's `localPath`, one memory space: its `MEMORY.md` index
-   * is in context from the first turn, and the agent is told how to keep it
-   * (§REQ404). Without it, auto memory is off.
-   */
-  readonly memoryDirectory?: string;
-}
+  /** The SDK's usage per model. */
+  readonly usage: Readonly<Record<string, ModelUsage>>;
+};
 
-export interface AgentRun<Output> {
-  readonly output: Output;
-  readonly sessionId: string;
-  readonly record: RunRecord;
-}
+export type AgentRunSpec<Output> = SharedAgentRunSpec<ClaudeTypes, Output>;
 
-/** A run that ended on its own terms without an answer: the task fails with this cause. */
-export class TaskFailure extends Error {
-  readonly taskCause: Cause;
+export type AgentRun<Output> = SharedAgentRun<ClaudeTypes, Output>;
 
-  constructor(taskCause: Cause) {
-    super(`${taskCause.code}: ${taskCause.message}`);
-    this.taskCause = taskCause;
-    this.name = 'TaskFailure';
-  }
-}
+/**
+ * What every `claude` procedure handler receives as its oRPC context. An
+ * interface rather than an alias, so a procedure module's inferred router
+ * type names it from `/claude/agent`.
+ */
+export interface TaskContext extends SharedTaskContext<ClaudeTypes> {}
 
-/** The run was cancelled; the task ends `TASK_STATE_CANCELED`. */
-export class TaskCanceled extends Error {
-  constructor() {
-    super('the task was cancelled');
-    this.name = 'TaskCanceled';
-  }
-}
-
-export interface KernelContext {
-  readonly signal: AbortSignal;
-  readonly onRecord: (record: RunRecord) => void;
+export interface KernelContext extends RunEnvironment {
   /** The store the deployment declares; a procedure's own `sessionStore` wins. */
   readonly sessionStore?: SessionStore;
 }
@@ -279,7 +262,9 @@ export async function runAgent<Output>(
     context.signal.removeEventListener('abort', onAbort);
   }
 
+  const usage = result === undefined ? undefined : usageOf(result);
   const record: RunRecord = {
+    framework: { name: 'claude', fullName: CLAUDE_AGENT_SDK_FULL_NAME },
     promptHash,
     promptBytes: Buffer.byteLength(JSON.stringify(message.message.content)),
     options: recordableOptions(ownedOptions),
@@ -298,8 +283,9 @@ export async function runAgent<Output>(
       ? {}
       : {
           numberOfTurns: result.num_turns,
+          ...(usage === undefined ? {} : { usage }),
+          rawUsage: result.modelUsage,
           totalCostUsd: result.total_cost_usd,
-          modelUsage: result.modelUsage,
           ...(result.terminal_reason === undefined
             ? {}
             : { terminalReason: result.terminal_reason }),
@@ -369,7 +355,39 @@ export async function runAgent<Output>(
   }
   const sessionId = observed.sessionId ?? result.session_id;
   const output = settle(result, spec.output, observed, wire.wrapped);
-  return { output, sessionId, record };
+  if (usage === undefined) {
+    throw new TaskFailure(
+      cause(
+        'EXECUTION_ERROR',
+        'the run answered, but its result reports no token usage',
+      ),
+    );
+  }
+  return { output, sessionId, usage, rawUsage: result.modelUsage, record };
+}
+
+/** The result's token usage in the shared terms; none where the result reports none. */
+function usageOf(result: SDKResultMessage): RunUsage | undefined {
+  const {
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    cache_read_input_tokens: cacheReadInputTokens,
+    cache_creation_input_tokens: cacheCreationInputTokens,
+  } = result.usage ?? {};
+  if (
+    typeof inputTokens !== 'number' ||
+    typeof outputTokens !== 'number' ||
+    typeof cacheReadInputTokens !== 'number' ||
+    typeof cacheCreationInputTokens !== 'number'
+  ) {
+    return undefined;
+  }
+  return {
+    inputTokens,
+    outputTokens,
+    cacheReadInputTokens,
+    cacheCreationInputTokens,
+  };
 }
 
 interface Observed {
@@ -526,6 +544,29 @@ async function nextBefore(
   }
 }
 
+/** The `claude` framework's own suggested actions, over the neutral ones. */
+const CLAUDE_SUGGESTED_ACTION_BY_CODE: Partial<Record<CauseCode, string>> = {
+  BUDGET_EXHAUSTED:
+    'Raise `maxTurns` or `maxBudgetUsd` for the procedure, or narrow what the prompt asks for.',
+  USAGE_LIMITED:
+    "Retry after `retryAfter`, when the subscription's usage limit resets.",
+  CREDENTIAL_EXPIRED:
+    "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ705).",
+};
+
+/** A cause, with the `claude` framework's suggested action where it has its own. */
+function claudeCause(
+  code: CauseCode,
+  message: string,
+  extra: Parameters<typeof cause>[2] = {},
+) {
+  const suggestedAction = CLAUDE_SUGGESTED_ACTION_BY_CODE[code];
+  return cause(code, message, {
+    ...(suggestedAction === undefined ? {} : { suggestedAction }),
+    ...extra,
+  });
+}
+
 const CREDENTIAL_ERRORS = new Set<SDKAssistantMessageError>([
   'authentication_failed',
   'oauth_org_not_allowed',
@@ -573,11 +614,13 @@ export function settle<Output>(
     return parsed.data;
   }
   if (result.subtype === 'error_max_turns') {
-    throw new TaskFailure(cause('BUDGET_EXHAUSTED', 'maxTurns was reached'));
+    throw new TaskFailure(
+      claudeCause('BUDGET_EXHAUSTED', 'maxTurns was reached'),
+    );
   }
   if (result.subtype === 'error_max_budget_usd') {
     throw new TaskFailure(
-      cause('BUDGET_EXHAUSTED', 'maxBudgetUsd was reached'),
+      claudeCause('BUDGET_EXHAUSTED', 'maxBudgetUsd was reached'),
     );
   }
   if (result.subtype === 'error_max_structured_output_retries') {
@@ -602,7 +645,7 @@ export function settle<Output>(
     status === 401 ||
     status === 403
   ) {
-    throw new TaskFailure(cause('CREDENTIAL_EXPIRED', message));
+    throw new TaskFailure(claudeCause('CREDENTIAL_EXPIRED', message));
   }
   if (
     assistantError === 'rate_limit' ||
@@ -611,7 +654,7 @@ export function settle<Output>(
   ) {
     const resetsAt = observed.rateLimitResetsAt;
     throw new TaskFailure(
-      cause(
+      claudeCause(
         'USAGE_LIMITED',
         message,
         resetsAt === undefined

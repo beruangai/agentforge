@@ -16,6 +16,10 @@ function writePublished(directory: string): void {
   writeFileSync(join(directory, 'Dockerfile'), 'FROM scratch\n');
   writeFileSync(join(directory, 'container', 'package.json'), '{}');
   writeFileSync(join(directory, 'container', 'bun.lock'), '{}');
+  mkdirSync(join(directory, 'claude', 'container'), { recursive: true });
+  writeFileSync(join(directory, 'claude', 'Dockerfile'), 'FROM scratch\n');
+  writeFileSync(join(directory, 'claude', 'container', 'package.json'), '{}');
+  writeFileSync(join(directory, 'claude', 'container', 'bun.lock'), '{}');
 }
 
 beforeEach(() => {
@@ -37,6 +41,14 @@ describe('containerInputsOf', () => {
       rootManifest: join(installed, 'container/package.json'),
       rootLock: join(installed, 'container/bun.lock'),
       version: '1.2.3',
+      frameworks: {
+        claude: {
+          dockerfile: join(installed, 'claude/Dockerfile'),
+          containerDirectory: join(installed, 'claude/container'),
+          rootManifest: join(installed, 'claude/container/package.json'),
+          rootLock: join(installed, 'claude/container/bun.lock'),
+        },
+      },
     });
   });
 
@@ -62,6 +74,9 @@ describe('containerInputsOf', () => {
         join(bundle, 'Dockerfile'),
         join(bundle, 'container/package.json'),
         join(bundle, 'container/bun.lock'),
+        join(bundle, 'claude/Dockerfile'),
+        join(bundle, 'claude/container/package.json'),
+        join(bundle, 'claude/container/bun.lock'),
       ].join(
         ', ',
       )} (running from source, they are @beruangai/agentforge's bundle output)`,

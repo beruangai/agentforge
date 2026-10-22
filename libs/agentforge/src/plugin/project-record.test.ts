@@ -55,7 +55,10 @@ describe('readAgenticProject', () => {
         WRITER,
         { generator: 'ts#agent', name: 'other', path: 'src/other' },
       ],
-      agentforge: { detached: { files: [], targets: ['image'] } },
+      agentforge: {
+        framework: 'claude',
+        detached: { files: [], targets: ['image'] },
+      },
     });
     expect(readAgenticProject(tree, 'golden-kata')).toEqual({
       name: '@proj/golden-kata',
@@ -63,6 +66,7 @@ describe('readAgenticProject', () => {
       packageName: '@proj/golden-kata',
       projectName: 'golden-kata',
       scope: 'proj',
+      framework: 'claude',
       agents: [WRITER],
       detached: { files: [], targets: ['image'] },
     });
@@ -83,6 +87,31 @@ describe('readAgenticProject', () => {
     });
     expect(() => readAgenticProject(tree, 'golden-kata')).toThrow(
       `@proj/golden-kata's component "writer" is not an agent's record`,
+    );
+  });
+
+  it('refuses a record that names no framework, naming the field and the frameworks provided', () => {
+    addProject({
+      generator: AGENTIC_PROJECT_GENERATOR,
+      components: [],
+      agentforge: { detached: { files: [], targets: [] } },
+    });
+    expect(() => readAgenticProject(tree, 'golden-kata')).toThrow(
+      "@proj/golden-kata's project.json metadata.agentforge.framework is missing: name the project's framework, one of claude",
+    );
+  });
+
+  it('refuses a framework AgentForge does not provide', () => {
+    addProject({
+      generator: AGENTIC_PROJECT_GENERATOR,
+      components: [],
+      agentforge: {
+        framework: 'langgraph',
+        detached: { files: [], targets: [] },
+      },
+    });
+    expect(() => readAgenticProject(tree, 'golden-kata')).toThrow(
+      /is not an agentic project's record[\s\S]*framework/,
     );
   });
 
@@ -204,7 +233,7 @@ describe('a workflow project', () => {
     addProject({
       generator: AGENTIC_PROJECT_GENERATOR,
       components: [WRITER],
-      agentforge: { detached: { files: [], targets: [] } },
+      agentforge: { framework: 'claude', detached: { files: [], targets: [] } },
     });
     const [connected] = connectedProjects(
       readWorkflowProject(tree, 'golden-kata-workflows'),

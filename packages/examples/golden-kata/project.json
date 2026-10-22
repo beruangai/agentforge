@@ -22,6 +22,7 @@
       }
     ],
     "agentforge": {
+      "framework": "claude",
       "detached": {
         "files": [],
         "targets": []
@@ -63,7 +64,7 @@
     "image": {
       "executor": "@beruangai/agentforge:image",
       "cache": false,
-      "dependsOn": ["lock", "image-agentforge"],
+      "dependsOn": ["lock", "image-agentforge-claude"],
       "options": {
         "layer": "base"
       }
@@ -212,6 +213,14 @@
       "cache": false,
       "options": {
         "stop": true
+      }
+    },
+    "image-agentforge-claude": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["image-agentforge"],
+      "options": {
+        "layer": "agentforge-claude"
       }
     }
   }

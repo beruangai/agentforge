@@ -1,9 +1,17 @@
-import { readProjectConfiguration, type Tree, writeJson } from '@nx/devkit';
+import {
+  readJson,
+  readProjectConfiguration,
+  type Tree,
+  writeJson,
+} from '@nx/devkit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FRAMEWORK_NAMES } from '#core/contract/framework.ts';
 import { treeFiles, workspaceTree } from '../../__fixtures__/workspace-tree.ts';
+import { peerRange } from '../../workspace-dependencies.ts';
 import agentGenerator from '../agent/generator.ts';
 import syncGenerator from '../sync/generator.ts';
 import agenticProjectGenerator from './generator.ts';
+import schema from './schema.json' with { type: 'json' };
 
 vi.mock(
   '@aws/nx-plugin/sdk/ts',
@@ -51,6 +59,39 @@ describe('agentic-project', () => {
     const before = treeFiles(tree);
     await syncGenerator(tree);
     expect(treeFiles(tree)).toEqual(before);
+  });
+
+  it('records the claude framework by default, and declares its peers', async () => {
+    await agenticProjectGenerator(tree, { name: 'golden-kata' });
+    expect(
+      readProjectConfiguration(tree, '@proj/golden-kata').metadata?.agentforge
+        .framework,
+    ).toBe('claude');
+    const { catalog } = readJson(tree, 'package.json');
+    for (const peer of [
+      '@anthropic-ai/claude-agent-sdk',
+      '@anthropic-ai/sdk',
+    ]) {
+      expect(catalog[peer]).toBe(peerRange(peer));
+    }
+  });
+
+  it('refuses a framework AgentForge does not provide, naming those it does, writing nothing', async () => {
+    const before = treeFiles(tree);
+    await expect(
+      agenticProjectGenerator(tree, {
+        name: 'golden-kata',
+        framework: 'strands' as never,
+      }),
+    ).rejects.toThrow(
+      'framework "strands" is not one AgentForge provides: claude',
+    );
+    expect(treeFiles(tree)).toEqual(before);
+  });
+
+  it('offers exactly the provided frameworks, claude by default', () => {
+    expect(schema.properties.framework.enum).toEqual([...FRAMEWORK_NAMES]);
+    expect(schema.properties.framework.default).toBe('claude');
   });
 
   it('changes nothing when generated again', async () => {

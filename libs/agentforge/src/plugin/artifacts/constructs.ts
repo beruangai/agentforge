@@ -1,3 +1,4 @@
+import { frameworkPlugin } from '#framework/registry.ts';
 import { agenticImage, imageIdFile } from '../container/images.ts';
 import { pascalCase } from '../names.ts';
 import type {
@@ -74,6 +75,7 @@ ${context.esm ? "import { fileURLToPath } from 'node:url';\n" : ''}import {
   type AgentRuntimeProps,
   type AgentSecrets,
 } from '@beruangai/agentforge/infra';
+import { REQUIRED_SECRETS as FRAMEWORK_SECRETS } from '${frameworkPlugin(project.framework).imports.infra}';
 import type { REQUIRED_SECRETS as PROJECT_SECRETS } from '${project.packageName}/secrets';
 import type { REQUIRED_SECRETS as AGENT_SECRETS } from '${project.packageName}/${agent.name}/secrets';
 import { AgentRuntimeArtifact } from 'aws-cdk-lib/aws-bedrockagentcore';
@@ -101,15 +103,17 @@ function parentImageId(): string {
 
 /**
  * The ${agent.name} agent's secrets, by the environment variable each becomes:
- * AgentForge's own, the base layer's and the agent's \`REQUIRED_SECRETS\`.
+ * its framework's, the base layer's and the agent's \`REQUIRED_SECRETS\`.
  */
 export type Secrets = AgentSecrets<
-  (typeof PROJECT_SECRETS)[number] | (typeof AGENT_SECRETS)[number]
+  | (typeof FRAMEWORK_SECRETS)[number]
+  | (typeof PROJECT_SECRETS)[number]
+  | (typeof AGENT_SECRETS)[number]
 >;
 
 export type AgentProps = Omit<
   AgentRuntimeProps,
-  'agentRuntimeArtifact' | 'secrets' | 'agentName'
+  'agentRuntimeArtifact' | 'secrets' | 'requiredSecrets' | 'agentName'
 > & {
   readonly secrets: Secrets;
 };
@@ -123,6 +127,7 @@ export class Agent extends AgentRuntime {
     super(scope, id, {
       ...props,
       agentName: '${agent.name}',
+      requiredSecrets: FRAMEWORK_SECRETS,
       agentRuntimeArtifact: AgentRuntimeArtifact.fromAsset(LAYER_DIRECTORY, {
         platform: Platform.LINUX_ARM64,
         buildArgs: { BASE_IMAGE: '${agenticImage(project)}' },

@@ -39,7 +39,7 @@
         "command": "tsdown && publint run ../../dist/libs/agentforge/bundle --strict --pack npm",
         "cwd": "{projectRoot}"
       },
-      "dependsOn": ["container-lock"]
+      "dependsOn": ["container-lock", "container-lock-claude"]
     },
     "pack": {
       "executor": "nx:run-commands",
@@ -72,6 +72,34 @@
       ],
       "options": {
         "command": "bun container/base-lock.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "container-lock-claude": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["container-lock"],
+      "inputs": [
+        "{projectRoot}/container/*.ts",
+        "{projectRoot}/container/workspace/package.json",
+        "{projectRoot}/container/workspace/bun.lock",
+        "{projectRoot}/src/plugin/container/container-workspace.ts",
+        "{projectRoot}/src/framework/registry.ts",
+        "{projectRoot}/src/framework/claude/plugin/*.ts",
+        "{projectRoot}/published-manifest.ts",
+        "{projectRoot}/package.json",
+        "{projectRoot}/src/plugin/*.json",
+        "{workspaceRoot}/package.json",
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": [
+        "{projectRoot}/src/framework/claude/container/package.json",
+        "{projectRoot}/src/framework/claude/container/bun.lock"
+      ],
+      "options": {
+        "command": "bun container/framework-lock.ts claude",
         "cwd": "{projectRoot}"
       }
     },
@@ -116,7 +144,7 @@
           "args": "--project=@beruangai/agentforge:integ:model"
         }
       },
-      "dependsOn": ["image", "pack"]
+      "dependsOn": ["image-claude", "pack"]
     },
     "lint": {
       "executor": "nx:run-commands",
@@ -139,8 +167,17 @@
       "cache": false,
       "dependsOn": ["bundle"],
       "options": {
-        "command": "docker build --platform linux/arm64 -f Dockerfile --build-context container=container -t agentforge/a2a-claude:local .",
+        "command": "docker build --platform linux/arm64 -f Dockerfile --build-context container=container -t agentforge/a2a:local .",
         "cwd": "{workspaceRoot}/dist/{projectRoot}/bundle"
+      }
+    },
+    "image-claude": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["image"],
+      "options": {
+        "command": "docker build --platform linux/arm64 -f Dockerfile --build-arg BASE_IMAGE=agentforge/a2a:local --build-context container=container -t agentforge/a2a-claude:local container",
+        "cwd": "{workspaceRoot}/dist/{projectRoot}/bundle/claude"
       }
     }
   }

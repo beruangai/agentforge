@@ -13,16 +13,21 @@ import { GOLDEN_KATA } from '../../__fixtures__/golden-kata.ts';
 import { assembleContainerWorkspace } from '../../container/container-workspace.ts';
 import { layerLock, workerLock } from './executor.ts';
 
+const CLAUDE = {
+  dockerfile: '/installed/agentforge/claude/Dockerfile',
+  containerDirectory: '/installed/agentforge/claude/container',
+  rootManifest: '/installed/agentforge/claude/container/package.json',
+  rootLock: '/installed/agentforge/claude/container/bun.lock',
+};
 const INPUTS = {
   packageDirectory: '/installed/agentforge',
-  rootManifest: '/installed/agentforge/container/package.json',
-  rootLock: '/installed/agentforge/container/bun.lock',
+  frameworks: { claude: CLAUDE },
 };
 
 describe('layerLock', () => {
-  it('locks the base layer on AgentForge, seeded with its root lock', () => {
+  it("locks the base layer on its framework's root, seeded with its framework's root lock", () => {
     expect(layerLock(GOLDEN_KATA, 'base', INPUTS, '/workspace')).toEqual({
-      rootManifest: INPUTS.rootManifest,
+      rootManifest: CLAUDE.rootManifest,
       members: [
         {
           containerPath: 'agentforge',
@@ -33,13 +38,14 @@ describe('layerLock', () => {
           manifest: '/workspace/packages/golden-kata/base/agentic/package.json',
         },
       ],
-      seed: INPUTS.rootLock,
+      seed: CLAUDE.rootLock,
       out: '/workspace/packages/golden-kata/base/agentic/bun.lock',
     });
   });
 
   it("locks an agent's layer on the base layer, seeded with its lock", () => {
     const lock = layerLock(GOLDEN_KATA, 'agents/writer', INPUTS, '/workspace');
+    expect(lock.rootManifest).toBe(CLAUDE.rootManifest);
     expect(lock.members.at(-1)).toEqual({
       containerPath: 'agentic/agent',
       manifest:
@@ -61,11 +67,14 @@ describe('layerLock', () => {
     );
   });
 
-  it('refuses the agentforge layer, whose lock AgentForge ships', () => {
-    expect(() =>
-      layerLock(GOLDEN_KATA, 'agentforge', INPUTS, '/workspace'),
-    ).toThrow("the agentforge layer's lock ships in AgentForge's package");
-  });
+  it.each(['agentforge', 'agentforge-claude'])(
+    'refuses the %s layer, whose lock AgentForge ships',
+    (layer) => {
+      expect(() => layerLock(GOLDEN_KATA, layer, INPUTS, '/workspace')).toThrow(
+        `the ${layer} layer's lock ships in AgentForge's package`,
+      );
+    },
+  );
 });
 
 describe('assembleContainerWorkspace', () => {

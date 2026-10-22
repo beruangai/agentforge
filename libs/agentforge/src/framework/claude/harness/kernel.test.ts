@@ -1,6 +1,7 @@
 import type {
   HookCallback,
   HookInput,
+  ModelUsage,
   Options,
   SDKMessage,
   SessionStore,
@@ -11,7 +12,12 @@ import { hash as ohash } from 'ohash';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { RunRecord } from '#core/contract/task.ts';
-import { S3SessionStore } from '#core/s3-session-store.ts';
+import {
+  TaskCanceled,
+  TaskFailure,
+} from '../../../server/harness/task-failure.ts';
+import { S3SessionStore } from '../core/s3-session-store.ts';
+import { CLAUDE_AGENT_SDK_VERSION } from '../core/sdk-version.ts';
 import { init, result, scriptedQuery } from './__fixtures__/scripted-query.ts';
 import { AUTO_MEMORY_FRAGMENT } from './auto-memory.ts';
 import {
@@ -20,8 +26,6 @@ import {
   matcherSelects,
   type QueryFunction,
   runAgent,
-  TaskCanceled,
-  TaskFailure,
 } from './kernel.ts';
 
 const OutputSchema = z.object({ answer: z.string() });
@@ -65,6 +69,36 @@ describe('runAgent', () => {
     expect(agentRun.record.options).toEqual({ maxTurns: 3 });
     expect(agentRun.record).not.toHaveProperty('prompt');
     expect(agentRun.record.promptHash).toEqual(expect.any(String));
+  });
+
+  it('names the framework on its record, and keeps the usage there and on the run', async () => {
+    const modelUsage = {
+      'claude-haiku-4-5': { inputTokens: 10 },
+    } as unknown as Record<string, ModelUsage>;
+    const { promise } = run(
+      scriptedQuery([
+        result({ structured_output: { answer: 'yes' }, modelUsage }),
+      ]),
+    );
+    const agentRun = await promise;
+    const usage = {
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheReadInputTokens: 2,
+      cacheCreationInputTokens: 1,
+    };
+    expect(agentRun.record).toMatchObject({
+      framework: {
+        name: 'claude',
+        fullName: `@anthropic-ai/claude-agent-sdk@${CLAUDE_AGENT_SDK_VERSION}`,
+      },
+      usage,
+      rawUsage: modelUsage,
+      totalCostUsd: 0.01,
+    });
+    expect(agentRun.record).not.toHaveProperty('modelUsage');
+    expect(agentRun.usage).toEqual(usage);
+    expect(agentRun.rawUsage).toEqual(modelUsage);
   });
 
   it('refuses an agent contract whose root is not an object, before the run', async () => {
@@ -460,6 +494,28 @@ describe('runAgent', () => {
     ],
   ])('classifies %s', async (_name, message, code) => {
     expect(await causeOf(run(scriptedQuery([message])).promise)).toBe(code);
+  });
+
+  it.each([
+    [
+      result({ subtype: 'error_max_turns', is_error: true }),
+      'Raise `maxTurns` or `maxBudgetUsd` for the procedure, or narrow what the prompt asks for.',
+    ],
+    [
+      result({ is_error: true, api_error_status: 429, result: 'limited' }),
+      "Retry after `retryAfter`, when the subscription's usage limit resets.",
+    ],
+    [
+      result({ is_error: true, api_error_status: 401, result: 'no' }),
+      "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ705).",
+    ],
+  ])('suggests the Claude action for its cause', async (message, suggested) => {
+    const error = await run(scriptedQuery([message])).promise.then(
+      () => undefined,
+      (thrown: unknown) => thrown,
+    );
+    expect(error).toBeInstanceOf(TaskFailure);
+    expect((error as TaskFailure).taskCause.suggestedAction).toBe(suggested);
   });
 
   it('fails when the stream ends with no result', async () => {

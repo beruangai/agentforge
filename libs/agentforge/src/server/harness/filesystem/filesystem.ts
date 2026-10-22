@@ -6,8 +6,8 @@ import {
   type TerminalTaskState,
   TerminalTaskStateEnum,
 } from '#core/contract/task.ts';
-import { TaskFailure } from '../kernel.ts';
-import type { TaskContext } from '../task-process.ts';
+import type { FrameworkTypes, TaskContext } from '../framework.ts';
+import { TaskFailure } from '../task-failure.ts';
 import { claimLocalDirectory } from './mount-claims.ts';
 
 /** The task states a filesystem may push on: a cancel never pushes, and a rejected task never mounts. */
@@ -21,7 +21,7 @@ export type PushOnState = z.infer<typeof PushOnStateEnum>;
 export interface FilesystemRequest {
   /** Validated against the procedure's contract. */
   readonly input: unknown;
-  readonly context: TaskContext;
+  readonly context: TaskContext<FrameworkTypes>;
 }
 
 /** Where under its roots a filesystem mounts for a request, and what within it may be written. A mount is readable whole. */
@@ -107,11 +107,22 @@ export interface Mount {
   readonly write: readonly string[];
 }
 
+/** What a permission lets an agent do. */
+export type PermissionAction = 'read' | 'edit';
+
+/** A baseline permission on a mount, in no framework's syntax: its framework renders it. */
+export interface Permission {
+  readonly action: PermissionAction;
+  /** Relative to the mount's `localPath`; `**` for the whole mount. */
+  readonly glob: string;
+}
+
 /** What the handler receives for a mounted filesystem: its local path, and permissions it may give an agent. */
 export interface MountedFilesystem {
   readonly localPath: string;
   /** Claude Code permission rules: reading the whole mount, and editing its write scope. AgentForge applies none: the handler decides. */
-  readonly permissions: { readonly allow: readonly string[] };
+  /** `read` on the whole mount first, then `edit` on each glob of its write scope. */
+  readonly permissions: readonly Permission[];
   /** The local path of `relativePath` in the mount; throws if it is absolute or climbs out. */
   path(relativePath: string): string;
   /** As `path`, and throws unless a write glob of the scope matches it: a write outside the scope would never be pushed. */
@@ -289,12 +300,10 @@ export class MountLifecycle {
         }
         return resolved;
       },
-      permissions: {
-        allow: [
-          `Read(/${mount.localPath}/**)`,
-          ...mount.write.map((glob) => `Edit(/${mount.localPath}/${glob})`),
-        ],
-      },
+      permissions: [
+        { action: 'read', glob: '**' },
+        ...mount.write.map((glob) => ({ action: 'edit' as const, glob })),
+      ],
     };
     const { checkpoints } = filesystem.options;
     if (checkpoints !== undefined) {

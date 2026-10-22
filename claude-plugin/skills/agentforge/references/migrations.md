@@ -10,6 +10,34 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
+## framework-seam, 2026-10-22 (from A6)
+
+### Breaks
+
+- **The project record.** Sync refuses an agentic project whose `project.json` `metadata.agentforge` names no `framework`, naming the field.
+- **Imports.** `implementAgent`, `runTaskProcess`, `TaskContext`, `runAgent`, `composeOptions`, `distill` and its types, `documentBlock`, and the Claude prompt and run types (`AgentOptions`, `AgentRun`, `AgentRunSpec`, `AgentPrompt`, `PromptContent`, `ContentBlock`, `CommandBlock`, `ContextDocument`) leave `@beruangai/agentforge/agent` for `@beruangai/agentforge/claude/agent`. `readTranscript` leaves `@beruangai/agentforge/client` for `@beruangai/agentforge/claude/client`. A stale import fails to compile.
+- **The cache breakpoint.** A context block's `cache` is `true` or `{ ttl: '5m' | '1h' }`; `{ type: 'ephemeral', ttl }` no longer compiles.
+- **Filesystem permissions.** `context.filesystems.<name>.permissions` is data, `{ action: 'read' | 'edit', glob }` relative to the mount, not Claude rule strings. `context.agentOptions` is unchanged for `claude`.
+- **The run record.** `modelUsage` leaves the top level: `usage` holds the shared token counts, `rawUsage` the SDK's `modelUsage`, and `framework` names the framework. `totalCostUsd` is optional.
+- **Images.** The base image is `agentforge/a2a`, with no bash, git or ripgrep, and the `claude` framework's image, `agentforge/a2a-claude`, is built on it. A project builds both through `image-agentforge` and `image-agentforge-claude`.
+- **Infrastructure.** `AgentRuntime` takes `requiredSecrets`, the framework's, which the generated construct passes from `@beruangai/agentforge/claude/infra`.
+
+### Change
+
+1. **Record the framework.** Add `"framework": "claude"` to each agentic project's `project.json` `metadata.agentforge`.
+2. **Upgrade and sync.** Take the new AgentForge, run `nx sync`, then `lock` for each layer. This rewrites the task and server entries, the constructs, the base Dockerfile and the targets.
+3. **Imports.** In each scaffolded or detached module, import the names listed above from `@beruangai/agentforge/claude/agent`, keeping filesystems, `composeContext`, `ContextBlockFunction`, `StopGuard` and `TaskFailure` on `@beruangai/agentforge/agent`. The base layer's `options.ts` imports `AgentOptions` from `@beruangai/agentforge/claude/agent`.
+4. **Transcripts.** Import `readTranscript` from `@beruangai/agentforge/claude/client`.
+5. **Cache breakpoints.** Replace `cache: { type: 'ephemeral', ttl }` with `cache: { ttl }`.
+6. **Permissions and records.** Code that read a mount's `permissions` as rule strings reads `{ action, glob }`. Code that read a run record's `modelUsage` reads `rawUsage`, or `usage` for token counts.
+7. **Detached Dockerfiles and infra.** A detached base `Dockerfile` builds on the framework image its `image` target names. A hand-written `AgentRuntime` passes `requiredSecrets: REQUIRED_SECRETS` from `@beruangai/agentforge/claude/infra`.
+
+### Verify
+
+- `nx sync:check` passes.
+- The project's `typecheck`, `lint` and `test` pass.
+- `e2e` passes locally. After deploying, `e2e-agentcore` passes, and a task's run records name `framework.name` `claude`.
+
 ## A6, 2026-10-08 (from A5)
 
 ### Breaks

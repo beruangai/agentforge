@@ -1,13 +1,17 @@
-# The AgentForge base image, `agentforge/a2a-claude`: Bun, what the Claude
-# Code CLI needs at run time, the ADOT collector that carries the CLI's
-# telemetry to CloudWatch, `s7cmd` for S3 filesystems, and the container's `/workspace` — a Bun
-# workspace whose root depends on the peers AgentForge's server and harness
-# import, with AgentForge itself as the member at `/workspace/agentforge`.
+# The AgentForge base image, `agentforge/a2a`: Bun, the ADOT collector that
+# carries a framework's telemetry to CloudWatch, `s7cmd` for S3 filesystems,
+# and the container's `/workspace` — a Bun workspace whose root depends on the
+# peers AgentForge's server and shared harness import, with AgentForge itself
+# as the member at `/workspace/agentforge`. It names no framework: a
+# framework's image (`agentforge/a2a-<framework>`, from the bundle's
+# `<framework>/Dockerfile`) is built on it and extends the workspace's root
+# with the framework's own peers.
 #
-# An agentic project's image adds its member at `/workspace/agentic`, and an
-# agent's image its member at `/workspace/agentic/agent`; each copies in its
-# own lock of the whole workspace and installs, so a layer bakes in only what
-# it adds and every layer resolves shared packages to one copy.
+# An agentic project's image, on its framework's, adds its member at
+# `/workspace/agentic`, and an agent's image its member at
+# `/workspace/agentic/agent`; each copies in its own lock of the whole
+# workspace and installs, so a layer bakes in only what it adds and every
+# layer resolves shared packages to one copy.
 #
 # Build context: the published bundle, which becomes the `agentforge` member.
 # The `container` context holds the root manifest and its lock.
@@ -27,20 +31,16 @@ FROM ${BUN_IMAGE}
 # A static binary; the server starts it when the construct sets a telemetry level.
 COPY --from=collector /awscollector /usr/local/bin/aws-otel-collector
 COPY --from=s7cmd /usr/local/bin/s7cmd /usr/local/bin/s7cmd
-# The Claude CLI's Bash tool needs bash, named by SHELL; git and ripgrep are its tools'.
 RUN apt-get update \
- && apt-get install --yes --no-install-recommends bash git ca-certificates ripgrep \
+ && apt-get install --yes --no-install-recommends ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /workspace/agentforge /workspace/agentic/agent \
  && chown -R bun:bun /workspace
-# The CLI refuses to run tools unattended as root; the image never runs as root.
+# The image never runs as root.
 USER bun
 WORKDIR /workspace
 COPY --from=container --chown=bun package.json bun.lock ./
 COPY --chown=bun . agentforge/
 RUN bun install --frozen-lockfile --production
-# Each run's cwd: the agent's own directory, so every layer's `.claude/`
-# composes up the tree from it.
-WORKDIR /workspace/agentic/agent
-ENV SHELL=/bin/bash AGENTFORGE_PORT=9000
+ENV AGENTFORGE_PORT=9000
 EXPOSE 9000

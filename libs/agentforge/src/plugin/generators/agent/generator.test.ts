@@ -169,6 +169,11 @@ describe('agent', () => {
     await expect(
       agentGenerator(tree, { project: 'golden-kata', name: 'base' }),
     ).rejects.toThrow('agent name "base" is reserved');
+    for (const name of ['agentforge', 'agentforge-claude']) {
+      await expect(
+        agentGenerator(tree, { project: 'golden-kata', name }),
+      ).rejects.toThrow(`agent name "${name}" is reserved`);
+    }
     await expect(
       agentGenerator(tree, {
         project: 'golden-kata',

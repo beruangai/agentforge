@@ -3,7 +3,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TaskContext } from '../task-process.ts';
+import type { FrameworkTypes, TaskContext } from '../framework.ts';
 import {
   S3Filesystem,
   type S3FilesystemOptions,
@@ -54,7 +54,7 @@ function s3(
       filesystem.resolve({
         name: 'vault',
         taskId: 't-1',
-        request: { input: {}, context: {} as TaskContext },
+        request: { input: {}, context: {} as TaskContext<FrameworkTypes> },
       }),
     );
   return { calls, mount };
@@ -256,7 +256,7 @@ describe('the declared buckets', () => {
           filesystem.resolve({
             name: 'vault',
             taskId: 't-1',
-            request: { input: {}, context: {} as TaskContext },
+            request: { input: {}, context: {} as TaskContext<FrameworkTypes> },
           }),
         ),
       ).rejects.toThrow(message);
@@ -272,7 +272,10 @@ describe('ScratchFilesystem', () => {
         filesystem.resolve({
           name: 'drafts',
           taskId,
-          request: { input: {}, context: { taskId } as TaskContext },
+          request: {
+            input: {},
+            context: { taskId } as TaskContext<FrameworkTypes>,
+          },
         }),
       );
     const defaulted = new ScratchFilesystem();
@@ -298,7 +301,10 @@ describe('ScratchFilesystem', () => {
       filesystem.resolve({
         name: 'scratch',
         taskId: 't-1',
-        request: { input: {}, context: { taskId: 't-1' } as TaskContext },
+        request: {
+          input: {},
+          context: { taskId: 't-1' } as TaskContext<FrameworkTypes>,
+        },
       }),
     );
     expect(scratch.mounted.localPath).toBe(

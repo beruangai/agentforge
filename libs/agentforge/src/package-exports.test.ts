@@ -13,9 +13,11 @@ import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * The entry-point boundary is enforced, not documented: `/agent` resolves only
- * under the `agentforge-agent` export condition, so a worker's build that
- * imports it fails to resolve rather than bundling the Agent SDK.
+ * The entry-point boundary is enforced, not documented: `/agent`, `/server`
+ * and the frameworks' agent and server parts resolve only under the
+ * `agentforge-agent` export condition, so a worker's build that imports one
+ * fails to resolve rather than bundling an agent SDK. The entry points every
+ * framework's project imports reach no framework's SDK at all.
  *
  * Resolved against the real `package.json` installed into a scratch consumer,
  * with every export target stubbed. Whether the built files match the map is
@@ -27,13 +29,18 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
   exports: Record<string, unknown>;
 };
 const AGENT_CONDITION = 'agentforge-agent';
+const AGENT_ENTRY_POINTS = ['agent', 'server', 'claude/agent', 'claude/server'];
 const OPEN_ENTRY_POINTS = [
   'contract',
   'client',
   'temporal',
   'temporal/workflow',
   'infra',
+  'claude/client',
+  'claude/infra',
 ];
+/** The entry points every framework's project imports, which must reach no framework's SDK. */
+const SHARED_ENTRY_POINTS = ['agent', 'client', 'contract'];
 
 /** Every file an export target names, however deeply its conditions nest. */
 function exportTargets(value: unknown): string[] {
@@ -133,8 +140,8 @@ function bunBuild(specifier: string, conditions: string[]) {
   );
 }
 
-describe('/agent', () => {
-  const specifier = `${packageJson.name}/agent`;
+describe.each(AGENT_ENTRY_POINTS)('/%s', (entryPoint) => {
+  const specifier = `${packageJson.name}/${entryPoint}`;
 
   it('does not resolve in Node without the agent condition', () => {
     const result = nodeImport(specifier, []);
@@ -155,7 +162,9 @@ describe('/agent', () => {
   it('resolves for TypeScript under the agent condition, to its declarations', () => {
     expect(
       typescriptResolve(specifier, [AGENT_CONDITION])?.resolvedFileName,
-    ).toBe(installedFile(declarationsTarget('./agent', AGENT_CONDITION)));
+    ).toBe(
+      installedFile(declarationsTarget(`./${entryPoint}`, AGENT_CONDITION)),
+    );
   });
 
   it('does not bundle with Bun without the agent condition', () => {
@@ -186,6 +195,54 @@ describe.each(OPEN_ENTRY_POINTS)('/%s', (entryPoint) => {
     );
   });
 });
+
+/** The source an entry point's `@beruangai/source` target names, under an optional condition. */
+function sourceTarget(subpath: string, condition?: string): string {
+  const entry = packageJson.exports[subpath] as Record<string, unknown>;
+  const conditioned = (condition ? entry[condition] : entry) as Record<
+    string,
+    unknown
+  >;
+  const source = conditioned['@beruangai/source'];
+  if (typeof source !== 'string') {
+    throw new Error(`exports["${subpath}"] declares no source target`);
+  }
+  return join(dirname(packageJsonPath), source);
+}
+
+describe.each(SHARED_ENTRY_POINTS)(
+  '/%s, shared by every framework',
+  (entryPoint) => {
+    it('reaches no Anthropic package, so it resolves and typechecks with neither installed', () => {
+      const { config } = ts.readConfigFile(
+        join(dirname(packageJsonPath), 'tsconfig.lib.json'),
+        ts.sys.readFile,
+      );
+      const { options } = ts.parseJsonConfigFileContent(
+        config,
+        ts.sys,
+        dirname(packageJsonPath),
+      );
+      const program = ts.createProgram(
+        [
+          sourceTarget(
+            `./${entryPoint}`,
+            entryPoint === 'agent' ? AGENT_CONDITION : undefined,
+          ),
+        ],
+        { ...options, noEmit: true, incremental: false },
+      );
+      const reached = program
+        .getSourceFiles()
+        .map((file) => file.fileName)
+        .filter((fileName) =>
+          fileName.includes('/node_modules/@anthropic-ai/'),
+        );
+      expect(reached).toEqual([]);
+      expect(ts.getPreEmitDiagnostics(program)).toEqual([]);
+    });
+  },
+);
 
 describe('the package root', () => {
   it('exports nothing, so every import names its environment', () => {

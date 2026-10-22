@@ -1,17 +1,15 @@
-// biome-ignore-start lint/style/noRestrictedImports: the store's types only, which compile away (ARCHITECTURE.md §8)
 import type {
   SessionKey,
   SessionStore,
   SessionStoreEntry,
 } from '@anthropic-ai/claude-agent-sdk';
-// biome-ignore-end lint/style/noRestrictedImports: -
 import {
   GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import type { TranscriptLocation } from './contract/task.ts';
+import type { TranscriptLocation } from '#core/contract/task.ts';
 
 const LOAD_CONCURRENCY = 16;
 

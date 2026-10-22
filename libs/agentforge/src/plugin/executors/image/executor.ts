@@ -11,6 +11,8 @@ import {
   agentImage,
   agenticImage,
   agentOfLayer,
+  frameworkImage,
+  frameworkOfLayer,
   imageIdFile,
   type Layer,
 } from '../../container/images.ts';
@@ -18,7 +20,7 @@ import type { AgenticProject } from '../../project-record.ts';
 import { executorProject } from '../executor-project.ts';
 
 export interface ImageExecutorOptions {
-  /** `agentforge`, `base`, or `agents/<agent>`. */
+  /** `agentforge`, `agentforge-<framework>`, `base`, or `agents/<agent>`. */
   readonly layer: string;
   /**
    * Further named build contexts for a project's layer, by name, each a
@@ -36,21 +38,34 @@ export interface ImageBuild {
   readonly idFile: string;
 }
 
-/** The ARM64 build of one layer, `FROM` its parent through `BASE_IMAGE`, writing its id. */
+/** The ARM64 build of one layer, `FROM` its parent through `BASE_IMAGE`, writing its id: the base image alone is `FROM` none. */
 export function imageBuild(
   project: AgenticProject,
   layer: string,
   inputs: Pick<
     ContainerInputs,
-    'packageDirectory' | 'dockerfile' | 'containerDirectory' | 'version'
+    | 'packageDirectory'
+    | 'dockerfile'
+    | 'containerDirectory'
+    | 'version'
+    | 'frameworks'
   >,
   workspaceRoot: string,
   buildContexts: Readonly<Record<string, string>> = {},
 ): ImageBuild {
   const agentName = agentOfLayer(project, layer);
-  if (layer === 'agentforge' && Object.keys(buildContexts).length > 0) {
+  const framework = frameworkOfLayer(layer);
+  if (
+    (layer === 'agentforge' || framework !== undefined) &&
+    Object.keys(buildContexts).length > 0
+  ) {
     throw new Error(
-      "the AgentForge image is AgentForge's; build contexts extend a project's layer",
+      "AgentForge's images are AgentForge's; build contexts extend a project's layer",
+    );
+  }
+  if (framework !== undefined && framework !== project.framework) {
+    throw new Error(
+      `${project.name} runs on the ${project.framework} framework; it builds no ${layer} image`,
     );
   }
   const contexts = Object.entries(buildContexts).flatMap(([name, path]) => [
@@ -81,13 +96,28 @@ export function imageBuild(
       `container=${inputs.containerDirectory}`,
     ]);
   }
+  if (framework !== undefined) {
+    const frameworkInputs = inputs.frameworks[framework];
+    return build(
+      frameworkImage(framework, inputs.version),
+      frameworkInputs.containerDirectory,
+      [
+        '--file',
+        frameworkInputs.dockerfile,
+        '--build-arg',
+        `BASE_IMAGE=${agentforgeImage(inputs.version)}`,
+        '--build-context',
+        `container=${frameworkInputs.containerDirectory}`,
+      ],
+    );
+  }
   if (agentName === undefined) {
     return build(
       agenticImage(project),
       join(workspaceRoot, project.root, 'base'),
       [
         '--build-arg',
-        `BASE_IMAGE=${agentforgeImage(inputs.version)}`,
+        `BASE_IMAGE=${frameworkImage(project.framework, inputs.version)}`,
         ...contexts,
       ],
     );

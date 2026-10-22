@@ -9,7 +9,7 @@ import {
 } from './published-manifest.ts';
 
 /**
- * One package, seven entry points and the Nx plugin's implementations. Code shared between entry points is split
+ * One package, eleven entry points and the Nx plugin's implementations. Code shared between entry points is split
  * into common chunks rather than duplicated into each, and every dependency
  * stays external — only this repository's own source is bundled. tsdown
  * externalises only what the manifest declares and inlines anything else with
@@ -27,6 +27,10 @@ export default defineConfig({
     agent: 'src/server/harness/index.ts',
     server: 'src/server/runtime/index.ts',
     infra: 'src/infra/index.ts',
+    'claude/agent': 'src/framework/claude/harness/index.ts',
+    'claude/server': 'src/framework/claude/server/index.ts',
+    'claude/client': 'src/framework/claude/client/index.ts',
+    'claude/infra': 'src/framework/claude/infra/index.ts',
     ...(await pluginEntries()),
   },
   format: 'esm',
@@ -46,10 +50,10 @@ export default defineConfig({
       from: 'src/infra/readiness-probe/index.mjs',
       to: `${BUNDLE_DIRECTORY}/readiness-probe`,
     },
-    // The container's collector configuration, beside `server.js`.
+    // The claude framework's collector configuration, beside `claude/server.js`.
     {
-      from: 'src/server/runtime/collector/*.yaml',
-      to: `${BUNDLE_DIRECTORY}/collector`,
+      from: 'src/framework/claude/server/collector/*.yaml',
+      to: `${BUNDLE_DIRECTORY}/claude/collector`,
     },
     // The container workspace's root manifest and lock, which `container-lock` writes.
     {
@@ -58,6 +62,18 @@ export default defineConfig({
         'container/workspace/bun.lock',
       ],
       to: `${BUNDLE_DIRECTORY}/container`,
+    },
+    // The claude framework image's Dockerfile, and its root manifest and lock, which `container-lock-claude` writes.
+    {
+      from: 'src/framework/claude/Dockerfile',
+      to: `${BUNDLE_DIRECTORY}/claude`,
+    },
+    {
+      from: [
+        'src/framework/claude/container/package.json',
+        'src/framework/claude/container/bun.lock',
+      ],
+      to: `${BUNDLE_DIRECTORY}/claude/container`,
     },
     // The shared local Temporal server's compose project, beside its executor.
     {

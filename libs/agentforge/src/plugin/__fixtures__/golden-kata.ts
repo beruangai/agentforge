@@ -23,5 +23,6 @@ export const GOLDEN_KATA: AgenticProject = {
       containerName: 'proj-golden-kata-grader',
     },
   ],
+  framework: 'claude',
   detached: { files: [], targets: [] },
 };

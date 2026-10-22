@@ -30,7 +30,7 @@ export async function readTranscript(
       // biome-ignore lint/style/noRestrictedImports: loaded only when a caller reads a transcript (ARCHITECTURE.md §8)
       import('@anthropic-ai/claude-agent-sdk'),
       import('@aws-sdk/client-s3'),
-      import('#core/s3-session-store.ts'),
+      import('../core/s3-session-store.ts'),
       import('#core/s3-endpoint.ts'),
     ]);
   const store = new S3SessionStore({

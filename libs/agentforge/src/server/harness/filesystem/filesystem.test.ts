@@ -3,7 +3,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TaskContext } from '../task-process.ts';
+import type { FrameworkTypes, TaskContext } from '../framework.ts';
 import { ScriptedFilesystem } from './__fixtures__/scripted-filesystem.ts';
 import {
   type FilesystemOptions,
@@ -24,7 +24,10 @@ async function mount(filesystem: ScriptedFilesystem, name = 'vault') {
     filesystem.resolve({
       name,
       taskId: 't-1',
-      request: { input: { topic: 'today' }, context: {} as TaskContext },
+      request: {
+        input: { topic: 'today' },
+        context: {} as TaskContext<FrameworkTypes>,
+      },
     }),
   );
 }
@@ -47,9 +50,10 @@ describe('Filesystem', () => {
     expect(existsSync(join(localPath, 'pulled.md'))).toBe(true);
     expect(vault.mounted).toMatchObject({
       localPath,
-      permissions: {
-        allow: [`Read(/${localPath}/**)`, `Edit(/${localPath}/notes/today.md)`],
-      },
+      permissions: [
+        { action: 'read', glob: '**' },
+        { action: 'edit', glob: 'notes/today.md' },
+      ],
     });
   });
 
@@ -83,7 +87,7 @@ describe('Filesystem', () => {
         filesystem.resolve({
           name: 'vault',
           taskId: 't-1',
-          request: { input: {}, context: {} as TaskContext },
+          request: { input: {}, context: {} as TaskContext<FrameworkTypes> },
         }),
       ).toMatchObject({
         localPath:
@@ -174,7 +178,7 @@ describe('Filesystem', () => {
   it('writes nothing by default when it never pushes', async () => {
     const localPath = join(root, 'vault');
     const vault = await mount(new ScriptedFilesystem({ localRoot: localPath }));
-    expect(vault.mounted.permissions.allow).toEqual([`Read(/${localPath}/**)`]);
+    expect(vault.mounted.permissions).toEqual([{ action: 'read', glob: '**' }]);
   });
 
   it.each<

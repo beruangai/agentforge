@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { cause } from '#core/contract/task.ts';
-import { TaskFailure } from './kernel.ts';
-import type { ContextBlock } from './prompt.ts';
-import type { TaskContext } from './task-process.ts';
+import type { ContextBlock } from '../../../server/harness/prompt.ts';
+import { TaskFailure } from '../../../server/harness/task-failure.ts';
+import type { TaskContext } from './kernel.ts';
 
 export interface DistillDocument {
   /** Names the document in citations: a file path, a URL, an id. */

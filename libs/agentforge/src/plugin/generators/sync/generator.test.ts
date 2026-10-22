@@ -25,6 +25,7 @@ function detach(detached: { files?: string[]; targets?: string[] }): void {
     metadata: {
       ...project.metadata,
       agentforge: {
+        ...(project.metadata?.agentforge as object),
         detached: { files: [], targets: [], ...detached },
       },
     },

@@ -142,7 +142,11 @@ describe('AgentForge installed from its archive, in a workspace of its own', () 
   }, 20 * MINUTE);
 
   afterAll(async () => {
-    for (const image of [...IMAGES, 'agentforge/a2a-claude:0.0.0']) {
+    for (const image of [
+      ...IMAGES,
+      'agentforge/a2a-claude:0.0.0',
+      'agentforge/a2a:0.0.0',
+    ]) {
       const { stdout } = await runCommand(
         'docker',
         ['image', 'ls', '-q', image],

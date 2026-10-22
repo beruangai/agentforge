@@ -7,6 +7,11 @@ import {
   updateProjectConfiguration,
 } from '@nx/devkit';
 import { z } from 'zod';
+import {
+  FRAMEWORK_NAMES,
+  type FrameworkName,
+  FrameworkNameEnum,
+} from '#core/contract/framework.ts';
 import { camelCase, KebabNameField, pascalCase, scopeOf } from './names.ts';
 
 /**
@@ -49,7 +54,10 @@ export type Detached = z.infer<typeof DetachedSchema>;
 export const AgenticProjectMetadataSchema = z.looseObject({
   generator: z.literal(AGENTIC_PROJECT_GENERATOR),
   components: z.array(ComponentSchema),
-  agentforge: z.object({ detached: DetachedSchema }),
+  agentforge: z.object({
+    framework: FrameworkNameEnum.optional(),
+    detached: DetachedSchema,
+  }),
 });
 
 export interface AgenticProject {
@@ -62,6 +70,8 @@ export interface AgenticProject {
   /** The project's own name, the last segment of its package name: `golden-kata`. */
   readonly projectName: string;
   readonly scope: string;
+  /** The framework its runs go through. */
+  readonly framework: FrameworkName;
   readonly agents: readonly AgentComponent[];
   readonly detached: Detached;
 }
@@ -104,12 +114,19 @@ export function agenticProjectOf(
   }
   const projectName = packageName.split('/').pop() ?? packageName;
   KebabNameField.parse(projectName);
+  const { framework } = parsed.data.agentforge;
+  if (framework === undefined) {
+    throw new Error(
+      `${name}'s project.json metadata.agentforge.framework is missing: name the project's framework, one of ${FRAMEWORK_NAMES.join(', ')} (references/migrations.md)`,
+    );
+  }
   return {
     name,
     root: configuration.root,
     packageName,
     projectName,
     scope: scopeOf(packageName),
+    framework,
     agents,
     detached: parsed.data.agentforge.detached,
   };

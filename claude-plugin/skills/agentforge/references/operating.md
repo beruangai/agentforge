@@ -24,7 +24,7 @@ Nx loads `.env.<configuration>` and `.env.<configuration>.local` into a target r
 
 | Target | File | Holds |
 |---|---|---|
-| `serve-<agent>` (configuration `serve`) | `.env.serve.local`, ignored | `CLAUDE_CODE_OAUTH_TOKEN` and every secret the layers' `secrets.ts` require |
+| `serve-<agent>` (configuration `serve`) | `.env.serve.local`, ignored | The framework's secrets (`claude`: `CLAUDE_CODE_OAUTH_TOKEN`) and every secret the layers' `secrets.ts` require |
 | a workflow project's `serve` | `.env.serve.local`, ignored | The project's secrets; `serve:hybrid` adds `.env.hybrid.local`, with `AGENTFORGE_AGENTS=runtime-config:<applicationId>` and AWS credentials. Never `TEMPORAL_API_KEY` against the local server |
 | an infra project's `deploy`, `destroy` (configuration `cdk`) | `.env.cdk`, the operator's | `AWS_PROFILE` for the operator; the stage pins account and region |
 | `test` | none | Unit tests reach nothing external |

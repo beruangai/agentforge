@@ -38,6 +38,7 @@ function synthesize(
       agentRuntimeArtifact: AgentRuntimeArtifact.fromImageUri(
         `123456789012.dkr.ecr.us-east-2.amazonaws.com/${agentName}:latest`,
       ),
+      requiredSecrets: ['CLAUDE_CODE_OAUTH_TOKEN'],
       secrets: { CLAUDE_CODE_OAUTH_TOKEN: token },
     });
   });

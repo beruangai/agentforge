@@ -3,6 +3,7 @@ import {
   installPackagesTask,
   type Tree,
 } from '@nx/devkit';
+import { FRAMEWORK_NAMES } from '#core/contract/framework.ts';
 import {
   agenticProjectRendering,
   applyAndFormat,
@@ -22,12 +23,20 @@ export interface AgentGeneratorSchema {
   readonly procedure?: string;
 }
 
-/** A name no agent may take: the base layer's package is `<project>-base`. */
-const RESERVED_AGENT_NAMES = ['base'];
+/**
+ * Names no agent may take: the base layer's package is `<project>-base`, and
+ * AgentForge's own image targets are `image-agentforge` and
+ * `image-agentforge-<framework>`.
+ */
+const RESERVED_AGENT_NAMES = [
+  'base',
+  'agentforge',
+  ...FRAMEWORK_NAMES.map((framework) => `agentforge-${framework}`),
+];
 
 /**
  * An agent as a component of its agentic project: its record, appended once;
- * its scaffolded contract, procedures and Claude configuration; and every
+ * its scaffolded contract, procedures and framework configuration; and every
  * maintained artifact that spans the project's agents, rendered again from
  * the project's components. Refused, before anything is written, for an
  * unknown or non-agentic project or an invalid name.
@@ -39,7 +48,11 @@ export default async function agentGenerator(
   const name = parseName(KebabNameField, 'agent name', options.name);
   if (RESERVED_AGENT_NAMES.includes(name)) {
     throw new Error(
-      `agent name "${name}" is reserved: the base layer's package takes it`,
+      `agent name "${name}" is reserved: ${
+        name === 'base'
+          ? "the base layer's package takes it"
+          : "AgentForge's own image targets take it"
+      }`,
     );
   }
   const procedure = parseName(

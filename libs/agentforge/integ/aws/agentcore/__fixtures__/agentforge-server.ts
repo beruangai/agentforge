@@ -1,5 +1,6 @@
 // AgentForge's own server, as an agent's image starts it: its task entry
 // named here, the rest from the environment the runtime is created with.
+import { framework } from '#framework/claude/server/index.ts';
 import { startServer } from '../../../../src/server/runtime/server.ts';
 
 await startServer({
@@ -7,5 +8,6 @@ await startServer({
     '../../../local/runtime/__fixtures__/task-entry.ts',
     import.meta.url,
   ),
+  framework,
   requiredSecrets: [],
 });

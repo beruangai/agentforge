@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { TaskContext } from '../task-process.ts';
+import type { FrameworkTypes, TaskContext } from '../framework.ts';
 import { ScriptedFilesystem } from './__fixtures__/scripted-filesystem.ts';
 import { FilesystemUnsynced } from './filesystem.ts';
 import { claimLocalDirectory, MOUNT_CLAIMS_DIRECTORY } from './mount-claims.ts';
@@ -63,7 +63,7 @@ describe('the mount claims', () => {
         filesystem.resolve({
           name: 'vault',
           taskId: 't-1',
-          request: { input: {}, context: {} as TaskContext },
+          request: { input: {}, context: {} as TaskContext<FrameworkTypes> },
         }),
       ),
     ).rejects.toMatchObject({

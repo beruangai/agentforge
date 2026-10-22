@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { contractHash } from '#core/contract/procedures.ts';
 import { cause } from '#core/contract/task.ts';
-import { TaskFailure } from '../kernel.ts';
+import { testFramework } from '../__fixtures__/test-framework.ts';
+import { TaskFailure } from '../task-failure.ts';
 import { executeProcedure, implementAgent } from '../task-process.ts';
 import { ScriptedFilesystem } from './__fixtures__/scripted-filesystem.ts';
 import { FilesystemUnsynced } from './filesystem.ts';
@@ -17,8 +18,7 @@ const Mounted = z.strictObject({
   names: z.array(z.string()),
   pulled: z.boolean(),
   agentOptions: z.strictObject({
-    additionalDirectories: z.array(z.string()).optional(),
-    allowedTools: z.array(z.string()).optional(),
+    mounts: z.array(z.string()).optional(),
   }),
 });
 const contract = {
@@ -34,8 +34,10 @@ let workspace: ScriptedFilesystem;
 let notes: ScriptedFilesystem;
 let ran: boolean;
 
+const { framework, runner } = testFramework([]);
+
 function build() {
-  const os = implementAgent(contract).use(
+  const os = implementAgent(framework, contract).use(
     filesystems({ workspace: house, scratch }),
   );
   return os.router({
@@ -90,6 +92,8 @@ function execute(procedure: keyof typeof contract, fail = false) {
     },
     signal: new AbortController().signal,
     onRecord: () => undefined,
+    framework,
+    runner,
   });
 }
 
@@ -114,19 +118,12 @@ describe('filesystems registered on a procedure', () => {
       output: {
         names: ['notes', 'scratch', 'workspace'],
         pulled: true,
+        // The framework's options, derived from the mounts after they mounted.
         agentOptions: {
-          additionalDirectories: [
+          mounts: [
             join(root, 'workspace'),
             join(root, 'scratch'),
             join(root, 'notes'),
-          ],
-          allowedTools: [
-            `Read(/${root}/workspace/**)`,
-            `Edit(/${root}/workspace/**)`,
-            `Read(/${root}/scratch/**)`,
-            `Edit(/${root}/scratch/**)`,
-            `Read(/${root}/notes/**)`,
-            `Edit(/${root}/notes/**)`,
           ],
         },
       },
@@ -138,7 +135,7 @@ describe('filesystems registered on a procedure', () => {
     }
   });
 
-  it('give a procedure with none empty agent options', async () => {
+  it('give a procedure with none the framework’s options for no mount', async () => {
     expect(await execute('bare')).toEqual({
       state: 'TASK_STATE_COMPLETED',
       output: { names: [], pulled: false, agentOptions: {} },

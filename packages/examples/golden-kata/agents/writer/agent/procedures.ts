@@ -1,11 +1,10 @@
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
+import { filesystems, ScratchFilesystem } from '@beruangai/agentforge/agent';
 import {
   composeOptions,
-  filesystems,
   implementAgent,
-  ScratchFilesystem,
-} from '@beruangai/agentforge/agent';
+} from '@beruangai/agentforge/claude/agent';
 import {
   KATA_FILE,
   KataSchema,

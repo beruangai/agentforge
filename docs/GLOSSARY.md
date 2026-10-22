@@ -6,7 +6,9 @@
 
 **Runtime** — Layer 1: the server, gateway, executor, task store and client. Distinct from a **runtime session** and a deployed **agent**.
 
-**Harness** — Layer 2: running a procedure through the kernel to an outcome.
+**Harness** — Layer 2: running a procedure through its project's **framework** to an outcome. Shared by every framework.
+
+**Framework** — The agent SDK an agentic project's runs go through, chosen per project and recorded on it: `claude`, the Claude Agent SDK, the default and only one provided. Each is one folder, `src/framework/<name>/`, with its own parts of the layers (ADR 0021). Distinct from the **harness**, which every framework shares.
 
 **Caller** — Whatever starts a task through the client; a Temporal activity in both consumers, run by a **workflow project**'s **worker**.
 
@@ -20,7 +22,7 @@
 
 **Task process** — The child process running one task: the consumer's **task entry**, calling `runTaskProcess`.
 
-**Kernel** — `context.runAgent`: one SDK `query()` to a settled, typed outcome.
+**Kernel** — The `claude` framework's `context.runAgent`: one Agent SDK `query()` to a settled, typed outcome.
 
 ## Procedures
 
@@ -34,7 +36,7 @@
 
 **Agent contract** — The Zod schema given to `runAgent` as `output`: what the model fills in. The handler builds the outer output from it.
 
-**Agent run** — One `context.runAgent({ prompt, output, options, memoryDirectory? })`, recorded as a **run record**.
+**Agent run** — One `context.runAgent({ prompt, output, options, … })` through the project's framework, recorded as a **run record** naming the framework, its shared token usage and the framework's own.
 
 **Structured output validation** — The kernel's `PreToolUse` hook on an agent run's `StructuredOutput` submission: the agent contract and every stop guard, all failures told to the agent at once, in its turn.
 
@@ -104,13 +106,13 @@
 
 **Container workspace** — `/workspace` in every image: a Bun workspace whose members are the layers — `agentforge`, `agentic`, `agentic/agent` — each installed by the image that adds it, from a lock of the whole workspace up to it.
 
-**AgentForge image** — `agentforge/a2a-claude:<version>`, built from the package's `Dockerfile` over the bundle: Bun, what the Claude CLI needs, a non-root user, and the container workspace with AgentForge and its runtime peers.
+**AgentForge image** — The base, `agentforge/a2a:<version>`, built from the package's `Dockerfile` over the bundle: Bun, the collector, `s7cmd`, a non-root user, and the container workspace with AgentForge and its shared peers. On it, each framework's AgentForge image, `agentforge/a2a-<framework>:<version>` (`agentforge/a2a-claude`), from the bundle's `<framework>/Dockerfile`: what the framework's SDK needs, and the workspace's root extended with its peers.
 
 **Agentic project** — An Nx project the plugin generates: a **base layer** and the agents built on it, recorded as **agent components**, with its **project client** and **project construct**.
 
 **Base layer** — An agentic project's shared layer: the member at `/workspace/agentic`, named `@<scope>/<project>-base` — dependencies, shared modules, MCP servers, and a `.claude/` with skills and `CLAUDE.md` that every agent's session composes.
 
-**Agentic image** — `<scope>/<project>:local`: the base layer on the AgentForge image.
+**Agentic image** — `<scope>/<project>:local`: the base layer on its framework's AgentForge image.
 
 **Agent image** — `<scope>/<project>-<agent>:local`: an agent's layer — the member at `/workspace/agentic/agent`, its cwd — on the agentic image.
 
@@ -132,7 +134,7 @@
 
 **Local Temporal server** — The docker-compose Temporal server every project on the machine shares, which the `temporal-server` executor starts and registers a project's namespace on.
 
-**Required secrets** — The secrets an agent must be given, by the environment variable each becomes: AgentForge's own (`CLAUDE_CODE_OAUTH_TOKEN`), then `REQUIRED_SECRETS` in the base layer's `secrets.ts` and in the agent's. The agent's construct requires exactly these in `secrets`, `serve` passes each by name, and the server fails a request while one is unset.
+**Required secrets** — The secrets an agent must be given, by the environment variable each becomes: its framework's (`claude`'s `CLAUDE_CODE_OAUTH_TOKEN`), then `REQUIRED_SECRETS` in the base layer's `secrets.ts` and in the agent's. The agent's construct requires exactly these in `secrets`, `serve` passes each by name, and the server fails a request while one is unset.
 
 **Maintained** — A generated file, key or target that `nx sync` keeps to what the installed AgentForge renders.
 

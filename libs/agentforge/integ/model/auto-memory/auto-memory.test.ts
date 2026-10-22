@@ -21,7 +21,7 @@ import {
   type AgentOptions,
   type QueryFunction,
   runAgent,
-} from '../../../src/server/harness/kernel.ts';
+} from '#framework/claude/harness/kernel.ts';
 import {
   createSandbox,
   createSubscriptionEnvironment,

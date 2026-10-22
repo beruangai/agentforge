@@ -32,6 +32,7 @@ export {
   PriorAttemptSchema,
   type RunRecord,
   RunRecordSchema,
+  type RunUsage,
   type TaskState,
   TaskStateEnum,
   type TerminalTaskState,
