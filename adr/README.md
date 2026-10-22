@@ -32,3 +32,4 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0018](0018-the-agentforge-image-is-debian.md) | The AgentForge image is Debian, for glibc | accepted |
 | [0019](0019-claude-code-guidance-ships-as-a-plugin-from-the-repository.md) | Claude Code guidance ships as a plugin from the repository | accepted |
 | [0020](0020-local-state-lives-in-a-shared-local-store.md) | Local state lives in a shared local store | proposed |
+| [0021](0021-an-agentic-project-chooses-its-framework.md) | An agentic project chooses its framework | proposed |
