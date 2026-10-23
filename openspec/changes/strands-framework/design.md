@@ -67,7 +67,8 @@ The spike's findings go to `docs/research/strands-agents.md`, dated. Each findin
 |---|---|---|
 | A submission still refused at the cap; `StructuredOutputError` | `OUTPUT_INVALID` | no |
 | The provider's `max_tokens` stop, or a run's own limit | `BUDGET_EXHAUSTED` | no |
-| The Console's spend limit (the field the spike finds) | `BUDGET_EXHAUSTED`, with its own suggested action | no |
+| The Console's spend limit: 400 `invalid_request_error` whose message starts `You have reached your specified API usage limits` or `You have reached your specified workspace API usage limits` | `BUDGET_EXHAUSTED`, with its own suggested action | no |
+| The tier's monthly spend cap: 429 `rate_limit_error` with `error.details.error_code` `enforced_spend_limit_reached` | `BUDGET_EXHAUSTED`, with its own suggested action | no |
 | HTTP 401 or 403 from the provider | `CREDENTIAL_EXPIRED` | no |
 | HTTP 429 rate limit | `USAGE_LIMITED`, `retryAfter` from the provider's reset header | yes |
 | HTTP 5xx or `overloaded_error` | `PROVIDER_TRANSIENT` | yes |
@@ -77,7 +78,7 @@ The spike's findings go to `docs/research/strands-agents.md`, dated. Each findin
 | A stop guard that throws | `EXECUTION_ERROR` | no |
 | Anything else | `EXECUTION_ERROR` | no |
 
-Classification reads fields: HTTP status, the provider error's `type`, the stop reason, from the error objects Strands surfaces. `framework/strands/` imports no Anthropic package directly, so the lint rule confining them to `framework/claude/**` stands. If the spike shows classification needs the Anthropic SDK's own error types, that is raised before the rule changes. **If the spike finds the spend limit distinguishable only by message text, the work stops and the operator decides**, since §REQ501 forbids classifying from text. The suggested actions are `strands`' own, passed through `cause()`, as `claude`'s are.
+Classification reads fields: HTTP status, the provider error's `type`, the stop reason, from the error objects Strands surfaces. `framework/strands/` imports no Anthropic package directly, so the lint rule confining them to `framework/claude/**` stands. If the spike shows classification needs the Anthropic SDK's own error types, that is raised before the rule changes. **The Console's spend limit is the one exception classified from text.** The API documents no field for it, only the message prefix (platform.claude.com/docs/en/api/rate-limits, 2026-10-23). The operator chose on 2026-10-23 to classify it by that documented prefix, without a live test, as a recorded exception to §REQ501. The tier's cap is classified by its field. The suggested actions are `strands`' own, passed through `cause()`, as `claude`'s are.
 
 Alternatives weighed:
 - The spend limit as `USAGE_LIMITED`, retryable after the reset. Rejected by the operator on 2026-10-22: the limit resets monthly, so the operator raises it rather than a workflow waiting a month.
