@@ -13,7 +13,7 @@ Every group keeps `nx run @beruangai/agentforge:test` and `:typecheck` green.
 ## 1. Requirements and the documents that change in meaning
 
 - [x] 1.1 `docs/REQUIREMENTS.md` gains §REQ713 in "Building and deploying", as the operator accepts it. `docs/GLOSSARY.md` gains *framework* (the agent SDK a project's runs go through, distinct from layer 2's *harness*), and *kernel*, *agent run*, *AgentForge image*, *agentic image* and *required secrets* are restated for it. Verify by reading each against the proposal.
-- [ ] 1.2 `docs/SOLUTION_SPACE.md` drops "Supporting agent frameworks other than the Claude Agent SDK" from out of scope, and its first line names frameworks. `docs/ARCHITECTURE.md` §10 drops "frameworks other than the Claude Agent SDK" from "Deliberately absent". The operator is asked to reword `CLAUDE.md`'s orientation sentence. Verify by reading each against ADR 0021.
+- [x] 1.2 `docs/SOLUTION_SPACE.md` drops "Supporting agent frameworks other than the Claude Agent SDK" from out of scope, and its first line names frameworks. `docs/ARCHITECTURE.md` §10 drops "frameworks other than the Claude Agent SDK" from "Deliberately absent". The operator is asked to reword `CLAUDE.md`'s orientation sentence. Verify by reading each against ADR 0021.
 - [x] 1.3 ADR 0001 is mutated in place: layer 4 is the project's framework's agent SDK. A dated note says what changed. Verify by reading it against ADR 0021.
 
 ## 2. The framework interface and the Claude move
