@@ -27,6 +27,7 @@ import {
   isAgenticProject,
   readAgenticProject,
 } from '../../project-record.ts';
+import { keepLayerManifestsOutOfTheRootWorkspace } from '../../root-workspace.ts';
 import {
   declareDependencies,
   dependencySpecifier,
@@ -192,5 +193,6 @@ export default async function agenticProjectGenerator(
     SHARED_CONSTRUCTS_DECLARATION,
   );
   await applyAndFormat(tree, [agenticProjectRendering(tree, project)]);
+  keepLayerManifestsOutOfTheRootWorkspace(tree, { removeStale: false });
   return () => installPackagesTask(tree);
 }

@@ -62,6 +62,7 @@ Every artifact spanning a project's agents — or a workflow project's connectio
 | shared constructs `package.json` | `dependencies["@beruangai/agentforge"]`; the project's package, `workspace:*` |
 | shared constructs `project.json` | `<project>:assemble` in `targets.assemble.dependsOn` |
 | shared constructs `src/app/index.ts`, `agentic-projects/index.ts` | the `export *` line for each project's index |
+| the workspace root's `package.json` | in `workspaces`, a negation per project whose layer manifests a root glob would otherwise make members — `!<root>/{agents,base}/**` for an agentic project, `!<root>/container` for a workflow project — appended when generated, removed by sync once the project's `project.json` is gone; none is added where the root's globs do not reach the layers or already exclude them |
 
 **Scaffolded** — written once when absent, then never touched: `base/agentic/options.ts` and `secrets.ts`, `agents/<agent>/agent/contract.ts`, `procedures.ts` and `secrets.ts`, every layer's configuration directory and instruction file (`claude`: `$claude/`; `strands`: `AGENTS.md` and `.agent/`), the project's `tsconfig.json` and the rest of its `tsconfig.lib.json`, and the host `package.json`'s other dependencies. The scaffolded contract is `.input(z.strictObject({})).output(z.strictObject({}))`: a contract's objects are strict or loose, since one that would drop undeclared keys is refused (§REQ103).
 

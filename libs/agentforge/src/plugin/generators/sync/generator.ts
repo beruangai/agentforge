@@ -8,6 +8,7 @@ import {
   readAgenticProjects,
   readWorkflowProjects,
 } from '../../project-record.ts';
+import { keepLayerManifestsOutOfTheRootWorkspace } from '../../root-workspace.ts';
 
 /** What Nx reads from a sync generator. */
 export interface SyncGeneratorResult {
@@ -18,7 +19,8 @@ export interface SyncGeneratorResult {
 /**
  * Brings every agentic and workflow project's maintained artifacts to what
  * the installed AgentForge renders from its components, except what the
- * consumer detached, and reports each one that differed. Attached to the
+ * consumer detached, keeps their layer manifests out of the root workspace,
+ * and reports each one that differed. Attached to the
  * plugin's lock and image tasks, and run by `nx sync`; `nx sync:check` fails
  * while anything differs.
  */
@@ -37,6 +39,9 @@ export default async function syncGenerator(
   ];
   const changes = await applyAndFormat(tree, renderings);
   const details = [
+    ...(keepLayerManifestsOutOfTheRootWorkspace(tree, { removeStale: true })
+      ? ['file package.json (workspaces)']
+      : []),
     ...changes.files.map((path) => `file ${path}`),
     ...changes.targets.map((target) => `target ${target}`),
   ];

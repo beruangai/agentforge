@@ -10,6 +10,20 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
+## Layer manifests out of the root workspace, 2026-10-23
+
+### Breaks
+
+- **`nx sync:check`** reports `package.json (workspaces)` in a workspace whose root globs reach a project's layer manifests (`packages/**`, say) without excluding them.
+
+### Change
+
+1. Run `nx sync`. It appends `!<root>/{agents,base}/**` for each agentic project and `!<root>/container` for each workflow project that the root's globs reach. A negation you wrote already, in any form that excludes them, is kept, and nothing is added for it.
+
+### Verify
+
+`nx sync:check` passes, and `bun install` lists no layer manifest as a workspace member.
+
 ## strands-framework, 2026-10-23
 
 ### Breaks

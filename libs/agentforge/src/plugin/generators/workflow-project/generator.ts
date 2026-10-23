@@ -23,6 +23,7 @@ import {
   readWorkflowProject,
   WORKFLOW_PROJECT_GENERATOR,
 } from '../../project-record.ts';
+import { keepLayerManifestsOutOfTheRootWorkspace } from '../../root-workspace.ts';
 import {
   catalogsEnabled,
   declareDependencies,
@@ -165,5 +166,6 @@ export default async function workflowProjectGenerator(
     SHARED_CONSTRUCTS_DECLARATION,
   );
   await applyAndFormat(tree, [await workflowProjectRendering(tree, project)]);
+  keepLayerManifestsOutOfTheRootWorkspace(tree, { removeStale: false });
   return () => installPackagesTask(tree);
 }
