@@ -10,6 +10,20 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
+## strands-framework, 2026-10-23
+
+### Breaks
+
+None: an existing `claude` project is unchanged.
+
+### Change
+
+Nothing to change. A new agentic project may choose `--framework strands` ([SKILL.md](../SKILL.md#choosing-a-framework)); it needs `ANTHROPIC_API_KEY` in `.env.serve.local` and, deployed, as a Secrets Manager secret mapped in its agent's construct. §REQ705 is replaced by §REQ714: the subscription stays wherever the framework can use it.
+
+### Verify
+
+`nx sync:check` passes on the existing projects.
+
 ## Vitest 5 toolchain, 2026-10-23
 
 ### Breaks

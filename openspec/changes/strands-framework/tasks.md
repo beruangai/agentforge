@@ -85,7 +85,7 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
 
 ## 8. Guidance and documents
 
-- [ ] 8.1 Update the `claude-plugin` skill: when to choose `strands`, defining and implementing a `strands` procedure, credentials and the spend limit, and the examples. `references/migrations.md` gains the entry design.md states. Verify: the plugin's local integration tests pass, and its links resolve.
+- [x] 8.1 Update the `claude-plugin` skill: when to choose `strands`, defining and implementing a `strands` procedure, credentials and the spend limit, and the examples. `references/migrations.md` gains the entry design.md states. Verify: the plugin's local integration tests pass, and its links resolve.
 - [ ] 8.2 Update:
   - `docs/ARCHITECTURE.md` §1, §5, §6 (a `strands` runner section beside the kernel, with the fragments rule), §7, and §8 (entry points, the layout line for `src/framework/strands/`, peers);
   - `docs/GLOSSARY.md`, with *memory space* framework-neutral;

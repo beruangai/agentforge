@@ -1,6 +1,6 @@
 # Defining and implementing a procedure
 
-Reference: [ARCHITECTURE §3 Procedures](../../../../docs/ARCHITECTURE.md#3-procedures) and [§6 The kernel](../../../../docs/ARCHITECTURE.md#6-the-kernel). Worked examples: `golden-kata`'s [writer](../../../../packages/examples/golden-kata/agents/writer/agent/procedures.ts) and `smoke-coverage`'s [hello-agent](../../../../packages/examples/smoke-coverage/agents/hello-agent/agent/procedures.ts).
+Reference: [ARCHITECTURE §3 Procedures](../../../../docs/ARCHITECTURE.md#3-procedures) and [§6 The runners](../../../../docs/ARCHITECTURE.md#6-the-runners). Worked examples: `golden-kata`'s [writer](../../../../packages/examples/golden-kata/agents/writer/agent/procedures.ts) and `smoke-coverage`'s [hello-agent](../../../../packages/examples/smoke-coverage/agents/hello-agent/agent/procedures.ts); on `strands`, `research-brief`'s [briefer](../../../../packages/examples/research-brief/agents/briefer/agent/procedures.ts). Sections 1–3 hold for both frameworks, with `claude`'s options, memory and Bash; section 4 is what differs on `strands`.
 
 ## 1. The contract
 
@@ -13,7 +13,7 @@ An agent's `contract.ts` is what callers import, so it holds no Agent SDK code: 
 
 ## 2. The handler
 
-A procedure imports from two entry points: `@beruangai/agentforge/agent` for what every framework shares — `filesystems` and the filesystem kinds, `composeContext` and `ContextBlockFunction`, `StopGuard`, `TaskFailure` — and its project's framework's, `@beruangai/agentforge/claude/agent`, for `implementAgent`, `composeOptions`, `distill`, `documentBlock` and the Claude prompt and run types. A procedure written for one framework does not compile against another.
+A procedure imports from two entry points: `@beruangai/agentforge/agent` for what every framework shares — `filesystems` and the filesystem kinds, `composeContext` and `ContextBlockFunction`, `StopGuard`, `TaskFailure` — and its project's framework's, `@beruangai/agentforge/claude/agent` or `@beruangai/agentforge/strands/agent`, for `implementAgent`, `composeOptions`, `distill` and the framework's prompt and run types (`claude` adds `documentBlock`). A procedure written for one framework does not compile against another.
 
 ```ts
 const os = implementAgent(contract); // from @beruangai/agentforge/claude/agent
@@ -134,3 +134,15 @@ AgentForge has no `onSuccess`, `before` or `after` hook. Only the handler knows 
 **Recovery is the consumer's.** A retried task under the same idempotency key gets `context.attempt` (1 on the first attempt) and `context.priorAttempt` (`{ taskId, state, cause? }`). Make side effects idempotent, or check what the prior attempt left before repeating it. A prior `LOST` means its side effects may have happened.
 
 **End a task with a cause** by throwing `new TaskFailure(cause(code, message))`, with `cause` from `@beruangai/agentforge/contract`.
+
+## 4. A `strands` procedure
+
+The contract, the handler, context functions, stop guards, filesystems, `distill` and side effects are as above. What differs is the framework's: [ARCHITECTURE, the `strands` runner](../../../../docs/ARCHITECTURE.md#the-strands-runner).
+
+- **Options** are AgentForge's `StrandsOptions`, not the SDK's `AgentConfig`: `model` and `maxTokens`, `modelConfig` for the provider's other settings, `systemPrompt`, `tools`, `mcpClients` by name, `plugins`, `interventions`, `conversationManager`, `limits` and `layers`. `composeOptions` composes them as `claude`'s does: lists accumulate, and an MCP client named twice throws. The base layer's `options.ts` sets the model.
+- **Tools are the procedure's**, chosen from the SDK's vended ones (`fileEditor`, `makeShell()`) or its own `tool()`s. Nothing is on by default.
+- **`context.agentOptions`** holds each mount as a working directory, named in the system prompt, and one Cedar intervention that refuses a `fileEditor` write outside the mounts' write globs, in the agent's turn. Compose it in. A shell command's writes are not bounded by it, and there is no read fence: which commands run is the procedure's to decide.
+- **The layers** are Strands' names: each layer's `AGENTS.md`, base first, joins the system prompt after the procedure's own, and each layer's `.agent/skills/<skill>/SKILL.md` loads as a skill. AgentForge's fragments follow, among them the instruction to answer through the `strands_structured_output` tool: an answer given only as text ends the run `OUTPUT_INVALID`.
+- **Extras** on `runAgent`: `memorySpace` keeps a memory space in the session bucket under `<agent>/memory/<space>/`, with the `search_memory` and `add_memory` tools, recalled by any later run that names it; `resume` takes the session id of an earlier run of the agent, in any of its containers; `offload` keeps tool results over `maxResultTokens` in storage, a preview in context; `maxStructuredOutputAttempts` caps submissions, five by default.
+- **A stop guard sees no submission.** It checks the world outside the answer, as on `claude`. A check on the answer's own content belongs in the agent contract, with a refinement, which refuses in the agent's turn.
+- **The run record** has no `totalCostUsd`; `usage` holds the tokens. Read a run's session with `readSession(run)` from `@beruangai/agentforge/strands/client`.

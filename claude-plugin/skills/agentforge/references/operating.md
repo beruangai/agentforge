@@ -1,6 +1,6 @@
 # Serving, testing, deploying
 
-Reference: [ARCHITECTURE §7](../../../../docs/ARCHITECTURE.md#7-agentic-projects-images-and-delivery) for images, targets and delivery, the [package README](../../../../libs/agentforge/README.md#the-nx-plugin) for what is maintained, and the root README's [known limits](../../../../README.md#known-limits). Worked examples: [`smoke-coverage`](../../../../packages/examples/smoke-coverage/project.json) and [`golden-kata-infra`](../../../../packages/examples/golden-kata-infra/src/stacks/application-stack.ts).
+Reference: [ARCHITECTURE §7](../../../../docs/ARCHITECTURE.md#7-agentic-projects-images-and-delivery) for images, targets and delivery, the [package README](../../../../libs/agentforge/README.md#the-nx-plugin) for what is maintained, and the root README's [known limits](../../../../README.md#known-limits). Worked examples: [`smoke-coverage`](../../../../packages/examples/smoke-coverage/project.json) and [`golden-kata-infra`](../../../../packages/examples/golden-kata-infra/src/stacks/application-stack.ts); on `strands`, [`research-brief-infra`](../../../../packages/examples/research-brief-infra/src/stacks/application-stack.ts).
 
 ## Targets
 
@@ -24,12 +24,14 @@ Nx loads `.env.<configuration>` and `.env.<configuration>.local` into a target r
 
 | Target | File | Holds |
 |---|---|---|
-| `serve-<agent>` (configuration `serve`) | `.env.serve.local`, ignored | The framework's secrets (`claude`: `CLAUDE_CODE_OAUTH_TOKEN`) and every secret the layers' `secrets.ts` require |
+| `serve-<agent>` (configuration `serve`) | `.env.serve.local`, ignored | The framework's secrets (`claude`: `CLAUDE_CODE_OAUTH_TOKEN`; `strands`: `ANTHROPIC_API_KEY`) and every secret the layers' `secrets.ts` require |
 | a workflow project's `serve` | `.env.serve.local`, ignored | The project's secrets; `serve:hybrid` adds `.env.hybrid.local`, with `AGENTFORGE_AGENTS=runtime-config:<applicationId>` and AWS credentials. Never `TEMPORAL_API_KEY` against the local server |
 | an infra project's `deploy`, `destroy` (configuration `cdk`) | `.env.cdk`, the operator's | `AWS_PROFILE` for the operator; the stage pins account and region |
 | `test` | none | Unit tests reach nothing external |
 
 On AgentCore, each secret is a Secrets Manager secret the operator creates, mapped to its variable in the agent's construct (`agents: { writer: { secrets: { CLAUDE_CODE_OAUTH_TOKEN: secret } } }`). A secret a layer declares and nothing maps fails to compile.
+
+**A `strands` project bills per use.** Its key is bounded by the Anthropic Console's monthly spend limit, which the operator sets. A run that reaches it, or the tier's spend cap, fails `BUDGET_EXHAUSTED`, not retryable: raise the limit, then retry the task. A rate limit below it is `USAGE_LIMITED`, with `retryAfter`, and a 5xx `PROVIDER_TRANSIENT`; both retryable. A procedure's own `limits` bound one run, and reaching one is also `BUDGET_EXHAUSTED`.
 
 ## Testing
 
