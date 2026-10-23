@@ -193,10 +193,10 @@
       "Resource": ["arn:aws:s3:::agentforge-example-*"]
     },
     {
-      "Sid": "UploadTheResearchBriefExamplesCorpora",
+      "Sid": "UploadTheExamplesCorpora",
       "Effect": "Allow",
       "Action": ["s3:PutObject"],
-      "Resource": ["arn:aws:s3:::agentforge-example-research-brief-*/corpora/*"]
+      "Resource": ["arn:aws:s3:::agentforge-example-*/corpora/*"]
     }
   ]
 }
