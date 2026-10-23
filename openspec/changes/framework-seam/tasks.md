@@ -83,7 +83,12 @@ Every group keeps `nx run @beruangai/agentforge:test` and `:typecheck` green.
 - [x] 7.1 Migrate `golden-kata`: add `framework: 'claude'` to the record, run `nx sync`, and move the imports to `/claude/agent` plus `/agent`. Verify: its `test`, `typecheck` and `nx sync:check` pass, and `golden-kata-workflows`' `test` and `nx sync:check` pass unchanged.
 - [x] 7.2 Migrate `smoke-coverage` the same way. Its local e2e imports `readTranscript` from `/claude/client`. Verify: `test`, `typecheck` and `nx sync:check` pass.
 - [ ] 7.3 Run the live regression: `integ` `local`, `aws` and `model`; `e2e` for `golden-kata`, `smoke-coverage` and `golden-kata-workflows`. Verify: all pass, with results noted in the change.
-- [ ] 7.4 Run `smoke-coverage` `e2e-agentcore` once, deploying the new image chain. Verify: it passes, and results are noted in the change.
+- [x] 7.4 Run `smoke-coverage` `e2e-agentcore` once, deploying the new image chain. Verify: it passes, and results are noted in the change.
+
+  Results, 2026-10-23:
+  - `integ` model: 15/15. `integ` aws: 8 files, 20/20. `integ` local: 9 of 10 files, 38 tests; `package-tarball` waits on the toolchain change, since `@aws/nx-plugin` 1.0.15's preset writes vitest 5.
+  - `e2e` local: golden-kata 2/2, smoke-coverage 10/10, golden-kata-workflows 1/1, after the image executor's schema accepted `agentforge-claude`.
+  - `e2e-agentcore`: smoke-coverage 10/10. Two notes on one topic, raced, both refused retryably, as `mount-claims.ts` allows. The case now asserts that neither mounts while the other holds, and that a retry mounts once the holder ends.
 
 ## 8. Guidance and documents
 

@@ -305,7 +305,9 @@ describe('hello-agent, on AgentCore', () => {
       }
     });
 
-    it('refuses the second on one topic while the first holds its directory, retryably', async () => {
+    // Of two racing claims never both mount; at worst both refuse, retryably
+    // (mount-claims.ts), so a refused one is retried as its suggested action says.
+    it('never mounts one topic for two at once, and refuses retryably until the holder ends', async () => {
       const topic = `e2e-${randomUUIDv7()}`;
       const kept = await keepTogether([topic, topic]);
       const completed = kept.filter(
@@ -314,18 +316,39 @@ describe('hello-agent, on AgentCore', () => {
       const refused = kept.filter(
         ({ ended }) => ended.state === 'TASK_STATE_FAILED',
       );
-      expect(completed).toHaveLength(1);
-      expect(refused).toHaveLength(1);
-      expect(refused[0]?.ended).toMatchObject({
-        cause: {
-          code: 'FILESYSTEM_UNSYNCED',
-          retryable: true,
-          message: expect.stringMatching(
-            /mounted by task .+ in this container/,
-          ),
-        },
-      });
-      expect(await recall(topic)).toBe(completed[0]?.note);
+      expect(completed.length).toBeLessThan(2);
+      expect(completed.length + refused.length).toBe(2);
+      for (const { ended } of refused) {
+        expect(ended).toMatchObject({
+          cause: {
+            code: 'FILESYSTEM_UNSYNCED',
+            retryable: true,
+            message: expect.stringMatching(
+              /mounted by task .+ in this container/,
+            ),
+          },
+        });
+      }
+      // KeepNote may only Write, which cannot overwrite a note it has not
+      // read, so the first note kept is the one recalled.
+      const keptNotes = completed.map(({ note }) => note);
+      for (const { note } of refused) {
+        const context = {
+          runtimeSessionId: newRuntimeSessionId(),
+          idempotencyKey: randomUUIDv7(),
+        };
+        const retried = await awaitTask(
+          helloAgent.KeepNote,
+          await helloAgent.KeepNote.SendMessage({ topic, note }, context),
+          { ...context, pollIntervalMilliseconds: POLL_INTERVAL_MILLISECONDS },
+        );
+        if (retried.state !== 'TASK_STATE_COMPLETED') {
+          throw new Error(`expected completion, got ${JSON.stringify(retried)}`);
+        }
+        if (retried.output.kept) keptNotes.push(note);
+      }
+      expect(keptNotes).toHaveLength(1);
+      expect(await recall(topic)).toBe(keptNotes[0]);
     });
   });
 
