@@ -56,3 +56,4 @@ vitest.config.*.timestamp*
 
 # @aws/nx-plugin runtime configuration, written for local runs
 runtime-config.json
+.vitest

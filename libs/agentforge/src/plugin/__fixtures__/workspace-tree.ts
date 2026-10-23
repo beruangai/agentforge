@@ -23,7 +23,7 @@ export default {
 } satisfies AwsNxPluginConfig;
 `,
   );
-  const tooling = { nx: '23.2.1', '@aws/nx-plugin': '1.0.3' };
+  const tooling = { nx: '23.3.0', '@aws/nx-plugin': '1.0.15' };
   updateJson(tree, 'package.json', (manifest) => ({
     ...manifest,
     devDependencies: {

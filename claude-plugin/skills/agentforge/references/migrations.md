@@ -10,6 +10,21 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
+## Vitest 5 toolchain, 2026-10-23
+
+### Breaks
+
+- **Peer ranges.** AgentForge needs `nx` and `@nx/devkit` `^23.3.0`, `@aws/nx-plugin` `^1.0.15` and `vitest` `^5.0.4`. Its `init` and generators refuse a catalog below them, naming each.
+
+### Change
+
+1. **Migrate Nx.** Run `nx migrate 23.3.0`, then `nx migrate --run-migrations`, and apply its Vitest 5 prompt.
+2. **Raise the catalog.** Set `@aws/nx-plugin` to `1.0.15`, and `vitest` and `@vitest/coverage-v8` to the plugin's `vitest`, `5.0.4`. A second vitest copy breaks `rejects.toThrow` in tests built on the plugin's test utility. Then `bun install`.
+
+### Verify
+
+`nx run-many -t test` passes, and `bun pm ls vitest` shows one version.
+
 ## framework-seam, 2026-10-22 (from A6)
 
 ### Breaks

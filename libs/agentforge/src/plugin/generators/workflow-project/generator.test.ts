@@ -81,7 +81,7 @@ describe('workflow-project', () => {
     expect(readJson(tree, 'package.json').catalog).toMatchObject({
       '@temporalio/worker': expect.stringMatching(/^\^1\./),
       '@temporalio/testing': expect.stringMatching(/^\^1\./),
-      vitest: expect.stringMatching(/^\^4\./),
+      vitest: expect.stringMatching(/^\^5\./),
     });
   });
 

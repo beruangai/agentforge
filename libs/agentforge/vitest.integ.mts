@@ -18,7 +18,7 @@ import unit from './vitest.config.mts';
  * uniquely named runtime, so no file can see another's, and a runtime's
  * deletion alone takes about five minutes. Everything else runs one file at a
  * time. Vitest runs the parallel files first and the sequential ones after
- * (vitest 4.1.11, checked 2026-09-23).
+ * (vitest 4.1.11, checked 2026-09-23; vitest 5.0.4, 2026-10-23).
  *
  * Spread rather than `mergeConfig`, which concatenates arrays and would run the
  * unit tests here too. The projects set `include` whole rather than extending

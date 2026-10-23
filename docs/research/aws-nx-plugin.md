@@ -45,10 +45,17 @@ AgentForge extends `@aws/nx-plugin`'s conventions rather than inventing its own 
 
 - **The preset writes Biome, not ESLint and Prettier** — one `biome.json` whose only lint rule is `noUndeclaredDependencies`, and per-project `format` and `lint` targets over it. Workspaces are `packages/*`, and versions live in the package manager's **catalog** (bun's top-level `catalog` field) by default, recorded as `packageManager.catalogs` in `aws-nx-plugin.config.mts`.
 - **The catalog pins TypeScript `~6.0.3`, not 7.** TypeScript 7.0.2 ships the native compiler with no classic compiler API, and **Nx 23.2.1's project graph fails outright on it** ("Failed to process project graph"), because `@nx/js/typescript` reads tsconfig files through that API. Measured by swapping 7.0.2 into a fresh preset workspace.
-- **Vitest is 4.1.11, not 5.** `@nx/vitest@23.2.1` declares `vitest: ^3.0.0 || ^4.0.0`.
+- **Vitest is 4.1.11, not 5.** `@nx/vitest@23.2.1` declares `vitest: ^3.0.0 || ^4.0.0`. *Superseded 2026-10-23, below.*
 - **`ts#project` generates** a `compile` target (`tsc --build`), `format` and `lint` over Biome, a vitest config with `environment: 'jsdom'` and `passWithNoTests: true`, and adds a `paths` alias plus an `@<scope>/source` custom condition to `tsconfig.base.json`. AgentForge keeps the Biome targets and drops the rest: one project bundled by tsdown needs no `tsc` emit, tests run in `node`, and a `paths` alias would bypass the package's own export map.
 - **Its `ts#sync` generator is not a model for AgentForge's sync generator.** It keeps each project's tsconfig `paths` in step with the base config — workspace hygiene, not keeping a consumer's wiring current with a library version.
 - **It generates no `integ` or `e2e` tier.** Those are this repository's (`.claude/rules/testing.md`).
+
+## The toolchain moves to Vitest 5 — 2026-10-23
+
+`@aws/nx-plugin@1.0.15` (2026-10-22) is on Nx 23.3.0 and depends on `vitest` exactly `5.0.4`; its preset writes that into a new workspace's catalog, and `@nx/vitest@23.3.0` declares `vitest: ^3.0.0 || ^4.0.0 || ^5.0.0`.
+
+- **The workspace's vitest must be the plugin's exact version.** The plugin's test utility, `src/utils/test.js` (`createTreeUsingTsSolutionSetup`, which the generator tests use), imports `vitest` from the plugin's own dependency. With the workspace on 5.0.5, a second copy loaded, and `await expect(promise).rejects.toThrow(text)` then reported the message as `''` in every test file importing it. Pinning the catalog's `vitest` and `@vitest/coverage-v8` to 5.0.4 removed it. A raise of the plugin raises them to its pin.
+- **`nx migrate 23.3.0`** ran one migration, `@nx/vitest`'s `migrate-to-vitest-5`, which added `.vitest` to `.gitignore`; its prompt half (runtime behaviour) needed one change here, a test expecting a vitest 4 range.
 
 ## What the shared constructs generator assumes, and continuous tasks — observed 2026-09-30
 
