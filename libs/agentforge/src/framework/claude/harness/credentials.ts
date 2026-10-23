@@ -14,7 +14,9 @@ export const OUTRANKING_CREDENTIAL_VARIABLES = [
  * The CLI's environment, with the subscription's credential the one it uses:
  * while the OAuth token is present, a credential that outranks it — another
  * framework's API key in the same environment — is left out of what the CLI
- * inherits, and one the procedure sets itself is refused rather than dropped.
+ * inherits, as is the same value passed through the procedure's env
+ * (`{ ...process.env }`, as the SDK suggests); a value of the procedure's own
+ * is refused rather than dropped.
  */
 export function subscriptionEnv(
   inheritedEnv: Readonly<Record<string, string | undefined>>,
@@ -23,7 +25,8 @@ export function subscriptionEnv(
   const env = { ...inheritedEnv, ...procedureEnv };
   if (!env[OAUTH_TOKEN_VARIABLE]) return env;
   for (const variable of OUTRANKING_CREDENTIAL_VARIABLES) {
-    if (procedureEnv[variable] !== undefined) {
+    const own = procedureEnv[variable];
+    if (own !== undefined && own !== inheritedEnv[variable]) {
       throw new Error(
         `the run sets ${variable} in its env, which the CLI would use instead of the subscription's ${OAUTH_TOKEN_VARIABLE}`,
       );

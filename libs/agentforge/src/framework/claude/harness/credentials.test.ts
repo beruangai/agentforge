@@ -19,11 +19,19 @@ describe('the CLI’s credentials', () => {
   it.each(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'])(
     'refuses %s set by the procedure beside the OAuth token',
     (variable) => {
-      expect(() => subscriptionEnv(OAUTH, { [variable]: 'own' })).toThrow(
-        `the run sets ${variable} in its env`,
-      );
+      expect(() =>
+        subscriptionEnv({ ...OAUTH, ...OUTRANKING }, { [variable]: 'own' }),
+      ).toThrow(`the run sets ${variable} in its env`);
     },
   );
+
+  it('leaves out an inherited credential the procedure passes through', () => {
+    const inherited = { ...OAUTH, ...OUTRANKING };
+    expect(subscriptionEnv(inherited, { ...inherited, OWN: '1' })).toEqual({
+      ...OAUTH,
+      OWN: '1',
+    });
+  });
 
   it('takes the OAuth token from the procedure’s env too', () => {
     expect(subscriptionEnv(OUTRANKING, OAUTH)).toEqual(OAUTH);

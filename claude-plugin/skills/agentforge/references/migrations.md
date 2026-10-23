@@ -14,7 +14,7 @@ Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded
 
 ### Breaks
 
-- **A `claude` run's credentials.** While `CLAUDE_CODE_OAUTH_TOKEN` is set, the CLI no longer inherits `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`, and a procedure that sets either in its options' `env` is refused `EXECUTION_ERROR`. A run that used a key beside the token now uses the subscription.
+- **A `claude` run's credentials.** While `CLAUDE_CODE_OAUTH_TOKEN` is set, the CLI no longer inherits `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`, and a procedure that sets its own value for either in its options' `env` is refused `EXECUTION_ERROR`. A run that used a key beside the token now uses the subscription.
 
 ### Change
 
