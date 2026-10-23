@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../dist/packages/examples/strands-smoke/tsc",
+    "tsBuildInfoFile": "../../../dist/packages/examples/strands-smoke/tsc/tsconfig.lib.tsbuildinfo",
+    "allowImportingTsExtensions": true,
+    "customConditions": [
+      "@beruangai/source",
+      "agentforge-agent"
+    ],
+    "paths": {
+      "@beruangai/strands-smoke-base/*": [
+        "./base/agentic/*.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}

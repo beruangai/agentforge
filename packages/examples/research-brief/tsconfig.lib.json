@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../dist/packages/examples/research-brief/tsc",
+    "tsBuildInfoFile": "../../../dist/packages/examples/research-brief/tsc/tsconfig.lib.tsbuildinfo",
+    "allowImportingTsExtensions": true,
+    "customConditions": [
+      "@beruangai/source",
+      "agentforge-agent"
+    ],
+    "paths": {
+      "@beruangai/research-brief-base/*": [
+        "./base/agentic/*.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}

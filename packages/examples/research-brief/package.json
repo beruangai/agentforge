@@ -1,0 +1,40 @@
+{
+  "name": "@beruangai/research-brief",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@strands-agents/sdk": "catalog:",
+    "@anthropic-ai/sdk": "catalog:",
+    "@modelcontextprotocol/client": "catalog:",
+    "@cedar-policy/cedar-wasm": "catalog:",
+    "@cedar-policy/mcp-schema-generator-wasm": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
+    "@a2a-js/sdk": "catalog:",
+    "@aws-sdk/client-cloudwatch": "catalog:",
+    "@aws-sdk/client-dynamodb": "catalog:",
+    "@aws-sdk/client-secrets-manager": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/server": "catalog:",
+    "express": "catalog:",
+    "zod": "catalog:",
+    "@aws-sdk/client-bedrock-agentcore": "catalog:",
+    "@aws-sdk/client-appconfigdata": "catalog:",
+    "@beruangai/agentforge": "workspace:*"
+  },
+  "exports": {
+    "./client": "./client.ts",
+    "./briefer": "./agents/briefer/agent/contract.ts",
+    "./briefer/secrets": "./agents/briefer/agent/secrets.ts",
+    "./*": "./base/agentic/*.ts"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}

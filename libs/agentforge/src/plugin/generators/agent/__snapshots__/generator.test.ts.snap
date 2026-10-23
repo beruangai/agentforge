@@ -292,8 +292,8 @@ exports[`agent > generates a strands project's agent, with its own instruction f
 // The container's entry: AgentForge's server, running \`task.ts\` once per task
 // under the strands framework, and requiring the secrets it and this
 // project's layers declare. Everything else comes from the environment.
-import { framework } from '@beruangai/agentforge/strands/server';
 import { startServer } from '@beruangai/agentforge/server';
+import { framework } from '@beruangai/agentforge/strands/server';
 import { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/strands-smoke-base/secrets';
 import { REQUIRED_SECRETS as AGENT_SECRETS } from './secrets.ts';
 

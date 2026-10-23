@@ -4,9 +4,6 @@
   "files": [],
   "references": [
     {
-      "path": "./libs/agentforge"
-    },
-    {
       "path": "./packages/common/constructs"
     },
     {
@@ -23,6 +20,18 @@
     },
     {
       "path": "./packages/examples/golden-kata-workflows"
+    },
+    {
+      "path": "./packages/examples/strands-smoke"
+    },
+    {
+      "path": "./packages/examples/research-brief"
+    },
+    {
+      "path": "./packages/examples/strands-smoke-infra"
+    },
+    {
+      "path": "./packages/examples/research-brief-infra"
     }
   ]
 }

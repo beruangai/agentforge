@@ -71,9 +71,11 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
 
 ## 6. Examples
 
-- [ ] 6.1 Generate `strands-smoke` with `--framework strands`, and implement its agent's procedures for a resume in another container, a cancel mid-tool, and a filesystem across containers. Its local e2e reads a run's session back with `readSession`. Verify: `test`, `typecheck` and `nx sync:check` pass.
-- [ ] 6.2 Generate the realistic non-coding example: a brief from documents in an `S3Filesystem`, a citing stop guard, and a memory space. Verify: `test`, `typecheck` and `nx sync:check` pass.
-- [ ] 6.3 Add both examples' infra projects, with `ANTHROPIC_API_KEY` as a Secrets Manager secret the operator creates. Verify: `synth` and `checkov` pass.
+- [x] 6.1 Generate `strands-smoke` with `--framework strands`, and implement its agent's procedures for a resume in another container, a cancel mid-tool, and a filesystem across containers. Its local e2e reads a run's session back with `readSession`. Verify: `test`, `typecheck` and `nx sync:check` pass.
+- [x] 6.2 Generate the realistic non-coding example: a brief from documents in an `S3Filesystem`, a citing stop guard, and a memory space. Verify: `test`, `typecheck` and `nx sync:check` pass.
+- [x] 6.3 Add both examples' infra projects, with `ANTHROPIC_API_KEY` as a Secrets Manager secret the operator creates. Verify: `synth` and `checkov` pass.
+
+  Neither example has a `test` target, as `smoke-coverage` has none: they hold no logic of their own to unit-test. `typecheck`, `lint` and `nx sync:check` pass; both infra projects synth, and `checkov` passes 51 of 51. The research-brief AgentCore suite uploads its corpus as the test role, so `test-role-permissions-policy.json` grants `s3:PutObject` on `agentforge-example-research-brief-*/corpora/*`, which the operator applies.
 
 ## 7. Live verification
 

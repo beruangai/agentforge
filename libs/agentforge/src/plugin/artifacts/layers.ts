@@ -141,6 +141,14 @@ export function serverEntry(
   project: AgenticProject,
   agent: AgentComponent,
 ): MaintainedFile {
+  // In the order the workspace's import sorting keeps, so a formatter run
+  // over the file leaves it in sync.
+  const agentforgeImports = [
+    `import { framework } from '${frameworkPlugin(project.framework).imports.server}';`,
+    "import { startServer } from '@beruangai/agentforge/server';",
+  ]
+    .sort((a, b) => specifierOf(a).localeCompare(specifierOf(b)))
+    .join('\n');
   return {
     path: `${agentDirectory(project, agent)}/agent/server.ts`,
     render: () => `${maintainedHeader('//')}
@@ -148,8 +156,7 @@ export function serverEntry(
 // The container's entry: AgentForge's server, running \`task.ts\` once per task
 // under the ${project.framework} framework, and requiring the secrets it and this
 // project's layers declare. Everything else comes from the environment.
-import { framework } from '${frameworkPlugin(project.framework).imports.server}';
-import { startServer } from '@beruangai/agentforge/server';
+${agentforgeImports}
 import { REQUIRED_SECRETS as PROJECT_SECRETS } from '${basePackageName(project)}/secrets';
 import { REQUIRED_SECRETS as AGENT_SECRETS } from './secrets.ts';
 
@@ -160,6 +167,11 @@ await startServer({
 });
 `,
   };
+}
+
+/** The module an import line names. */
+function specifierOf(line: string): string {
+  return line.slice(line.indexOf("'") + 1, line.lastIndexOf("'"));
 }
 
 /** The task entry: where the harness and the agent's procedures meet. */

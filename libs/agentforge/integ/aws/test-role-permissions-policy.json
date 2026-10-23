@@ -191,6 +191,12 @@
       "Effect": "Allow",
       "Action": ["s3:ListBucket"],
       "Resource": ["arn:aws:s3:::agentforge-example-*"]
+    },
+    {
+      "Sid": "UploadTheResearchBriefExamplesCorpora",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject"],
+      "Resource": ["arn:aws:s3:::agentforge-example-research-brief-*/corpora/*"]
     }
   ]
 }

@@ -12,7 +12,9 @@
     "@beruangai/agentforge": "workspace:*",
     "@beruangai/golden-kata": "workspace:*",
     "@beruangai/smoke-coverage": "workspace:*",
-    "@beruangai/golden-kata-workflows": "workspace:*"
+    "@beruangai/golden-kata-workflows": "workspace:*",
+    "@beruangai/strands-smoke": "workspace:*",
+    "@beruangai/research-brief": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"

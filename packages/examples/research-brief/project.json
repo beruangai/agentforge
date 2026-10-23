@@ -1,0 +1,157 @@
+{
+  "name": "@beruangai/research-brief",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/research-brief",
+  "projectType": "library",
+  "metadata": {
+    "generator": "@beruangai/agentforge:agentic-project",
+    "components": [
+      {
+        "generator": "@beruangai/agentforge:agent",
+        "name": "briefer",
+        "path": "agents/briefer",
+        "runtimeConfigKey": "ResearchBriefBriefer",
+        "containerName": "beruangai-research-brief-briefer"
+      }
+    ],
+    "agentforge": {
+      "framework": "strands",
+      "detached": {
+        "files": [],
+        "targets": []
+      }
+    }
+  },
+  "targets": {
+    "image-agentforge": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["^bundle"],
+      "options": {
+        "layer": "agentforge"
+      }
+    },
+    "image-agentforge-strands": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["image-agentforge"],
+      "options": {
+        "layer": "agentforge-strands"
+      }
+    },
+    "lock": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["^bundle"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/base/agentic/bun.lock"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "image": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock", "image-agentforge-strands"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "assemble": {
+      "executor": "nx:noop",
+      "dependsOn": ["image-briefer"]
+    },
+    "local-store": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false
+    },
+    "local-store-stop": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false,
+      "options": {
+        "stop": true
+      }
+    },
+    "lock-briefer": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["lock"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        "{projectRoot}/agents/briefer/agent/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/agents/briefer/agent/bun.lock"],
+      "options": {
+        "layer": "agents/briefer"
+      }
+    },
+    "image-briefer": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock-briefer", "image"],
+      "options": {
+        "layer": "agents/briefer"
+      }
+    },
+    "serve-briefer": {
+      "executor": "@beruangai/agentforge:serve",
+      "continuous": true,
+      "dependsOn": ["image-briefer", "local-store"],
+      "defaultConfiguration": "serve",
+      "options": {
+        "agent": "briefer"
+      },
+      "configurations": {
+        "serve": {}
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["serve-briefer"],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project local",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "e2e-agentcore": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        {
+          "projects": ["@beruangai/research-brief-infra"],
+          "target": "deploy"
+        }
+      ],
+      "options": {
+        "command": "vitest run --config vitest.e2e.mts --project agentcore",
+        "cwd": "{projectRoot}",
+        "envFile": "{workspaceRoot}/.env.integ"
+      }
+    }
+  }
+}

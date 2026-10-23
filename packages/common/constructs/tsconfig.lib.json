@@ -28,6 +28,12 @@
   ],
   "references": [
     {
+      "path": "../../examples/research-brief/tsconfig.lib.json"
+    },
+    {
+      "path": "../../examples/strands-smoke/tsconfig.lib.json"
+    },
+    {
       "path": "../../examples/golden-kata-workflows/tsconfig.lib.json"
     },
     {
