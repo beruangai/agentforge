@@ -13,16 +13,18 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
 
 ## 1. Spike
 
-- [ ] 1.1 In a scratch workspace outside the package, run `@strands-agents/sdk` under Bun in a child process, the way a task process runs. Drive an `Agent` on the Anthropic provider to a structured output, and load Cedar's wasm. Verify: both run, or the finding stops the work for the operator.
-- [ ] 1.1a Settle the SDK's peer set for the provider, storage, Cedar, MCP and telemetry. Find an `@anthropic-ai/sdk` version that serves both the SDK and `claude`'s pinned `0.128.0` in one workspace. Verify: a shared version installs and both frameworks' unit tests pass on it, or the conflict goes to the operator.
-- [ ] 1.2 Settle storage. Use `S3Storage` sessions against the local store's S3 and against AWS S3 as the test role in `us-east-2`. Resume a session in a second process. Keep memory and an offloaded tool result in the same prefix. Verify: each holds, and each answer is recorded.
-- [ ] 1.3 Settle structured output under a `BeforeToolCall` hook on `strands_structured_output`. Find whether the hook can refuse with a message the model sees in its turn, how attempts can be counted and capped, and what happens with two submissions in one message. Verify: the behaviour is recorded, and the design's settlement rules hold or are raised with the operator.
-- [ ] 1.4 Settle cache points. Explicit cache points with automatic placement off; a second run reads the cache. Verify: the cache read tokens are non-zero on the second run.
-- [ ] 1.5 Settle cancel latency mid-tool, with the task's `AbortSignal`. Verify: it is recorded.
-- [ ] 1.6 Settle the write scope. A Cedar intervention with a `contextEnricher` refuses a vended file-tool edit outside the write globs, and permits one inside them. Verify: both, or the hook fallback is chosen and recorded.
-- [ ] 1.7 Settle the layers' directory and instruction file names that Strands' skills plugin and conventions use, and what the vended shell tool needs in the image. Verify: they are recorded, with sources.
-- [ ] 1.8 Find what the Anthropic API answers when the Console's spend limit is reached: the status, the error `type`, and any field that tells it apart. Verify: a field distinguishes it, or the finding stops the work for the operator (§REQ501).
-- [ ] 1.9 Write `docs/research/strands-agents.md`, dated, with each finding and its source. Name any seam change the spike shows is needed. Verify by reading it against this design.
+- [x] 1.1 In a scratch workspace outside the package, run `@strands-agents/sdk` under Bun in a child process, the way a task process runs. Drive an `Agent` on the Anthropic provider to a structured output, and load Cedar's wasm. Verify: both run, or the finding stops the work for the operator.
+- [x] 1.1a Settle the SDK's peer set for the provider, storage, Cedar, MCP and telemetry. Find an `@anthropic-ai/sdk` version that serves both the SDK and `claude`'s pinned `0.128.0` in one workspace. Verify: a shared version installs and both frameworks' unit tests pass on it, or the conflict goes to the operator.
+- [x] 1.2 Settle storage. Use `S3Storage` sessions against the local store's S3 and against AWS S3 as the test role in `us-east-2`. Resume a session in a second process. Keep memory and an offloaded tool result in the same prefix. Verify: each holds, and each answer is recorded.
+- [x] 1.3 Settle structured output under a `BeforeToolCall` hook on `strands_structured_output`. Find whether the hook can refuse with a message the model sees in its turn, how attempts can be counted and capped, and what happens with two submissions in one message. Verify: the behaviour is recorded, and the design's settlement rules hold or are raised with the operator.
+- [x] 1.4 Settle cache points. Explicit cache points with automatic placement off; a second run reads the cache. Verify: the cache read tokens are non-zero on the second run.
+- [x] 1.5 Settle cancel latency mid-tool, with the task's `AbortSignal`. Verify: it is recorded.
+- [x] 1.6 Settle the write scope. A Cedar intervention with a `contextEnricher` refuses a vended file-tool edit outside the write globs, and permits one inside them. Verify: both, or the hook fallback is chosen and recorded.
+- [x] 1.7 Settle the layers' directory and instruction file names that Strands' skills plugin and conventions use, and what the vended shell tool needs in the image. Verify: they are recorded, with sources.
+- [x] 1.8 Find what the Anthropic API answers when the Console's spend limit is reached: the status, the error `type`, and any field that tells it apart. Verify: a field distinguishes it, or the finding stops the work for the operator (§REQ501).
+- [x] 1.9 Write `docs/research/strands-agents.md`, dated, with each finding and its source. Name any seam change the spike shows is needed. Verify by reading it against this design.
+
+  Done 2026-10-23, `docs/research/strands-agents.md`. No decision is overturned. The shared `@anthropic-ai/sdk` is `0.128.0`, outside the SDK's `^0.109.1` peer range but working under Bun on the real API; `strands`' unit tests in group 3 run on it. The seam needs no change.
 
 ## 2. Requirements and ADRs
 
