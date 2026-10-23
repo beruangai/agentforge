@@ -6,8 +6,8 @@
   "properties": {
     "layer": {
       "type": "string",
-      "description": "agentforge, base, or agents/<agent>",
-      "pattern": "^(agentforge|base|agents/[a-z][a-z0-9-]*)$"
+      "description": "agentforge, agentforge-<framework>, base, or agents/<agent>",
+      "pattern": "^(agentforge|agentforge-claude|base|agents/[a-z][a-z0-9-]*)$"
     },
     "buildContexts": {
       "type": "object",

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { FRAMEWORK_NAMES } from '#core/contract/framework.ts';
 import { GOLDEN_KATA } from '../../__fixtures__/golden-kata.ts';
+import { frameworkLayer } from '../../container/images.ts';
 import { imageBuild } from './executor.ts';
+import schema from './schema.json' with { type: 'json' };
 
 const INPUTS = {
   packageDirectory: '/installed/agentforge',
@@ -100,6 +103,19 @@ describe('imageBuild', () => {
       tag: 'proj/golden-kata-grader:local',
       idFile: '/workspace/dist/packages/golden-kata/image/agents/grader.id',
     });
+  });
+
+  it("accepts every layer in its schema, a framework's included", () => {
+    const pattern = new RegExp(schema.properties.layer.pattern);
+    for (const layer of [
+      'agentforge',
+      ...FRAMEWORK_NAMES.map((framework) => frameworkLayer(framework)),
+      'base',
+      'agents/grader',
+    ]) {
+      expect(layer).toMatch(pattern);
+    }
+    expect('top').not.toMatch(pattern);
   });
 
   it('refuses a layer that is not one', () => {
