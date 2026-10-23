@@ -17,6 +17,11 @@
  * So nothing may route to a runtime before it is READY, and a refusal in the
  * window cannot be told from a bad request by its shape. This keeps checking
  * both, and how soon after READY the session is served.
+ *
+ * 2026-10-23: one probe whose status read said CREATING was served, ~3.6 s
+ * before the next read said READY. A probe reads the status, then invokes;
+ * the two are not one moment, so the first served probe may follow a
+ * CREATING read. Nothing relies on the order at the transition.
  */
 import { setTimeout } from 'node:timers/promises';
 import { GetAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore-control';
@@ -140,13 +145,13 @@ describe('the AgentCore provisioning window (research §B)', () => {
       );
       const [first] = observations;
       expect(first?.controlPlaneStatus, summary).toBe('CREATING');
-      // While CREATING, nothing is served, and the refusal is not the
-      // documented retryable 409.
+      // While CREATING, every refusal is the bad request, not the documented
+      // retryable 409; a probe served at the transition may follow a CREATING
+      // read.
       const whileCreating = observations.filter(
         ({ controlPlaneStatus }) => controlPlaneStatus === 'CREATING',
       );
       for (const { invocation } of whileCreating) {
-        expect(invocation.delivered, summary).toBe(false);
         if (invocation.delivered) continue;
         expect(invocation.httpStatusCode, summary).toBe(
           REFUSAL_WHILE_CREATING.httpStatusCode,

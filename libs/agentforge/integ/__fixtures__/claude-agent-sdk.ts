@@ -25,6 +25,7 @@ import {
   type SDKSystemMessage,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
+import { subscriptionEnv } from '#framework/claude/harness/credentials.ts';
 import { taskOutputDirectory } from './task-output-directory.ts';
 
 /**
@@ -94,17 +95,21 @@ export function createSandbox(name: string): Sandbox {
  */
 export const CARRIER_TOOL_NAME = 'StructuredOutput';
 
-/** The environment for a run billed to the operator's subscription. */
+/**
+ * The environment for a run billed to the operator's subscription: without
+ * the API key `.env.integ.local` also holds for `strands`, which the CLI
+ * would otherwise use instead, as the kernel leaves it out.
+ */
 export function createSubscriptionEnvironment(
   configDirectory: string,
   additionalVariables: Record<string, string> = {},
 ): Record<string, string | undefined> {
-  return {
+  return subscriptionEnv({
     ...process.env,
     CLAUDE_CODE_OAUTH_TOKEN: resolveClaudeCodeOAuthToken(),
     CLAUDE_CONFIG_DIR: configDirectory,
     ...additionalVariables,
-  };
+  });
 }
 
 const CREDENTIAL_VARIABLE_PATTERN = /^(ANTHROPIC_|CLAUDE_|TEMP_CLAUDE_)/;

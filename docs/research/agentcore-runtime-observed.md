@@ -193,6 +193,8 @@ The gateway's idempotency index also held over the real platform: the same key s
 
 The session held **one container across the `CREATING` → `READY` transition**.
 
+**2026-10-23, `us-east-2`:** the V2 window held — `CREATING` for ~3 minutes, every probe in it refused 400 `-32052` — except that the first served probe followed a status read of `CREATING`, ~3.6 s before a read of `READY`. A probe reads the status and then invokes, so at the transition the two disagree; `provisioning-window.test.ts` no longer asserts that nothing is served after a `CREATING` read.
+
 ### Deleting is far slower than creating
 
 `CreateAgentRuntime` reaches `READY` in **~10 seconds**. `DeleteAgentRuntime` returns immediately but the runtime sat in `DELETING` for **about five minutes**, and the workload identity AgentCore mints alongside it stays listed until the runtime is gone — `DeleteWorkloadIdentity` refuses it with *"WorkloadIdentity is linked to a service and cannot be deleted by the caller"*.
