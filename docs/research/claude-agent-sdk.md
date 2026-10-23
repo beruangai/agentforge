@@ -127,3 +127,8 @@ From [Configure permissions](https://code.claude.com/docs/en/permissions.md) ("W
 
 - **Claude Code adds one-hour cache breakpoints of its own after the prompt AgentForge sends**, on the operator's subscription. A prompt block marked with a five-minute breakpoint (`ttl: '5m'`) failed the run before its first turn: API 400, "a ttl='1h' cache_control block must not come after a ttl='5m' cache_control block". Seen in golden-kata's e2e, the first run to mark a block.
 - **What this means for AgentForge:** `cache: true` and a command's cache markers render `ttl: '1h'`, which is valid before a breakpoint of either length. A procedure that asks for `5m` itself fails the same way, loudly.
+
+## Credentials beside the subscription — read 2026-10-23
+
+- **The CLI prefers an API key to the OAuth token.** Its [precedence](https://code.claude.com/docs/en/authentication#authentication-precedence) puts `ANTHROPIC_AUTH_TOKEN`, then `ANTHROPIC_API_KEY`, then `apiKeyHelper` above `CLAUDE_CODE_OAUTH_TOKEN`, and in non-interactive mode the key is always used when present.
+- **`env` replaces the CLI's environment** rather than merging with `process.env` ([TypeScript reference](https://code.claude.com/docs/en/agent-sdk/typescript)). The kernel builds it from `process.env`, so a key beside the token in one environment — `.env.integ.local`, which holds `strands`' key too — would reach the CLI. While the token is set, the kernel leaves both variables out and refuses either in a procedure's `env`.

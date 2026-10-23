@@ -40,7 +40,7 @@ A live slice is integration however expensive it is; e2e means the whole path.
 
 A target gets exactly the credentials it uses, from `.env.<target>` — never `.env.local`, which Nx loads into every task.
 
-- `integ`: `.env.integ` (committed) sets `AWS_PROFILE=agentforge--test-integ`, `AWS_REGION=us-east-2` (`integ/aws/test-role-permissions-policy.json`); `.env.integ.local` (ignored) holds `CLAUDE_CODE_OAUTH_TOKEN`
+- `integ`: `.env.integ` (committed) sets `AWS_PROFILE=agentforge--test-integ`, `AWS_REGION=us-east-2` (`integ/aws/test-role-permissions-policy.json`); `.env.integ.local` (ignored) holds `CLAUDE_CODE_OAUTH_TOKEN` and `strands`' `ANTHROPIC_API_KEY`; a `claude` run is given no API key while the token is set
 - `e2e`: the example's target reads `.env.integ.local` for the token; a container gets it by name (`-e CLAUDE_CODE_OAUTH_TOKEN`), never by value on a command line
 - `cdk`: an infra project's `synth`, `deploy` and `destroy` take their `cdk` configuration's `.env.cdk` (the operator's, uncommitted), and its stage pins account and region, so the credentials only authorise. The test role is for integration tests and research, never an infra project's deploy
 - `test`: nothing. There is no `default` profile

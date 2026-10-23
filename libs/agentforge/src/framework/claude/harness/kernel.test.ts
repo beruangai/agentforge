@@ -156,6 +156,24 @@ describe('runAgent', () => {
     expect(options.outputFormat.type).toBe('json_schema');
   });
 
+  it('gives the CLI the subscription’s credential, not an API key beside it', async () => {
+    vi.stubEnv('CLAUDE_CODE_OAUTH_TOKEN', 'oauth');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'strands-key');
+    try {
+      const scripted = scriptedQuery([
+        result({ structured_output: { answer: 'x' } }),
+      ]);
+      await run(scripted).promise;
+      const options = scripted.calls[0]?.options as {
+        env: Record<string, string | undefined>;
+      };
+      expect(options.env.CLAUDE_CODE_OAUTH_TOKEN).toBe('oauth');
+      expect(options.env).not.toHaveProperty('ANTHROPIC_API_KEY');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   describe('auto memory', () => {
     const MEMORY_DIRECTORY = '/workspace/memories/spaces/a';
     const FRAGMENT = AUTO_MEMORY_FRAGMENT.render({

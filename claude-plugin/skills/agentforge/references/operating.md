@@ -31,6 +31,8 @@ Nx loads `.env.<configuration>` and `.env.<configuration>.local` into a target r
 
 On AgentCore, each secret is a Secrets Manager secret the operator creates, mapped to its variable in the agent's construct (`agents: { writer: { secrets: { CLAUDE_CODE_OAUTH_TOKEN: secret } } }`). A secret a layer declares and nothing maps fails to compile.
 
+**One environment may hold both credentials.** While `CLAUDE_CODE_OAUTH_TOKEN` is set, a `claude` run's CLI is given no `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`, which it would otherwise use instead of the subscription, and a procedure that sets either in its `env` is refused.
+
 **A `strands` project bills per use.** Its key is bounded by the Anthropic Console's monthly spend limit, which the operator sets. A run that reaches it, or the tier's spend cap, fails `BUDGET_EXHAUSTED`, not retryable: raise the limit, then retry the task. A rate limit below it is `USAGE_LIMITED`, with `retryAfter`, and a 5xx `PROVIDER_TRANSIENT`; both retryable. A procedure's own `limits` bound one run, and reaching one is also `BUDGET_EXHAUSTED`.
 
 ## Testing

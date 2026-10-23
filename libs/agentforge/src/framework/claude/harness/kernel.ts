@@ -31,6 +31,7 @@ import {
 import { S3SessionStore } from '../core/s3-session-store.ts';
 import { CLAUDE_AGENT_SDK_FULL_NAME } from '../core/sdk-version.ts';
 import { autoMemoryOptions } from './auto-memory.ts';
+import { subscriptionEnv } from './credentials.ts';
 import {
   type CommandBlock,
   type ContentBlock,
@@ -682,7 +683,10 @@ function ownedByTheKernel(spec: AgentRunSpec<unknown>) {
   try {
     return {
       systemPrompt: composeSystemPrompt(spec),
-      memory: autoMemoryOptions(spec, { ...process.env, ...spec.options?.env }),
+      memory: autoMemoryOptions(
+        spec,
+        subscriptionEnv(process.env, spec.options?.env),
+      ),
     };
   } catch (error) {
     throw new TaskFailure(
