@@ -507,7 +507,7 @@ describe('runAgent', () => {
     ],
     [
       result({ is_error: true, api_error_status: 401, result: 'no' }),
-      "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ705).",
+      "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ714).",
     ],
   ])('suggests the Claude action for its cause', async (message, suggested) => {
     const error = await run(scriptedQuery([message])).promise.then(

@@ -69,7 +69,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ401** | The consumer controls every identifier the platforms expose — isolation, conversation, transcript, working directory — with their distinct meanings intact, and AgentForge carries and records them without imposing a mapping |
 | **REQ402** | A session started in one container resumes in another |
 | **REQ403** | Nothing carries from one invocation to the next except state the consumer declared durable, and nothing an invocation started outlives it |
-| **REQ404** | An agent may keep Claude Code's auto memory — the `MEMORY.md` index and the files it lists, never a `CLAUDE.md` — in a directory its run declares, so a later task recalls what an earlier one saved. It is optional: a run that declares none keeps none |
+| **REQ404** | An agent may keep memory across its tasks, in a space its run declares, so a later task recalls what an earlier one saved. It is optional: a run that declares none keeps none |
 
 ### Failure — `REQ5xx`
 
@@ -95,7 +95,6 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ701** | One code path locally and in the cloud; caller logic does not branch on which, and an unavailable target fails loudly rather than falling back |
 | **REQ702** | A procedure runs in isolation against a fixture, with no container and no workflow engine |
 | **REQ704** | A consumer extends the base image with what its procedures need |
-| **REQ705** | Authentication is the operator's subscription; no pay-per-use key is present, and each deployment reads only the secrets it declares |
 | **REQ706** | Identifiers AgentForge mints itself are uuid7; an id a platform or SDK mints — an A2A task id — is carried as it comes |
 | **REQ707** | Each deployed agent is resolvable by name, serves the image it was deployed with, and reports liveness without running an agent — and nothing a procedure does delays that report |
 | **REQ708** | A caller invokes remotely with least privilege — exactly its own agents, and nothing else |
@@ -104,6 +103,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ711** | A consumer's workflows run locally on one Temporal server every project on the machine shares, keeping their history and advanced visibility across restarts, as Temporal Cloud does; a target starts it when it is not running and registers the project's namespace on it |
 | **REQ712** | A consumer's Claude Code is guided in developing with AgentForge by guidance AgentForge maintains in its repository, current with the developer's clone |
 | **REQ713** | A consumer chooses each agentic project's agent framework; its contracts, callers, clients, workflows, filesystems and infrastructure are the same whichever it chooses, and a procedure written for one framework does not compile against another |
+| **REQ714** | Each deployment authenticates to its model provider only with what it declares — the operator's subscription where the framework can use it, otherwise an API key, with spend bounded by the provider account's limit — and no credential is present that it did not declare |
 
 ---
 
@@ -114,6 +114,7 @@ An id here is spent. It is never reused.
 | | Was | Why it is gone |
 |---|---|---|
 | **REQ703** | A change reaching the next run without an image rebuild | Withdrawn. Code ships in the image ([ADR 0008](../adr/0008-code-ships-in-the-image.md)); with layered images and affected-only rebuilds a change deploys only the agent that contains it, and a deploy never interrupts a running session — so the need the requirement protected is met without the mechanism it asked for |
+| **REQ705** | Authentication is the operator's subscription; no pay-per-use key is present, and each deployment reads only the secrets it declares | Replaced by §REQ714. The `strands` framework cannot use the subscription, so it authenticates with an API key bounded by the provider account's spend limit ([ADR 0022](../adr/0022-a-framework-that-cannot-use-the-subscription-uses-an-api-key.md)); the subscription stays wherever the framework can use it, and the declared-secrets rule carries over |
 
 ---
 

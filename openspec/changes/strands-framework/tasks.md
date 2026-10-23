@@ -28,10 +28,10 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
 
 ## 2. Requirements and ADRs
 
-- [ ] 2.1 In `docs/REQUIREMENTS.md`, withdraw §REQ705 into "Withdrawn, and reserved" with its reason. Add §REQ714 as ADR 0022 words it, and reword §REQ404 as design.md states. Verify by reading each against the proposal, as the operator accepts them.
-- [ ] 2.2 Extend ADR 0011 with a dated note: framework storage under the agent's name in the session bucket. It adds to the decision and replaces nothing. Verify by reading it against design.md.
-- [ ] 2.3 Ask the operator to reword `CLAUDE.md`'s orientation and its subscription premise for §REQ714, and `docs/SOLUTION_SPACE.md`'s authentication assumption. Verify: the operator has the proposed wording.
-- [ ] 2.4 Bring §ODO005 to the operator. Its trigger, a key beyond the subscription, fires here, so it is deferred with a new trigger or settled. Verify: `docs/DESIGN_OPTIONS.md` records the outcome.
+- [x] 2.1 In `docs/REQUIREMENTS.md`, withdraw §REQ705 into "Withdrawn, and reserved" with its reason. Add §REQ714 as ADR 0022 words it, and reword §REQ404 as design.md states. Verify by reading each against the proposal, as the operator accepts them.
+- [x] 2.2 Extend ADR 0011 with a dated note: framework storage under the agent's name in the session bucket. It adds to the decision and replaces nothing. Verify by reading it against design.md.
+- [x] 2.3 Ask the operator to reword `CLAUDE.md`'s orientation and its subscription premise for §REQ714, and `docs/SOLUTION_SPACE.md`'s authentication assumption. Verify: the operator has the proposed wording.
+- [x] 2.4 Bring §ODO005 to the operator. Its trigger, a key beyond the subscription, fires here, so it is deferred with a new trigger or settled. Verify: `docs/DESIGN_OPTIONS.md` records the outcome.
 
 ## 3. The framework's core and harness
 

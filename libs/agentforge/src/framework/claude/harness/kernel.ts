@@ -551,7 +551,7 @@ const CLAUDE_SUGGESTED_ACTION_BY_CODE: Partial<Record<CauseCode, string>> = {
   USAGE_LIMITED:
     "Retry after `retryAfter`, when the subscription's usage limit resets.",
   CREDENTIAL_EXPIRED:
-    "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ705).",
+    "An operator renews the subscription token (`claude setup-token`) and updates the agent's secret; a retry cannot succeed before that (§REQ714).",
 };
 
 /** A cause, with the `claude` framework's suggested action where it has its own. */

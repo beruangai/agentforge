@@ -46,4 +46,4 @@ It is not an opinion about how a consumer isolates its work. AgentCore runtime s
 
 - Consumers are TypeScript on Bun, orchestrated by Temporal
 - Bedrock AgentCore Runtime is the cloud target; Docker is the local one
-- Claude authentication is the operator's Claude Max subscription, used as intended
+- Claude authentication is the operator's Claude Max subscription, used as intended, for a `claude` project; a `strands` project uses an Anthropic API key, bounded by the Console's spend limit
