@@ -10,11 +10,12 @@ import type {
   Prompt,
   PromptContent as SharedPromptContent,
 } from '../../../server/harness/framework.ts';
-import type {
-  CacheBreakpoint,
-  ContextBlock,
-  ContextBlockFunction as SharedContextBlockFunction,
-  ContextContent as SharedContextContent,
+import {
+  type CacheBreakpoint,
+  type ContextBlock,
+  renderContextBlock,
+  type ContextBlockFunction as SharedContextBlockFunction,
+  type ContextContent as SharedContextContent,
 } from '../../../server/harness/prompt.ts';
 
 /** A block the Messages API takes as it is. */
@@ -169,66 +170,15 @@ export async function resolveContextDocument(
   };
 }
 
-const RESERVED_CONTEXT_KEYS = new Set([
-  'tag',
-  'description',
-  'context',
-  'filepath',
-  'cache',
-]);
-
 export async function resolveContextBlock(
   block: ContextBlock,
   cwd: string,
 ): Promise<TextBlockParam> {
-  const { tag = 'context', description } = block;
-  const context = await contextBlockText(block, cwd);
-  const attributes: string[] = [];
-  if (description) attributes.push(attribute('description', description));
-  for (const [key, value] of Object.entries(block)) {
-    if (
-      RESERVED_CONTEXT_KEYS.has(key) ||
-      value === undefined ||
-      value === null
-    ) {
-      continue;
-    }
-    attributes.push(
-      attribute(
-        key,
-        typeof value === 'object' ? JSON.stringify(value) : String(value),
-      ),
-    );
-  }
-  const opening = [tag, ...attributes].join(' ');
   return {
     type: 'text',
-    text: `<${opening}>\n${context}\n</${tag}>`,
+    text: await renderContextBlock(block, cwd),
     ...cacheControl(block.cache),
   };
-}
-
-/** A context block's text: its own, or its file's without the file's final newline. */
-async function contextBlockText(
-  block: ContextBlock,
-  cwd: string,
-): Promise<string> {
-  const { context, filepath } = block;
-  if (typeof context === 'string' && filepath === undefined) return context;
-  if (typeof filepath !== 'string' || context !== undefined) {
-    throw new Error(
-      `a context block takes its text from one of \`context\` or \`filepath\`: ${JSON.stringify(block)}`,
-    );
-  }
-  try {
-    const text = await readFile(path.resolve(cwd, filepath), 'utf8');
-    return text.replace(/\r?\n$/, '');
-  } catch (error) {
-    throw new Error(
-      `the prompt's context block file "${filepath}" could not be read`,
-      { cause: error },
-    );
-  }
 }
 
 /** A text block carrying only a cache breakpoint. */
@@ -305,10 +255,6 @@ export function cacheControl(
       ttl: cache === true ? '1h' : cache.ttl,
     },
   };
-}
-
-function attribute(key: string, value: string): string {
-  return `${key}="${value.replaceAll('"', '&quot;')}"`;
 }
 
 /** `Array.isArray` narrowed for readonly arrays, which it does not narrow. */

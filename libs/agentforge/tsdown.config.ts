@@ -9,7 +9,7 @@ import {
 } from './published-manifest.ts';
 
 /**
- * One package, eleven entry points and the Nx plugin's implementations. Code shared between entry points is split
+ * One package, fifteen entry points and the Nx plugin's implementations. Code shared between entry points is split
  * into common chunks rather than duplicated into each, and every dependency
  * stays external — only this repository's own source is bundled. tsdown
  * externalises only what the manifest declares and inlines anything else with
@@ -31,6 +31,10 @@ export default defineConfig({
     'claude/server': 'src/framework/claude/server/index.ts',
     'claude/client': 'src/framework/claude/client/index.ts',
     'claude/infra': 'src/framework/claude/infra/index.ts',
+    'strands/agent': 'src/framework/strands/harness/index.ts',
+    'strands/server': 'src/framework/strands/server/index.ts',
+    'strands/client': 'src/framework/strands/client/index.ts',
+    'strands/infra': 'src/framework/strands/infra/index.ts',
     ...(await pluginEntries()),
   },
   format: 'esm',
@@ -74,6 +78,23 @@ export default defineConfig({
         'src/framework/claude/container/bun.lock',
       ],
       to: `${BUNDLE_DIRECTORY}/claude/container`,
+    },
+    // The strands framework's collector configuration, beside `strands/server.js`.
+    {
+      from: 'src/framework/strands/server/collector/*.yaml',
+      to: `${BUNDLE_DIRECTORY}/strands/collector`,
+    },
+    // The strands framework image's Dockerfile, and its root manifest and lock, which `container-lock-strands` writes.
+    {
+      from: 'src/framework/strands/Dockerfile',
+      to: `${BUNDLE_DIRECTORY}/strands`,
+    },
+    {
+      from: [
+        'src/framework/strands/container/package.json',
+        'src/framework/strands/container/bun.lock',
+      ],
+      to: `${BUNDLE_DIRECTORY}/strands/container`,
     },
     // The shared local Temporal server's compose project, beside its executor.
     {

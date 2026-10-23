@@ -17,6 +17,12 @@ const INPUTS = {
       rootManifest: '/installed/agentforge/claude/container/package.json',
       rootLock: '/installed/agentforge/claude/container/bun.lock',
     },
+    strands: {
+      dockerfile: '/installed/agentforge/strands/Dockerfile',
+      containerDirectory: '/installed/agentforge/strands/container',
+      rootManifest: '/installed/agentforge/strands/container/package.json',
+      rootLock: '/installed/agentforge/strands/container/bun.lock',
+    },
   },
 };
 
@@ -120,7 +126,7 @@ describe('imageBuild', () => {
 
   it('refuses a layer that is not one', () => {
     expect(() => imageBuild(GOLDEN_KATA, 'top', INPUTS, '/workspace')).toThrow(
-      'layer "top" is not agentforge, agentforge-claude, base or agents/<agent>',
+      'layer "top" is not agentforge, agentforge-claude, agentforge-strands, base or agents/<agent>',
     );
   });
 

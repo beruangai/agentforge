@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
 /**
  * A cache breakpoint on a block: `true` is one hour, or a TTL named. Each
  * framework renders it in its own terms; under `claude`, Claude Code places
@@ -101,3 +104,70 @@ type UnionToIntersection<Union> = (
 
 /** An intersection shown as the one object type it is. */
 type Flatten<Type> = { [Key in keyof Type]: Type[Key] };
+
+const RESERVED_CONTEXT_KEYS = new Set([
+  'tag',
+  'description',
+  'context',
+  'filepath',
+  'cache',
+]);
+
+/**
+ * A context block as the tagged text every framework sends: its tag, its
+ * `description` and other attributes, and its text, a file's read against
+ * `cwd` when it names one. Its cache breakpoint is the framework's to render.
+ */
+export async function renderContextBlock(
+  block: ContextBlock,
+  cwd: string,
+): Promise<string> {
+  const { tag = 'context', description } = block;
+  const context = await contextBlockText(block, cwd);
+  const attributes: string[] = [];
+  if (description) attributes.push(attribute('description', description));
+  for (const [key, value] of Object.entries(block)) {
+    if (
+      RESERVED_CONTEXT_KEYS.has(key) ||
+      value === undefined ||
+      value === null
+    ) {
+      continue;
+    }
+    attributes.push(
+      attribute(
+        key,
+        typeof value === 'object' ? JSON.stringify(value) : String(value),
+      ),
+    );
+  }
+  const opening = [tag, ...attributes].join(' ');
+  return `<${opening}>\n${context}\n</${tag}>`;
+}
+
+/** A context block's text: its own, or its file's without the file's final newline. */
+async function contextBlockText(
+  block: ContextBlock,
+  cwd: string,
+): Promise<string> {
+  const { context, filepath } = block;
+  if (typeof context === 'string' && filepath === undefined) return context;
+  if (typeof filepath !== 'string' || context !== undefined) {
+    throw new Error(
+      `a context block takes its text from one of \`context\` or \`filepath\`: ${JSON.stringify(block)}`,
+    );
+  }
+  try {
+    const text = await readFile(path.resolve(cwd, filepath), 'utf8');
+    return text.replace(/\r?\n$/, '');
+  } catch (error) {
+    throw new Error(
+      `the prompt's context block file "${filepath}" could not be read`,
+      { cause: error },
+    );
+  }
+}
+
+function attribute(key: string, value: string): string {
+  return `${key}="${value.replaceAll('"', '&quot;')}"`;
+}

@@ -16,14 +16,23 @@ import type { RunRecord } from '#core/contract/task.ts';
  * caller that never reads a transcript needs neither.
  */
 export async function readTranscript(
-  run: Pick<RunRecord, 'sessionId' | 'transcript'>,
+  run: Pick<RunRecord, 'framework' | 'sessionId' | 'transcript'>,
   options: { readonly client?: S3Client } = {},
 ): Promise<SessionMessage[]> {
   const { sessionId, transcript } = run;
+  if (run.framework.name !== 'claude') {
+    throw new Error(
+      `the run went through the ${run.framework.name} framework: its own client reads its session`,
+    );
+  }
   if (sessionId === undefined || transcript === undefined) {
     throw new Error(
       "the run records no transcript: it started no session, or kept it in a procedure's own store",
     );
+  }
+  const { projectKey } = transcript;
+  if (projectKey === undefined) {
+    throw new Error('the run records its transcript without a project key');
   }
   const [{ getSessionMessages }, { S3Client }, { S3SessionStore }, endpoint] =
     await Promise.all([
@@ -40,7 +49,6 @@ export async function readTranscript(
   });
   // Read at the recorded key, whatever project key the SDK derives from the
   // directory it is given.
-  const { projectKey } = transcript;
   const recorded: SessionStore = {
     append: () =>
       Promise.reject(new Error('a transcript is read here, never written')),

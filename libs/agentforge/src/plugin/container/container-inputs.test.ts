@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { FRAMEWORK_NAMES } from '#core/contract/framework.ts';
 import { containerInputsOf } from './container-inputs.ts';
 
 let workspace: string;
@@ -16,10 +17,12 @@ function writePublished(directory: string): void {
   writeFileSync(join(directory, 'Dockerfile'), 'FROM scratch\n');
   writeFileSync(join(directory, 'container', 'package.json'), '{}');
   writeFileSync(join(directory, 'container', 'bun.lock'), '{}');
-  mkdirSync(join(directory, 'claude', 'container'), { recursive: true });
-  writeFileSync(join(directory, 'claude', 'Dockerfile'), 'FROM scratch\n');
-  writeFileSync(join(directory, 'claude', 'container', 'package.json'), '{}');
-  writeFileSync(join(directory, 'claude', 'container', 'bun.lock'), '{}');
+  for (const name of FRAMEWORK_NAMES) {
+    mkdirSync(join(directory, name, 'container'), { recursive: true });
+    writeFileSync(join(directory, name, 'Dockerfile'), 'FROM scratch\n');
+    writeFileSync(join(directory, name, 'container', 'package.json'), '{}');
+    writeFileSync(join(directory, name, 'container', 'bun.lock'), '{}');
+  }
 }
 
 beforeEach(() => {
@@ -41,14 +44,17 @@ describe('containerInputsOf', () => {
       rootManifest: join(installed, 'container/package.json'),
       rootLock: join(installed, 'container/bun.lock'),
       version: '1.2.3',
-      frameworks: {
-        claude: {
-          dockerfile: join(installed, 'claude/Dockerfile'),
-          containerDirectory: join(installed, 'claude/container'),
-          rootManifest: join(installed, 'claude/container/package.json'),
-          rootLock: join(installed, 'claude/container/bun.lock'),
-        },
-      },
+      frameworks: Object.fromEntries(
+        FRAMEWORK_NAMES.map((name) => [
+          name,
+          {
+            dockerfile: join(installed, `${name}/Dockerfile`),
+            containerDirectory: join(installed, `${name}/container`),
+            rootManifest: join(installed, `${name}/container/package.json`),
+            rootLock: join(installed, `${name}/container/bun.lock`),
+          },
+        ]),
+      ),
     });
   });
 
@@ -74,9 +80,11 @@ describe('containerInputsOf', () => {
         join(bundle, 'Dockerfile'),
         join(bundle, 'container/package.json'),
         join(bundle, 'container/bun.lock'),
-        join(bundle, 'claude/Dockerfile'),
-        join(bundle, 'claude/container/package.json'),
-        join(bundle, 'claude/container/bun.lock'),
+        ...FRAMEWORK_NAMES.flatMap((name) => [
+          join(bundle, `${name}/Dockerfile`),
+          join(bundle, `${name}/container/package.json`),
+          join(bundle, `${name}/container/bun.lock`),
+        ]),
       ].join(
         ', ',
       )} (running from source, they are @beruangai/agentforge's bundle output)`,

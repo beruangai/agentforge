@@ -35,29 +35,31 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
 
 ## 3. The framework's core and harness
 
-- [ ] 3.1 Add `framework/strands/core/`: `REQUIRED_SECRETS = ['ANTHROPIC_API_KEY']`, and the SDK version the image pins, tested against `package.json`'s peer. Add `@strands-agents/sdk` as a caret optional peer with the peers 1.1a settled, and `strands` to `FRAMEWORK_NAMES`. Verify with unit tests.
-- [ ] 3.2 Replace the stub's placeholder types with the real `StrandsTypes`, and add `composeOptions`: lists accumulate, and an MCP client named twice throws. Verify with unit tests.
-- [ ] 3.3 Implement the runner against a scripted Anthropic provider:
+- [x] 3.1 Add `framework/strands/core/`: `REQUIRED_SECRETS = ['ANTHROPIC_API_KEY']`, and the SDK version the image pins, tested against `package.json`'s peer. Add `@strands-agents/sdk` as a caret optional peer with the peers 1.1a settled, and `strands` to `FRAMEWORK_NAMES`. Verify with unit tests.
+- [x] 3.2 Replace the stub's placeholder types with the real `StrandsTypes`, and add `composeOptions`: lists accumulate, and an MCP client named twice throws. Verify with unit tests.
+- [x] 3.3 Implement the runner against a scripted Anthropic provider:
   - settlement: the cap, the first accepted submission, every failure in one refusal, a throwing guard;
   - no background work, and fail-closed MCP;
   - the run record and usage.
 
   Verify with unit tests for each scenario of `framework-strands`'s settlement requirement.
-- [ ] 3.4 Implement classification over the design's error table, with `strands`' suggested actions. Verify with a unit test per row.
-- [ ] 3.5 Implement the prompt rendering: `composeContext`'s content to text blocks, a cache breakpoint to a cache point with its TTL, file-backed blocks, and the layers' instructions in order, before AgentForge's fragments. Verify with unit tests.
-- [ ] 3.6 Implement storage: `S3Storage` under `<agent>/` in the session bucket, from the environment `prepare()` reads; `memorySpace`; offloading; a refused write fails `EXECUTION_ERROR`. Verify with unit tests over a stubbed S3, and an `integ/local/` slice against the local store resuming a session in a second process.
-- [ ] 3.7 Implement the `agentOptionsMiddleware`: working directories and the Cedar intervention from the mounts' permissions. Verify with unit tests driving the vended file tool inside and outside the write scope.
-- [ ] 3.8 Implement `distill` for `strands`, with `claude`'s contract. Verify with the distillation unit tests ported to the scripted provider.
-- [ ] 3.9 Wire `/strands/agent` (bound `implementAgent`, `runTaskProcess` and `TaskContext`) in the export map and `tsdown.config.ts`. Make any seam change the spike named, in shared code and `claude` together. Verify:
+- [x] 3.4 Implement classification over the design's error table, with `strands`' suggested actions. Verify with a unit test per row.
+- [x] 3.5 Implement the prompt rendering: `composeContext`'s content to text blocks, a cache breakpoint to a cache point with its TTL, file-backed blocks, and the layers' instructions in order, before AgentForge's fragments. Verify with unit tests.
+- [x] 3.6 Implement storage: `S3Storage` under `<agent>/` in the session bucket, from the environment `prepare()` reads; `memorySpace`; offloading; a refused write fails `EXECUTION_ERROR`. Verify with unit tests over a stubbed S3, and an `integ/local/` slice against the local store resuming a session in a second process.
+- [x] 3.7 Implement the `agentOptionsMiddleware`: working directories and the Cedar intervention from the mounts' permissions. Verify with unit tests driving the vended file tool inside and outside the write scope.
+- [x] 3.8 Implement `distill` for `strands`, with `claude`'s contract. Verify with the distillation unit tests ported to the scripted provider.
+- [x] 3.9 Wire `/strands/agent` (bound `implementAgent`, `runTaskProcess` and `TaskContext`) in the export map and `tsdown.config.ts`. Make any seam change the spike named, in shared code and `claude` together. Verify:
   - `package-exports.test.ts` covers the subpath under `agentforge-agent`;
   - `/agent`, `/client` and `/contract` reach no Strands package;
   - the biome rules confine `@strands-agents/*` to `framework/strands/**`, and `framework/strands/**` still imports no Anthropic package.
 
+  Done 2026-10-23. The seam changes: `TranscriptLocation.projectKey` is optional, as `claude`'s alone; the context block's rendering (`renderContextBlock`) and distillation (`distillDocuments`) moved into `server/harness/`, each framework keeping only its own wrapping.
+
 ## 4. Server, infra and the image
 
-- [ ] 4.1 Add `framework/strands/server/`: `framework: FrameworkServer`, with the OTLP environment per level and `strands`' own collector configuration, copied into the bundle beside `strands/server.js`. Export it from `/strands/server`. Verify with unit tests and `package-exports.test.ts`.
+- [x] 4.1 Add `framework/strands/server/`: `framework: FrameworkServer`, with the OTLP environment per level and `strands`' own collector configuration, copied into the bundle beside `strands/server.js`. Export it from `/strands/server`. Verify with unit tests and `package-exports.test.ts`.
 - [ ] 4.2 Add `framework/strands/infra/` re-exporting `REQUIRED_SECRETS`, as `/strands/infra` with no condition. Verify: an `AgentRuntime` given `requiredSecrets` from it fails synth without `ANTHROPIC_API_KEY`, naming it.
-- [ ] 4.2a Add `framework/strands/client/` with `readSession(run)`, loading the SDK and the S3 client only when called, as `/strands/client` with no condition. Verify with a unit test over a stubbed S3, and `package-exports.test.ts`.
+- [x] 4.2a Add `framework/strands/client/` with `readSession(run)`, loading the SDK and the S3 client only when called, as `/strands/client` with no condition. Verify with a unit test over a stubbed S3, and `package-exports.test.ts`.
 - [ ] 4.3 Add `framework/strands/Dockerfile` and its `container/` root manifest and lock, `container-lock-strands`, and the `image-strands` target. Ship them in the bundle. Verify with `nx run @beruangai/agentforge:image-strands`: inside it, the bundle's `framework/strands` imports the SDK, and no Anthropic Agent SDK or Claude binary is present.
 - [ ] 4.4 Add `integ/model/strands-structured-output/` and `integ/model/strands-cache-points/`, and an `integ/aws/` slice for the storage under an agent's role. Verify: they pass.
 

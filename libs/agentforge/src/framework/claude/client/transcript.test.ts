@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { readTranscript } from './transcript.ts';
 
 const LOCATION = { bucket: 'sessions', agent: 'writer', projectKey: 'project' };
+const CLAUDE_FRAMEWORK = {
+  name: 'claude',
+  fullName: '@anthropic-ai/claude-agent-sdk@0.3.280',
+} as const;
 /** The SDK reads a session only by a UUID. */
 const SESSION_ID = '2b7f0e4c-1d2a-4c55-9a51-5b0c9f6a3e11';
 
@@ -51,19 +55,27 @@ describe('readTranscript', () => {
         .join('\n')}\n`,
     });
     const messages = await readTranscript(
-      { sessionId: SESSION_ID, transcript: LOCATION },
+      {
+        framework: CLAUDE_FRAMEWORK,
+        sessionId: SESSION_ID,
+        transcript: LOCATION,
+      },
       { client },
     );
     expect(messages.map((message) => message.uuid)).toEqual(['u1', 'a1']);
   });
 
   it('refuses a run that records no transcript, and names the key that holds none', async () => {
-    await expect(readTranscript({ sessionId: SESSION_ID })).rejects.toThrow(
-      /records no transcript/,
-    );
+    await expect(
+      readTranscript({ framework: CLAUDE_FRAMEWORK, sessionId: SESSION_ID }),
+    ).rejects.toThrow(/records no transcript/);
     await expect(
       readTranscript(
-        { sessionId: SESSION_ID, transcript: LOCATION },
+        {
+          framework: CLAUDE_FRAMEWORK,
+          sessionId: SESSION_ID,
+          transcript: LOCATION,
+        },
         { client: s3Holding({}) },
       ),
     ).rejects.toThrow(

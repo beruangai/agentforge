@@ -1,0 +1,51 @@
+# The container's OpenTelemetry collector (ADOT): receives a strands task
+# process's OTLP on localhost and signs it on to CloudWatch's OTLP endpoints
+# with the runtime's role. The server starts it and sets the variables below.
+#
+# Strands names its spans by the GenAI semantic conventions itself —
+# `invoke_agent`, `chat`, `execute_tool`, with `gen_ai.*` usage and names —
+# so nothing is remapped. It emits no log records.
+extensions:
+  health_check:
+    endpoint: 127.0.0.1:13133
+  sigv4auth/traces:
+    region: ${env:AWS_REGION}
+    service: xray
+  sigv4auth/metrics:
+    region: ${env:AWS_REGION}
+    service: monitoring
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:4318
+processors:
+  # Short, so little is buffered when AgentCore stops the container.
+  batch:
+    timeout: 1s
+  # A container serves one runtime session: every span joins it.
+  attributes/session:
+    actions:
+      - { key: session.id, value: '${env:AGENTFORGE_RUNTIME_SESSION_ID}', action: insert }
+exporters:
+  otlp_http/traces:
+    traces_endpoint: https://xray.${env:AWS_REGION}.amazonaws.com/v1/traces
+    compression: gzip
+    auth:
+      authenticator: sigv4auth/traces
+  otlp_http/metrics:
+    metrics_endpoint: https://monitoring.${env:AWS_REGION}.amazonaws.com/v1/metrics
+    compression: gzip
+    auth:
+      authenticator: sigv4auth/metrics
+service:
+  extensions: [health_check, sigv4auth/traces, sigv4auth/metrics]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes/session, batch]
+      exporters: [otlp_http/traces]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http/metrics]

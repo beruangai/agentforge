@@ -1,44 +1,60 @@
-import type { Framework } from '../../../server/harness/framework.ts';
+/**
+ * `@beruangai/agentforge/strands/agent` — what a `strands` project's
+ * procedures import beside `/agent`: the implementer and the task process
+ * entry bound to Strands Agents, the runner behind `context.runAgent`, and
+ * the SDK's prompt content. Resolvable only under the `agentforge-agent`
+ * export condition, so a worker's build cannot import it.
+ */
+import type { RouterContract } from '@orpc/contract';
+import type { Router } from '@orpc/server';
+import {
+  implementAgent as implementSharedAgent,
+  runTaskProcess as runSharedTaskProcess,
+} from '../../../server/harness/task-process.ts';
+import { framework } from './framework.ts';
+import type { TaskContext } from './types.ts';
 
-/** A Strands content block, as a placeholder until `strands-framework` defines it. */
-interface StrandsContentBlock {
-  readonly type: 'strands-content';
-  readonly text: string;
-}
+export {
+  DEFAULT_DISTILL_CAP_TOKENS,
+  type DistillDocument,
+  type DistillSpec,
+  distill,
+} from './distill.ts';
+export { framework } from './framework.ts';
+export { composeOptions } from './options.ts';
+export type {
+  AgentPrompt,
+  ContextBlockFunction,
+  ContextContent,
+  PromptContent,
+} from './prompt.ts';
+export type {
+  AgentRun,
+  AgentRunSpec,
+  StrandsOptions,
+  StrandsTypes,
+  TaskContext,
+} from './types.ts';
 
-/** A Strands run's options, as a placeholder until `strands-framework` defines them. */
-interface StrandsOptions {
-  readonly model?: string;
-  readonly maxTokens?: number;
-}
-
-/** A Strands run's usage, as a placeholder until `strands-framework` defines it. */
-interface StrandsUsage {
-  readonly inputTokens: number;
-  readonly outputTokens: number;
-}
-
-/** What the `strands` framework would fix for its procedures' types. */
-export type StrandsTypes = {
-  readonly content: StrandsContentBlock;
-  readonly options: StrandsOptions;
-  readonly extras: { readonly sessionManager?: string };
-  readonly usage: StrandsUsage;
-};
-
-function notImplemented(): never {
-  throw new Error('the strands framework is not implemented');
+/**
+ * The oRPC implementer for a contract, with the `strands` task context. A
+ * contract that would drop undeclared keys is refused (§REQ103), so the
+ * procedure module that calls this fails to load.
+ */
+export function implementAgent<Contract extends RouterContract>(
+  contract: Contract,
+) {
+  return implementSharedAgent(framework, contract).$context<TaskContext>();
 }
 
 /**
- * A typechecked shell of Strands Agents as a framework, so the interface is
- * not shaped by `claude` alone (ADR 0021). It is in no registry, export or
- * bundle entry; `strands-framework` implements it.
+ * The entry point of a spawned task process: waits for its one `run`, runs
+ * it, reports the outcome, and exits. Called from the consumer's task entry,
+ * the one place the harness and the consumer's procedures meet.
  */
-export const strands: Framework<StrandsTypes> = {
-  name: 'strands',
-  prepare: notImplemented,
-  get agentOptionsMiddleware(): Framework<StrandsTypes>['agentOptionsMiddleware'] {
-    return notImplemented();
-  },
-};
+export function runTaskProcess(options: {
+  readonly contract: RouterContract;
+  readonly router: Router<TaskContext>;
+}): void {
+  runSharedTaskProcess({ framework, ...options });
+}

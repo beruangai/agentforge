@@ -11,8 +11,8 @@ describe('agentOfLayer', () => {
 
   it("names an agent's layer, and refuses one that is no layer or no recorded agent's", () => {
     expect(agentOfLayer(GOLDEN_KATA, 'agents/writer')).toBe('writer');
-    expect(() => agentOfLayer(GOLDEN_KATA, 'agentforge-strands')).toThrow(
-      'layer "agentforge-strands" is not agentforge, agentforge-claude, base or agents/<agent>',
+    expect(() => agentOfLayer(GOLDEN_KATA, 'top')).toThrow(
+      'layer "top" is not agentforge, agentforge-claude, agentforge-strands, base or agents/<agent>',
     );
     expect(() => agentOfLayer(GOLDEN_KATA, 'agents/fixer')).toThrow(
       'layer "agents/fixer" names no agent of @proj/golden-kata',

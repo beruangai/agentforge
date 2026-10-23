@@ -12,6 +12,7 @@ What the `strands` framework relies on (`openspec/changes/strands-framework`). `
   - `@cedar-policy/cedar-wasm` ^4, and `@cedar-policy/mcp-schema-generator-wasm` ^0.6, which the Cedar intervention imports statically;
   - the OpenTelemetry SDK and exporters, for telemetry.
 - **Required peers:** `@modelcontextprotocol/client` ^2, `@opentelemetry/api` ^1.9 and `zod` ^4.5.
+  - The OpenTelemetry SDK 2.12 packages cap the API below 1.10, so the API is pinned at 1.9.1.
 - **Unused:** `@a2a-js/sdk` (peered `^0.3.10`, against AgentForge's 1.2.0), since Strands' A2A server is not used.
 - **A hard dependency:** `@aws-sdk/client-bedrock-runtime`, installed whatever the provider.
 
@@ -41,6 +42,11 @@ What the `strands` framework relies on (`openspec/changes/strands-framework`). `
 - **The vended shell does not see a cancel.** `makeShell` passes only `timeout` to the sandbox, so a cancel waits for the command: a 30 s `sleep` took 30,033 ms.
 - **A signalled sandbox ends it quickly.** `Sandbox.execute` takes a `signal` that kills the process. A `Sandbox` subclass delegates to the agent's own sandbox and adds `agent.cancelSignal`. Bound with `makeShell(sandbox)`, which binds only an `instanceof Sandbox`, it ends the run 13 ms after the abort.
 - **The command's child survives briefly.** The SDK kills `sh`, not its process group, so the command's child outlives it until it exits. The runtime already SIGKILLs the task's process group when a task ends.
+- **Cancel mid-model-call.** The Anthropic provider passes no signal to its request, so a cancel waits for the model's next event; against a response that sends none, it never ends. The Anthropic client's own `fetch`, given the agent's `cancelSignal`, ends it at once (the runner's unit tests, scripted API).
+- **A model call can be refused.** `BeforeModelCallEvent.cancel = '<text>'` skips the request and ends the turn with that text as the assistant's message.
+
+## Errors
+- **A provider error arrives wrapped.** The model's `streamAggregated` wraps whatever the provider threw in a `ModelError`, with the Anthropic SDK's `APIError` as its `cause`; a 429 arrives as `ModelThrottledError`, also with the `APIError` as its cause. A connection timeout arrives as a `ModelError` over `APIConnectionTimeoutError`, with no status.
 
 ## Write scope
 - **Cedar refuses outside the write globs, in turn.** `CedarAuthorization` with a `contextEnricher` computes `withinWriteScope` from the vended `fileEditor` input: picomatch over the path relative to the mount. An outside `create` is refused ("DENIED: Access denied by Cedar policy: policy1"), and an inside one is permitted.
@@ -61,7 +67,11 @@ Per the [errors](https://platform.claude.com/docs/en/api/errors) and [rate limit
 - **It records the first accepted submission itself,** and ends the run once it has one.
 - **It ends a run with `agent.cancel()`** after recording the cause, whether at the structured-output cap or for a throwing guard.
 - **It ends a run that stops without submitting as `OUTPUT_INVALID`,** before Strands' forced request.
-- **It binds the vended shell to a signalled sandbox.**
+- **It does not bind a signalled sandbox.** The SDK's default sandbox is not reachable through its public API. A cancel mid-command is bounded by the executor's grace and process-group kill.
+- **It gives the Anthropic client a `fetch` that takes the agent's cancel signal,** so a cancel or a run's end stops a model call in flight.
+- **It refuses the next model call once a submission is accepted,** and cancels the invocation.
+- **It classifies a provider error from the `ModelError`'s cause.**
 - **It fails a run whose memory write failed,** with `EXECUTION_ERROR`.
 - **Its storage prefix is `<agent>/`,** with the memory store named for the space.
-- **The seam needs no change.** `prepare()` stays synchronous: storage and telemetry set up without awaiting.
+- **`prepare()` stays synchronous:** storage and telemetry set up without awaiting.
+- **The seam changes the apply made:** `TranscriptLocation.projectKey` is optional, `claude`'s alone; the context block's rendering and distillation moved into `server/harness/`.

@@ -25,7 +25,7 @@
     "framework": {
       "type": "string",
       "description": "The agent framework the project's runs go through",
-      "enum": ["claude"],
+      "enum": ["claude", "strands"],
       "default": "claude"
     }
   },

@@ -29,7 +29,14 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
   exports: Record<string, unknown>;
 };
 const AGENT_CONDITION = 'agentforge-agent';
-const AGENT_ENTRY_POINTS = ['agent', 'server', 'claude/agent', 'claude/server'];
+const AGENT_ENTRY_POINTS = [
+  'agent',
+  'server',
+  'claude/agent',
+  'claude/server',
+  'strands/agent',
+  'strands/server',
+];
 const OPEN_ENTRY_POINTS = [
   'contract',
   'client',
@@ -38,6 +45,8 @@ const OPEN_ENTRY_POINTS = [
   'infra',
   'claude/client',
   'claude/infra',
+  'strands/client',
+  'strands/infra',
 ];
 /** The entry points every framework's project imports, which must reach no framework's SDK. */
 const SHARED_ENTRY_POINTS = ['agent', 'client', 'contract'];
@@ -213,7 +222,7 @@ function sourceTarget(subpath: string, condition?: string): string {
 describe.each(SHARED_ENTRY_POINTS)(
   '/%s, shared by every framework',
   (entryPoint) => {
-    it('reaches no Anthropic package, so it resolves and typechecks with neither installed', () => {
+    it("reaches no framework's SDK, so it resolves and typechecks with none installed", () => {
       const { config } = ts.readConfigFile(
         join(dirname(packageJsonPath), 'tsconfig.lib.json'),
         ts.sys.readFile,
@@ -235,8 +244,10 @@ describe.each(SHARED_ENTRY_POINTS)(
       const reached = program
         .getSourceFiles()
         .map((file) => file.fileName)
-        .filter((fileName) =>
-          fileName.includes('/node_modules/@anthropic-ai/'),
+        .filter(
+          (fileName) =>
+            fileName.includes('/node_modules/@anthropic-ai/') ||
+            fileName.includes('/node_modules/@strands-agents/'),
         );
       expect(reached).toEqual([]);
       expect(ts.getPreEmitDiagnostics(program)).toEqual([]);

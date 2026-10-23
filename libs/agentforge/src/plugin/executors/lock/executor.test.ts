@@ -19,9 +19,15 @@ const CLAUDE = {
   rootManifest: '/installed/agentforge/claude/container/package.json',
   rootLock: '/installed/agentforge/claude/container/bun.lock',
 };
+const STRANDS = {
+  dockerfile: '/installed/agentforge/strands/Dockerfile',
+  containerDirectory: '/installed/agentforge/strands/container',
+  rootManifest: '/installed/agentforge/strands/container/package.json',
+  rootLock: '/installed/agentforge/strands/container/bun.lock',
+};
 const INPUTS = {
   packageDirectory: '/installed/agentforge',
-  frameworks: { claude: CLAUDE },
+  frameworks: { claude: CLAUDE, strands: STRANDS },
 };
 
 describe('layerLock', () => {

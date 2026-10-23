@@ -198,12 +198,14 @@ export function outcomeOfArtifacts(artifacts: unknown): Outcome | undefined {
 
 /**
  * Where a session's transcript is kept: the session bucket, and its keys'
- * agent and project parts (`<agent>/<projectKey>/<sessionId>/`).
+ * agent part. A `claude` session's keys also carry their project part
+ * (`<agent>/<projectKey>/<sessionId>/`); a framework that keys sessions by id
+ * alone records none.
  */
 export const TranscriptLocationSchema = z.strictObject({
   bucket: z.string(),
   agent: z.string(),
-  projectKey: z.string(),
+  projectKey: z.string().optional(),
 });
 export type TranscriptLocation = z.infer<typeof TranscriptLocationSchema>;
 
@@ -226,7 +228,7 @@ export const RunRecordSchema = z.strictObject({
   /** The framework's options, as recorded. */
   options: z.record(z.string(), z.unknown()),
   sessionId: z.string().optional(),
-  /** Where the run's transcript is, when the deployment's store kept it; `readTranscript` reads it. */
+  /** Where the run's transcript is, when the deployment's store kept it; its framework's client reads it. */
   transcript: TranscriptLocationSchema.optional(),
   numberOfTurns: z.number().optional(),
   durationMilliseconds: z.number().optional(),

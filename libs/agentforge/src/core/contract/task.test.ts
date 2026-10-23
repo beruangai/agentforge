@@ -73,7 +73,7 @@ describe('a run record', () => {
     expect(
       RunRecordSchema.safeParse({
         ...record,
-        framework: { name: 'strands', fullName: 'sdk@1' },
+        framework: { name: 'langgraph', fullName: 'sdk@1' },
       }).success,
     ).toBe(false);
     const { framework: _, ...nameless } = record;

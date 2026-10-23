@@ -81,10 +81,10 @@ describe('agentic-project', () => {
     await expect(
       agenticProjectGenerator(tree, {
         name: 'golden-kata',
-        framework: 'strands' as never,
+        framework: 'langgraph' as never,
       }),
     ).rejects.toThrow(
-      'framework "strands" is not one AgentForge provides: claude',
+      'framework "langgraph" is not one AgentForge provides: claude, strands',
     );
     expect(treeFiles(tree)).toEqual(before);
   });

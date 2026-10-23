@@ -70,7 +70,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/core/**"],
+      "includes": [
+        "libs/agentforge/src/core/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -88,13 +90,14 @@
                       "aws-cdk-lib",
                       "aws-cdk-lib/**"
                     ],
-                    "message": "core is shared by every seam and imports none of them, and never a platform SDK (ARCHITECTURE.md §1, §8)."
+                    "message": "core is shared by every seam and imports none of them, and never a platform SDK (ARCHITECTURE.md \u00a71, \u00a78)."
                   },
                   {
                     "group": [
                       "**/framework/**",
                       "#framework/**",
-                      "@anthropic-ai/**"
+                      "@anthropic-ai/**",
+                      "@strands-agents/**"
                     ],
                     "message": "Shared modules never import a framework or its SDK; a framework plugs into the seam, and the plugin reaches frameworks only through the registry (ADR 0021)."
                   }
@@ -106,7 +109,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/server/runtime/**"],
+      "includes": [
+        "libs/agentforge/src/server/runtime/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -115,14 +120,17 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/harness/**"],
-                    "message": "Layer 1 never imports layer 2; they share only core (ARCHITECTURE.md §1)."
+                    "group": [
+                      "**/harness/**"
+                    ],
+                    "message": "Layer 1 never imports layer 2; they share only core (ARCHITECTURE.md \u00a71)."
                   },
                   {
                     "group": [
                       "**/framework/**",
                       "#framework/**",
-                      "@anthropic-ai/**"
+                      "@anthropic-ai/**",
+                      "@strands-agents/**"
                     ],
                     "message": "Shared modules never import a framework or its SDK; a framework plugs into the seam, and the plugin reaches frameworks only through the registry (ADR 0021)."
                   }
@@ -134,7 +142,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/server/harness/**"],
+      "includes": [
+        "libs/agentforge/src/server/harness/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -143,14 +153,19 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/runtime/**", "@a2a-js/**", "express"],
-                    "message": "Layer 2 never imports layer 1, and knows nothing of A2A or the container; they share only core (ARCHITECTURE.md §1)."
+                    "group": [
+                      "**/runtime/**",
+                      "@a2a-js/**",
+                      "express"
+                    ],
+                    "message": "Layer 2 never imports layer 1, and knows nothing of A2A or the container; they share only core (ARCHITECTURE.md \u00a71)."
                   },
                   {
                     "group": [
                       "**/framework/**",
                       "#framework/**",
-                      "@anthropic-ai/**"
+                      "@anthropic-ai/**",
+                      "@strands-agents/**"
                     ],
                     "message": "Shared modules never import a framework or its SDK; a framework plugs into the seam, and the plugin reaches frameworks only through the registry (ADR 0021)."
                   }
@@ -162,7 +177,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/client/**"],
+      "includes": [
+        "libs/agentforge/src/client/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -171,14 +188,18 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/server/**", "**/infra/**"],
-                    "message": "The client runs in a caller and must never reach the container's code or an agent SDK (ARCHITECTURE.md §8)."
+                    "group": [
+                      "**/server/**",
+                      "**/infra/**"
+                    ],
+                    "message": "The client runs in a caller and must never reach the container's code or an agent SDK (ARCHITECTURE.md \u00a78)."
                   },
                   {
                     "group": [
                       "**/framework/**",
                       "#framework/**",
-                      "@anthropic-ai/**"
+                      "@anthropic-ai/**",
+                      "@strands-agents/**"
                     ],
                     "message": "Shared modules never import a framework or its SDK; a framework plugs into the seam, and the plugin reaches frameworks only through the registry (ADR 0021)."
                   }
@@ -190,7 +211,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/infra/**"],
+      "includes": [
+        "libs/agentforge/src/infra/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -199,14 +222,18 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/server/**", "**/client/**"],
-                    "message": "The constructs run in a CDK application and reach nothing that runs in the container or a caller (ARCHITECTURE.md §8)."
+                    "group": [
+                      "**/server/**",
+                      "**/client/**"
+                    ],
+                    "message": "The constructs run in a CDK application and reach nothing that runs in the container or a caller (ARCHITECTURE.md \u00a78)."
                   },
                   {
                     "group": [
                       "**/framework/**",
                       "#framework/**",
-                      "@anthropic-ai/**"
+                      "@anthropic-ai/**",
+                      "@strands-agents/**"
                     ],
                     "message": "Shared modules never import a framework or its SDK; a framework plugs into the seam, and the plugin reaches frameworks only through the registry (ADR 0021)."
                   }
@@ -218,7 +245,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/plugin/**"],
+      "includes": [
+        "libs/agentforge/src/plugin/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -232,7 +261,8 @@
                       "#framework/**",
                       "!**/framework/registry.ts",
                       "!#framework/registry.ts",
-                      "@anthropic-ai/**"
+                      "@anthropic-ai/**",
+                      "@strands-agents/**"
                     ],
                     "message": "Shared modules never import a framework or its SDK; a framework plugs into the seam, and the plugin reaches frameworks only through the registry (ADR 0021)."
                   }
@@ -244,7 +274,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/framework/*/core/**"],
+      "includes": [
+        "libs/agentforge/src/framework/*/core/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -269,10 +301,13 @@
                       "../../../infra/**",
                       "../../../../infra/**"
                     ],
-                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md §1, §8)."
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
                   },
                   {
-                    "group": ["**/claude/**", "**/strands/**"],
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
                     "message": "Frameworks never import each other (ADR 0021)."
                   }
                 ]
@@ -283,7 +318,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/framework/*/harness/**"],
+      "includes": [
+        "libs/agentforge/src/framework/*/harness/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -306,10 +343,13 @@
                       "../../../infra/**",
                       "../../../../infra/**"
                     ],
-                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md §1, §8)."
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
                   },
                   {
-                    "group": ["**/claude/**", "**/strands/**"],
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
                     "message": "Frameworks never import each other (ADR 0021)."
                   }
                 ]
@@ -320,7 +360,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/framework/*/server/**"],
+      "includes": [
+        "libs/agentforge/src/framework/*/server/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -343,10 +385,13 @@
                       "../../../infra/**",
                       "../../../../infra/**"
                     ],
-                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md §1, §8)."
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
                   },
                   {
-                    "group": ["**/claude/**", "**/strands/**"],
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
                     "message": "Frameworks never import each other (ADR 0021)."
                   }
                 ]
@@ -357,7 +402,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/framework/*/client/**"],
+      "includes": [
+        "libs/agentforge/src/framework/*/client/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -378,15 +425,20 @@
                       "../../../infra/**",
                       "../../../../infra/**"
                     ],
-                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md §1, §8)."
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
                   },
                   {
-                    "group": ["**/claude/**", "**/strands/**"],
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
                     "message": "Frameworks never import each other (ADR 0021)."
                   },
                   {
-                    "group": ["@anthropic-ai/**"],
-                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md §8)."
+                    "group": [
+                      "@anthropic-ai/**"
+                    ],
+                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md \u00a78)."
                   }
                 ]
               }
@@ -396,7 +448,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/framework/*/infra/**"],
+      "includes": [
+        "libs/agentforge/src/framework/*/infra/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -417,10 +471,13 @@
                       "../../../client/**",
                       "../../../../client/**"
                     ],
-                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md §1, §8)."
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
                   },
                   {
-                    "group": ["**/claude/**", "**/strands/**"],
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
                     "message": "Frameworks never import each other (ADR 0021)."
                   }
                 ]
@@ -431,7 +488,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/framework/*/plugin/**"],
+      "includes": [
+        "libs/agentforge/src/framework/*/plugin/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -452,10 +511,13 @@
                       "../../../client/**",
                       "../../../../client/**"
                     ],
-                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md §1, §8)."
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
                   },
                   {
-                    "group": ["**/claude/**", "**/strands/**"],
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
                     "message": "Frameworks never import each other (ADR 0021)."
                   }
                 ]
@@ -466,7 +528,109 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/framework/strands/harness/**"],
+      "includes": [
+        "libs/agentforge/src/framework/claude/core/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../server/**",
+                      "../../server/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../infra/**",
+                      "../../infra/**",
+                      "../../../server/**",
+                      "../../../../server/**",
+                      "../../../client/**",
+                      "../../../../client/**",
+                      "../../../infra/**",
+                      "../../../../infra/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@strands-agents/**"
+                    ],
+                    "message": "Only the strands framework imports the Strands SDK (ADR 0021)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/strands/core/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../server/**",
+                      "../../server/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../infra/**",
+                      "../../infra/**",
+                      "../../../server/**",
+                      "../../../../server/**",
+                      "../../../client/**",
+                      "../../../../client/**",
+                      "../../../infra/**",
+                      "../../../../infra/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@anthropic-ai/**"
+                    ],
+                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md \u00a78)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/claude/harness/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -489,15 +653,20 @@
                       "../../../infra/**",
                       "../../../../infra/**"
                     ],
-                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md §1, §8)."
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
                   },
                   {
-                    "group": ["**/claude/**", "**/strands/**"],
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
                     "message": "Frameworks never import each other (ADR 0021)."
                   },
                   {
-                    "group": ["@anthropic-ai/**"],
-                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md §8)."
+                    "group": [
+                      "@strands-agents/**"
+                    ],
+                    "message": "Only the strands framework imports the Strands SDK (ADR 0021)."
                   }
                 ]
               }
@@ -507,7 +676,9 @@
       }
     },
     {
-      "includes": ["libs/agentforge/src/framework/registry.ts"],
+      "includes": [
+        "libs/agentforge/src/framework/strands/harness/**"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -516,7 +687,436 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["@anthropic-ai/**"],
+                    "group": [
+                      "../server/**",
+                      "../../server/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../infra/**",
+                      "../../infra/**",
+                      "../../../server/runtime/**",
+                      "../../../../server/runtime/**",
+                      "../../../client/**",
+                      "../../../../client/**",
+                      "../../../infra/**",
+                      "../../../../infra/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@anthropic-ai/**"
+                    ],
+                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md \u00a78)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/claude/server/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../infra/**",
+                      "../../infra/**",
+                      "../../../server/harness/**",
+                      "../../../../server/harness/**",
+                      "../../../client/**",
+                      "../../../../client/**",
+                      "../../../infra/**",
+                      "../../../../infra/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@strands-agents/**"
+                    ],
+                    "message": "Only the strands framework imports the Strands SDK (ADR 0021)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/strands/server/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../infra/**",
+                      "../../infra/**",
+                      "../../../server/harness/**",
+                      "../../../../server/harness/**",
+                      "../../../client/**",
+                      "../../../../client/**",
+                      "../../../infra/**",
+                      "../../../../infra/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@anthropic-ai/**"
+                    ],
+                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md \u00a78)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/claude/client/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../server/**",
+                      "../../server/**",
+                      "../infra/**",
+                      "../../infra/**",
+                      "../../../server/**",
+                      "../../../../server/**",
+                      "../../../infra/**",
+                      "../../../../infra/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@anthropic-ai/**"
+                    ],
+                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "@strands-agents/**"
+                    ],
+                    "message": "Only the strands framework imports the Strands SDK (ADR 0021)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/strands/client/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../server/**",
+                      "../../server/**",
+                      "../infra/**",
+                      "../../infra/**",
+                      "../../../server/**",
+                      "../../../../server/**",
+                      "../../../infra/**",
+                      "../../../../infra/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@anthropic-ai/**"
+                    ],
+                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md \u00a78)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/claude/infra/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../server/**",
+                      "../../server/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../../../server/**",
+                      "../../../../server/**",
+                      "../../../client/**",
+                      "../../../../client/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@strands-agents/**"
+                    ],
+                    "message": "Only the strands framework imports the Strands SDK (ADR 0021)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/strands/infra/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../server/**",
+                      "../../server/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../../../server/**",
+                      "../../../../server/**",
+                      "../../../client/**",
+                      "../../../../client/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@anthropic-ai/**"
+                    ],
+                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md \u00a78)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/claude/plugin/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../server/**",
+                      "../../server/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../../../server/**",
+                      "../../../../server/**",
+                      "../../../client/**",
+                      "../../../../client/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@strands-agents/**"
+                    ],
+                    "message": "Only the strands framework imports the Strands SDK (ADR 0021)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/strands/plugin/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../harness/**",
+                      "../../harness/**",
+                      "../server/**",
+                      "../../server/**",
+                      "../client/**",
+                      "../../client/**",
+                      "../../../server/**",
+                      "../../../../server/**",
+                      "../../../client/**",
+                      "../../../../client/**"
+                    ],
+                    "message": "Inside a framework the layer rules hold: each part imports only its framework's core/ and the shared modules its layer may (ADR 0021, ARCHITECTURE.md \u00a71, \u00a78)."
+                  },
+                  {
+                    "group": [
+                      "**/claude/**",
+                      "**/strands/**"
+                    ],
+                    "message": "Frameworks never import each other (ADR 0021)."
+                  },
+                  {
+                    "group": [
+                      "@anthropic-ai/**"
+                    ],
+                    "message": "Only the claude framework imports the Anthropic SDKs, and never in a part that runs in a caller (ARCHITECTURE.md \u00a78)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "libs/agentforge/src/framework/registry.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@anthropic-ai/**",
+                      "@strands-agents/**"
+                    ],
                     "message": "Shared modules never import a framework or its SDK; a framework plugs into the seam, and the plugin reaches frameworks only through the registry (ADR 0021)."
                   }
                 ]

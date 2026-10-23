@@ -7,7 +7,7 @@
     "layer": {
       "type": "string",
       "description": "agentforge, agentforge-<framework>, base, or agents/<agent>",
-      "pattern": "^(agentforge|agentforge-claude|base|agents/[a-z][a-z0-9-]*)$"
+      "pattern": "^(agentforge|agentforge-claude|agentforge-strands|base|agents/[a-z][a-z0-9-]*)$"
     },
     "buildContexts": {
       "type": "object",
