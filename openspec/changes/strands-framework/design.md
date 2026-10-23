@@ -72,6 +72,7 @@ The spike's findings go to `docs/research/strands-agents.md`, dated. Each findin
 | HTTP 401 or 403 from the provider | `CREDENTIAL_EXPIRED` | no |
 | HTTP 429 rate limit | `USAGE_LIMITED`, `retryAfter` from the provider's reset header | yes |
 | HTTP 5xx or `overloaded_error` | `PROVIDER_TRANSIENT` | yes |
+| A connection error or timeout, which has no status: the Anthropic SDK's `APIConnectionError` class, by name (operator, 2026-10-23) | `PROVIDER_TRANSIENT` | yes |
 | The task's signal | the task ends `TASK_STATE_CANCELED` | — |
 | A storage write refused | `EXECUTION_ERROR`, naming the write | no |
 | An MCP server that does not start; a dead hook matcher | `EXECUTION_ERROR`, before the first turn | no |
@@ -104,7 +105,7 @@ The operator chose one storage on 2026-10-22. Strands' `S3Storage` holds session
 
 - **Sessions (§REQ402)** resume by the Strands session id, which the run returns as `sessionId` and records with where it is stored.
 - **Memory (§REQ404, reworded).** A run declares `memorySpace?: string`, a `StrandsTypes` extra. Its memory is kept under `<agent>/memory/<space>/`, recalled by a later run that declares the same space. With none declared, the run is given no memory. A space is the agent's own: its role reads and writes only under its name.
-- **Offloading** writes under the same prefix.
+- **Offloading** writes under the same prefix, and never evicts: the SDK deletes an entry after 20 cycles and swallows a refused delete, and the agent's role may not delete. The operator chose on 2026-10-23 to keep offloaded results until the bucket's retention removes them.
 - **A write the storage refuses** fails the run `EXECUTION_ERROR`, as `claude`'s mirror check does.
 - **ADR 0011 is extended,** not replaced, with a dated note: a framework persists its state through its own storage API into the session bucket, under the agent's name.
 - **The glossary's *memory space*** becomes framework-neutral: one space of an agent's memory, a `claude` run's memory directory or a `strands` run's prefix in its storage.
@@ -196,7 +197,7 @@ export function readSession(run: RunRecord, options?: { client?: S3Client }): Pr
 
 The operator chose two on 2026-10-22, both generated with `--framework strands`:
 
-- **A realistic non-coding project:** an agent reads a set of documents from an `S3Filesystem` and returns a typed brief. A stop guard requires every claim to cite a document, and a declared memory space keeps a glossary across tasks. Its name and procedure are settled when it is generated.
+- **A realistic non-coding project,** `research-brief`: an agent reads a set of documents from an `S3Filesystem` and returns a typed brief, and a declared memory space keeps a glossary across tasks. Every claim cites a document in its own words through the run's agent contract, built per run with a refinement, since a stop guard sees no submission; the stop guard holds the answer until every document is read (operator, 2026-10-23).
 - **`strands-smoke`:** one agent covering what the framework touches: a resume in another container, a cancel mid-tool, and a filesystem across containers. Attach, a container stop ending `LOST`, and the Temporal activity are the runtime's and the client's, below the seam; `smoke-coverage` proves them, and they do not change with the framework.
 
 ## Testing

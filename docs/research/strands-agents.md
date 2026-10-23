@@ -23,7 +23,7 @@ What the `strands` framework relies on (`openspec/changes/strands-framework`). `
   - `FileMemoryStore({ name, writable: true, storage })` writes `memory/<name>/<slug>.md` under the storage's prefix itself. So the prefix is `<agent>/`, and the store is named for the memory space. A second process recalled the memory.
   - `add_memory` is offered only with `addToolConfig: true`; `search_memory` is offered by default.
   - Writes wait by default (`waitForWrites: true`). A failed `add_memory` reaches the model as a tool error, not a run failure.
-- **Offloading:** `ContextOffloader({ storage, maxResultTokens, previewTokens })`, with `previewTokens` < `maxResultTokens`. It writes `<prefix>offloader/<toolUseId>` and offers `retrieve_offloaded_content`.
+- **Offloading:** `ContextOffloader({ storage, maxResultTokens, previewTokens })`, with `previewTokens` < `maxResultTokens`. It writes `<prefix>offloader/<toolUseId>` and offers `retrieve_offloaded_content`. It evicts an entry after 20 cycles by default (`evictAfterCycles`, `null` to disable) through `storage.delete`, swallowing a refused delete.
 
 ## Structured output
 - **A hook refuses in turn.** `BeforeToolCallEvent.cancel = '<reason>'` on `strands_structured_output` reaches the model as an `is_error` tool result carrying the reason, and its next submission is accepted.
@@ -46,7 +46,7 @@ What the `strands` framework relies on (`openspec/changes/strands-framework`). `
 - **A model call can be refused.** `BeforeModelCallEvent.cancel = '<text>'` skips the request and ends the turn with that text as the assistant's message.
 
 ## Errors
-- **A provider error arrives wrapped.** The model's `streamAggregated` wraps whatever the provider threw in a `ModelError`, with the Anthropic SDK's `APIError` as its `cause`; a 429 arrives as `ModelThrottledError`, also with the `APIError` as its cause. A connection timeout arrives as a `ModelError` over `APIConnectionTimeoutError`, with no status.
+- **A provider error arrives wrapped.** The model's `streamAggregated` wraps whatever the provider threw in a `ModelError`, with the Anthropic SDK's `APIError` as its `cause`; a 429 arrives as `ModelThrottledError`, also with the `APIError` as its cause. A connection timeout arrives as a `ModelError` over `APIConnectionTimeoutError`, with no status and the name `Error`: only its class names it.
 
 ## Write scope
 - **Cedar refuses outside the write globs, in turn.** `CedarAuthorization` with a `contextEnricher` computes `withinWriteScope` from the vended `fileEditor` input: picomatch over the path relative to the mount. An outside `create` is refused ("DENIED: Access denied by Cedar policy: policy1"), and an inside one is permitted.
@@ -70,7 +70,8 @@ Per the [errors](https://platform.claude.com/docs/en/api/errors) and [rate limit
 - **It does not bind a signalled sandbox.** The SDK's default sandbox is not reachable through its public API. A cancel mid-command is bounded by the executor's grace and process-group kill.
 - **It gives the Anthropic client a `fetch` that takes the agent's cancel signal,** so a cancel or a run's end stops a model call in flight.
 - **It refuses the next model call once a submission is accepted,** and cancels the invocation.
-- **It classifies a provider error from the `ModelError`'s cause.**
+- **It classifies a provider error from the `ModelError`'s cause,** and a connection error by its class's name.
+- **It never evicts offloaded results,** since the agent's role may not delete.
 - **It fails a run whose memory write failed,** with `EXECUTION_ERROR`.
 - **Its storage prefix is `<agent>/`,** with the memory store named for the space.
 - **`prepare()` stays synchronous:** storage and telemetry set up without awaiting.

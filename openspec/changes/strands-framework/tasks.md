@@ -83,10 +83,12 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
 - [ ] 7.2 Run `e2e-agentcore` for both examples once. Verify: they pass, with results noted in the change.
 - [ ] 7.3 Rerun the `claude` regression: `integ` `local`, `aws` and `model`, and `e2e` for `golden-kata`, `smoke-coverage` and `golden-kata-workflows`. Verify: they pass unchanged.
 
+  2026-10-23: `integ` `local` (11 files) and `model` (11) pass, as do the `e2e` of `golden-kata`, `smoke-coverage` and `golden-kata-workflows`. `integ` `aws` passes 8 of 9: `agentcore/provisioning-window.test.ts` saw an invocation delivered while the control plane still read `CREATING`, 1.8 s before `READY`, which the test asserts never happens. It touches no framework code; the operator decides whether it is a race in the test's sampling or the platform's window moving.
+
 ## 8. Guidance and documents
 
 - [x] 8.1 Update the `claude-plugin` skill: when to choose `strands`, defining and implementing a `strands` procedure, credentials and the spend limit, and the examples. `references/migrations.md` gains the entry design.md states. Verify: the plugin's local integration tests pass, and its links resolve.
-- [ ] 8.2 Update:
+- [x] 8.2 Update:
   - `docs/ARCHITECTURE.md` §1, §5, §6 (a `strands` runner section beside the kernel, with the fragments rule), §7, and §8 (entry points, the layout line for `src/framework/strands/`, peers);
   - `docs/GLOSSARY.md`, with *memory space* framework-neutral;
   - `docs/SOLUTION_SPACE.md`, as the operator words it;

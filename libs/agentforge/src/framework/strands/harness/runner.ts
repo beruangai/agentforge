@@ -196,6 +196,9 @@ export async function runAgent<Output>(
             new ContextOffloader({
               storage,
               maxResultTokens: spec.offload.maxResultTokens,
+              // Never evicted: the agent's role may not delete, and the SDK
+              // swallows a refused delete. The bucket's retention keeps them.
+              evictAfterCycles: null,
               ...(spec.offload.previewTokens === undefined
                 ? {}
                 : { previewTokens: spec.offload.previewTokens }),

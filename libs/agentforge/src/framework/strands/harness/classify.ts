@@ -175,11 +175,31 @@ export function classify(error: unknown): Cause {
   }
   if (
     (typeof status === 'number' && status >= 500) ||
-    provider?.type === 'overloaded_error'
+    provider?.type === 'overloaded_error' ||
+    isConnectionError(error)
   ) {
     return cause('PROVIDER_TRANSIENT', message, { stackTrace });
   }
   return cause('EXECUTION_ERROR', message, { stackTrace });
+}
+
+/**
+ * The Anthropic SDK's connection errors, a timeout among them, carry no
+ * status and the generic name `Error`; their class is the one field that
+ * names them, read without importing the SDK.
+ */
+const CONNECTION_ERROR_CLASSES = new Set([
+  'APIConnectionError',
+  'APIConnectionTimeoutError',
+]);
+
+function isConnectionError(error: unknown): boolean {
+  const candidate = error instanceof ModelError ? error.cause : error;
+  return (
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    CONNECTION_ERROR_CLASSES.has(candidate.constructor.name)
+  );
 }
 
 export function describe(error: unknown): string {

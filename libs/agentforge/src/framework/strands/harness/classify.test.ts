@@ -135,6 +135,21 @@ group('classify, from what the provider answered', () => {
     expect((await failureOf(runScripted(api).promise)).retryAfter).toBe(RESET);
   });
 
+  it('a connection timeout is PROVIDER_TRANSIENT', async () => {
+    api = await scriptedAnthropic([{ hang: true }]);
+    const failure = await failureOf(
+      runScripted(
+        api,
+        {},
+        { clientConfig: { ...api.clientConfig, timeout: 200 } },
+      ).promise,
+    );
+    expect(failure).toMatchObject({
+      code: 'PROVIDER_TRANSIENT',
+      retryable: true,
+    });
+  });
+
   it('does not retry the spend cap', async () => {
     api = await scriptedAnthropic([
       refused(429, 'rate_limit_error', 'spend cap', {
