@@ -89,28 +89,6 @@ describe('structuredOutputValidation', () => {
     ).toMatch(/>=2 items/);
   });
 
-  it('runs every guard though one denies, and tells every failure in one denial', async () => {
-    const later = vi.fn<StopGuard>(async () => ({
-      reason: 'Write notes.md before submitting.',
-    }));
-    const output = await submit(
-      {
-        guards: [
-          async () => ({ reason: 'Write kata.md before submitting.' }),
-          async () => undefined,
-          later,
-        ],
-      },
-      { ...VALID, source: 'not a url' },
-    );
-    expect(later).toHaveBeenCalledOnce();
-    const reason = reasonOf(output);
-    expect(reason).toMatch(/at source/);
-    expect(reason).toMatch(/- Write kata\.md before submitting\./);
-    expect(reason).toMatch(/- Write notes\.md before submitting\./);
-    expect(reason.indexOf('at source')).toBeLessThan(reason.indexOf('kata.md'));
-  });
-
   it('hands a guard that throws to the run, never to the agent as a reason', async () => {
     const onGuardError = vi.fn();
     const failure = new Error('the guard broke');

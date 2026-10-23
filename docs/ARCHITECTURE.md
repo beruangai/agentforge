@@ -238,7 +238,7 @@ One published package, `@beruangai/agentforge`, with an entry point per environm
 libs/agentforge/              @beruangai/agentforge — the one Nx project that publishes
   src/core/                   contract helpers, task shapes, task-process messages
   src/server/runtime/         layer 1: server, gateway, executor, task store
-  src/server/harness/         layer 2: the framework interface, task process, prompt pieces, stop guards; filesystem/ the filesystems
+  src/server/harness/         layer 2: the framework interface, task process, prompt pieces, stop guards and structured-output validation; filesystem/ the filesystems
   src/client/                 the client and transports; temporal/ the activity and the worker, temporal/workflow/ the workflow side
   src/infra/                  the AgenticProjectResources, AgentRuntime, S3FilesystemBucket and TemporalWorker constructs, the readiness probe
   src/plugin/                 the Nx plugin: generators, executors, and the artifacts they render; executors/temporal-server/ the local Temporal stack
