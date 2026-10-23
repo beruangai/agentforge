@@ -1,6 +1,6 @@
 # AgentForge
 
-Run an agent procedure — through the agent framework its project chooses, the Claude Agent SDK today — as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — and call it from anything, Temporal included.
+Run an agent procedure — through the agent framework its project chooses, the Claude Agent SDK on the operator's subscription or Strands Agents on the Anthropic API — as an asynchronous, typed task — locally in Docker or on Bedrock AgentCore — and call it from anything, Temporal included.
 
 Built for its consumers, StrategyFoundry and TrendBot, not for public use. **Status:** A1–A4 delivered — the whole path runs locally and on AgentCore, with filesystems, against a real model, specified and audited — A5's baseline: the Nx plugin generates, syncs and deploys agentic projects, AgentForge's own [examples](packages/examples) among them — and A6, what must hold before the first live consumer, with the [Claude Code plugin](#claude-code-plugin) ([roadmap](docs/ROADMAP.md)).
 
@@ -64,11 +64,13 @@ await context.runAgent({
 | Who the agent is; rules for every run of an agent or project | `CLAUDE.md` in the layer's `.claude/`, composed across layers |
 | Know-how needed only sometimes | A skill in the layer's `.claude/skills/` |
 | A procedure's role and standing instructions | Its `systemPrompt`; AgentForge appends its own fragments after it |
+
+For a `strands` project the same roles are Strands' own names: a layer's `AGENTS.md` for its rules, composed base first, and `.agent/skills/` for its skills.
 | Protocols and contracts a prompt carries | File-backed context blocks, first in the prompt |
 
 What a run is about follows, from dynamic context functions. Static content first with a cache breakpoint on its last block keeps a prompt's stable prefix cached across runs. [`golden-kata`](packages/examples/golden-kata) composes its prompts this way.
 
-**3. Package it** — two entries, a `package.json` and its generated `bun.lock` (the container workspace's, up to this agent), and a Dockerfile `FROM` its framework's AgentForge image, `agentforge/a2a-claude` (itself on the base `agentforge/a2a`), that copies them to `/workspace/agentic/agent` and installs.
+**3. Package it** — two entries, a `package.json` and its generated `bun.lock` (the container workspace's, up to this agent), and a Dockerfile `FROM` its framework's AgentForge image, `agentforge/a2a-claude` or `agentforge/a2a-strands` (each on the base `agentforge/a2a`), that copies them to `/workspace/agentic/agent` and installs.
 
 ```ts
 // task.ts — run by the server, once per task

@@ -38,11 +38,13 @@ import { classify, describe, isSpendLimit, strandsCause } from './classify.ts';
 import { readLayers } from './layers.ts';
 import { renderPrompt } from './prompt.ts';
 import { type AgentStorage, recordingStorage } from './storage.ts';
-import { composeSystemPrompt } from './system-prompt.ts';
+import {
+  composeSystemPrompt,
+  STRUCTURED_OUTPUT_TOOL,
+} from './system-prompt.ts';
 import type { AgentRun, AgentRunSpec, StrandsOptions } from './types.ts';
 
-/** The tool Strands gives the agent for its structured output. */
-export const STRUCTURED_OUTPUT_TOOL = 'strands_structured_output';
+export { STRUCTURED_OUTPUT_TOOL } from './system-prompt.ts';
 
 /** How many structured outputs an agent may submit before the run fails, as the Claude CLI allows (§REQ208). */
 export const DEFAULT_MAX_STRUCTURED_OUTPUT_ATTEMPTS = 5;
@@ -178,7 +180,7 @@ export async function runAgent<Output>(
         },
       },
     }),
-    ...(systemPrompt === undefined ? {} : { systemPrompt }),
+    systemPrompt,
     tools: [
       ...((options.tools ?? []) as ToolList),
       ...Object.values(options.mcpClients ?? {}),

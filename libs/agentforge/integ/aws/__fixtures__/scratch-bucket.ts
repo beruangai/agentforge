@@ -12,10 +12,7 @@ import {
   paginateListObjectsV2,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import {
-  INTEG_TAG,
-  resolveCallerIdentity,
-} from '../../__fixtures__/aws-account.ts';
+import { INTEG_TAG, resolveCallerIdentity } from './aws-account.ts';
 
 /**
  * `agentforge-integ-{account}-{run id without hyphens}` — 62 characters,

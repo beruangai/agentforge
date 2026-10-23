@@ -72,6 +72,15 @@ export default defineConfig({
         root: import.meta.dirname,
         test: {
           ...integration,
+          name: '@beruangai/agentforge:integ:aws:strands-storage',
+          include: [`integ/aws/strands-storage/${testFiles}`],
+          fileParallelism: false,
+        },
+      },
+      {
+        root: import.meta.dirname,
+        test: {
+          ...integration,
           name: '@beruangai/agentforge:integ:model',
           include: [`integ/model/${testFiles}`],
           fileParallelism: false,

@@ -70,6 +70,13 @@ What every agent in this project is told. Replace this placeholder.
     dockerfile: 'claude/Dockerfile',
     containerDirectory: 'claude/container',
   },
-  configurationDirectory: { source: '$claude', target: '.claude' },
+  configurationDirectory: {
+    source: '$claude',
+    target: '.claude',
+    purpose: {
+      base: "which every agent's session composes from its cwd below",
+      agent: 'the one place a session reads `settings.json` and hooks from',
+    },
+  },
   requiredSecrets: REQUIRED_SECRETS,
 };

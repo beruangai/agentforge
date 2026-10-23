@@ -76,6 +76,26 @@ describe('agent', () => {
     ).toEqual({ dependsOn: ['@proj/golden-kata:assemble'] });
   });
 
+  it("generates a strands project's agent, with its own instruction file and skills", async () => {
+    await agenticProjectGenerator(tree, {
+      name: 'strands-smoke',
+      directory: 'packages/examples',
+      framework: 'strands',
+    });
+    await agentGenerator(tree, { project: 'strands-smoke', name: 'briefer' });
+    const files = treeFiles(
+      tree,
+      'packages/examples/strands-smoke/agents/briefer',
+    );
+    expect(Object.keys(files).sort()).toMatchSnapshot();
+    for (const [path, content] of Object.entries(files)) {
+      expect(content).toMatchSnapshot(`strands ${path}`);
+    }
+    const before = treeFiles(tree);
+    await syncGenerator(tree);
+    expect(treeFiles(tree)).toEqual(before);
+  });
+
   it('stubs the procedure Run by default', async () => {
     await agentGenerator(tree, { project: 'golden-kata', name: 'writer' });
     expect(read(`${ROOT}/agents/writer/agent/contract.ts`)).toContain(

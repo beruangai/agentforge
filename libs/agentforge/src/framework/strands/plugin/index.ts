@@ -76,6 +76,13 @@ What every agent in this project is told. Replace this placeholder.
     dockerfile: 'strands/Dockerfile',
     containerDirectory: 'strands/container',
   },
-  configurationDirectory: { source: '.agent', target: '.agent' },
+  configurationDirectory: {
+    source: '.agent',
+    target: '.agent',
+    purpose: {
+      base: 'whose skills every agent below loads',
+      agent: "whose skills this agent loads beside the base layer's",
+    },
+  },
   requiredSecrets: REQUIRED_SECRETS,
 };

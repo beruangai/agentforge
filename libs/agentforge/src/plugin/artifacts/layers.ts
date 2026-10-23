@@ -76,7 +76,7 @@ const DOCKERFILE_DIRECTIVE = '# check=skip=InvalidDefaultArgInFrom';
 
 /** The agentic image: the base layer on the project's framework image. */
 export function baseDockerfile(project: AgenticProject): MaintainedFile {
-  const { source, target } = frameworkPlugin(
+  const { source, target, purpose } = frameworkPlugin(
     project.framework,
   ).configurationDirectory;
   return {
@@ -86,7 +86,7 @@ ${maintainedHeader('#')}
 #
 # The agentic image: the project's base layer at /workspace/agentic, on the
 # ${project.framework} framework's AgentForge image. \`agentic/${source}/\` becomes its
-# \`${target}/\`, which every agent's session composes from its cwd below. The
+# \`${target}/\`, ${purpose.base}. The
 # layer's lock is the whole workspace's up to it, so the install adds only
 # what this layer adds.
 ARG BASE_IMAGE
@@ -109,7 +109,7 @@ export function agentDockerfile(
   project: AgenticProject,
   agent: AgentComponent,
 ): MaintainedFile {
-  const { source, target } = frameworkPlugin(
+  const { source, target, purpose } = frameworkPlugin(
     project.framework,
   ).configurationDirectory;
   return {
@@ -119,7 +119,7 @@ ${maintainedHeader('#')}
 #
 # The ${agent.name} agent's image: its layer at /workspace/agentic/agent — every
 # run's cwd — on the project's agentic image. \`agent/${source}/\` becomes its
-# \`${target}/\`, the one place a session reads \`settings.json\` and hooks from.
+# \`${target}/\`, ${purpose.agent}.
 ARG BASE_IMAGE
 FROM \${BASE_IMAGE}
 COPY --chown=bun --exclude=bun.lock --exclude=${escaped(source)} agent/ /workspace/agentic/agent/

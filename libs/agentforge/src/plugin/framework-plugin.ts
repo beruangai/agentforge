@@ -43,6 +43,8 @@ export interface FrameworkPlugin {
   readonly configurationDirectory: {
     readonly source: string;
     readonly target: string;
+    /** What the directory is, as the base layer's and an agent's Dockerfile say it. */
+    readonly purpose: { readonly base: string; readonly agent: string };
   };
   /** The secrets every agent of the framework requires. */
   readonly requiredSecrets: readonly string[];

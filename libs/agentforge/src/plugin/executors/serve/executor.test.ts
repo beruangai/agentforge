@@ -101,6 +101,23 @@ describe('serveRefusal', () => {
     );
   });
 
+  it('refuses a strands agent without the Anthropic API key, naming it', () => {
+    expect(
+      serveRefusal(
+        servePlan(
+          { ...GOLDEN_KATA, framework: 'strands' },
+          'writer',
+          [],
+          IMAGE_ID,
+        ),
+        TOKEN,
+        stateIs('absent'),
+      ),
+    ).toBe(
+      "ANTHROPIC_API_KEY not set; the serve configuration loads the agent's secrets from .env.serve.local",
+    );
+  });
+
   it('refuses an agent already being served, naming its container', () => {
     expect(serveRefusal(PLAN, TOKEN, stateIs('running'))).toBe(
       'proj-golden-kata-writer is already being served',

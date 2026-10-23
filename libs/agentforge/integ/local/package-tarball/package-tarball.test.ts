@@ -39,6 +39,13 @@ const IMAGES = [
   `${WORKSPACE_NAME}/${AGENTIC_PROJECT}-${AGENT}:local`,
   `${WORKSPACE_NAME}/${AGENTIC_PROJECT}:local`,
 ];
+/** A second agentic project, on the `strands` framework. */
+const STRANDS_PROJECT = 'brief';
+const STRANDS_AGENT = 'briefer';
+const STRANDS_IMAGES = [
+  `${WORKSPACE_NAME}/${STRANDS_PROJECT}-${STRANDS_AGENT}:local`,
+  `${WORKSPACE_NAME}/${STRANDS_PROJECT}:local`,
+];
 
 const MINUTE = 60_000;
 
@@ -126,6 +133,20 @@ describe('AgentForge installed from its archive, in a workspace of its own', () 
       AGENT,
     );
     await generate(
+      'generating a strands agentic project',
+      '@beruangai/agentforge:agentic-project',
+      STRANDS_PROJECT,
+      '--framework',
+      'strands',
+    );
+    await generate(
+      'generating a strands agent',
+      '@beruangai/agentforge:agent',
+      '--project',
+      STRANDS_PROJECT,
+      STRANDS_AGENT,
+    );
+    await generate(
       'generating a workflow project',
       '@beruangai/agentforge:workflow-project',
       WORKFLOW_PROJECT,
@@ -144,7 +165,9 @@ describe('AgentForge installed from its archive, in a workspace of its own', () 
   afterAll(async () => {
     for (const image of [
       ...IMAGES,
+      ...STRANDS_IMAGES,
       'agentforge/a2a-claude:0.0.0',
+      'agentforge/a2a-strands:0.0.0',
       'agentforge/a2a:0.0.0',
     ]) {
       const { stdout } = await runCommand(
@@ -167,6 +190,7 @@ describe('AgentForge installed from its archive, in a workspace of its own', () 
     const manifests = [
       'package.json',
       `packages/${AGENTIC_PROJECT}/package.json`,
+      `packages/${STRANDS_PROJECT}/package.json`,
       `packages/${WORKFLOW_PROJECT}/package.json`,
       'packages/common/constructs/package.json',
     ];
@@ -225,6 +249,25 @@ describe('AgentForge installed from its archive, in a workspace of its own', () 
         `@${WORKSPACE_NAME}/${AGENTIC_PROJECT}:image-${AGENT}`,
       );
       for (const image of IMAGES) {
+        await runCommand('docker', ['image', 'inspect', image], {
+          purpose: `inspecting ${image}`,
+        });
+      }
+    },
+    15 * MINUTE,
+  );
+
+  it(
+    "builds a strands agent's images from the installed package",
+    async () => {
+      await inWorkspace(
+        "building the strands agent's images",
+        'bunx',
+        'nx',
+        'run',
+        `@${WORKSPACE_NAME}/${STRANDS_PROJECT}:image-${STRANDS_AGENT}`,
+      );
+      for (const image of STRANDS_IMAGES) {
         await runCommand('docker', ['image', 'inspect', image], {
           purpose: `inspecting ${image}`,
         });

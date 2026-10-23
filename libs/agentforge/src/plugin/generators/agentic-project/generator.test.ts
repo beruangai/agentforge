@@ -76,6 +76,28 @@ describe('agentic-project', () => {
     }
   });
 
+  it('generates a strands project: its base layer, options and instruction file, and its peers', async () => {
+    await agenticProjectGenerator(tree, {
+      name: 'strands-smoke',
+      directory: 'packages/examples',
+      framework: 'strands',
+    });
+    expect(
+      readProjectConfiguration(tree, '@proj/strands-smoke').metadata?.agentforge
+        .framework,
+    ).toBe('strands');
+    const files = treeFiles(tree, 'packages/examples/strands-smoke');
+    expect(Object.keys(files).sort()).toMatchSnapshot();
+    for (const [path, content] of Object.entries(files)) {
+      expect(content).toMatchSnapshot(`strands ${path}`);
+    }
+    const { catalog } = readJson(tree, 'package.json');
+    for (const peer of ['@strands-agents/sdk', '@anthropic-ai/sdk']) {
+      expect(catalog[peer]).toBe(peerRange(peer));
+    }
+    expect(catalog['@anthropic-ai/claude-agent-sdk']).toBeUndefined();
+  });
+
   it('refuses a framework AgentForge does not provide, naming those it does, writing nothing', async () => {
     const before = treeFiles(tree);
     await expect(

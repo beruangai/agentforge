@@ -37,12 +37,12 @@ import {
   type S3FilesystemOptions,
   type S7cmdRunner,
 } from '../../../src/server/harness/filesystem/s3-filesystem.ts';
-import { s7cmdInBaseImage } from './__fixtures__/s7cmd-in-base-image.ts';
 import {
   createScratchBucket,
   deleteScratchBucket,
   listRelativeKeys,
-} from './__fixtures__/scratch-bucket.ts';
+} from '../__fixtures__/scratch-bucket.ts';
+import { s7cmdInBaseImage } from './__fixtures__/s7cmd-in-base-image.ts';
 
 /** Everything but where it mounts, which is per task. */
 const OPTIONS: Omit<S3FilesystemOptions, 'localRoot'> = {

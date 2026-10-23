@@ -8,7 +8,7 @@
 
 **Harness** — Layer 2: running a procedure through its project's **framework** to an outcome. Shared by every framework.
 
-**Framework** — The agent SDK an agentic project's runs go through, chosen per project and recorded on it: `claude`, the Claude Agent SDK, the default and only one provided. Each is one folder, `src/framework/<name>/`, with its own parts of the layers (ADR 0021). Distinct from the **harness**, which every framework shares.
+**Framework** — The agent SDK an agentic project's runs go through, chosen per project and recorded on it: `claude`, the Claude Agent SDK, by default, or `strands`, Strands Agents on the Anthropic API. Each is one folder, `src/framework/<name>/`, with its own parts of the layers (ADR 0021). Distinct from the **harness**, which every framework shares.
 
 **Caller** — Whatever starts a task through the client; a Temporal activity in both consumers, run by a **workflow project**'s **worker**.
 
@@ -22,7 +22,7 @@
 
 **Task process** — The child process running one task: the consumer's **task entry**, calling `runTaskProcess`.
 
-**Kernel** — The `claude` framework's `context.runAgent`: one Agent SDK `query()` to a settled, typed outcome.
+**Kernel** — The `claude` framework's `context.runAgent`: one Agent SDK `query()` to a settled, typed outcome. The `strands` framework's is its **runner**: one Strands `Agent` invocation.
 
 ## Procedures
 
@@ -38,7 +38,7 @@
 
 **Agent run** — One `context.runAgent({ prompt, output, options, … })` through the project's framework, recorded as a **run record** naming the framework, its shared token usage and the framework's own.
 
-**Structured output validation** — The kernel's `PreToolUse` hook on an agent run's `StructuredOutput` submission: the agent contract and every stop guard, all failures told to the agent at once, in its turn.
+**Structured output validation** — The agent contract and every stop guard, run on each structured-output submission, all failures told to the agent at once, in its turn: the kernel's `PreToolUse` hook on `StructuredOutput`, the `strands` runner's `BeforeToolCall` hook on `strands_structured_output`.
 
 **Stop guard** — A check a run declares in `guardrails.stop` that must pass before its structured output is accepted; denied, it tells the agent why. Not the SDK's `Stop` hook event, which cannot hold back a submission.
 
@@ -98,7 +98,7 @@
 
 **Auto memory** — Claude Code's own memory: a `MEMORY.md` index and the topic files it lists, in one directory, the index loaded into the agent's context from the first turn. A run has it only in the `memoryDirectory` it declares (§REQ404); otherwise it is off. Never a `CLAUDE.md`.
 
-**Memory space** — One auto-memory directory an agent keeps across tasks: a subpath of the memories filesystem, chosen by its scope from the request, so tasks naming the same space recall what earlier ones saved.
+**Memory space** — One space of an agent's memory, kept across tasks so tasks naming the same space recall what earlier ones saved: for `claude`, a run's auto-memory directory, a subpath of the memories filesystem chosen by its scope from the request; for `strands`, a run's `memorySpace`, a prefix of its storage under the agent's name.
 
 **System-prompt fragment** — Instructions AgentForge appends to a run's system prompt, after the procedure's own, when what the run declares calls for them; the first is auto memory's. Never the `claude_code` preset ([ADR 0017](../adr/0017-agentforge-adds-system-prompt-fragments-never-the-preset.md)).
 

@@ -176,6 +176,163 @@ export {
 "
 `;
 
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/Dockerfile 1`] = `
+"# check=skip=InvalidDefaultArgInFrom
+# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+# installed version generates. To own it, name it in the project's
+# project.json metadata.agentforge.detached.files.
+#
+# The briefer agent's image: its layer at /workspace/agentic/agent — every
+# run's cwd — on the project's agentic image. \`agent/.agent/\` becomes its
+# \`.agent/\`, whose skills this agent loads beside the base layer's.
+ARG BASE_IMAGE
+FROM \${BASE_IMAGE}
+COPY --chown=bun --exclude=bun.lock --exclude=.agent agent/ /workspace/agentic/agent/
+COPY --chown=bun agent/.agent/ /workspace/agentic/agent/.agent/
+COPY --chown=bun agent/bun.lock /workspace/bun.lock
+RUN bun install --cwd /workspace --frozen-lockfile --production
+ENV AGENTFORGE_AGENT_NAME=briefer
+CMD ["bun", "--conditions=agentforge-agent", "server.ts"]
+"
+`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/agent/.agent/skills/.gitkeep 1`] = `""`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/agent/AGENTS.md 1`] = `
+"What this agent is told, after the project's instructions. Replace this placeholder.
+"
+`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/agent/contract.ts 1`] = `
+"import { timeBudget } from '@beruangai/agentforge/contract';
+import { oc } from '@orpc/contract';
+import { z } from 'zod';
+
+/** What callers import to call the briefer agent. */
+export const contract = {
+  Run: oc
+    .meta(timeBudget(300))
+    .input(z.strictObject({}))
+    .output(z.strictObject({})),
+};
+"
+`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/agent/package.json 1`] = `
+"{
+  "name": "@proj/strands-smoke-briefer",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@beruangai/agentforge": "workspace:*",
+    "@proj/strands-smoke-base": "workspace:*"
+  },
+  "peerDependencies": {
+    "@strands-agents/sdk": "^1.22.0",
+    "@anthropic-ai/sdk": "0.128.0",
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@cedar-policy/cedar-wasm": "^4.14.0",
+    "@cedar-policy/mcp-schema-generator-wasm": "0.6.1",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/sdk-trace-base": "^2.12.0",
+    "@opentelemetry/sdk-metrics": "^2.12.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.219.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.219.0",
+    "@a2a-js/sdk": "^1.2.0",
+    "@aws-sdk/client-cloudwatch": "^3.1138.0",
+    "@aws-sdk/client-dynamodb": "^3.1138.0",
+    "@aws-sdk/client-secrets-manager": "^3.1138.0",
+    "@aws-sdk/client-s3": "^3.1138.0",
+    "@orpc/contract": "2.0.0-beta.39",
+    "@orpc/server": "2.0.0-beta.39",
+    "express": "^5.2.1",
+    "zod": "^4.6.5"
+  }
+}
+"
+`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/agent/procedures.ts 1`] = `
+"import { implementAgent } from '@beruangai/agentforge/strands/agent';
+import { contract } from './contract.ts';
+
+const os = implementAgent(contract);
+
+/**
+ * The briefer agent's procedures. A handler runs the agent with
+ * \`context.runAgent\`, its options composed over the base layer's:
+ * \`composeOptions(baseOptions(), { … })\`, with \`baseOptions\` from
+ * \`@proj/strands-smoke-base/options\`.
+ */
+export const router = os.router({
+  Run: os.Run.handler(async () => {
+    throw new Error('not implemented: briefer.Run');
+  }),
+});
+"
+`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/agent/secrets.ts 1`] = `
+"/**
+ * The secrets the briefer agent requires, by the environment variable each
+ * becomes — beside its framework's own, ANTHROPIC_API_KEY. The agent's
+ * construct requires a secret for each, \`serve\` passes each from
+ * .env.serve.local, and the agent's server fails a request while one is unset.
+ */
+export const REQUIRED_SECRETS = [] as const satisfies readonly string[];
+"
+`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/agent/server.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The container's entry: AgentForge's server, running \`task.ts\` once per task
+// under the strands framework, and requiring the secrets it and this
+// project's layers declare. Everything else comes from the environment.
+import { framework } from '@beruangai/agentforge/strands/server';
+import { startServer } from '@beruangai/agentforge/server';
+import { REQUIRED_SECRETS as PROJECT_SECRETS } from '@proj/strands-smoke-base/secrets';
+import { REQUIRED_SECRETS as AGENT_SECRETS } from './secrets.ts';
+
+await startServer({
+  taskEntry: new URL('./task.ts', import.meta.url),
+  framework,
+  requiredSecrets: [...PROJECT_SECRETS, ...AGENT_SECRETS],
+});
+"
+`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills > strands packages/examples/strands-smoke/agents/briefer/agent/task.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The task entry: the one place the harness and this agent's procedures meet.
+import { runTaskProcess } from '@beruangai/agentforge/strands/agent';
+import { contract } from './contract.ts';
+import { router } from './procedures.ts';
+
+runTaskProcess({ contract, router });
+"
+`;
+
+exports[`agent > generates a strands project's agent, with its own instruction file and skills 1`] = `
+[
+  "packages/examples/strands-smoke/agents/briefer/Dockerfile",
+  "packages/examples/strands-smoke/agents/briefer/agent/.agent/skills/.gitkeep",
+  "packages/examples/strands-smoke/agents/briefer/agent/AGENTS.md",
+  "packages/examples/strands-smoke/agents/briefer/agent/contract.ts",
+  "packages/examples/strands-smoke/agents/briefer/agent/package.json",
+  "packages/examples/strands-smoke/agents/briefer/agent/procedures.ts",
+  "packages/examples/strands-smoke/agents/briefer/agent/secrets.ts",
+  "packages/examples/strands-smoke/agents/briefer/agent/server.ts",
+  "packages/examples/strands-smoke/agents/briefer/agent/task.ts",
+]
+`;
+
 exports[`agent > generates the agent's folder, record, image, entries and construct > agent construct 1`] = `
 "// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
 // installed version generates. To own it, name it in the project's

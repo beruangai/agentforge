@@ -58,16 +58,16 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
 ## 4. Server, infra and the image
 
 - [x] 4.1 Add `framework/strands/server/`: `framework: FrameworkServer`, with the OTLP environment per level and `strands`' own collector configuration, copied into the bundle beside `strands/server.js`. Export it from `/strands/server`. Verify with unit tests and `package-exports.test.ts`.
-- [ ] 4.2 Add `framework/strands/infra/` re-exporting `REQUIRED_SECRETS`, as `/strands/infra` with no condition. Verify: an `AgentRuntime` given `requiredSecrets` from it fails synth without `ANTHROPIC_API_KEY`, naming it.
+- [x] 4.2 Add `framework/strands/infra/` re-exporting `REQUIRED_SECRETS`, as `/strands/infra` with no condition. Verify: an `AgentRuntime` given `requiredSecrets` from it fails synth without `ANTHROPIC_API_KEY`, naming it.
 - [x] 4.2a Add `framework/strands/client/` with `readSession(run)`, loading the SDK and the S3 client only when called, as `/strands/client` with no condition. Verify with a unit test over a stubbed S3, and `package-exports.test.ts`.
-- [ ] 4.3 Add `framework/strands/Dockerfile` and its `container/` root manifest and lock, `container-lock-strands`, and the `image-strands` target. Ship them in the bundle. Verify with `nx run @beruangai/agentforge:image-strands`: inside it, the bundle's `framework/strands` imports the SDK, and no Anthropic Agent SDK or Claude binary is present.
-- [ ] 4.4 Add `integ/model/strands-structured-output/` and `integ/model/strands-cache-points/`, and an `integ/aws/` slice for the storage under an agent's role. Verify: they pass.
+- [x] 4.3 Add `framework/strands/Dockerfile` and its `container/` root manifest and lock, `container-lock-strands`, and the `image-strands` target. Ship them in the bundle. Verify with `nx run @beruangai/agentforge:image-strands`: inside it, the bundle's `framework/strands` imports the SDK, and no Anthropic Agent SDK or Claude binary is present.
+- [x] 4.4 Add `integ/model/strands-structured-output/` and `integ/model/strands-cache-points/`, and an `integ/aws/` slice for the storage under an agent's role. Verify: they pass.
 
 ## 5. The plugin
 
-- [ ] 5.1 Add `framework/strands/plugin/` as design.md states, and register `strands` in `FRAMEWORK_PLUGINS`; the schema enum follows `FRAMEWORK_NAMES`. Verify with generator snapshot tests for a `--framework strands` project and agent, and the enum test.
-- [ ] 5.2 Make `agent`, sync, `serve` and the constructs follow a `strands` project: the base layer `FROM` `agentforge/a2a-strands` through `image-agentforge-strands`; serve requiring `ANTHROPIC_API_KEY`; the construct typed by `/strands/infra`. Verify with unit tests, including a `strands` serve refusing without the key, naming it.
-- [ ] 5.3 Extend `integ/local/package-tarball` to generate, sync, typecheck and build a `strands` project from the packed archive. Verify: it passes.
+- [x] 5.1 Add `framework/strands/plugin/` as design.md states, and register `strands` in `FRAMEWORK_PLUGINS`; the schema enum follows `FRAMEWORK_NAMES`. Verify with generator snapshot tests for a `--framework strands` project and agent, and the enum test.
+- [x] 5.2 Make `agent`, sync, `serve` and the constructs follow a `strands` project: the base layer `FROM` `agentforge/a2a-strands` through `image-agentforge-strands`; serve requiring `ANTHROPIC_API_KEY`; the construct typed by `/strands/infra`. Verify with unit tests, including a `strands` serve refusing without the key, naming it.
+- [x] 5.3 Extend `integ/local/package-tarball` to generate, sync, typecheck and build a `strands` project from the packed archive. Verify: it passes.
 
 ## 6. Examples
 

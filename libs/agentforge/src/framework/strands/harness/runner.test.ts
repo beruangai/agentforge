@@ -467,6 +467,7 @@ describe('runAgent', () => {
         'BASE INSTRUCTIONS',
         'AGENT INSTRUCTIONS',
         '/mnt/work',
+        STRUCTURED_OUTPUT_TOOL,
       ].map((text) => system.indexOf(text));
       expect(order.every((index) => index >= 0)).toBe(true);
       expect([...order].sort((a, b) => a - b)).toEqual(order);

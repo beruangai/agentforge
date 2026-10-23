@@ -380,3 +380,336 @@ exports[`agentic-project > generates a base layer, its targets, client and const
   "packages/examples/golden-kata/tsconfig.lib.json",
 ]
 `;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/base/Dockerfile 1`] = `
+"# check=skip=InvalidDefaultArgInFrom
+# Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+# installed version generates. To own it, name it in the project's
+# project.json metadata.agentforge.detached.files.
+#
+# The agentic image: the project's base layer at /workspace/agentic, on the
+# strands framework's AgentForge image. \`agentic/.agent/\` becomes its
+# \`.agent/\`, whose skills every agent below loads. The
+# layer's lock is the whole workspace's up to it, so the install adds only
+# what this layer adds.
+ARG BASE_IMAGE
+FROM \${BASE_IMAGE}
+COPY --chown=bun --exclude=bun.lock --exclude=.agent agentic/ /workspace/agentic/
+COPY --chown=bun agentic/.agent/ /workspace/agentic/.agent/
+COPY --chown=bun agentic/bun.lock /workspace/bun.lock
+RUN bun install --cwd /workspace --frozen-lockfile --production
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/base/agentic/.agent/skills/.gitkeep 1`] = `""`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/base/agentic/AGENTS.md 1`] = `
+"# strands-smoke
+
+What every agent in this project is told. Replace this placeholder.
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/base/agentic/options.ts 1`] = `
+"import type { StrandsOptions } from '@beruangai/agentforge/strands/agent';
+
+/**
+ * What every agent in strands-smoke runs with, composed under each agent's own
+ * options with \`composeOptions\`. Every run names its model. A procedure
+ * composes \`context.agentOptions\` — its mounts as working directories, and the
+ * file tool's write scope — into a run's own. MCP servers must start, and
+ * nothing runs in the background. Agents import it as
+ * \`@proj/strands-smoke-base/options\`.
+ */
+export function baseOptions(): StrandsOptions {
+  return { model: 'claude-sonnet-5-5' };
+}
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/base/agentic/package.json 1`] = `
+"{
+  "name": "@proj/strands-smoke-base",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./*.ts"
+  },
+  "dependencies": {
+    "@beruangai/agentforge": "workspace:*"
+  },
+  "peerDependencies": {
+    "@strands-agents/sdk": "^1.22.0",
+    "@anthropic-ai/sdk": "0.128.0",
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@cedar-policy/cedar-wasm": "^4.14.0",
+    "@cedar-policy/mcp-schema-generator-wasm": "0.6.1",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/sdk-trace-base": "^2.12.0",
+    "@opentelemetry/sdk-metrics": "^2.12.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.219.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.219.0",
+    "@a2a-js/sdk": "^1.2.0",
+    "@aws-sdk/client-cloudwatch": "^3.1138.0",
+    "@aws-sdk/client-dynamodb": "^3.1138.0",
+    "@aws-sdk/client-secrets-manager": "^3.1138.0",
+    "@aws-sdk/client-s3": "^3.1138.0",
+    "@orpc/contract": "2.0.0-beta.39",
+    "@orpc/server": "2.0.0-beta.39",
+    "express": "^5.2.1",
+    "zod": "^4.6.5"
+  }
+}
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/base/agentic/secrets.ts 1`] = `
+"/**
+ * The secrets every agent in strands-smoke requires, by the environment variable each
+ * becomes — beside its framework's own, ANTHROPIC_API_KEY. The agent's
+ * construct requires a secret for each, \`serve\` passes each from
+ * .env.serve.local, and the agent's server fails a request while one is unset.
+ */
+export const REQUIRED_SECRETS = [] as const satisfies readonly string[];
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/client.ts 1`] = `
+"// Maintained by @beruangai/agentforge: \`nx sync\` rewrites this file to what the
+// installed version generates. To own it, name it in the project's
+// project.json metadata.agentforge.detached.files.
+//
+// The project client: one client over every agent of strands-smoke,
+// typed by its contract, built once from how each agent is reached.
+import {
+  type AgentForgeClient,
+  agentCoreTransportsFromRuntimeConfig,
+  type RuntimeConfigSource,
+  type Transport,
+} from '@beruangai/agentforge/client';
+import type {
+  InferRouterContractInputs,
+  InferRouterContractOutputs,
+} from '@orpc/contract';
+
+/** Each agent's contract. */
+export const CONTRACTS = {};
+
+/** Each agent's key in the runtime configuration its construct registers it under. */
+export const RUNTIME_CONFIG_KEYS = {} as const;
+
+/** Each agent's local container, as \`serve-<agent>\` runs it. */
+export const CONTAINER_NAMES = {} as const;
+
+export type Agent = keyof typeof CONTRACTS;
+
+/** Each procedure's input, by agent and procedure: \`Inputs['<agent>']['<Procedure>']\`. */
+export type Inputs = InferRouterContractInputs<typeof CONTRACTS>;
+
+/** Each procedure's output, by agent and procedure: \`Outputs['<agent>']['<Procedure>']\`. */
+export type Outputs = InferRouterContractOutputs<typeof CONTRACTS>;
+
+export type Client = {
+  readonly [Name in Agent]: AgentForgeClient<(typeof CONTRACTS)[Name]>;
+};
+
+function withTransports(
+  _transports: Readonly<Record<Agent, Transport>>,
+): Client {
+  return {};
+}
+
+/** The strands-smoke client, built from how each agent is reached. */
+export const client = {
+  /** Each agent through the transport given for it. */
+  withTransports,
+  /** Each agent in its local container, found by name. */
+  local: (): Client => withTransports({}),
+  /** Each agent on AgentCore, resolved from the deployment's runtime configuration. */
+  fromRuntimeConfig: async (source: RuntimeConfigSource): Promise<Client> =>
+    withTransports(
+      await agentCoreTransportsFromRuntimeConfig(RUNTIME_CONFIG_KEYS, source),
+    ),
+};
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/package.json 1`] = `
+"{
+  "name": "@proj/strands-smoke",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@strands-agents/sdk": "catalog:",
+    "@anthropic-ai/sdk": "catalog:",
+    "@modelcontextprotocol/client": "catalog:",
+    "@cedar-policy/cedar-wasm": "catalog:",
+    "@cedar-policy/mcp-schema-generator-wasm": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
+    "@a2a-js/sdk": "catalog:",
+    "@aws-sdk/client-cloudwatch": "catalog:",
+    "@aws-sdk/client-dynamodb": "catalog:",
+    "@aws-sdk/client-secrets-manager": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/server": "catalog:",
+    "express": "catalog:",
+    "zod": "catalog:",
+    "@aws-sdk/client-bedrock-agentcore": "catalog:",
+    "@aws-sdk/client-appconfigdata": "catalog:",
+    "@beruangai/agentforge": "^1.0.0"
+  },
+  "exports": {
+    "./client": "./client.ts",
+    "./*": "./base/agentic/*.ts"
+  }
+}
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/project.json 1`] = `
+"{
+  "name": "@proj/strands-smoke",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/examples/strands-smoke",
+  "projectType": "library",
+  "metadata": {
+    "generator": "@beruangai/agentforge:agentic-project",
+    "components": [],
+    "agentforge": {
+      "framework": "strands",
+      "detached": {
+        "files": [],
+        "targets": []
+      }
+    }
+  },
+  "targets": {
+    "image-agentforge": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["^bundle"],
+      "options": {
+        "layer": "agentforge"
+      }
+    },
+    "image-agentforge-strands": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["image-agentforge"],
+      "options": {
+        "layer": "agentforge-strands"
+      }
+    },
+    "lock": {
+      "executor": "@beruangai/agentforge:lock",
+      "cache": true,
+      "dependsOn": ["^bundle"],
+      "inputs": [
+        "{projectRoot}/base/agentic/package.json",
+        {
+          "dependentTasksOutputFiles": "**/package.json",
+          "transitive": true
+        },
+        {
+          "dependentTasksOutputFiles": "**/bun.lock",
+          "transitive": true
+        },
+        {
+          "runtime": "bun --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/base/agentic/bun.lock"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "image": {
+      "executor": "@beruangai/agentforge:image",
+      "cache": false,
+      "dependsOn": ["lock", "image-agentforge-strands"],
+      "options": {
+        "layer": "base"
+      }
+    },
+    "assemble": {
+      "executor": "nx:noop",
+      "dependsOn": []
+    },
+    "local-store": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false
+    },
+    "local-store-stop": {
+      "executor": "@beruangai/agentforge:local-store",
+      "cache": false,
+      "options": {
+        "stop": true
+      }
+    }
+  }
+}
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/tsconfig.json 1`] = `
+"{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {},
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.lib.json"
+    }
+  ]
+}
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers > strands packages/examples/strands-smoke/tsconfig.lib.json 1`] = `
+"{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../dist/packages/examples/strands-smoke/tsc",
+    "tsBuildInfoFile": "../../../dist/packages/examples/strands-smoke/tsc/tsconfig.lib.tsbuildinfo",
+    "allowImportingTsExtensions": true,
+    "customConditions": [
+      "agentforge-agent"
+    ],
+    "paths": {
+      "@proj/strands-smoke-base/*": [
+        "./base/agentic/*.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}
+"
+`;
+
+exports[`agentic-project > generates a strands project: its base layer, options and instruction file, and its peers 1`] = `
+[
+  "packages/examples/strands-smoke/base/Dockerfile",
+  "packages/examples/strands-smoke/base/agentic/.agent/skills/.gitkeep",
+  "packages/examples/strands-smoke/base/agentic/AGENTS.md",
+  "packages/examples/strands-smoke/base/agentic/options.ts",
+  "packages/examples/strands-smoke/base/agentic/package.json",
+  "packages/examples/strands-smoke/base/agentic/secrets.ts",
+  "packages/examples/strands-smoke/client.ts",
+  "packages/examples/strands-smoke/package.json",
+  "packages/examples/strands-smoke/project.json",
+  "packages/examples/strands-smoke/tsconfig.json",
+  "packages/examples/strands-smoke/tsconfig.lib.json",
+]
+`;
