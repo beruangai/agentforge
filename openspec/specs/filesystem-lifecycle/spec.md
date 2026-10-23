@@ -49,7 +49,7 @@ A filesystem SHALL declare a local root, an absolute directory, and MAY declare 
 
 #### Scenario: The handler sees the resolved mount
 - **WHEN** a handler reads a filesystem's path whose local root is `/workspace/memories` and whose subpath resolved to `spaces/a`
-- **THEN** the path is `/workspace/memories/spaces/a`, and its baseline permissions are rooted there
+- **THEN** the path is `/workspace/memories/spaces/a`, and its baseline permissions are relative to it
 
 #### Scenario: A subpath that climbs
 - **WHEN** a scope resolves the subpath `../other` or `/etc`
@@ -76,25 +76,6 @@ A filesystem SHALL resolve, from the request's input and context, what it mounts
 #### Scenario: A file written outside the write scope stays local
 - **WHEN** a filesystem that may write only `notes/today.md` finds another changed file at push
 - **THEN** only `notes/today.md` is pushed
-
-### Requirement: The handler receives each filesystem's directory and baseline permissions
-The handler SHALL receive, for each mounted filesystem, its directory and baseline permission rules: reading the whole mount, and writing its write scope. It SHALL also receive, as one set of agent run options it can compose into a run's own, every mounted directory as an additional working directory and every mount's baseline rules as allowed tools — and nothing else — so that a run whose reads are fenced to its working directories can read its own mounts and no other. A procedure with no mounted filesystem SHALL receive an empty set. AgentForge SHALL NOT apply either to an agent run; the handler decides.
-
-#### Scenario: Baseline rules follow the scopes
-- **WHEN** a filesystem mounted at `/workspace/vault` may write only `notes/today.md`
-- **THEN** its baseline allows `Read(//workspace/vault/**)` and `Edit(//workspace/vault/notes/today.md)`, and nothing else
-
-#### Scenario: One set of run options for every mount
-- **WHEN** a procedure registers two filesystems, mounted at `/workspace/vault` and `/workspace/notes`
-- **THEN** the run options it receives name both directories as additional working directories and allow both mounts' baseline rules, and set nothing else
-
-#### Scenario: No filesystem, no options
-- **WHEN** a procedure registers no filesystem
-- **THEN** the run options it receives are empty
-
-#### Scenario: A fenced run reads its own mounts and no other
-- **WHEN** a run fences reads to its working directories and composes its task's run options into its own
-- **THEN** it reads a file in its own mount, and a read of a file in a directory outside them is refused, even where an allow rule names that directory
 
 ### Requirement: A kind decides its local root, and what it needs
 Each filesystem kind SHALL either set a default local root the consumer may override, or require the consumer to give one, and SHALL refuse options it cannot honour before anything is mounted. A scratch filesystem's subpath SHALL be its task's own, so a local root it is given holds one directory per task. Two filesystems of one procedure SHALL NOT resolve the same local directory or one inside the other; the task SHALL fail before anything is mounted.
@@ -129,3 +110,14 @@ For each mounted filesystem, the handler SHALL be able to resolve a path relativ
 #### Scenario: A write outside the write scope
 - **WHEN** a handler resolves `index.md` for writing on a filesystem whose write scope is only `notes/**`
 - **THEN** resolving throws, naming the path and the write scope
+
+### Requirement: The handler receives each filesystem's directory and permissions as data
+The handler SHALL receive, for each mounted filesystem, its directory and its baseline permissions. The permissions SHALL be stated as actions on globs relative to the mount: `read` on the whole mount, and `edit` on each glob of its write scope. They SHALL name no framework's rule syntax. Turning a procedure's mounts into a run's options is its framework's (see [harness-framework](../harness-framework/spec.md)). AgentForge SHALL NOT apply the permissions to an agent run; the handler decides.
+
+#### Scenario: Baseline permissions follow the scopes
+- **WHEN** a filesystem mounted at `/workspace/vault` may write only `notes/today.md`
+- **THEN** the handler receives `/workspace/vault` with `read` on the whole mount and `edit` on `notes/today.md`, relative to it, and no other permission
+
+#### Scenario: A filesystem that writes nothing
+- **WHEN** a filesystem's scope declares no write globs
+- **THEN** its baseline permissions are `read` on the whole mount alone
