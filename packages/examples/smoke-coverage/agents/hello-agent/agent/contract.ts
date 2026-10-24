@@ -5,6 +5,9 @@ import { z } from 'zod';
 /** A topic names the notebook's prefix its note is kept under. */
 export const TopicField = z.string().regex(/^[a-z0-9-]{1,64}$/);
 
+/** A day names a journal entry's file. */
+export const DayField = z.string().regex(/^[a-z0-9-]{1,64}$/);
+
 /** A space names the memory an agent keeps across tasks, a prefix of the memories bucket. */
 export const SpaceField = z.string().regex(/^[a-z0-9-]{1,64}$/);
 
@@ -70,6 +73,29 @@ export const contract = {
   RecallNote: oc
     .input(z.strictObject({ topic: TopicField }))
     .output(z.strictObject({ note: z.string() })),
+  /**
+   * Keeps a journal entry in a git filesystem under a topic, which the agent
+   * pushes itself, with its own message; and a scratch note beside it, outside
+   * the write scope, which only the local copy keeps.
+   */
+  KeepJournal: oc
+    .input(
+      z.strictObject({
+        topic: TopicField,
+        day: DayField,
+        entry: z.string().min(1),
+        message: z.string().min(1),
+        scratch: z.string().min(1),
+      }),
+    )
+    .output(
+      z.strictObject({
+        /** Whether the entry's file holds the entry: read back, never asked of the model. */
+        written: z.boolean(),
+        /** The scratch note an earlier task of the session left, if any. */
+        carried: z.string().optional(),
+      }),
+    ),
   /** Saves a fact to the agent's auto memory in a space. */
   Remember: oc
     .input(z.strictObject({ space: SpaceField, fact: z.string().min(1) }))

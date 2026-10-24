@@ -343,7 +343,9 @@ describe('hello-agent, on AgentCore', () => {
           { ...context, pollIntervalMilliseconds: POLL_INTERVAL_MILLISECONDS },
         );
         if (retried.state !== 'TASK_STATE_COMPLETED') {
-          throw new Error(`expected completion, got ${JSON.stringify(retried)}`);
+          throw new Error(
+            `expected completion, got ${JSON.stringify(retried)}`,
+          );
         }
         if (retried.output.kept) keptNotes.push(note);
       }

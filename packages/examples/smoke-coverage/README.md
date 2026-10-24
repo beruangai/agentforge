@@ -20,11 +20,12 @@ What is maintained, scaffolded and detachable is listed in [AgentForge's README]
 | `SleepThenAnswer` | A run long enough to cancel, or to lose, mid-Bash |
 | `KeepNote`, `RecallNote` | An S3 filesystem, `notebook`, scoped per topic: written in one container, read back in another |
 | `Remember`, `Recall` | Auto memory in an S3 filesystem, `memories`, a space per request: saved in one container, recalled in another with no tools |
+| `KeepJournal` | A git filesystem, `journal`, scoped per topic: the agent writes an entry and commits it with its push tool, and the handler's file outside the write scope is kept for the session's next task, never committed |
 | `ReportNautilusTraderVersion` | A layer extended beyond its manifest: the agent runs a script in its layer, Python importing NautilusTrader, through Bash, and answers with its version |
 
 | Suite | Asserts |
 |---|---|
-| `e2e/local/hello-agent.test.ts` | Against the local store: a typed output, an attach under the same key, the run's record and its logged prompt; a session resumed from its transcript in the store once the container's own copy is gone; the notebook and a memory read back by a later task from the store; a cancel mid-Bash leaving the container idle; NautilusTrader's version |
+| `e2e/local/hello-agent.test.ts` | Against the local store: a typed output, an attach under the same key, the run's record and its logged prompt; a session resumed from its transcript in the store once the container's own copy is gone; the notebook and a memory read back by a later task, in another runtime session, from the store; the journal's commit in its host repository, with its message and trailers, and the file outside the write scope carried to the session's next task; a cancel mid-Bash leaving the container idle; NautilusTrader's version |
 | `e2e/local/temporal-activity.test.ts` | The Temporal activity returning the typed output while heartbeating, and cancelling its task when cancelled |
 | `e2e/agentcore/hello-agent.test.ts` | On AgentCore: an attach to a completed task; a session resumed in another container from its transcript in S3; the notebook across containers; a memory across containers; a container stopped mid-Bash ending the task `LOST`, its retry running as attempt 2; NautilusTrader's version on ARM64 |
 
@@ -38,4 +39,4 @@ nx run @beruangai/smoke-coverage:e2e
 nx run @beruangai/smoke-coverage:e2e-agentcore
 ```
 
-`e2e` serves hello-agent locally through `serve-hello-agent`, against the machine's local store, with the subscription token from `.env.serve.local` and its filesystems' buckets from the committed `.env.serve`, and runs the `local` project. `e2e-agentcore` deploys [smoke-coverage-infra](../smoke-coverage-infra/README.md) first and runs the `agentcore` project as the test role, resolving the agent from the deployment's runtime configuration.
+`e2e` serves hello-agent locally through `serve-hello-agent`, against the machine's local store, with the subscription token from `.env.serve.local` and its filesystems' buckets and the journal's host repository, which serve creates empty on first use, from the committed `.env.serve`, and runs the `local` project. `e2e-agentcore` deploys [smoke-coverage-infra](../smoke-coverage-infra/README.md) first and runs the `agentcore` project as the test role, resolving the agent from the deployment's runtime configuration.

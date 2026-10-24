@@ -5,11 +5,13 @@
  * outcome, recording the image that ran it and where its transcript is,
  * read back through the client; an attach; a session resumed
  * from its transcript in the local store; a note in an S3 filesystem and a
- * memory, each read back by a later task from the store, since a mount's
- * directory goes with its task; a cancel mid-Bash; a procedure that distills
+ * memory, each read back by a task of another runtime session, so from the
+ * store and not a kept copy; a journal entry in a git filesystem, pushed by
+ * the agent's own tool; a cancel mid-Bash; a procedure that distills
  * its documents in a run before answering in another; and Python importing
  * what the base layer installed.
  */
+import { execFileSync } from 'node:child_process';
 import { randomUUIDv7 } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
@@ -49,11 +51,28 @@ const LOCAL_STORE = new S3Client({
   credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
 });
 const SESSION_BUCKET = 'beruangai-smoke-coverage-sessions';
+/** The journal's host repository, as `.env.serve` declares it and serve creates it. */
+const JOURNAL = new URL(
+  '../../../../../.agentforge/repositories/smoke-coverage-journal.git',
+  import.meta.url,
+).pathname;
+
+function journal(...args: string[]): string {
+  return execFileSync('git', ['-C', JOURNAL, ...args], {
+    encoding: 'utf8',
+  }).trim();
+}
 
 let helloAgent: SmokeCoverageClient['helloAgent'];
 const RUNTIME_SESSION_ID = `e2e-${randomUUIDv7()}`;
 const POLL_OPTIONS = {
   runtimeSessionId: RUNTIME_SESSION_ID,
+  pollIntervalMilliseconds: 1_000,
+};
+/** Another runtime session, whose tasks never see this one's kept copies. */
+const OTHER_RUNTIME_SESSION_ID = `e2e-${randomUUIDv7()}`;
+const OTHER_POLL_OPTIONS = {
+  runtimeSessionId: OTHER_RUNTIME_SESSION_ID,
   pollIntervalMilliseconds: 1_000,
 };
 
@@ -156,7 +175,7 @@ describe('hello-agent, locally', () => {
     expect(ended.output.sessionId).toBe(firstSessionId);
   });
 
-  it('keeps a note in an S3 filesystem, and a later task reads it back from the store', async () => {
+  it('keeps a note in an S3 filesystem, and a task of another session reads it back from the store', async () => {
     const topic = `e2e-${randomUUIDv7()}`;
     const note = `The notebook outlives the task that wrote ${topic}.`;
     const kept = await awaitTask(
@@ -181,11 +200,11 @@ describe('hello-agent, locally', () => {
       await helloAgent.RecallNote.SendMessage(
         { topic },
         {
-          runtimeSessionId: RUNTIME_SESSION_ID,
+          runtimeSessionId: OTHER_RUNTIME_SESSION_ID,
           idempotencyKey: randomUUIDv7(),
         },
       ),
-      POLL_OPTIONS,
+      OTHER_POLL_OPTIONS,
     );
     if (recalled.state !== 'TASK_STATE_COMPLETED') {
       throw new Error(
@@ -195,7 +214,7 @@ describe('hello-agent, locally', () => {
     expect(recalled.output.note.trim()).toBe(note);
   });
 
-  it('remembers a fact, and a later task recalls it from its memory space in the store', async () => {
+  it('remembers a fact, and a task of another session recalls it from its memory space in the store', async () => {
     const space = `e2e-${randomUUIDv7()}`;
     const codename = `HERON-${randomUUIDv7().slice(-8).toUpperCase()}`;
     const remembered = await awaitTask(
@@ -223,11 +242,11 @@ describe('hello-agent, locally', () => {
       await helloAgent.Recall.SendMessage(
         { space, question: 'What is the deploy codename for this project?' },
         {
-          runtimeSessionId: RUNTIME_SESSION_ID,
+          runtimeSessionId: OTHER_RUNTIME_SESSION_ID,
           idempotencyKey: randomUUIDv7(),
         },
       ),
-      POLL_OPTIONS,
+      OTHER_POLL_OPTIONS,
     );
     if (recalled.state !== 'TASK_STATE_COMPLETED') {
       throw new Error(
@@ -235,6 +254,55 @@ describe('hello-agent, locally', () => {
       );
     }
     expect(recalled.output.answer).toContain(codename);
+  });
+
+  it("keeps a journal entry in a git filesystem, pushed by the agent's tool with its message, and the session's next task finds what the first kept locally", async () => {
+    const topic = `e2e-${randomUUIDv7()}`;
+    const keep = async (day: string, scratch: string) => {
+      const idempotencyKey = randomUUIDv7();
+      const message = `journal: ${topic} ${day}`;
+      const kept = await awaitTask(
+        helloAgent.KeepJournal,
+        await helloAgent.KeepJournal.SendMessage(
+          {
+            topic,
+            day,
+            entry: `On ${day}, ${topic} was kept in git.`,
+            message,
+            scratch,
+          },
+          { runtimeSessionId: RUNTIME_SESSION_ID, idempotencyKey },
+        ),
+        POLL_OPTIONS,
+      );
+      if (kept.state !== 'TASK_STATE_COMPLETED') {
+        throw new Error(
+          `expected completion, got ${JSON.stringify(kept)}\n${logs()}`,
+        );
+      }
+      expect(kept.output.written).toBe(true);
+      // The agent's push: its message, and the trailers naming the task.
+      const commit = journal(
+        'log',
+        '-1',
+        '--format=%B',
+        'main',
+        '--',
+        `topics/${topic}/entries/${day}.md`,
+      );
+      expect(commit).toContain(message);
+      expect(commit).toContain(`AgentForge-Idempotency-Key: ${idempotencyKey}`);
+      expect(journal('show', `main:topics/${topic}/entries/${day}.md`)).toBe(
+        `On ${day}, ${topic} was kept in git.`,
+      );
+      return kept.output;
+    };
+    expect((await keep('monday', 'first scratch')).carried).toBeUndefined();
+    expect((await keep('tuesday', 'second scratch')).carried).toBe(
+      'first scratch',
+    );
+    // Outside the write scope: never committed.
+    expect(() => journal('show', `main:topics/${topic}/scratch.md`)).toThrow();
   });
 
   it('cancels a run mid-Bash, and the container is idle again', async () => {

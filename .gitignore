@@ -57,3 +57,6 @@ vitest.config.*.timestamp*
 # @aws/nx-plugin runtime configuration, written for local runs
 runtime-config.json
 .vitest
+
+# Host repositories a local serve or seed-repository keeps (git filesystems)
+/.agentforge/

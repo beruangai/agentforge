@@ -57,9 +57,9 @@ Groups 1–2 come first; 2.6 also depends on 3. Groups 3 and 4 depend on 1 and c
 
 ## 6. Example (dogfood)
 
-- [ ] 6.1 `smoke-coverage`'s hello-agent: a procedure on a git filesystem pushing on `TASK_STATE_FAILED`, whose agent writes in and outside the write scope and calls its push tool, with its repository in `.env.serve`.
-- [ ] 6.2 Local e2e: the host repository has the agent's commit with its message and trailers; the second task in the same session finds the first's file outside the write scope.
-- [ ] 6.3 `smoke-coverage`'s S3 note and memory round trips read back in another runtime session. Re-run every example's local e2e (`golden-kata`, `smoke-coverage`, `strands-smoke`, `research-brief`).
+- [x] 6.1 `smoke-coverage`'s hello-agent: a procedure on a git filesystem pushing on `TASK_STATE_FAILED`, whose agent writes in and outside the write scope and calls its push tool, with its repository in `.env.serve`.
+- [x] 6.2 Local e2e: the host repository has the agent's commit with its message and trailers; the second task in the same session finds the first's file outside the write scope.
+- [x] 6.3 `smoke-coverage`'s S3 note and memory round trips read back in another runtime session. Re-run every example's local e2e (`golden-kata`, `smoke-coverage`, `strands-smoke`, `research-brief`).
 
 ## 7. Documents and guidance
 

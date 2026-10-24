@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import {
   filesystems,
+  GitFilesystem,
   S3Filesystem,
   type S3FilesystemOptions,
 } from '@beruangai/agentforge/agent';
@@ -34,6 +35,22 @@ const MEMORIES: S3FilesystemOptions = {
     subpath: `spaces/${z.object({ space: SpaceField }).parse(input).space}`,
   }),
 };
+
+/**
+ * The journal, a git repository with a directory per topic. Declared at
+ * module scope, as a git filesystem with a token must be. It pushes on
+ * failure too, so the agent is offered a push of its own.
+ */
+const journal = new GitFilesystem({
+  localRoot: '/workspace/journal',
+  repository: 'journal',
+  remoteRoot: '/topics',
+  scope: ({ input }) => ({
+    subpath: z.object({ topic: TopicField }).parse(input).topic,
+    write: ['entries/**'],
+  }),
+  pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
+});
 
 export const router = os.router({
   Summarise: os.Summarise.handler(async ({ input, context }) => {
@@ -132,6 +149,37 @@ export const router = os.router({
     });
     return { note: run.output.note };
   }),
+  KeepJournal: os.KeepJournal.use(filesystems({ journal })).handler(
+    async ({ input, context }) => {
+      const mount = context.filesystems.journal;
+      // Outside the write scope: the local copy keeps it, the store never has it.
+      const scratch = mount.path('scratch.md');
+      const carried = existsSync(scratch)
+        ? await readFile(scratch, 'utf8')
+        : undefined;
+      await writeFile(scratch, input.scratch);
+      const entry = mount.writablePath(`entries/${input.day}.md`);
+      await context.runAgent({
+        prompt: [
+          `Write the entry below, exactly, to the file \`${entry}\` with the Write tool. Then call the push_journal tool with the message below, exactly. Then answer whether the push recorded the file.`,
+          { tag: 'entry', context: input.entry },
+          { tag: 'message', context: input.message },
+        ],
+        output: z.object({ pushed: z.boolean() }),
+        options: composeOptions(baseOptions(), context.agentOptions, {
+          maxTurns: 6,
+          tools: ['Write'],
+          permissionMode: 'dontAsk',
+        }),
+      });
+      return {
+        written:
+          existsSync(entry) &&
+          (await readFile(entry, 'utf8')).trim() === input.entry.trim(),
+        ...(carried === undefined ? {} : { carried }),
+      };
+    },
+  ),
   Remember: os.Remember.use(
     filesystems({
       memory: new S3Filesystem({
