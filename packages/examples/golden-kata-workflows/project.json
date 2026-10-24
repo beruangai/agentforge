@@ -173,6 +173,7 @@
           "target": "deploy"
         }
       ],
+      "defaultConfiguration": "integ",
       "options": {
         "command": "vitest run --config vitest.e2e.mts --project agentcore",
         "cwd": "{projectRoot}",
@@ -180,10 +181,13 @@
           "TEMPORAL_ADDRESS": "beruangai-agentforge.vwhld.tmprl.cloud:7233"
         }
       },
-      "defaultConfiguration": "integ",
       "configurations": {
         "integ": {}
       }
+    },
+    "seed-repository": {
+      "executor": "@beruangai/agentforge:seed-repository",
+      "cache": false
     }
   }
 }

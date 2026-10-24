@@ -34,6 +34,11 @@
       "implementation": "./executors/local-store/executor.ts",
       "schema": "./executors/local-store/schema.json",
       "description": "Starts the local store every project shares \u2014 DynamoDB Local and an S3-compatible server \u2014 if it is not running; or stops it"
+    },
+    "seed-repository": {
+      "implementation": "./executors/seed-repository/executor.ts",
+      "schema": "./executors/seed-repository/schema.json",
+      "description": "Seeds a declared repository's host repository from its remote, for every project of the workspace; never writes to the remote"
     }
   }
 }

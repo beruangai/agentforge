@@ -7,6 +7,7 @@ import {
   builtImageId,
   type ContainerState,
   cleanupCommand,
+  servedRepositories,
   servePlan,
   serveRefusal,
   startCommand,
@@ -27,6 +28,7 @@ describe('servePlan', () => {
       tableName: 'proj-golden-kata-tasks',
       sessionBucket: 'proj-golden-kata-sessions',
       filesystemBuckets: {},
+      repositories: {},
     });
     expect(storeBuckets(PLAN)).toEqual(['proj-golden-kata-sessions']);
   });
@@ -43,7 +45,7 @@ describe('servePlan', () => {
       'kata-notebook',
       'kata-memories',
     ]);
-    expect(startCommand(plan)).toContain(
+    expect(startCommand(plan, [])).toContain(
       'AGENTFORGE_FILESYSTEM_BUCKETS={"notebook":"kata-notebook","memories":"kata-memories"}',
     );
     expect(() =>
@@ -51,6 +53,58 @@ describe('servePlan', () => {
         AGENTFORGE_FILESYSTEM_BUCKETS: 'notebook',
       }),
     ).toThrow(/AGENTFORGE_FILESYSTEM_BUCKETS is not JSON/);
+  });
+
+  it('gives the agent each declared repository: a host directory bind-mounted by its file URL, a remote as it is', () => {
+    const plan = servePlan(GOLDEN_KATA, 'writer', [], IMAGE_ID, {
+      AGENTFORGE_FILESYSTEM_REPOSITORIES: JSON.stringify({
+        vault: '.agentforge/repositories/vault.git',
+        archive: '/srv/archive.git',
+        shared: 'https://github.com/o/shared.git',
+      }),
+    });
+    const repositories = servedRepositories(plan, '/workspace');
+    expect(repositories).toEqual([
+      {
+        name: 'vault',
+        location: 'file:///mnt/agentforge-repositories/vault',
+        hostPath: '/workspace/.agentforge/repositories/vault.git',
+      },
+      {
+        name: 'archive',
+        location: 'file:///mnt/agentforge-repositories/archive',
+        hostPath: '/srv/archive.git',
+      },
+      { name: 'shared', location: 'https://github.com/o/shared.git' },
+    ]);
+    const command = startCommand(plan, repositories);
+    expect(command).toContain(
+      'type=bind,source=/workspace/.agentforge/repositories/vault.git,target=/mnt/agentforge-repositories/vault',
+    );
+    expect(command).toContain(
+      'AGENTFORGE_FILESYSTEM_REPOSITORIES={"vault":"file:///mnt/agentforge-repositories/vault","archive":"file:///mnt/agentforge-repositories/archive","shared":"https://github.com/o/shared.git"}',
+    );
+    expect(command.filter((argument) => argument === '--mount')).toHaveLength(
+      2,
+    );
+  });
+
+  it.each([
+    [{ Vault: 'vault.git' }, /repository "Vault", which must match/],
+    [{ vault: 'ssh://git@github.com/o/vault' }, /must be https:\/\/, not ssh:/],
+    [
+      { vault: 'https://token@github.com/o/vault' },
+      /carries a credential in its URL/,
+    ],
+    [
+      { vault: 'git@github.com:o/vault.git' },
+      /neither an https:\/\/ URL nor a host directory/,
+    ],
+  ])('refuses repositories %j', (repositories, message) => {
+    const plan = servePlan(GOLDEN_KATA, 'writer', [], IMAGE_ID, {
+      AGENTFORGE_FILESYSTEM_REPOSITORIES: JSON.stringify(repositories),
+    });
+    expect(() => servedRepositories(plan, '/workspace')).toThrow(message);
   });
 
   it("requires its framework's secrets, then its layers', once each", () => {
@@ -139,6 +193,7 @@ describe('the docker commands', () => {
   it('passes each secret by name, never its value, on a host-assigned port, against the local store', () => {
     const agent = startCommand(
       servePlan(GOLDEN_KATA, 'writer', ['KATA_API_KEY'], IMAGE_ID),
+      [],
     );
     expect(agent.join(' ')).toContain(
       '--env CLAUDE_CODE_OAUTH_TOKEN --env KATA_API_KEY',

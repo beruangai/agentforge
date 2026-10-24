@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Seeds a declared repository's host repository from its remote, for every project of the workspace",
+  "type": "object",
+  "properties": {
+    "repository": {
+      "type": "string",
+      "description": "The repository's name, as AGENTFORGE_FILESYSTEM_REPOSITORIES and a git filesystem's repository use it"
+    },
+    "remote": {
+      "type": "string",
+      "description": "The remote to clone: https:// with no credential in it, authenticated by the host's own git"
+    },
+    "location": {
+      "type": "string",
+      "description": "Where the host repository lives, absolute (declared in .env.serve.local) or relative to the workspace (declared in .env.serve); .agentforge/repositories/<repository>.git by default"
+    },
+    "readingClone": {
+      "type": "string",
+      "description": "A working clone whose origin becomes the host repository: cloned from it when absent, re-pointed when it shares a commit with it"
+    }
+  },
+  "required": ["repository", "remote"],
+  "additionalProperties": false
+}

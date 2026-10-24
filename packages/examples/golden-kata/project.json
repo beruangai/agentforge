@@ -222,6 +222,10 @@
       "options": {
         "layer": "agentforge-claude"
       }
+    },
+    "seed-repository": {
+      "executor": "@beruangai/agentforge:seed-repository",
+      "cache": false
     }
   }
 }

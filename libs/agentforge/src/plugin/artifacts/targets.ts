@@ -118,5 +118,11 @@ export function projectTargets(
     cache: false,
     options: { stop: true },
   };
+  // Seeds a host repository from its remote for the whole workspace: the
+  // same location and declaration whichever project runs it.
+  targets['seed-repository'] = {
+    executor: `${EXECUTOR}:seed-repository`,
+    cache: false,
+  };
   return targets;
 }

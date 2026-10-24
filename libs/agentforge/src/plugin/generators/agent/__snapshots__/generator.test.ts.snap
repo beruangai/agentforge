@@ -867,6 +867,10 @@ exports[`agent > generates the agent's folder, record, image, entries and constr
       "{projectRoot}/agents/writer/agent/bun.lock",
     ],
   },
+  "seed-repository": {
+    "cache": false,
+    "executor": "@beruangai/agentforge:seed-repository",
+  },
   "serve-writer": {
     "configurations": {
       "serve": {},

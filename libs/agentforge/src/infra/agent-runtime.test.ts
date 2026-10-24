@@ -331,4 +331,43 @@ describe('AgentRuntime', () => {
       })),
     ).toThrow(/filesystem bucket name "Vault"/);
   });
+
+  it('names its repositories to the harness, with a token that is a secret but not required', () => {
+    const template = synthesize((stack) => ({
+      repositories: { vault: 'https://github.com/o/vault.git' },
+      secrets: {
+        CLAUDE_CODE_OAUTH_TOKEN: Secret.fromSecretNameV2(
+          stack,
+          'OAuthToken',
+          'agentforge/claude-code-oauth-token',
+        ),
+        VAULT_GIT_TOKEN: Secret.fromSecretNameV2(
+          stack,
+          'VaultToken',
+          'agentforge/vault-git-token',
+        ),
+      },
+    }));
+    const [runtime] = Object.values(
+      template.findResources('AWS::BedrockAgentCore::Runtime'),
+    );
+    const variables = runtime?.Properties.EnvironmentVariables;
+    expect(JSON.parse(variables.AGENTFORGE_FILESYSTEM_REPOSITORIES)).toEqual({
+      vault: 'https://github.com/o/vault.git',
+    });
+    expect(JSON.stringify(variables.AGENTFORGE_SECRETS)).toContain(
+      'VAULT_GIT_TOKEN',
+    );
+  });
+
+  it.each([
+    [{ Vault: 'https://github.com/o/vault.git' }, /repository name "Vault"/],
+    [{ vault: 'file:///srv/vault' }, /must be https:\/\/, not file:/],
+    [
+      { vault: 'https://token@github.com/o/vault.git' },
+      /carries a credential in its URL/,
+    ],
+  ])('refuses repositories %j', (repositories, message) => {
+    expect(() => synthesize({ repositories })).toThrow(message);
+  });
 });

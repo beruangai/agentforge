@@ -152,6 +152,10 @@
         "cwd": "{projectRoot}",
         "envFile": "{workspaceRoot}/.env.integ"
       }
+    },
+    "seed-repository": {
+      "executor": "@beruangai/agentforge:seed-repository",
+      "cache": false
     }
   }
 }

@@ -485,6 +485,12 @@ export function workflowProjectTargets(): Record<string, TargetConfiguration> {
       cache: false,
       options: { stop: true },
     },
+    // Seeds a host repository from its remote for the whole workspace, as an
+    // agentic project's does: the worker reads the same declaration.
+    'seed-repository': {
+      executor: `${EXECUTOR}:seed-repository`,
+      cache: false,
+    },
     // Run as the image runs it: the bundle beside the Temporal packages its
     // lock pins, installed apart from the build context, which stays free of
     // node_modules. Nx loads .env.serve.local for the target, and

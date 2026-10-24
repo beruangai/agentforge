@@ -232,6 +232,10 @@ exports[`workflow-project > generates the project, its worker, a placeholder wor
         "stop": true
       }
     },
+    "seed-repository": {
+      "executor": "@beruangai/agentforge:seed-repository",
+      "cache": false
+    },
     "serve": {
       "executor": "nx:run-commands",
       "continuous": true,
@@ -584,6 +588,10 @@ exports[`workflow-project > generates the project, its worker, a placeholder wor
     "outputs": [
       "{projectRoot}/container/bun.lock",
     ],
+  },
+  "seed-repository": {
+    "cache": false,
+    "executor": "@beruangai/agentforge:seed-repository",
   },
   "serve": {
     "configurations": {

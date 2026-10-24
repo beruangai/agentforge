@@ -1,13 +1,16 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ExecutorContext } from '@nx/devkit';
 import { z } from 'zod';
 import { AGENT_IMAGE_VARIABLE } from '#core/agent-image.ts';
 import {
   FILESYSTEM_BUCKETS_VARIABLE,
-  parseDeclaredBuckets,
+  FILESYSTEM_NAME_PATTERN,
+  FILESYSTEM_REPOSITORIES_VARIABLE,
+  parseDeclared,
+  parseRepositoryRemote,
 } from '#core/filesystem.ts';
 import { S3_ENDPOINT_VARIABLE } from '#core/s3-endpoint.ts';
 import { SecretNameSchema } from '#core/secrets.ts';
@@ -23,6 +26,11 @@ import {
   LOCAL_STORE_HOST_ENDPOINTS,
   LOCAL_STORE_NETWORK,
 } from '../local-store/executor.ts';
+import {
+  allowPartialClones,
+  hostGit,
+  hostPathKind,
+} from '../seed-repository/host-repository.ts';
 
 export interface ServeExecutorOptions {
   readonly agent: string;
@@ -45,7 +53,24 @@ export interface ServePlan {
   readonly tableName: string;
   readonly sessionBucket: string;
   readonly filesystemBuckets: Readonly<Record<string, string>>;
+  /** The repositories the environment declares, as it declares them: a remote URL, or a host directory. */
+  readonly repositories: Readonly<Record<string, string>>;
 }
+
+/** Where a host repository is mounted in the agent's container. */
+const REPOSITORIES_MOUNT = '/mnt/agentforge-repositories';
+
+/**
+ * A declared repository as the agent is given it: a remote as it is, or a
+ * host directory, bind-mounted and named to the agent by its `file://` URL.
+ */
+export type ServedRepository =
+  | { readonly name: string; readonly location: string }
+  | {
+      readonly name: string;
+      readonly location: string;
+      readonly hostPath: string;
+    };
 
 /** `@proj/golden-kata` → `proj-golden-kata`: what the project's table and bucket in the local store are named by. */
 function storeName(packageName: string): string {
@@ -84,10 +109,78 @@ export function servePlan(
     ],
     tableName: `${name}-tasks`,
     sessionBucket: `${name}-sessions`,
-    filesystemBuckets: parseDeclaredBuckets(
+    filesystemBuckets: parseDeclared(
+      FILESYSTEM_BUCKETS_VARIABLE,
       environment[FILESYSTEM_BUCKETS_VARIABLE],
     ),
+    repositories: parseDeclared(
+      FILESYSTEM_REPOSITORIES_VARIABLE,
+      environment[FILESYSTEM_REPOSITORIES_VARIABLE],
+    ),
   };
+}
+
+/**
+ * Each declared repository as the agent is given it. A location with a
+ * scheme is a remote, `https://` only; any other is a host directory,
+ * absolute or relative to the workspace.
+ */
+export function servedRepositories(
+  plan: ServePlan,
+  workspaceRoot: string,
+): readonly ServedRepository[] {
+  return Object.entries(plan.repositories).map(([name, location]) => {
+    if (!FILESYSTEM_NAME_PATTERN.test(name)) {
+      throw new Error(
+        `${FILESYSTEM_REPOSITORIES_VARIABLE} names repository "${name}", which must match ${FILESYSTEM_NAME_PATTERN}`,
+      );
+    }
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(location)) {
+      parseRepositoryRemote(`repository "${name}"`, location, ['https:']);
+      return { name, location };
+    }
+    if (/^[^/]*:/.test(location)) {
+      throw new Error(
+        `repository "${name}" is declared at ${location}, which is neither an https:// URL nor a host directory`,
+      );
+    }
+    return {
+      name,
+      location: `file://${REPOSITORIES_MOUNT}/${name}`,
+      hostPath: isAbsolute(location)
+        ? location
+        : resolve(workspaceRoot, location),
+    };
+  });
+}
+
+/**
+ * Makes each host repository ready to mount: an absent one is created empty
+ * on `main`, which is for a repository with no remote, saying so; one that
+ * exists must be a bare repository at its own root.
+ */
+export function prepareHostRepositories(
+  repositories: readonly ServedRepository[],
+  projectName: string,
+  log: (line: string) => void = console.log,
+): void {
+  for (const repository of repositories) {
+    if (!('hostPath' in repository)) continue;
+    const { name, hostPath } = repository;
+    const kind = hostPathKind(hostPath);
+    if (kind === 'absent') {
+      mkdirSync(dirname(hostPath), { recursive: true });
+      hostGit(['init', '--quiet', '--bare', '--initial-branch=main', hostPath]);
+      allowPartialClones(hostPath);
+      log(
+        `Created an empty host repository for ${name} at ${hostPath}. A repository with a remote is seeded from it instead: nx run ${projectName}:seed-repository --repository=${name} --remote=<https URL>`,
+      );
+    } else if (kind !== 'bare') {
+      throw new Error(
+        `repository "${name}" is declared at ${hostPath}, which is not a bare repository; seed it with seed-repository, or declare another location`,
+      );
+    }
+  }
 }
 
 /**
@@ -171,8 +264,11 @@ export function storeBuckets(plan: ServePlan): readonly string[] {
   ];
 }
 
-/** The `docker` command that starts the agent against the local store. */
-export function startCommand(plan: ServePlan): readonly string[] {
+/** The `docker` command that starts the agent against the local store, with its repositories as `servedRepositories` gives them. */
+export function startCommand(
+  plan: ServePlan,
+  repositories: readonly ServedRepository[],
+): readonly string[] {
   return [
     'run',
     '--detach',
@@ -196,6 +292,24 @@ export function startCommand(plan: ServePlan): readonly string[] {
       : [
           '--env',
           `${FILESYSTEM_BUCKETS_VARIABLE}=${JSON.stringify(plan.filesystemBuckets)}`,
+        ]),
+    ...repositories.flatMap((repository) =>
+      'hostPath' in repository
+        ? [
+            '--mount',
+            `type=bind,source=${repository.hostPath},target=${REPOSITORIES_MOUNT}/${repository.name}`,
+          ]
+        : [],
+    ),
+    ...(repositories.length === 0
+      ? []
+      : [
+          '--env',
+          `${FILESYSTEM_REPOSITORIES_VARIABLE}=${JSON.stringify(
+            Object.fromEntries(
+              repositories.map(({ name, location }) => [name, location]),
+            ),
+          )}`,
         ]),
     '--env',
     'AWS_ACCESS_KEY_ID=local',
@@ -294,6 +408,8 @@ export default async function* serveExecutor(
   );
   const refusal = serveRefusal(plan, process.env, containerState);
   if (refusal !== undefined) throw new Error(refusal);
+  const repositories = servedRepositories(plan, context.root);
+  prepareHostRepositories(repositories, project.name);
   const cleanup = () => {
     spawnSync('docker', cleanupCommand(plan), { stdio: 'ignore' });
   };
@@ -307,7 +423,7 @@ export default async function* serveExecutor(
   try {
     // The local-store target has the store up; the server creates its table.
     for (const bucket of storeBuckets(plan)) await createStoreBucket(bucket);
-    docker(startCommand(plan));
+    docker(startCommand(plan, repositories));
     const url = publishedUrl(plan.agent, AGENT_PORT);
     await until(
       `${plan.agent} to answer /ping`,

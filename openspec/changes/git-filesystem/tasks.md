@@ -13,17 +13,17 @@ Groups 1–2 come first; 2.6 also depends on 3. Groups 3 and 4 depend on 1 and c
 
 ## 2. Repository declaration
 
-- [ ] 2.1 `FILESYSTEM_REPOSITORIES_VARIABLE` in `core/filesystem.ts`, and one `parseDeclared(variable, value)` replacing `parseDeclaredBuckets` for both, with tests.
-- [ ] 2.2 `AgentRuntime` takes `repositories` and names them to the harness. Construct test.
-- [ ] 2.3 The serve executor maps each repository. A path location: create a bare repository if it is absent (`uploadpack.allowFilter`), logging that it did and naming `seed-repository`; bind-mount it at `/mnt/agentforge-repositories/<name>`; and pass `file://`. A URL location passes as it is. Executor tests.
-- [ ] 2.4 The `seed-repository` executor (design § Seeding a host repository), with unit tests for remote validation, origin comparison, the env-file merge and the masking check:
+- [x] 2.1 `FILESYSTEM_REPOSITORIES_VARIABLE` in `core/filesystem.ts`, and one `parseDeclared(variable, value)` replacing `parseDeclaredBuckets` for both, with tests.
+- [x] 2.2 `AgentRuntime` takes `repositories` and names them to the harness. Construct test.
+- [x] 2.3 The serve executor maps each repository. A path location: create a bare repository if it is absent (`uploadpack.allowFilter`), logging that it did and naming `seed-repository`; bind-mount it at `/mnt/agentforge-repositories/<name>`; and pass `file://`. A URL location passes as it is. Executor tests.
+- [x] 2.4 The `seed-repository` executor (design § Seeding a host repository), with unit tests for remote validation, origin comparison, the env-file merge and the masking check:
   - validation before anything is created;
   - a clone into a temporary sibling, renamed into place, with `uploadpack.allowFilter`;
   - adopting a bare repository of the same remote, and failing on anything else at the location;
   - `.gitignore` for a location inside the workspace;
   - the env-file merge, and the check that every project sees the entry;
   - the reading clone.
-- [ ] 2.5 Vend `seed-repository` on agentic and workflow projects, through their targets and sync. Update the generator snapshots and sync tests.
+- [x] 2.5 Vend `seed-repository` on agentic and workflow projects, through their targets and sync. Update the generator snapshots and sync tests.
 - [ ] 2.6 `integ/local/seed-repository` (design § Tests). The HTTPS remote is a spike, settled in the test itself.
 
 ## 3. `GitFilesystem`

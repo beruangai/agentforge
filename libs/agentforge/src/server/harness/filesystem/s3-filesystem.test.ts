@@ -235,7 +235,7 @@ describe('the declared buckets', () => {
     [
       'not a map of names to buckets',
       '["vault"]',
-      /AGENTFORGE_FILESYSTEM_BUCKETS is not a JSON object of bucket names/,
+      /AGENTFORGE_FILESYSTEM_BUCKETS is not a JSON object of names/,
     ],
   ])(
     'refuse a value that is %s, naming the variable',

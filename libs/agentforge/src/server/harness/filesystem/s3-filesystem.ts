@@ -3,7 +3,7 @@ import picomatch from 'picomatch';
 import {
   FILESYSTEM_BUCKETS_VARIABLE,
   FILESYSTEM_NAME_PATTERN,
-  parseDeclaredBuckets,
+  parseDeclared,
 } from '#core/filesystem.ts';
 import { s3Endpoint } from '#core/s3-endpoint.ts';
 import {
@@ -171,7 +171,8 @@ export class S3Filesystem extends Filesystem {
   }
 
   #remoteUrl(mount: Mount): string {
-    this.#declaredBuckets ??= parseDeclaredBuckets(
+    this.#declaredBuckets ??= parseDeclared(
+      FILESYSTEM_BUCKETS_VARIABLE,
       this.#environment[FILESYSTEM_BUCKETS_VARIABLE],
     );
     const declaredBuckets = this.#declaredBuckets;

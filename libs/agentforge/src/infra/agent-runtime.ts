@@ -18,6 +18,8 @@ import { AGENT_NAME_PATTERN, AGENT_NAME_VARIABLE } from '#core/agent-name.ts';
 import {
   FILESYSTEM_BUCKETS_VARIABLE,
   FILESYSTEM_NAME_PATTERN,
+  FILESYSTEM_REPOSITORIES_VARIABLE,
+  parseRepositoryRemote,
 } from '#core/filesystem.ts';
 import { METRICS_NAMESPACE, METRICS_VARIABLE } from '#core/metrics.ts';
 import { SECRETS_VARIABLE } from '#core/secrets.ts';
@@ -87,6 +89,13 @@ export interface AgentRuntimeProps
    * declares as its `bucket`. A bucket may be given to several agents.
    */
   readonly filesystems?: Readonly<Record<string, S3FilesystemBucket>>;
+  /**
+   * The remotes the agent's `GitFilesystem`s may mount, by the name each
+   * declares as its `repository`: `https://` URLs with no credential in
+   * them. A remote's token is a secret in `secrets`, not in
+   * `requiredSecrets`, named by the filesystem's `tokenVariable`.
+   */
+  readonly repositories?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -122,6 +131,7 @@ export class AgentRuntime extends Construct {
       secrets,
       telemetry = 'INFO',
       filesystems = {},
+      repositories = {},
       environmentVariables = {},
       requestHeaderConfiguration,
       ...runtimeProps
@@ -140,6 +150,7 @@ export class AgentRuntime extends Construct {
       SECRETS_VARIABLE,
       TELEMETRY_VARIABLE,
       FILESYSTEM_BUCKETS_VARIABLE,
+      FILESYSTEM_REPOSITORIES_VARIABLE,
     ]) {
       if (owned in environmentVariables) {
         throw new Error(
@@ -153,6 +164,14 @@ export class AgentRuntime extends Construct {
           `filesystem bucket name "${name}" must match ${FILESYSTEM_NAME_PATTERN}`,
         );
       }
+    }
+    for (const [name, remote] of Object.entries(repositories)) {
+      if (!FILESYSTEM_NAME_PATTERN.test(name)) {
+        throw new Error(
+          `repository name "${name}" must match ${FILESYSTEM_NAME_PATTERN}`,
+        );
+      }
+      parseRepositoryRemote(`repository "${name}"`, remote, ['https:']);
     }
     for (const name of requiredSecrets) {
       if (secrets[name] === undefined) {
@@ -204,6 +223,11 @@ export class AgentRuntime extends Construct {
                   ]),
                 ),
               ),
+            }),
+        ...(Object.keys(repositories).length === 0
+          ? {}
+          : {
+              [FILESYSTEM_REPOSITORIES_VARIABLE]: JSON.stringify(repositories),
             }),
       },
     });
