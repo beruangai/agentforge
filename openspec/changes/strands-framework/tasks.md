@@ -82,9 +82,9 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
 - [x] 7.1 Run `e2e` for both examples locally against a real model. Verify: they pass, with results noted in the change.
 
   2026-10-23: `strands-smoke` 4 of 4 and `research-brief` 2 of 2 pass, each on its first run.
-- [ ] 7.2 Run `e2e-agentcore` for both examples once. Verify: they pass, with results noted in the change.
+- [x] 7.2 Run `e2e-agentcore` for both examples once. Verify: they pass, with results noted in the change.
 
-  2026-10-23: `strands-smoke` passes 4 of 4. `research-brief` was refused uploading its corpus: CDK truncates the bucket's generated name (`agentforge-example-researc-…`), so the test role's grant now covers `agentforge-example-*/corpora/*`; it reruns once the operator applies the policy.
+  2026-10-23: `strands-smoke` passes 4 of 4. `research-brief` was refused uploading its corpus: CDK truncates the bucket's generated name (`agentforge-example-researc-…`), so the test role's grant now covers `agentforge-example-*/corpora/*`; with the policy applied, it passes 1 of 1.
 - [x] 7.3 Rerun the `claude` regression: `integ` `local`, `aws` and `model`, and `e2e` for `golden-kata`, `smoke-coverage` and `golden-kata-workflows`. Verify: they pass unchanged.
 
   2026-10-23: `integ` `local` (11 files) and `model` (11) pass, as do the `e2e` of `golden-kata`, `smoke-coverage` and `golden-kata-workflows`. `integ` `aws` passes 8 of 9: `agentcore/provisioning-window.test.ts` saw an invocation delivered while the control plane still read `CREATING`, 1.8 s before `READY`, which the test asserts never happens. It touches no framework code; the operator decides whether it is a race in the test's sampling or the platform's window moving. Those `claude` model slices ran on `strands`' API key, which `.env.integ.local` holds beside the token: the kernel's slices through the kernel, the direct-SDK slices through `createSubscriptionEnvironment`. With both fixed, `integ` `model` passes 11 of 11 on the subscription, every recorded run's `apiKeySource` `none`; the one-off `hook-only-rule` failure ran on the key and did not recur in four runs. `provisioning-window.test.ts` now allows the first served probe to follow a `CREATING` read, since a probe reads the status before it invokes; it passes.
