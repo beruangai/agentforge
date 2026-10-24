@@ -3,11 +3,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ExecutorContext } from '@nx/devkit';
 import { describe, expect, it } from 'vitest';
+import { projectTargets } from '../../artifacts/targets.ts';
+import { workflowProjectTargets } from '../../artifacts/workflow-project.ts';
 import {
   AGENTIC_PROJECT_GENERATOR,
+  type AgenticProject,
   WORKFLOW_PROJECT_GENERATOR,
 } from '../../project-record.ts';
 import {
+  checkEveryTaskSees,
   defaultLocation,
   effectiveDeclaration,
   sameRemote,
@@ -120,7 +124,7 @@ describe('effectiveDeclaration', () => {
 });
 
 describe('serveTasks', () => {
-  it("is every agentic project's serve executor and a workflow project's serve, in each configuration", () => {
+  it("is every agentic project's serve executor and a workflow project's serve, in each configuration it runs under", () => {
     const context = {
       projectsConfigurations: {
         version: 2,
@@ -131,6 +135,7 @@ describe('serveTasks', () => {
             targets: {
               'serve-writer': {
                 executor: '@beruangai/agentforge:serve',
+                defaultConfiguration: 'serve',
                 configurations: { serve: {} },
               },
               lock: { executor: '@beruangai/agentforge:lock' },
@@ -158,13 +163,62 @@ describe('serveTasks', () => {
         (task) => `${task.project}:${task.target}:${task.configuration}`,
       ),
     ).toEqual([
-      'rnd:serve-writer:undefined',
       'rnd:serve-writer:serve',
       'flows:serve:undefined',
       'flows:serve:local',
       'flows:serve:hybrid',
     ]);
   });
+});
+
+describe('checkEveryTaskSees', () => {
+  // The serve targets the plugin generates, each with a default configuration.
+  const generated = {
+    projectsConfigurations: {
+      version: 2,
+      projects: {
+        rnd: {
+          root: 'apps/rnd/agentic',
+          metadata: { generator: AGENTIC_PROJECT_GENERATOR },
+          targets: projectTargets({
+            framework: 'claude',
+            agents: [{ name: 'loop' }],
+          } as unknown as AgenticProject),
+        },
+        'rnd-workflows': {
+          root: 'apps/rnd/worker',
+          metadata: { generator: WORKFLOW_PROJECT_GENERATOR },
+          targets: workflowProjectTargets(),
+        },
+      },
+    },
+  } as unknown as ExecutorContext;
+
+  it.each([
+    ['an absolute', '/repositories/strategies.git', '.env.serve.local'],
+    [
+      'a workspace-relative',
+      '.agentforge/repositories/strategies.git',
+      '.env.serve',
+    ],
+  ])(
+    "passes every generated serve task %s location declared only in the workspace's file for it",
+    (_label, location, file) => {
+      const contents = (each: string) =>
+        each === file
+          ? `AGENTFORGE_FILESYSTEM_REPOSITORIES=${JSON.stringify({ strategies: location })}\n`
+          : undefined;
+      expect(() =>
+        checkEveryTaskSees(
+          serveTasks(generated),
+          contents,
+          'strategies',
+          location,
+          SAME,
+        ),
+      ).not.toThrow();
+    },
+  );
 });
 
 describe('seedRepository', () => {

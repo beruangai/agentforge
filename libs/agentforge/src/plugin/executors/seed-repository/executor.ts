@@ -71,7 +71,11 @@ export interface ServeTask {
   readonly configuration: string | undefined;
 }
 
-/** Every serve task of the workspace's agentic and workflow projects, in each of its configurations. */
+/**
+ * Every serve task of the workspace's agentic and workflow projects, in each
+ * configuration it runs under: Nx runs a target with a default configuration
+ * under it, never without one.
+ */
 export function serveTasks(context: ExecutorContext): readonly ServeTask[] {
   return Object.entries(context.projectsConfigurations.projects).flatMap(
     ([project, configuration]) => {
@@ -82,14 +86,17 @@ export function serveTasks(context: ExecutorContext): readonly ServeTask[] {
             : isWorkflowProject(configuration) && target === 'serve',
       );
       return serves.flatMap(([target, definition]) =>
-        [undefined, ...Object.keys(definition.configurations ?? {})].map(
-          (configurationName) => ({
-            project,
-            projectRoot: configuration.root,
-            target,
-            configuration: configurationName,
-          }),
-        ),
+        [
+          ...new Set([
+            definition.defaultConfiguration,
+            ...Object.keys(definition.configurations ?? {}),
+          ]),
+        ].map((configurationName) => ({
+          project,
+          projectRoot: configuration.root,
+          target,
+          configuration: configurationName,
+        })),
       );
     },
   );
@@ -116,6 +123,31 @@ export function effectiveDeclaration(
     if (value !== undefined) return { file, value };
   }
   return undefined;
+}
+
+/** Fails, naming the task and the file, unless every task would see `repository` declared at `location`. */
+export function checkEveryTaskSees(
+  tasks: readonly ServeTask[],
+  contents: Contents,
+  repository: string,
+  location: string,
+  sameLocation: (left: string, right: string) => boolean,
+): void {
+  for (const task of tasks) {
+    const effective = effectiveDeclaration(task, contents);
+    const seen =
+      effective === undefined
+        ? undefined
+        : parseDeclared(
+            `${FILESYSTEM_REPOSITORIES_VARIABLE} in ${effective.file}`,
+            effective.value,
+          )[repository];
+    if (seen === undefined || !sameLocation(seen, location)) {
+      throw new Error(
+        `${task.project}:${task.target}${task.configuration === undefined ? '' : `:${task.configuration}`} would not see repository "${repository}" at ${location}: ${effective?.file ?? 'no file'} defines ${FILESYSTEM_REPOSITORIES_VARIABLE} ${seen === undefined ? 'without it' : `with it at ${seen}`}; declare it there too, or declare repositories only at the workspace root`,
+      );
+    }
+  }
 }
 
 const DECLARATION_LINE = new RegExp(
@@ -259,21 +291,7 @@ export function seedRepository(
     const path = join(workspaceRoot, file);
     return existsSync(path) ? readFileSync(path, 'utf8') : undefined;
   };
-  for (const task of tasks) {
-    const effective = effectiveDeclaration(task, contents);
-    const seen =
-      effective === undefined
-        ? undefined
-        : parseDeclared(
-            `${FILESYSTEM_REPOSITORIES_VARIABLE} in ${effective.file}`,
-            effective.value,
-          )[repository];
-    if (seen === undefined || !sameLocation(seen, location)) {
-      throw new Error(
-        `${task.project}:${task.target}${task.configuration === undefined ? '' : `:${task.configuration}`} would not see repository "${repository}" at ${location}: ${effective?.file ?? 'no file'} defines ${FILESYSTEM_REPOSITORIES_VARIABLE} ${seen === undefined ? 'without it' : `with it at ${seen}`}; declare it there too, or declare repositories only at the workspace root`,
-      );
-    }
-  }
+  checkEveryTaskSees(tasks, contents, repository, location, sameLocation);
 
   if (kind === 'absent') {
     const parent = dirname(hostPath);
