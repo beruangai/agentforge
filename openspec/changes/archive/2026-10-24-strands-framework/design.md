@@ -33,7 +33,7 @@ See proposal.md — Why. What holds once `framework-seam` lands:
 
 ### The SDK with selected vended tools, not the harness
 
-[ADR 0023](../../../adr/0023-strands-runs-on-its-sdk-not-its-harness.md) (proposed) records the operator's choice and the alternative.
+[ADR 0023](../../../adr/0023-strands-runs-on-its-sdk-not-its-harness.md) (accepted) records the operator's choice and the alternative.
 
 ### A spike before any surface is fixed
 
@@ -147,7 +147,7 @@ AgentForge appends its fragments after the procedure's own system prompt, and ne
 
 ### Credentials and secrets
 
-[ADR 0022](../../../adr/0022-a-framework-that-cannot-use-the-subscription-uses-an-api-key.md) (proposed) records the decision.
+[ADR 0022](../../../adr/0022-a-framework-that-cannot-use-the-subscription-uses-an-api-key.md) (accepted) records the decision.
 
 - `framework/strands/core/secrets.ts` declares `REQUIRED_SECRETS = ['ANTHROPIC_API_KEY']`, which its server, infra and plugin parts import.
 - §REQ705 is withdrawn and §REQ714 added, as the ADR words them.

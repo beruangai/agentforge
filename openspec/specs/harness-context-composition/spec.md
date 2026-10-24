@@ -6,7 +6,7 @@ Lets a procedure build its agent's context from reusable, typed pieces — stati
 ## Requirements
 
 ### Requirement: Context is composed from typed context functions
-A procedure SHALL be able to define a context function: a function of named input variables that returns prompt content — text, content blocks and tagged context blocks — synchronously or not. Composing several context functions SHALL yield one context function whose input is every input variable any of them needs, and whose output is each one's content, concatenated in the order they were given. A composed context function SHALL compose again like any other. Calling a context function without an input variable one of its parts needs, or with one of the wrong type, SHALL be a compile-time error. The content a context function returns SHALL be usable as a run's prompt and as a command's context alike.
+A procedure SHALL be able to define a context function: a function of named input variables that returns prompt content — text, content blocks and tagged context blocks — synchronously or not. Composing several context functions SHALL yield one context function whose input is every input variable any of them needs, and whose output is each one's content, concatenated in the order they were given. A composed context function SHALL compose again like any other. Calling a context function without an input variable one of its parts needs, or with one of the wrong type, SHALL be a compile-time error. The content a context function returns SHALL be usable as a run's prompt and, in a `claude` run, as a command's context alike.
 
 #### Scenario: A composite keeps its parts' order
 - **WHEN** a procedure composes a function returning static protocol blocks, a function of `directory` and a function of `topic`, and calls the composite with a directory and a topic
@@ -21,7 +21,7 @@ A procedure SHALL be able to define a context function: a function of named inpu
 - **THEN** the procedure fails to compile, naming the missing variable
 
 #### Scenario: Composed content under a command
-- **WHEN** a procedure places a composite's content as a command's context
+- **WHEN** a `claude` procedure places a composite's content as a command's context
 - **THEN** the agent receives the command followed by that content, in order
 
 ### Requirement: A context block can carry a file's content

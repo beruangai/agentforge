@@ -6,7 +6,7 @@ Lets a session outlive its container, so a later task resumes it in any containe
 ## Requirements
 
 ### Requirement: A session resumes in any container
-An agent SHALL persist every run's session beyond its container — deployed in the project's session bucket, served locally in the local store — so a later task in any container of that agent can resume it. A procedure MAY name its own session store, which is then used instead.
+An agent SHALL persist every run's session beyond its container — deployed in the project's session bucket, served locally in the local store — so a later task in any container of that agent can resume it. A `claude` procedure MAY name its own session store, which is then used instead.
 
 #### Scenario: Resumed in another container
 - **WHEN** a deployed agent's container is stopped after a run, and a later task resumes that run's session
@@ -17,7 +17,7 @@ An agent SHALL persist every run's session beyond its container — deployed in 
 - **THEN** the session resumes from the local store
 
 #### Scenario: A procedure's own store
-- **WHEN** a procedure names its own session store
+- **WHEN** a `claude` procedure names its own session store
 - **THEN** its runs persist to that store, not the agent's
 
 ### Requirement: A session that did not persist whole fails the run

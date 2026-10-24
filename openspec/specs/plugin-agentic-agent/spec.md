@@ -6,7 +6,7 @@ Generates an agent as a component of its agentic project — recorded once, and 
 ## Requirements
 
 ### Requirement: An agent is a component of its project
-The plugin SHALL generate an agent in an existing agentic project and record it as a component of that project. The agent SHALL have a contract its callers import by the project's package name, declaring one stub procedure whose handler fails its task loudly until the consumer implements it; procedures composing the base layer; a server and task entry; its own Claude configuration scaffolded as placeholders; and an image built on the project's agentic image. Every artifact that spans the project's agents SHALL be generated from the project's components, so adding an agent updates each of them. Generating an agent that exists SHALL change nothing in a synced workspace.
+The plugin SHALL generate an agent in an existing agentic project and record it as a component of that project. The agent SHALL have a contract its callers import by the project's package name, declaring one stub procedure whose handler fails its task loudly until the consumer implements it; procedures composing the base layer; a server and task entry; its own framework's configuration scaffolded as placeholders — Claude configuration for a `claude` project; and an image built on the project's agentic image. Every artifact that spans the project's agents SHALL be generated from the project's components, so adding an agent updates each of them. Generating an agent that exists SHALL change nothing in a synced workspace.
 
 #### Scenario: A second agent
 - **WHEN** a consumer adds a second agent to a project
@@ -43,7 +43,7 @@ An agent's image SHALL be built on its project's agentic image, installing only 
 - **THEN** the agent answers under its container name, and stopping it leaves no container behind
 
 #### Scenario: A required secret absent
-- **WHEN** a consumer serves an agent without the subscription credential, or another secret its layers require, in its environment
+- **WHEN** a consumer serves an agent without its framework's credential — the subscription token for `claude`, the API key for `strands` — or another secret its layers require, in its environment
 - **THEN** serving fails before starting anything, naming each absent secret
 
 #### Scenario: Already served
