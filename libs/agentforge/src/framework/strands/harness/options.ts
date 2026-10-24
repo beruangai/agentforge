@@ -1,10 +1,32 @@
+import type {
+  HookableEvent,
+  HookableEventConstructor,
+  HookCallback,
+  HookCallbackOptions,
+} from '@strands-agents/sdk';
 import { merge as deepMerge } from 'ts-deepmerge';
-import type { StrandsOptions } from './types.ts';
+import type { StrandsHook, StrandsOptions } from './types.ts';
+
+/**
+ * A callback on one of the agent's events, for `StrandsOptions.hooks`: the
+ * arguments `agent.addHook` takes, its callback typed by its event.
+ */
+export function hook<Event extends HookableEvent>(
+  event: HookableEventConstructor<Event>,
+  callback: HookCallback<Event>,
+  options?: HookCallbackOptions,
+): StrandsHook {
+  return {
+    event,
+    callback: callback as HookCallback<HookableEvent>,
+    ...(options === undefined ? {} : { options }),
+  };
+}
 
 /**
  * Composes `strands` options from a house default and a procedure's own,
  * later parts winning — except where losing a contribution would be silent
- * (§REQ204). Lists accumulate, without duplicates: tools, plugins,
+ * (§REQ204). Lists accumulate, without duplicates: tools, plugins, hooks,
  * interventions and working directories. Plain objects merge key by key. A
  * value given as `undefined` changes nothing. An MCP server named twice is an
  * error rather than one client replacing another.

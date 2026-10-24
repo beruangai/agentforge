@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { McpClient, tool } from '@strands-agents/sdk';
+import { BeforeToolCallEvent, McpClient, tool } from '@strands-agents/sdk';
 import { InMemoryStorage, type Storage } from '@strands-agents/sdk/storage';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ import {
   scriptedAnthropic,
   toolResults,
 } from './__fixtures__/scripted-anthropic.ts';
+import { hook } from './options.ts';
 import { STRUCTURED_OUTPUT_TOOL } from './runner.ts';
 import type { AgentStorage } from './storage.ts';
 
@@ -66,6 +67,27 @@ describe('runAgent', () => {
     expect(records[0]).not.toHaveProperty('totalCostUsd');
     expect(records[0]?.rawUsage).toEqual(run.rawUsage);
     expect(run.rawUsage).toMatchObject({ inputTokens: 10, outputTokens: 5 });
+  });
+
+  it("registers the procedure's hooks on the agent, and records their events", async () => {
+    await scripted([submit({ answer: 'a' })]);
+    const seen: string[] = [];
+    const { promise, records } = runScripted(current(), {
+      options: {
+        model: 'claude-test',
+        maxTokens: 1024,
+        hooks: [
+          hook(BeforeToolCallEvent, async (event) => {
+            seen.push(event.toolUse.name);
+          }),
+        ],
+      },
+    });
+    await promise;
+    expect(seen).toEqual([STRUCTURED_OUTPUT_TOOL]);
+    expect(records[0]?.options).toMatchObject({
+      hooks: ['BeforeToolCallEvent'],
+    });
   });
 
   it('tells the agent a refused submission in its turn, and accepts the next', async () => {

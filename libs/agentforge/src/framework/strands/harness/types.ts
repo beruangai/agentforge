@@ -1,6 +1,10 @@
 import type {
   ContentBlock,
   ConversationManager,
+  HookableEvent,
+  HookableEventConstructor,
+  HookCallback,
+  HookCallbackOptions,
   InterventionHandler,
   InvokeLimits,
   McpClient,
@@ -14,6 +18,17 @@ import type {
   AgentRunSpec as SharedAgentRunSpec,
   TaskContext as SharedTaskContext,
 } from '../../../server/harness/framework.ts';
+
+/**
+ * One callback on one of the agent's events, which the runner registers with
+ * `agent.addHook` before the run. Made with `hook()`, which checks the
+ * callback against its event.
+ */
+export interface StrandsHook {
+  readonly event: HookableEventConstructor;
+  readonly callback: HookCallback<HookableEvent>;
+  readonly options?: HookCallbackOptions;
+}
 
 /** The options a `strands` procedure may set; the runner owns the rest. */
 export interface StrandsOptions {
@@ -35,6 +50,8 @@ export interface StrandsOptions {
   /** MCP servers by name. Each must start, or the run fails before its first turn (§REQ201). */
   readonly mcpClients?: Readonly<Record<string, McpClient>>;
   readonly plugins?: readonly Plugin[];
+  /** Callbacks on the agent's events, registered after AgentForge's own; they accumulate across parts. */
+  readonly hooks?: readonly StrandsHook[];
   readonly interventions?: readonly InterventionHandler[];
   readonly conversationManager?: ConversationManager;
   /** Directories the agent works in, named in its system prompt: a procedure's mounts, from `context.agentOptions`. */

@@ -170,6 +170,7 @@ export type StrandsTypes = {
 export type AgentRunSpec<O> = SharedAgentRunSpec<StrandsTypes, O>;
 export type AgentRun<O> = SharedAgentRun<StrandsTypes, O>;
 export function composeOptions(...parts: Partial<StrandsOptions>[]): StrandsOptions;
+export function hook<E extends HookableEvent>(event: HookableEventConstructor<E>, callback: HookCallback<E>, options?: HookCallbackOptions): StrandsHook;
 export function distill(context: TaskContext, spec: DistillSpec): Promise<readonly ContextBlock[]>;
 
 // @beruangai/agentforge/strands/server  (agentforge-agent condition)
@@ -182,7 +183,7 @@ export const REQUIRED_SECRETS: readonly ['ANTHROPIC_API_KEY'];
 export function readSession(run: RunRecord, options?: { client?: S3Client }): Promise<readonly Message[]>;
 ```
 
-`composeOptions` keeps the seam's rule that every list accumulates: tools, MCP clients, plugins, interventions and working directories. Hooks accumulate with them: a Strands hook is registered by a plugin, the SDK having no hooks option. A narrower part cannot remove a guardrail, and an MCP client named twice throws, as an MCP server named twice does for `claude`.
+`composeOptions` keeps the seam's rule that every list accumulates: tools, MCP clients, plugins, hooks, interventions and working directories. Strands takes no hooks in its `Agent`'s options, only through `agent.addHook`, so `StrandsOptions.hooks` holds each as `hook(event, callback, options?)` makes it — the callback typed by its event — and the runner registers them after its own (operator, 2026-10-24). A narrower part cannot remove a guardrail, and an MCP client named twice throws, as an MCP server named twice does for `claude`.
 
 **The seam may change** where the spike proves it short. The one change foreseen: `prepare()` may become async, if Strands' telemetry or storage setup must await. Any change is named in the findings and lands in shared code and in `claude` together.
 

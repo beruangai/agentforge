@@ -1,6 +1,10 @@
-import type { McpClient } from '@strands-agents/sdk';
+import {
+  AfterToolCallEvent,
+  BeforeToolCallEvent,
+  type McpClient,
+} from '@strands-agents/sdk';
 import { describe, expect, it } from 'vitest';
-import { composeOptions } from './options.ts';
+import { composeOptions, hook } from './options.ts';
 
 const client = {} as McpClient;
 
@@ -24,6 +28,14 @@ describe('composeOptions', () => {
       workingDirectories: ['/a', '/b'],
       limits: { turns: 5, outputTokens: 10 },
     });
+  });
+
+  it('accumulates hooks from every part', () => {
+    const first = hook(BeforeToolCallEvent, () => {});
+    const second = hook(AfterToolCallEvent, () => {}, { order: 1 });
+    expect(
+      composeOptions({ hooks: [first] }, { hooks: [second] }).hooks,
+    ).toEqual([first, second]);
   });
 
   it('changes nothing for a value given as undefined', () => {

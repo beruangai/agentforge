@@ -21,7 +21,7 @@ export {
   distill,
 } from './distill.ts';
 export { framework } from './framework.ts';
-export { composeOptions } from './options.ts';
+export { composeOptions, hook } from './options.ts';
 export type {
   AgentPrompt,
   ContextBlockFunction,
@@ -31,6 +31,7 @@ export type {
 export type {
   AgentRun,
   AgentRunSpec,
+  StrandsHook,
   StrandsOptions,
   StrandsTypes,
   TaskContext,

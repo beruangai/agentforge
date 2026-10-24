@@ -301,6 +301,11 @@ export async function runAgent<Output>(
       );
     });
 
+    // The procedure's own, after AgentForge's, which settle the run.
+    for (const { event, callback, options: order } of options.hooks ?? []) {
+      agent.addHook(event, callback, order);
+    }
+
     let result: AgentResult | undefined;
     let invokeError: unknown;
     try {
@@ -607,6 +612,9 @@ function recordableOptions(
     ...(options.plugins === undefined
       ? {}
       : { plugins: names(options.plugins) }),
+    ...(options.hooks === undefined
+      ? {}
+      : { hooks: options.hooks.map((entry) => entry.event.name) }),
     ...(options.interventions === undefined
       ? {}
       : {

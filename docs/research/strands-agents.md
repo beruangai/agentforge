@@ -72,7 +72,9 @@ Per the [errors](https://platform.claude.com/docs/en/api/errors) and [rate limit
 - **It refuses the next model call once a submission is accepted,** and cancels the invocation.
 - **It classifies a provider error from the `ModelError`'s cause,** and a connection error by its class's name.
 - **It never evicts offloaded results,** since the agent's role may not delete.
-- **It fails a run whose memory write failed,** with `EXECUTION_ERROR`.
+- **It fails a run whose storage call failed,** a write, a read or a list, with `EXECUTION_ERROR` (2026-10-24, 1.22.0): the SDK logs a failed memory search and returns no results, skips an unreadable memory entry, and turns a failed offload read into "reference not found".
+- **It connects and disconnects each MCP client itself,** connecting with the task's signal: `agent.shutdown()` only flushes memory, and the `Agent` never disconnects a client (2026-10-24, 1.22.0).
+- **It registers a procedure's hooks with `agent.addHook`:** the TypeScript `Agent` takes no hooks in its options, only `plugins`; a callback may be async, and `order` places it, lower first ([hooks](https://strandsagents.com/docs/user-guide/sdk/agents/hooks/), `hooks/types.d.ts`, 2026-10-24).
 - **Its storage prefix is `<agent>/`,** with the memory store named for the space.
 - **`prepare()` stays synchronous:** storage and telemetry set up without awaiting.
 - **The seam changes the apply made:** `TranscriptLocation.projectKey` is optional, `claude`'s alone; `FrameworkPlugin.configurationDirectory` gains `purpose`; the context block's rendering and distillation moved into `server/harness/`.
