@@ -1,6 +1,6 @@
 # Strands Agents — checked 2026-10-23
 
-What the `strands` framework relies on (`openspec/changes/strands-framework`). `@strands-agents/sdk` 1.22.0 under Bun 1.4.0, each agent in a child process as a task process runs. The checks used a scripted Messages API (SSE), unless they say otherwise. Sources are the SDK's published `dist/` and the [docs](https://strandsagents.com).
+What the `strands` framework relies on (`openspec/changes/archive/2026-10-24-strands-framework`). `@strands-agents/sdk` 1.22.0 under Bun 1.4.0, each agent in a child process as a task process runs. The checks used a scripted Messages API (SSE), unless they say otherwise. Sources are the SDK's published `dist/` and the [docs](https://strandsagents.com).
 
 ## Bun, peers, one Anthropic SDK
 - **Runs under Bun.** The SDK and Cedar's wasm run under Bun in a child process. Against the real API (`claude-haiku-5-5`), two runs in two processes each settled a structured output, with `stopReason` `toolUse`.
