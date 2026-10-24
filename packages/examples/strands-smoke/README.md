@@ -17,7 +17,7 @@ What follows was written by hand into the scaffolded files.
 | Layer | Holds |
 |---|---|
 | `base/agentic` | `options.ts` — Haiku, 4,096 output tokens; `AGENTS.md` |
-| `agents/hello-agent` | `Summarise({ text, resumeSessionId? })`, resuming a session when given one; `SleepThenAnswer({ seconds })`, a shell command to cancel mid-run, on a 300-second budget; `KeepNote` and `RecallNote({ topic })`, a note written through the file tool into the `notebook` S3 filesystem and read back by a later task; `AGENTS.md` |
+| `agents/hello-agent` | `Summarise({ text, resumeSessionId? })`, resuming a session when given one; `SleepThenAnswer({ seconds })`, a shell command to cancel mid-run, on a 300-second budget; `KeepNote` and `RecallNote({ topic })`, a note written through the file tool into the `notebook` S3 filesystem and read back by a later task; `KeepJournal({ topic, day, entry, message })`, an entry in the `journal` git filesystem that the agent commits with its `push_journal` tool; `AGENTS.md` |
 
 ## Running it
 
@@ -25,7 +25,7 @@ What follows was written by hand into the scaffolded files.
 nx run @beruangai/strands-smoke:e2e
 ```
 
-`e2e` serves hello-agent locally with `ANTHROPIC_API_KEY` from the root `.env.serve.local`, and asserts the run record and its session through `readSession`, the layers' `AGENTS.md` composed base first into the system prompt, a session resumed from the local store, the note across tasks, and a cancel mid-shell.
+`e2e` serves hello-agent locally with `ANTHROPIC_API_KEY` from the root `.env.serve.local`, and asserts the run record and its session through `readSession`, the layers' `AGENTS.md` composed base first into the system prompt, a session resumed from the local store, the note across tasks, the agent's commit in the journal's host repository (which serve creates from the committed `.env.serve`), and a cancel mid-shell.
 
 ```bash
 nx run @beruangai/strands-smoke:e2e-agentcore

@@ -5,6 +5,9 @@ import { z } from 'zod';
 /** A topic names the notebook's prefix its note is kept under. */
 export const TopicField = z.string().regex(/^[a-z0-9-]{1,64}$/);
 
+/** A day names a journal entry's file. */
+export const DayField = z.string().regex(/^[a-z0-9-]{1,64}$/);
+
 /**
  * What callers import to call the hello-agent agent: one procedure per
  * behaviour the smoke suites exercise on the strands framework.
@@ -44,4 +47,20 @@ export const contract = {
   RecallNote: oc
     .input(z.strictObject({ topic: TopicField }))
     .output(z.strictObject({ note: z.string() })),
+  /** Keeps a journal entry in a git filesystem, the agent committing it with its push tool. */
+  KeepJournal: oc
+    .input(
+      z.strictObject({
+        topic: TopicField,
+        day: DayField,
+        entry: z.string().min(1),
+        message: z.string().min(1),
+      }),
+    )
+    .output(
+      z.strictObject({
+        /** Whether the entry's file holds the entry: read back, never asked of the model. */
+        written: z.boolean(),
+      }),
+    ),
 };

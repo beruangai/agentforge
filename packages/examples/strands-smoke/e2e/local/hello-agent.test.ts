@@ -7,8 +7,10 @@
  * composed base first into the system prompt; a session resumed from the
  * local store, the only place a strands session is kept; a note in an S3
  * filesystem, written through the file tool and read back by a later task;
+ * a journal entry in a git filesystem, committed by the agent's push tool;
  * and a cancel mid-shell.
  */
+import { execFileSync } from 'node:child_process';
 import { randomUUIDv7 } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
@@ -35,6 +37,17 @@ const LOCAL_STORE = new S3Client({
   credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
 });
 const SESSION_BUCKET = 'beruangai-strands-smoke-sessions';
+/** The journal's host repository, as `.env.serve` declares it and serve creates it. */
+const JOURNAL = new URL(
+  '../../../../../.agentforge/repositories/strands-smoke-journal.git',
+  import.meta.url,
+).pathname;
+
+function journal(...args: string[]): string {
+  return execFileSync('git', ['-C', JOURNAL, ...args], {
+    encoding: 'utf8',
+  }).trim();
+}
 
 let helloAgent: StrandsSmokeClient['helloAgent'];
 const RUNTIME_SESSION_ID = `e2e-${randomUUIDv7()}`;
@@ -177,6 +190,47 @@ describe('hello-agent on strands, locally', () => {
       );
     }
     expect(recalled.output.note.trim()).toBe(note);
+  });
+
+  it("keeps a journal entry in a git filesystem, pushed by the agent's tool with its message", async () => {
+    const topic = `e2e-${randomUUIDv7()}`;
+    const message = `journal: ${topic} monday`;
+    const context = newContext();
+    const kept = await awaitTask(
+      helloAgent.KeepJournal,
+      await helloAgent.KeepJournal.SendMessage(
+        {
+          topic,
+          day: 'monday',
+          entry: `On monday, ${topic} was kept in git.`,
+          message,
+        },
+        context,
+      ),
+      POLL_OPTIONS,
+    );
+    if (kept.state !== 'TASK_STATE_COMPLETED') {
+      throw new Error(
+        `expected completion, got ${JSON.stringify(kept)}\n${logs()}`,
+      );
+    }
+    expect(kept.output.written).toBe(true);
+    // The agent's push, not the unmount's: its message, and the trailers naming the task.
+    const commit = journal(
+      'log',
+      '-1',
+      '--format=%B',
+      'main',
+      '--',
+      `topics/${topic}/entries/monday.md`,
+    );
+    expect(commit).toContain(message);
+    expect(commit).toContain(
+      `AgentForge-Idempotency-Key: ${context.idempotencyKey}`,
+    );
+    expect(journal('show', `main:topics/${topic}/entries/monday.md`)).toBe(
+      `On monday, ${topic} was kept in git.`,
+    );
   });
 
   it('cancels a run mid-shell, and the container is idle again', async () => {

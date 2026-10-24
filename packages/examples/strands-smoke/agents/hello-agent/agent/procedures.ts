@@ -1,6 +1,8 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import {
   filesystems,
+  GitFilesystem,
   S3Filesystem,
   type S3FilesystemOptions,
 } from '@beruangai/agentforge/agent';
@@ -25,6 +27,22 @@ const NOTEBOOK: S3FilesystemOptions = {
     subpath: `topics/${z.object({ topic: TopicField }).parse(input).topic}`,
   }),
 };
+
+/**
+ * The journal, a git repository with a directory per topic. Declared at
+ * module scope, as a git filesystem with a token must be. It pushes on
+ * failure too, so the agent is offered a push of its own.
+ */
+const journal = new GitFilesystem({
+  localRoot: '/workspace/journal',
+  repository: 'journal',
+  remoteRoot: '/topics',
+  scope: ({ input }) => ({
+    subpath: z.object({ topic: TopicField }).parse(input).topic,
+    write: ['entries/**'],
+  }),
+  pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
+});
 
 export const router = os.router({
   Summarise: os.Summarise.handler(async ({ input, context }) => {
@@ -95,4 +113,28 @@ export const router = os.router({
     });
     return { note: run.output.note };
   }),
+  KeepJournal: os.KeepJournal.use(filesystems({ journal })).handler(
+    async ({ input, context }) => {
+      const entry = context.filesystems.journal.writablePath(
+        `entries/${input.day}.md`,
+      );
+      await context.runAgent({
+        prompt: [
+          `Create the file \`${entry}\` with the entry below as its content, exactly, using the file tool. Then call the push_journal tool with the message below, exactly. Then answer whether the push recorded the file.`,
+          { tag: 'entry', context: input.entry },
+          { tag: 'message', context: input.message },
+        ],
+        output: z.object({ pushed: z.boolean() }),
+        options: composeOptions(baseOptions(), context.agentOptions, {
+          tools: [fileEditor],
+          limits: { turns: 6 },
+        }),
+      });
+      return {
+        written:
+          existsSync(entry) &&
+          (await readFile(entry, 'utf8')).trim() === input.entry.trim(),
+      };
+    },
+  ),
 });
