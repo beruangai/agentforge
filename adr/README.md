@@ -35,3 +35,4 @@ Decisions worth keeping the reasoning for, in [MADR 4.0.0](https://adr.github.io
 | [0021](0021-an-agentic-project-chooses-its-framework.md) | An agentic project chooses its framework | accepted |
 | [0022](0022-a-framework-that-cannot-use-the-subscription-uses-an-api-key.md) | A framework that cannot use the subscription uses an API key | accepted |
 | [0023](0023-strands-runs-on-its-sdk-not-its-harness.md) | Strands runs on its SDK, not its harness | accepted |
+| [0024](0024-git-filesystems-commit-onto-one-branch.md) | Git filesystems commit onto one branch, refuse a shared file, and keep their token from the agent | proposed |
