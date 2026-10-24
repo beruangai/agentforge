@@ -31,8 +31,9 @@ FROM ${BUN_IMAGE}
 # A static binary; the server starts it when the construct sets a telemetry level.
 COPY --from=collector /awscollector /usr/local/bin/aws-otel-collector
 COPY --from=s7cmd /usr/local/bin/s7cmd /usr/local/bin/s7cmd
+# git: GitFilesystem's plumbing, 2.40 or later for merge-tree --merge-base (ADR 0024).
 RUN apt-get update \
- && apt-get install --yes --no-install-recommends ca-certificates \
+ && apt-get install --yes --no-install-recommends ca-certificates git \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /workspace/agentforge /workspace/agentic/agent \
  && chown -R bun:bun /workspace

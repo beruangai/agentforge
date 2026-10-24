@@ -25,6 +25,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -76,6 +77,7 @@ async function body(key: string): Promise<string> {
 function mount(
   taskId: string,
   options: Partial<S3FilesystemOptions> = {},
+  runtimeSessionId = 'r-1',
 ): Promise<MountLifecycle> {
   const filesystem = new S3Filesystem(
     { ...OPTIONS, localRoot: join(root, taskId), ...options },
@@ -86,12 +88,12 @@ function mount(
       },
     },
   );
-  // No scope here reads the request.
+  // No scope here reads the request; a kept copy is identified by its session.
   return filesystem.mount(
     filesystem.resolve({
       name: 'vault',
       taskId,
-      request: { input: undefined, context: {} as never },
+      request: { input: undefined, context: { runtimeSessionId } as never },
     }),
   );
 }
@@ -214,6 +216,44 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
     expect(await listRelativeKeys(s3, bucket, 'c/')).toEqual(['settled.md']);
   });
 
+  it('pulls over a kept copy: a newer local edit stays, a newer object wins, a missing file returns, and a deletion in the store does not reach it', async () => {
+    await put('k/local-newer.md', 'store');
+    await put('k/store-newer.md', 'store, old');
+    await put('k/missing.md', 'missing');
+    await put('k/deleted.md', 'deleted');
+    const kept = {
+      localRoot: join(root, 'kept'),
+      scope: () => ({ subpath: 'k' }),
+      dangerouslyEnableDeletes: false,
+    };
+    const first = await mount('kept-1', kept);
+    const { localPath } = first.mounted;
+    await first.unmount('TASK_STATE_CANCELED');
+    await delay(1_100); // so modification times order the two sides
+    await writeFile(join(localPath, 'local-newer.md'), 'local');
+    await rm(join(localPath, 'missing.md'));
+    await delay(1_100);
+    await put('k/store-newer.md', 'store, new');
+    await s3.send(
+      new DeleteObjectCommand({ Bucket: bucket, Key: 'k/deleted.md' }),
+    );
+
+    const second = await mount('kept-2', kept);
+    expect(await readFile(join(localPath, 'local-newer.md'), 'utf8')).toBe(
+      'local',
+    );
+    expect(await readFile(join(localPath, 'store-newer.md'), 'utf8')).toBe(
+      'store, new',
+    );
+    expect(await readFile(join(localPath, 'missing.md'), 'utf8')).toBe(
+      'missing',
+    );
+    expect(await readFile(join(localPath, 'deleted.md'), 'utf8')).toBe(
+      'deleted',
+    );
+    await second.unmount('TASK_STATE_CANCELED');
+  });
+
   it('fails unsynced when the object store refuses', async () => {
     const refused = new S3Filesystem(
       { ...OPTIONS, localRoot: join(root, 'refused') },
@@ -231,7 +271,10 @@ describe('S3 filesystems on s7cmd, against a real bucket', () => {
         refused.resolve({
           name: 'vault',
           taskId: 'refused',
-          request: { input: undefined, context: {} as never },
+          request: {
+            input: undefined,
+            context: { runtimeSessionId: 'r-1' } as never,
+          },
         }),
       ),
     ).rejects.toMatchObject({

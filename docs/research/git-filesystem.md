@@ -25,7 +25,7 @@ Spiked against a bare `file://` repository holding `vault/a`, `vault/b` and `REA
 - takes the store's file when the store changed after the local edit;
 - restores a file the copy lacks.
 
-Read from `s7cmd sync --help` (1.8.5). **To be verified** by `integ/aws/filesystem-s3-sync` (git-filesystem task 5.3). Without `--delete`, a pull does not remove a local file the store no longer has.
+Read from `s7cmd sync --help` (1.8.5), and **verified on 2026-10-24** by `integ/aws/filesystem-s3-sync` against a real bucket. Without `--delete`, a pull does not remove a local file the store no longer has.
 
 ## Removing a variable from the environment, on Bun
 
@@ -33,4 +33,4 @@ Probed 2026-10-24 on Bun 1.4.0: after `delete process.env.X`, a child started wi
 
 ## In the image
 
-`apt-get install --no-install-recommends git` on the AgentForge image's Debian 13 adds about 29 MB (`/usr/lib/git-core`, `/usr/bin/git`, `/usr/share/git-core`).
+`apt-get install --no-install-recommends git` on the AgentForge image's Debian 13 adds about 29 MB (`/usr/lib/git-core`, `/usr/bin/git`, `/usr/share/git-core`). Built into the image on 2026-10-24: `git version 2.47.3`, run as `bun`.

@@ -51,9 +51,9 @@ Groups 1–2 come first; 2.6 also depends on 3. Groups 3 and 4 depend on 1 and c
 
 ## 5. Image and integration
 
-- [ ] 5.1 `git` in the AgentForge image's `Dockerfile`; the pinned-base-image integ still passes.
+- [x] 5.1 `git` in the AgentForge image's `Dockerfile`; the pinned-base-image integ still passes.
 - [x] 5.2 `integ/local/filesystem-git`, covering the scenarios in design § Tests. The no-token case probes a `node:child_process` child. Record the Bun spawn finding in `docs/research/git-filesystem.md`.
-- [ ] 5.3 `integ/aws/filesystem-s3-sync`: a pull over a kept copy keeps a newer local edit, takes a newer store object, restores a missing file, and does not take a store deletion. Then update the research note's "to be verified".
+- [x] 5.3 `integ/aws/filesystem-s3-sync`: a pull over a kept copy keeps a newer local edit, takes a newer store object, restores a missing file, and does not take a store deletion. Then update the research note's "to be verified".
 
 ## 6. Example (dogfood)
 
