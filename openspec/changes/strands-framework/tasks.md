@@ -53,7 +53,7 @@ Every group keeps `nx run @beruangai/agentforge:test`, `:typecheck` and `:lint` 
   - `/agent`, `/client` and `/contract` reach no Strands package;
   - the biome rules confine `@strands-agents/*` to `framework/strands/**`, and `framework/strands/**` still imports no Anthropic package.
 
-  Done 2026-10-23. The seam changes: `TranscriptLocation.projectKey` is optional, as `claude`'s alone; the context block's rendering (`renderContextBlock`) and distillation (`distillDocuments`) moved into `server/harness/`, each framework keeping only its own wrapping.
+  Done 2026-10-23. The seam changes: `TranscriptLocation.projectKey` is optional, as `claude`'s alone; `FrameworkPlugin.configurationDirectory` gains `purpose`, what the base layer's and an agent's Dockerfile say the directory is; the context block's rendering (`renderContextBlock`) and distillation (`distillDocuments`) moved into `server/harness/`, each framework keeping only its own wrapping.
 
 ## 4. Server, infra and the image
 

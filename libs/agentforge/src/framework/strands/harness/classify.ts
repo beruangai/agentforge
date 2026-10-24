@@ -5,6 +5,7 @@ import {
   StructuredOutputError,
 } from '@strands-agents/sdk';
 import { type Cause, type CauseCode, cause } from '#core/contract/task.ts';
+import { describeError } from '../../../server/harness/task-failure.ts';
 
 /** The `strands` framework's own suggested actions, over the neutral ones. */
 const STRANDS_SUGGESTED_ACTION_BY_CODE: Partial<Record<CauseCode, string>> = {
@@ -145,7 +146,7 @@ function retryAfter(provider: ProviderError): string | undefined {
 
 /** A run's failure, classified from the error's fields, never its text but for the documented spend limit (§REQ501). */
 export function classify(error: unknown): Cause {
-  const message = describe(error);
+  const message = describeError(error);
   const stackTrace = inspect(error, { depth: 8 });
   if (error instanceof StructuredOutputError) {
     return cause('OUTPUT_INVALID', message, { stackTrace });
@@ -200,10 +201,4 @@ function isConnectionError(error: unknown): boolean {
     candidate !== null &&
     CONNECTION_ERROR_CLASSES.has(candidate.constructor.name)
   );
-}
-
-export function describe(error: unknown): string {
-  return error instanceof Error
-    ? `${error.name}: ${error.message}`
-    : String(error);
 }

@@ -37,14 +37,33 @@ describe('recordingStorage', () => {
     expect(await storage.list('a/')).toEqual(['a/b']);
   });
 
-  it('reports a refused write, and still throws it', async () => {
-    const refusal = new Error('AccessDenied');
-    const inner = new InMemoryStorage();
-    vi.spyOn(inner, 'write').mockRejectedValueOnce(refusal);
-    const onRefused = vi.fn();
-    await expect(
-      recordingStorage(inner, onRefused).write('k', new Uint8Array()),
-    ).rejects.toBe(refusal);
-    expect(onRefused).toHaveBeenCalledWith('k', refusal);
+  it.each(['write', 'read', 'list'] as const)(
+    'reports a failed %s, and still throws it',
+    async (operation) => {
+      const failure = new Error('AccessDenied');
+      const inner = new InMemoryStorage();
+      vi.spyOn(inner, operation).mockRejectedValueOnce(failure);
+      const onFailed = vi.fn();
+      const storage = recordingStorage(inner, onFailed);
+      const call = {
+        write: () => storage.write('k', new Uint8Array()),
+        read: () => storage.read('k'),
+        list: () => storage.list('k'),
+      }[operation];
+      await expect(call()).rejects.toBe(failure);
+      expect(onFailed).toHaveBeenCalledWith(
+        operation,
+        expect.any(String),
+        failure,
+      );
+    },
+  );
+
+  it('reads a missing key as null, which is not a failure', async () => {
+    const onFailed = vi.fn();
+    expect(
+      await recordingStorage(new InMemoryStorage(), onFailed).read('absent'),
+    ).toBeNull();
+    expect(onFailed).not.toHaveBeenCalled();
   });
 });

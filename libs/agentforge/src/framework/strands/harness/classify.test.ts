@@ -4,7 +4,7 @@ import {
   StructuredOutputError,
   TextBlock,
 } from '@strands-agents/sdk';
-import { afterEach, expect, describe as group, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { failureOf, runScripted } from './__fixtures__/run-scripted.ts';
 import {
   type ScriptedAnthropic,
@@ -36,7 +36,7 @@ const refused = (
   ...(extra.headers === undefined ? {} : { headers: extra.headers }),
 });
 
-group('classify, from what the provider answered', () => {
+describe('classify, from what the provider answered', () => {
   it.each([
     [
       '401',
@@ -99,16 +99,34 @@ group('classify, from what the provider answered', () => {
     expect((await failureOf(runScripted(api).promise)).code).toBe(code);
   });
 
-  it('names the spend limit, not a retry, as the action', async () => {
-    api = await scriptedAnthropic([
+  it.each([
+    [
+      "the tier's spend cap",
       refused(429, 'rate_limit_error', 'spend cap', {
         details: { error_code: 'enforced_spend_limit_reached' },
       }),
-    ]);
-    const failure = await failureOf(runScripted(api).promise);
-    expect(failure.suggestedAction).toContain('spend limit');
-    expect(failure.retryAfter).toBeUndefined();
-  });
+    ],
+    [
+      "the Console's spend limit",
+      refused(
+        400,
+        'invalid_request_error',
+        'You have reached your specified API usage limits.',
+      ),
+    ],
+  ])(
+    'names the spend limit, not a retry, as the action for %s',
+    async (_name, step) => {
+      api = await scriptedAnthropic([step]);
+      const failure = await failureOf(runScripted(api).promise);
+      expect(failure).toMatchObject({
+        code: 'BUDGET_EXHAUSTED',
+        retryable: false,
+      });
+      expect(failure.suggestedAction).toContain('spend limit');
+      expect(failure.retryAfter).toBeUndefined();
+    },
+  );
 
   it('takes retryAfter from retry-after', async () => {
     api = await scriptedAnthropic([
@@ -164,7 +182,7 @@ group('classify, from what the provider answered', () => {
   });
 });
 
-group('classify, from what the SDK threw', () => {
+describe('classify, from what the SDK threw', () => {
   it('a structured output Strands gave up on is OUTPUT_INVALID', () => {
     expect(classify(new StructuredOutputError('no output')).code).toBe(
       'OUTPUT_INVALID',

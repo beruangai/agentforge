@@ -11,7 +11,7 @@ See proposal.md — Why. What holds once `framework-seam` lands:
 - **The image chain.** The base `agentforge/a2a` carries Bun, the collector, `s7cmd` and the shared peers. `agentforge/a2a-claude` extends the workspace root with the Anthropic SDKs; an agentic image is `FROM` its framework's image.
 - **Strands in TypeScript,** checked at the source on 2026-10-22:
   - `@strands-agents/sdk` 1.22.0, with minors roughly weekly; `@strands-agents/harness` 0.3.1, whose minors break.
-  - **Structured output** takes Zod 4 through a `strands_structured_output` tool. An invalid submission goes back to the model with no retry cap of its own, and only the first submission in a message counts. A model that never calls the tool is forced once, then `StructuredOutputError` is thrown.
+  - **Structured output** takes Zod 4 through a `strands_structured_output` tool. An invalid submission goes back to the model with no retry cap of its own. A model that never calls the tool is forced once, then `StructuredOutputError` is thrown. The spike found that two submissions in one message do not settle as documented (`docs/research/strands-agents.md`), so AgentForge settles them itself (The runner, below).
   - **S3 storage** for sessions, offloading and memory; TS throws without a storage backend.
   - **The Anthropic provider** supports cache points with a TTL, extended thinking with `effort`, and betas.
   - **Cancel:** an `AbortSignal` passed to the provider and checked at fixed points in the loop.
@@ -55,17 +55,21 @@ The spike's findings go to `docs/research/strands-agents.md`, dated. Each findin
 
 - **One outcome (§REQ206).** Nothing runs in the background. AgentForge passes no subagent or tool that backgrounds, and a run that configures one fails `EXECUTION_ERROR` before it starts. Memory and storage writes Strands defers are flushed (`agent.shutdown()`) before the run returns, so none is lost with the process. The first accepted structured output is the outcome.
 - **In-turn validation (§REQ208).** A `BeforeToolCall` hook on `strands_structured_output` parses the submission against the agent contract and runs every stop guard. It refuses with every failure in one message through `validateStructuredOutput` in `server/harness/`, which `claude`'s hook calls too.
-  - AgentForge counts the attempts and fails `OUTPUT_INVALID` with the last refusal at the cap. The cap is five by default, as the Claude CLI's, and a run sets another as `maxStructuredOutputAttempts`. The first submission in a message counts, as Strands has it; the spike confirms that holds under the hook.
-  - Strands' `StructuredOutputError`, from a model that never calls the tool, is `OUTPUT_INVALID`.
+  - AgentForge counts the attempts and fails `OUTPUT_INVALID` with the last refusal at the cap. The cap is five by default, as the Claude CLI's, and a run sets another as `maxStructuredOutputAttempts`.
+  - Submissions are validated one at a time, in the order the agent made them, and the first accepted is the outcome. A later submission is told the run is ending, and the next model call is cancelled, since Strands does not settle on it.
+  - A turn that ends without an accepted submission fails `OUTPUT_INVALID` at once: Strands would force the tool next, and the current models refuse the forced call. Strands' `StructuredOutputError` is classified `OUTPUT_INVALID` for any case left.
 - **Cancel (§REQ304).** The task's signal aborts the invocation. The executor's grace and process-group kill stay as they are.
-- **Fail closed (§REQ201).** Every MCP client is created with `continueOnError: false`. A run that sets it otherwise fails `EXECUTION_ERROR` before it starts. A hook whose matcher selects no tool fails the run, as for `claude`.
+- **Fail closed (§REQ201).** Every MCP client must start: a run whose client sets `continueOnError: true` fails `EXECUTION_ERROR` before it starts, and one that does not start fails it before the first turn. Each client is connected with the task's signal and disconnected once the run is over, however it ended. A Strands hook has no matcher, so there is no dead matcher to refuse.
+- **Storage (ADR 0011).** A storage call that fails — a write, a read, a list — fails the run `EXECUTION_ERROR`, naming it. The SDK would otherwise swallow it: a refused write in a hook, an unoffloaded result, or no memory recalled. A missing key reads as `null` and is not a failure.
+- **Shutdown.** `agent.shutdown()` that fails fails the run, since what Strands defers may be lost. A telemetry flush that fails is logged, and the outcome stands.
+- **The client is the runner's.** `modelConfig` takes neither `apiKey`, `client` nor `clientConfig`: the runner sets the key (§REQ714) and the request's cancel.
 - **The record (§REQ601).** The shared fields, `usage` from Strands' accumulated usage, `rawUsage` its own, no `totalCostUsd`, and `framework` `{ name: 'strands', fullName: '@strands-agents/sdk@<pinned>' }`.
 
 ### Errors and the causes they map to
 
 | Strands or provider signal | Cause | Retryable |
 |---|---|---|
-| A submission still refused at the cap; `StructuredOutputError` | `OUTPUT_INVALID` | no |
+| A submission still refused at the cap; a turn ended without an accepted submission; `StructuredOutputError` | `OUTPUT_INVALID` | no |
 | The provider's `max_tokens` stop, or a run's own limit | `BUDGET_EXHAUSTED` | no |
 | The Console's spend limit: 400 `invalid_request_error` whose message starts `You have reached your specified API usage limits` or `You have reached your specified workspace API usage limits` | `BUDGET_EXHAUSTED`, with its own suggested action | no |
 | The tier's monthly spend cap: 429 `rate_limit_error` with `error.details.error_code` `enforced_spend_limit_reached` | `BUDGET_EXHAUSTED`, with its own suggested action | no |
@@ -74,8 +78,8 @@ The spike's findings go to `docs/research/strands-agents.md`, dated. Each findin
 | HTTP 5xx or `overloaded_error` | `PROVIDER_TRANSIENT` | yes |
 | A connection error or timeout, which has no status: the Anthropic SDK's `APIConnectionError` class, by name (operator, 2026-10-23) | `PROVIDER_TRANSIENT` | yes |
 | The task's signal | the task ends `TASK_STATE_CANCELED` | — |
-| A storage write refused | `EXECUTION_ERROR`, naming the write | no |
-| An MCP server that does not start; a dead hook matcher | `EXECUTION_ERROR`, before the first turn | no |
+| A storage write, read or list that fails | `EXECUTION_ERROR`, naming the call | no |
+| An MCP server that does not start | `EXECUTION_ERROR`, before the first turn | no |
 | A stop guard that throws | `EXECUTION_ERROR` | no |
 | Anything else | `EXECUTION_ERROR` | no |
 
@@ -88,7 +92,7 @@ Alternatives weighed:
 
 The framework's `agentOptionsMiddleware` renders each mount into Strands options:
 
-- the mount as a working directory of the vended file and shell tools;
+- the mount's path in `workingDirectories`, which the system prompt names as where the agent works; the file tool takes absolute paths and refuses relative ones and `..`, and no tool's own working directory changes;
 - one Cedar authorisation intervention for the run, from every mount's permissions.
 
 A glob cannot be the Cedar resource, and Cedar's `like` has only `*`, which also matches `/`. So the `contextEnricher` resolves each tool call's paths against the mounts, matching with the same matcher `writablePath` uses. It sets `context.withinWriteScope`. The policy permits an edit action only when that is true. A shell command's writes are not bounded by the policy, since a command can write without naming its path (`cd`, variables, subshells). Which commands run is the procedure's allow list, as for `claude`'s Bash. The spike confirms the shape.
@@ -105,7 +109,7 @@ The operator chose one storage on 2026-10-22. Strands' `S3Storage` holds session
 
 - **Sessions (§REQ402)** resume by the Strands session id, which the run returns as `sessionId` and records with where it is stored.
 - **Memory (§REQ404, reworded).** A run declares `memorySpace?: string`, a `StrandsTypes` extra. Its memory is kept under `<agent>/memory/<space>/`, recalled by a later run that declares the same space. With none declared, the run is given no memory. A space is the agent's own: its role reads and writes only under its name.
-- **Offloading** writes under the same prefix, and never evicts: the SDK deletes an entry after 20 cycles and swallows a refused delete, and the agent's role may not delete. The operator chose on 2026-10-23 to keep offloaded results until the bucket's retention removes them.
+- **Offloading** is off unless a run declares `offload`. It writes under the same prefix, and never evicts: the SDK deletes an entry after 20 cycles and swallows a refused delete, and the agent's role may not delete. The operator chose on 2026-10-23 to keep offloaded results until the bucket's retention removes them.
 - **A write the storage refuses** fails the run `EXECUTION_ERROR`, as `claude`'s mirror check does.
 - **ADR 0011 is extended,** not replaced, with a dated note: a framework persists its state through its own storage API into the session bucket, under the agent's name.
 - **The glossary's *memory space*** becomes framework-neutral: one space of an agent's memory, a `claude` run's memory directory or a `strands` run's prefix in its storage.
@@ -147,6 +151,7 @@ AgentForge appends its fragments after the procedure's own system prompt, and ne
 
 - `framework/strands/core/secrets.ts` declares `REQUIRED_SECRETS = ['ANTHROPIC_API_KEY']`, which its server, infra and plugin parts import.
 - §REQ705 is withdrawn and §REQ714 added, as the ADR words them.
+- **A `claude` run authenticates with the subscription (§REQ714).** The CLI prefers `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_API_KEY` to `CLAUDE_CODE_OAUTH_TOKEN`, and in headless mode always uses them. Where both frameworks share an environment, `strands`' key would win. So while the token is present, `claude`'s kernel leaves both out of the CLI's environment, and refuses a run that sets either itself. The operator chose this on 2026-10-23 over splitting each target's environment by framework.
 
 ### Public surface
 
@@ -159,7 +164,7 @@ export interface TaskContext extends SharedTaskContext<StrandsTypes> {}
 export type StrandsTypes = {
   content: ContentBlock;                       // the SDK's
   options: StrandsOptions;                     // model, maxTokens, tools, mcpClients, interventions, …
-  extras: { memorySpace?: string; maxStructuredOutputAttempts?: number; resume?: string };
+  extras: { memorySpace?: string; maxStructuredOutputAttempts?: number; resume?: string; offload?: { maxResultTokens: number; previewTokens?: number } };
   usage: StrandsUsage;                         // the SDK's accumulated usage
 };
 export type AgentRunSpec<O> = SharedAgentRunSpec<StrandsTypes, O>;
@@ -177,7 +182,7 @@ export const REQUIRED_SECRETS: readonly ['ANTHROPIC_API_KEY'];
 export function readSession(run: RunRecord, options?: { client?: S3Client }): Promise<readonly Message[]>;
 ```
 
-`composeOptions` keeps the seam's rule that every list accumulates: tools, MCP clients, hooks and interventions. A narrower part cannot remove a guardrail, and an MCP client named twice throws, as an MCP server named twice does for `claude`.
+`composeOptions` keeps the seam's rule that every list accumulates: tools, MCP clients, plugins, interventions and working directories. Hooks accumulate with them: a Strands hook is registered by a plugin, the SDK having no hooks option. A narrower part cannot remove a guardrail, and an MCP client named twice throws, as an MCP server named twice does for `claude`.
 
 **The seam may change** where the spike proves it short. The one change foreseen: `prepare()` may become async, if Strands' telemetry or storage setup must await. Any change is named in the findings and lands in shared code and in `claude` together.
 
@@ -185,7 +190,7 @@ export function readSession(run: RunRecord, options?: { client?: S3Client }): Pr
 
 - **`agentforge/a2a-strands`,** from `framework/strands/Dockerfile`, `FROM` the base. Its `container/` root manifest is the base's plus `@strands-agents/sdk` and the peers the spike settles, locked by `container-lock-strands`, seeded with the base's lock. It adds what the vended shell tool needs, which the spike names, and no Claude binary. The package gains the `image-strands` target.
 - **The plugin part,** `framework/strands/plugin/`:
-  - scaffolds the base `options.ts` (the model, `continueOnError: false` and no background work) and each layer's placeholder instruction file and `skills/`;
+  - scaffolds the base `options.ts`, which names the model, and each layer's placeholder instruction file and `skills/`. Fail-closed MCP and no background work are the runner's to enforce, so the scaffold does not restate them;
   - `containerPeers`: `@strands-agents/sdk` and its peers that the framework uses;
   - the entry imports `/strands/agent`, `/strands/server` and `/strands/infra`;
   - image paths `strands/Dockerfile` and `strands/container`;
@@ -203,16 +208,17 @@ The operator chose two on 2026-10-22, both generated with `--framework strands`:
 ## Testing
 
 - **Unit (`test`), against a scripted Anthropic provider:**
-  - the runner's settlement — the cap, the first accepted submission, a guard's reason, a throwing guard;
+  - the runner's settlement — the default and a set cap, the first accepted submission, a guard's reason, a throwing guard, a turn ended without one;
   - classification, over each row of the error table;
   - the record;
   - `composeOptions`' accumulation;
-  - the middleware's rendering and the Cedar policy over in-scope and out-of-scope paths, through the file and shell tools;
+  - the middleware's rendering and the Cedar policy over in-scope and out-of-scope paths, through the file tool;
   - the layers' instruction order;
-  - fail-closed MCP;
+  - fail-closed MCP, and each client connected with the task's signal and disconnected after;
+  - memory kept and recalled across runs, none without a space, and a failed storage call on each path;
   - the plugin part's snapshots and the enum test.
 - **`integ/model/strands-structured-output/` and `integ/model/strands-cache-points/`** — what AgentForge relies on, the documentation does not settle, and can drift:
-  - structured-output settlement under the hook: the cap, and the first submission in a message;
+  - structured-output settlement under the hook against a real model: a contract's JSON Schema accepted as the tool's input, and a refusal told in the turn answered by a submission that is accepted. The cap and two submissions in one message are scripted in the unit tier, which settles them whichever way a model would;
   - cache points honoured on the Anthropic API.
 - **`integ/local/`:** S3 storage against the local store, a session written by one process and resumed by another.
 - **`integ/aws/`:** the same storage against AWS S3 under the agent's role.
@@ -230,4 +236,4 @@ The operator chose two on 2026-10-22, both generated with `--framework strands`:
 
 ## Migration Plan
 
-Additive for existing `claude` projects: no consumer change. `references/migrations.md` gains a short entry: `strands` is available, and §REQ705 has become §REQ714. The examples land in the same change.
+None: no consumer has adopted AgentForge, so the change is v0, neither breaking nor additive. `references/migrations.md` gains a short entry: `strands` is available, and §REQ705 has become §REQ714. The examples land in the same change.

@@ -190,13 +190,23 @@
       "Sid": "ListTheExamplesSessionTranscripts",
       "Effect": "Allow",
       "Action": ["s3:ListBucket"],
-      "Resource": ["arn:aws:s3:::agentforge-example-*"]
+      "Resource": ["arn:aws:s3:::agentforge-example-*"],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-2"
+        }
+      }
     },
     {
       "Sid": "UploadTheExamplesCorpora",
       "Effect": "Allow",
       "Action": ["s3:PutObject"],
-      "Resource": ["arn:aws:s3:::agentforge-example-*/corpora/*"]
+      "Resource": ["arn:aws:s3:::agentforge-example-*/corpora/*"],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-2"
+        }
+      }
     }
   ]
 }

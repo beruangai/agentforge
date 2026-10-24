@@ -28,11 +28,11 @@ Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded
 
 ### Breaks
 
-- **A `claude` run's credentials.** While `CLAUDE_CODE_OAUTH_TOKEN` is set, the CLI no longer inherits `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`, and a procedure that sets its own value for either in its options' `env` is refused `EXECUTION_ERROR`. A run that used a key beside the token now uses the subscription.
+None.
 
 ### Change
 
-Nothing to change. A new agentic project may choose `--framework strands` ([SKILL.md](../SKILL.md#choosing-a-framework)); it needs `ANTHROPIC_API_KEY` in `.env.serve.local` and, deployed, as a Secrets Manager secret mapped in its agent's construct. §REQ705 is replaced by §REQ714: the subscription stays wherever the framework can use it.
+Nothing to change. A new agentic project may choose `--framework strands` ([SKILL.md](../SKILL.md#choosing-a-framework)); it needs `ANTHROPIC_API_KEY` in `.env.serve.local` and, deployed, as a Secrets Manager secret mapped in its agent's construct. §REQ705 is replaced by §REQ714: the subscription stays wherever the framework can use it, so while `CLAUDE_CODE_OAUTH_TOKEN` is set a `claude` run's CLI is given neither `ANTHROPIC_API_KEY` nor `ANTHROPIC_AUTH_TOKEN`, and a procedure that sets either in its options' `env` is refused `EXECUTION_ERROR`.
 
 ### Verify
 

@@ -1,5 +1,10 @@
 import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { cause } from '#core/contract/task.ts';
+import {
+  describeError,
+  TaskFailure,
+} from '../../../server/harness/task-failure.ts';
 
 /** The instruction file a layer carries at its root, as Strands' own harness names it. */
 export const INSTRUCTION_FILE = 'AGENTS.md';
@@ -44,11 +49,11 @@ async function readInstructions(file: string): Promise<string | undefined> {
     return await readFile(file, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw new Error(
-      `the layer's instruction file "${file}" could not be read`,
-      {
-        cause: error,
-      },
+    throw new TaskFailure(
+      cause(
+        'EXECUTION_ERROR',
+        `the layer's instruction file "${file}" could not be read: ${describeError(error)}`,
+      ),
     );
   }
 }

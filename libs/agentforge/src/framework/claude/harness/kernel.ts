@@ -25,6 +25,7 @@ import type {
   TaskContext as SharedTaskContext,
 } from '../../../server/harness/framework.ts';
 import {
+  describeError,
   TaskCanceled,
   TaskFailure,
 } from '../../../server/harness/task-failure.ts';
@@ -299,7 +300,7 @@ export async function runAgent<Output>(
     throw new TaskFailure(
       cause(
         'EXECUTION_ERROR',
-        `a stop guard threw while the structured output was validated: ${describe(guardError.error)}`,
+        `a stop guard threw while the structured output was validated: ${describeError(guardError.error)}`,
         { stackTrace: inspect(guardError.error, { depth: 8 }) },
       ),
     );
@@ -322,7 +323,7 @@ export async function runAgent<Output>(
     throw new TaskFailure(
       cause(
         'EXECUTION_ERROR',
-        `the run ended without a result: ${describe(streamError)}${
+        `the run ended without a result: ${describeError(streamError)}${
           observed.mirrorError === undefined
             ? ''
             : `; and the session transcript could not be mirrored: ${observed.mirrorError}`
@@ -731,10 +732,4 @@ function recordableOptions(
     }
   }
   return recorded;
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error
-    ? `${error.name}: ${error.message}`
-    : String(error);
 }

@@ -75,4 +75,4 @@ Per the [errors](https://platform.claude.com/docs/en/api/errors) and [rate limit
 - **It fails a run whose memory write failed,** with `EXECUTION_ERROR`.
 - **Its storage prefix is `<agent>/`,** with the memory store named for the space.
 - **`prepare()` stays synchronous:** storage and telemetry set up without awaiting.
-- **The seam changes the apply made:** `TranscriptLocation.projectKey` is optional, `claude`'s alone; the context block's rendering and distillation moved into `server/harness/`.
+- **The seam changes the apply made:** `TranscriptLocation.projectKey` is optional, `claude`'s alone; `FrameworkPlugin.configurationDirectory` gains `purpose`; the context block's rendering and distillation moved into `server/harness/`.

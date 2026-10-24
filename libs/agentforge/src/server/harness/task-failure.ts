@@ -18,3 +18,10 @@ export class TaskCanceled extends Error {
     this.name = 'TaskCanceled';
   }
 }
+
+/** An error as a cause's message gives it: its name and message. */
+export function describeError(error: unknown): string {
+  return error instanceof Error
+    ? `${error.name}: ${error.message}`
+    : String(error);
+}

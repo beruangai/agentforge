@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { type McpClient, tool } from '@strands-agents/sdk';
+import { McpClient, tool } from '@strands-agents/sdk';
 import { InMemoryStorage, type Storage } from '@strands-agents/sdk/storage';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -63,6 +63,9 @@ describe('runAgent', () => {
       options: { model: 'claude-test', maxTokens: 1024 },
     });
     expect(records[0]).not.toHaveProperty('transcript');
+    expect(records[0]).not.toHaveProperty('totalCostUsd');
+    expect(records[0]?.rawUsage).toEqual(run.rawUsage);
+    expect(run.rawUsage).toMatchObject({ inputTokens: 10, outputTokens: 5 });
   });
 
   it('tells the agent a refused submission in its turn, and accepts the next', async () => {
@@ -89,6 +92,16 @@ describe('runAgent', () => {
     expect(failure.message).toContain('2 attempts');
     expect(failure.payload).toEqual({ answer: 2 });
     expect(requests).toHaveLength(2);
+  });
+
+  it('fails OUTPUT_INVALID at five attempts by default', async () => {
+    const { requests } = await scripted(
+      [1, 2, 3, 4, 5].map((answer) => submit({ answer })),
+    );
+    const failure = await failureOf(runScripted(current()).promise);
+    expect(failure.code).toBe('OUTPUT_INVALID');
+    expect(failure.message).toContain('5 attempts');
+    expect(requests).toHaveLength(5);
   });
 
   it('tells the agent a stop guard denial, as a refusal', async () => {
@@ -207,6 +220,25 @@ describe('runAgent', () => {
     expect(failure.message).toContain('limitTurns');
   });
 
+  it('keeps an accepted outcome when the telemetry does not flush', async () => {
+    await scripted([submit({ answer: 'a' })]);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const run = await runScripted(
+      current(),
+      {},
+      {
+        flushTelemetry: async () => {
+          throw new Error('collector down');
+        },
+      },
+    ).promise;
+    expect(run.output).toEqual({ answer: 'a' });
+    expect(console.error).toHaveBeenCalledWith(
+      "the run's telemetry did not flush",
+      expect.any(Error),
+    );
+  });
+
   it('is cancelled by the task signal mid-request', async () => {
     const { requests } = await scripted([{ hang: true }]);
     const controller = new AbortController();
@@ -233,7 +265,11 @@ describe('runAgent', () => {
   });
 
   describe('refuses what it cannot run, before the model', () => {
-    const closed = { continueOnError: false, connect: async () => {} };
+    const closed = {
+      continueOnError: false,
+      connect: async () => {},
+      disconnect: async () => {},
+    };
     it.each([
       ['no model', { options: {} }, 'names its model'],
       [
@@ -246,6 +282,13 @@ describe('runAgent', () => {
         { options: { model: 'm', modelConfig: { cacheConfig: {} } } },
         'cacheConfig',
       ],
+      ...['apiKey', 'client', 'clientConfig'].map(
+        (key): [string, object, string] => [
+          `the provider ${key}`,
+          { options: { model: 'm', modelConfig: { [key]: {} } } },
+          `sets no \`${key}\``,
+        ],
+      ),
       [
         'an MCP server that continues on error',
         {
@@ -304,6 +347,75 @@ describe('runAgent', () => {
       expect(failure.message).toContain('MCP server "docs" did not start');
       expect(failure.message).toContain('spawn failed');
       expect(requests).toHaveLength(0);
+    });
+  });
+
+  describe('MCP servers', () => {
+    /** A real client, whose connection is `connect`: the Agent takes MCP servers by class. */
+    function mcpClient(connect: (signal: AbortSignal) => Promise<void>) {
+      const mcp = new McpClient({
+        transport: {
+          start: async () => {},
+          send: async () => {},
+          close: async () => {},
+        } as never,
+      });
+      const client = {
+        connect: vi
+          .spyOn(mcp, 'connect')
+          .mockImplementation(async (_reconnect, options) =>
+            connect(options?.signal ?? new AbortController().signal),
+          ),
+        disconnect: vi.spyOn(mcp, 'disconnect').mockResolvedValue(undefined),
+      };
+      vi.spyOn(mcp, 'listTools').mockResolvedValue([]);
+      return { client, mcp };
+    }
+
+    it('disconnects every server once the run is over', async () => {
+      await scripted([submit({ answer: 'a' })]);
+      const docs = mcpClient(async () => {});
+      await runScripted(current(), {
+        options: { model: 'm', mcpClients: { docs: docs.mcp } },
+      }).promise;
+      expect(docs.client.disconnect).toHaveBeenCalledOnce();
+    });
+
+    it('disconnects the servers that started when another does not', async () => {
+      await scripted([]);
+      const docs = mcpClient(async () => {});
+      const search = mcpClient(async () => {
+        throw new Error('spawn failed');
+      });
+      await failureOf(
+        runScripted(current(), {
+          options: {
+            model: 'm',
+            mcpClients: { docs: docs.mcp, search: search.mcp },
+          },
+        }).promise,
+      );
+      expect(docs.client.disconnect).toHaveBeenCalledOnce();
+    });
+
+    it('stops waiting for a server to start when the task is cancelled', async () => {
+      await scripted([]);
+      const hung = mcpClient(
+        (signal) =>
+          new Promise((_resolve, reject) =>
+            signal.addEventListener('abort', () => reject(signal.reason)),
+          ),
+      );
+      const controller = new AbortController();
+      const { promise } = runScripted(
+        current(),
+        { options: { model: 'm', mcpClients: { hung: hung.mcp } } },
+        {},
+        controller.signal,
+      );
+      await vi.waitFor(() => expect(hung.client.connect).toHaveBeenCalled());
+      controller.abort();
+      await expect(promise).rejects.toBeInstanceOf(TaskCanceled);
     });
   });
 
@@ -368,6 +480,37 @@ describe('runAgent', () => {
       ).toContain('the code is 42');
     });
 
+    it('offers no memory tools to a run that declares no memory space', async () => {
+      const { requests } = await scripted([submit({ answer: 'a' })]);
+      await runScripted(current(), {}, { storage: agentStorage() }).promise;
+      const names = requests[0]?.tools?.map((entry) => entry.name);
+      expect(names).not.toContain('add_memory');
+      expect(names).not.toContain('search_memory');
+    });
+
+    it('recalls in a later run what an earlier one kept in the same space', async () => {
+      const { requests } = await scripted([
+        {
+          toolCalls: [
+            { name: 'add_memory', input: { entries: ['the code is 42'] } },
+          ],
+        },
+        submit({ answer: 'kept' }),
+        {
+          toolCalls: [{ name: 'search_memory', input: { query: 'code' } }],
+        },
+        submit({ answer: '42' }),
+      ]);
+      const storage = agentStorage();
+      await runScripted(current(), { memorySpace: 'notes' }, { storage })
+        .promise;
+      await runScripted(current(), { memorySpace: 'notes' }, { storage })
+        .promise;
+      const [recalled] = toolResults(requests[3]);
+      expect(recalled?.isError).toBe(false);
+      expect(recalled?.text).toContain('the code is 42');
+    });
+
     it('offloads a tool result over its cap into the storage, when declared', async () => {
       const { requests } = await scripted([
         { toolCalls: [{ name: 'dump', input: {} }] },
@@ -427,6 +570,83 @@ describe('runAgent', () => {
       expect(failure.message).toContain("the agent's storage refused a write");
       expect(failure.message).toContain('AccessDenied');
     });
+  });
+
+  describe('the storage failing', () => {
+    /** Storage that fails `operation` for every key under `prefix`. */
+    function failing(
+      operation: 'write' | 'read' | 'list',
+      prefix: string,
+    ): Storage {
+      const inner = new InMemoryStorage();
+      const refuse = (key: string) => {
+        if (key.startsWith(prefix)) throw new Error('AccessDenied');
+      };
+      return {
+        write: async (key, data) => {
+          if (operation === 'write') refuse(key);
+          return inner.write(key, data);
+        },
+        read: async (key) => {
+          if (operation === 'read') refuse(key);
+          return inner.read(key);
+        },
+        delete: (key) => inner.delete(key),
+        list: async (query) => {
+          if (operation === 'list') refuse(query);
+          return inner.list(query);
+        },
+      };
+    }
+
+    const dump = tool({
+      name: 'dump',
+      description: 'Returns a large result.',
+      inputSchema: z.object({}),
+      callback: () => 'line of output\n'.repeat(500),
+    });
+
+    it.each([
+      [
+        'a memory write',
+        failing('write', 'memory/'),
+        { memorySpace: 'notes' },
+        { name: 'add_memory', input: { entries: ['x'] } },
+        'write',
+      ],
+      [
+        'a memory search',
+        failing('list', 'memory/'),
+        { memorySpace: 'notes' },
+        { name: 'search_memory', input: { query: 'x' } },
+        'list',
+      ],
+      [
+        'an offload',
+        failing('write', 'offloader/'),
+        {
+          options: { model: 'claude-test', maxTokens: 1024, tools: [dump] },
+          offload: { maxResultTokens: 100, previewTokens: 20 },
+        },
+        { name: 'dump', input: {} },
+        'write',
+      ],
+    ] as const)(
+      'fails EXECUTION_ERROR for %s',
+      async (_name, storage, spec, call, operation) => {
+        await scripted([{ toolCalls: [call] }, submit({ answer: 'a' })]);
+        const failure = await failureOf(
+          runScripted(current(), spec as never, {
+            storage: agentStorage(storage),
+          }).promise,
+        );
+        expect(failure.code).toBe('EXECUTION_ERROR');
+        expect(failure.message).toContain(
+          `the agent's storage refused a ${operation}`,
+        );
+        expect(failure.message).toContain('AccessDenied');
+      },
+    );
   });
 
   describe('layers', () => {
@@ -493,9 +713,13 @@ describe('runAgent', () => {
       const { requests } = await scripted([submit({ answer: 'a' })]);
       const root = await mkdtemp(path.join(tmpdir(), 'strands-layers-'));
       await mkdir(path.join(root, 'AGENTS.md'));
-      await expect(
+      const failure = await failureOf(
         runScripted(current(), {}, { layers: [root] }).promise,
-      ).rejects.toThrow(/instruction file .*AGENTS\.md" could not be read/);
+      );
+      expect(failure.code).toBe('EXECUTION_ERROR');
+      expect(failure.message).toMatch(
+        /instruction file .*AGENTS\.md" could not be read/,
+      );
       expect(requests).toHaveLength(0);
     });
   });

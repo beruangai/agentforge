@@ -16,7 +16,7 @@ A project generated for the `strands` framework (see [plugin-agentic-project](..
 - **THEN** it fails with cause `BUDGET_EXHAUSTED`, not retryable, and the suggested action says to raise the limit
 
 ### Requirement: A Strands run's structured output is bounded and settles once
-A `strands` run SHALL meet every rule of an agent run's settlement (see [harness-kernel-settlement](../harness-kernel-settlement/spec.md)). The agent's structured-output attempts SHALL be bounded by AgentForge, five unless the run sets another bound, since Strands bounds none. No work SHALL run in the background: subagents and tools complete before the answer counts. Every MCP server a run is given SHALL start, or the run SHALL fail with cause `EXECUTION_ERROR` naming it before the agent's first turn.
+A `strands` run SHALL meet every rule of an agent run's settlement (see [harness-kernel-settlement](../harness-kernel-settlement/spec.md)). The agent's structured-output attempts SHALL be bounded by AgentForge, five unless the run sets another bound, since Strands bounds none. No work SHALL run in the background: subagents and tools complete before the answer counts. Every MCP server a run is given SHALL start, or the run SHALL fail with cause `EXECUTION_ERROR` naming it before the agent's first turn; a cancel SHALL stop the wait for one to start, and each SHALL be stopped once the run is over, however it ended.
 
 #### Scenario: Attempts exhausted
 - **WHEN** a `strands` run's agent submits a structured output its contract refuses five times
@@ -27,7 +27,7 @@ A `strands` run SHALL meet every rule of an agent run's settlement (see [harness
 - **THEN** the run fails with cause `EXECUTION_ERROR` naming the server, and the agent never starts
 
 ### Requirement: A Strands run's file tool edits only within its mounts' write scopes
-The run options the `strands` framework derives from a procedure's mounts (see [harness-framework](../harness-framework/spec.md)) SHALL make every mount a working directory of the agent's file and shell tools. They SHALL refuse an edit through the file tool of a path outside the write globs of every mount, while the run composes them into its own. They SHALL NOT bound what a shell command writes: which commands a run may execute is its procedure's own allow list, as it is for `claude`'s shell. AgentForge SHALL NOT apply them unless the handler composes them.
+The run options the `strands` framework derives from a procedure's mounts (see [harness-framework](../harness-framework/spec.md)) SHALL name every mount to the agent as a directory it works in. They SHALL refuse an edit through the file tool of a path outside the write globs of every mount, while the run composes them into its own. They SHALL NOT bound what a shell command writes: which commands a run may execute is its procedure's own allow list, as it is for `claude`'s shell. AgentForge SHALL NOT apply them unless the handler composes them.
 
 #### Scenario: An edit inside the write scope
 - **WHEN** a `strands` run whose mount at `/workspace/vault` may write `notes/*.md` composes its task's run options, and its agent writes `notes/today.md`
@@ -38,7 +38,7 @@ The run options the `strands` framework derives from a procedure's mounts (see [
 - **THEN** the edit is refused, and the agent is told why
 
 ### Requirement: A Strands agent's memory and offloaded results persist with its sessions
-A `strands` agent SHALL keep its memory and the tool results it offloads in the same storage as its sessions, which persist and resume as every agent's do (see [harness-session-persistence](../harness-session-persistence/spec.md)): deployed in the project's session bucket under the agent's name, served locally in the local store. A run that declares a memory space SHALL keep its memory there, recalled by a later run that declares the same space, and one that declares none SHALL keep none. A write the storage does not accept SHALL fail the run with cause `EXECUTION_ERROR`, as an incomplete session does.
+A `strands` agent SHALL keep its memory and the tool results it offloads in the same storage as its sessions, which persist and resume as every agent's do (see [harness-session-persistence](../harness-session-persistence/spec.md)): deployed in the project's session bucket under the agent's name, served locally in the local store. A run that declares a memory space SHALL keep its memory there, recalled by a later run that declares the same space, and one that declares none SHALL keep none. A write, read or listing the storage fails SHALL fail the run with cause `EXECUTION_ERROR`, as an incomplete session does, rather than leave the run without the memory or result it asked for.
 
 #### Scenario: A memory recalled in a later task
 - **WHEN** a `strands` run that declares a memory space is told a fact to remember, its container is stopped, and a later run in another container declares the same space and is asked for it
@@ -51,6 +51,10 @@ A `strands` agent SHALL keep its memory and the tool results it offloads in the 
 #### Scenario: The storage refuses a write
 - **WHEN** the storage does not accept a write a run makes to its memory or an offloaded result
 - **THEN** the run fails with cause `EXECUTION_ERROR`
+
+#### Scenario: The storage fails a read
+- **WHEN** the storage fails a read or listing a run makes to recall its memory
+- **THEN** the run fails with cause `EXECUTION_ERROR`, rather than going on without the memory
 
 ### Requirement: A Strands agent's layers compose their instructions
 A `strands` agent's instructions and skills SHALL compose from its project's base layer, then its own layer, under Strands' own directory and file names. A layer's instructions SHALL join the procedure's system prompt, and AgentForge's own system-prompt fragments SHALL follow the procedure's prompt.

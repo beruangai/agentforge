@@ -6,6 +6,7 @@ import {
   BeforeModelCallEvent,
   BeforeToolCallEvent,
   DefaultModelRetryStrategy,
+  type McpClient,
   type Message,
   type Plugin,
   SessionManager,
@@ -29,12 +30,13 @@ import {
 import type { RunEnvironment } from '../../../server/harness/framework.ts';
 import { validateStructuredOutput } from '../../../server/harness/structured-output-validation.ts';
 import {
+  describeError,
   TaskCanceled,
   TaskFailure,
 } from '../../../server/harness/task-failure.ts';
 import { STRANDS_SDK_FULL_NAME } from '../core/sdk-version.ts';
 import { sessionPrefix } from '../core/session-keys.ts';
-import { classify, describe, isSpendLimit, strandsCause } from './classify.ts';
+import { classify, isSpendLimit, strandsCause } from './classify.ts';
 import { readLayers } from './layers.ts';
 import { renderPrompt } from './prompt.ts';
 import { type AgentStorage, recordingStorage } from './storage.ts';
@@ -51,6 +53,9 @@ export const DEFAULT_MAX_STRUCTURED_OUTPUT_ATTEMPTS = 5;
 
 /** The property a non-object agent contract is nested under, when a run opts in. */
 export const STRUCTURED_OUTPUT_WRAPPER_KEY = 'output';
+
+/** The Anthropic client's settings the runner owns, refused in a run's `modelConfig`. */
+const RUNNER_OWNED_CLIENT_KEYS = ['apiKey', 'client', 'clientConfig'] as const;
 
 /** Told to the agent in place of a tool's result once the run is ending. */
 const RUN_ENDING = 'Stop: this run is ending.';
@@ -125,261 +130,267 @@ export async function runAgent<Output>(
   if (spec.resume !== undefined) {
     await refuseUnknownSession(spec.resume, context.storage);
   }
-  for (const [name, client] of Object.entries(options.mcpClients ?? {})) {
-    try {
-      await client.connect();
-    } catch (error) {
-      throw new TaskFailure(
-        cause(
-          'EXECUTION_ERROR',
-          `MCP server "${name}" did not start: ${describe(error)}`,
-        ),
-      );
-    }
-  }
+  const mcpClients = options.mcpClients ?? {};
+  try {
+    await connectMcpClients(mcpClients, environment.signal);
 
-  let ended: Cause | undefined;
-  let accepted: { readonly value: Output } | undefined;
-  let lastRefusal: string | undefined;
-  let attempts = 0;
-  let agent: Agent | undefined;
-  const end = (reason: Cause): void => {
-    ended ??= reason;
-    agent?.cancel();
-  };
-  const storage =
-    context.storage === undefined
-      ? undefined
-      : recordingStorage(context.storage.storage, (key, error) =>
+    let ended: Cause | undefined;
+    let accepted: { readonly value: Output } | undefined;
+    let lastRefusal: string | undefined;
+    let attempts = 0;
+    let agent: Agent | undefined;
+    const end = (reason: Cause): void => {
+      ended ??= reason;
+      agent?.cancel();
+    };
+    const storage =
+      context.storage === undefined
+        ? undefined
+        : recordingStorage(context.storage.storage, (operation, key, error) =>
+            end(
+              cause(
+                'EXECUTION_ERROR',
+                `the agent's storage refused a ${operation} of "${key}": ${describeError(error)}`,
+              ),
+            ),
+          );
+
+    agent = new Agent({
+      model: new AnthropicModel({
+        ...options.modelConfig,
+        apiKey: context.apiKey,
+        modelId: owned.model,
+        ...(options.maxTokens === undefined
+          ? {}
+          : { maxTokens: options.maxTokens }),
+        // The provider does not pass the run's cancel to its request, so a
+        // cancel mid-call would wait for the model; the request takes it here.
+        clientConfig: {
+          ...context.clientConfig,
+          fetch: (input: string | URL | Request, init: RequestInit = {}) => {
+            const signals = [
+              ...(init.signal ? [init.signal] : []),
+              ...(agent === undefined ? [] : [agent.cancelSignal]),
+            ];
+            return fetch(input, { ...init, signal: AbortSignal.any(signals) });
+          },
+        },
+      }),
+      systemPrompt,
+      tools: [...(options.tools ?? []), ...Object.values(mcpClients)],
+      plugins: [
+        ...(options.plugins ?? []),
+        ...(layers.skillDirectories.length === 0
+          ? []
+          : [new AgentSkills({ skills: [...layers.skillDirectories] })]),
+        ...(storage === undefined || spec.offload === undefined
+          ? []
+          : [
+              new ContextOffloader({
+                storage,
+                maxResultTokens: spec.offload.maxResultTokens,
+                // Never evicted: the agent's role may not delete, and the SDK
+                // swallows a refused delete. The bucket's retention keeps them.
+                evictAfterCycles: null,
+                ...(spec.offload.previewTokens === undefined
+                  ? {}
+                  : { previewTokens: spec.offload.previewTokens }),
+              }) as Plugin,
+            ]),
+      ],
+      ...(options.interventions === undefined
+        ? {}
+        : { interventions: [...options.interventions] }),
+      ...(options.conversationManager === undefined
+        ? {}
+        : { conversationManager: options.conversationManager }),
+      structuredOutputSchema: owned.wire,
+      ...(storage === undefined
+        ? {}
+        : { storage, sessionManager: new SessionManager({ sessionId }) }),
+      ...(storage === undefined || spec.memorySpace === undefined
+        ? {}
+        : {
+            memoryManager: {
+              stores: [
+                new FileMemoryStore({
+                  name: spec.memorySpace,
+                  writable: true,
+                  extraction: false,
+                  storage,
+                }),
+              ],
+              addToolConfig: true,
+            },
+          }),
+      retryStrategy:
+        context.retryStrategy === null ? null : new RetryUnlessSpendLimited(),
+      ...(context.agentName === undefined ? {} : { name: context.agentName }),
+      printer: false,
+    });
+
+    // One submission is validated at a time, in the order the agent made them,
+    // so the first accepted is the outcome whichever tool call finishes first.
+    let validated: Promise<unknown> = Promise.resolve();
+    agent.addHook(BeforeToolCallEvent, (event) => {
+      if (event.toolUse.name !== STRUCTURED_OUTPUT_TOOL) return;
+      const turn = validated.then(async () => {
+        if (ended !== undefined || accepted !== undefined) {
+          event.cancel = RUN_ENDING;
+          return;
+        }
+        attempts += 1;
+        const submission = owned.unwrap(event.toolUse.input);
+        let refusal: string | undefined;
+        try {
+          refusal = await validateStructuredOutput(
+            { output: spec.output, guards: spec.guardrails?.stop ?? [] },
+            submission,
+          );
+        } catch (error) {
+          // A guard that throws is a defect, never told to the agent.
+          event.cancel = RUN_ENDING;
           end(
             cause(
               'EXECUTION_ERROR',
-              `the agent's storage refused a write to "${key}": ${describe(error)}`,
+              `a stop guard threw while the structured output was validated: ${describeError(error)}`,
             ),
-          ),
-        );
-
-  agent = new Agent({
-    model: new AnthropicModel({
-      ...options.modelConfig,
-      apiKey: context.apiKey,
-      modelId: owned.model,
-      ...(options.maxTokens === undefined
-        ? {}
-        : { maxTokens: options.maxTokens }),
-      // The provider does not pass the run's cancel to its request, so a
-      // cancel mid-call would wait for the model; the request takes it here.
-      clientConfig: {
-        ...context.clientConfig,
-        fetch: (input: string | URL | Request, init: RequestInit = {}) => {
-          const signals = [
-            ...(init.signal ? [init.signal] : []),
-            ...(agent === undefined ? [] : [agent.cancelSignal]),
-          ];
-          return fetch(input, { ...init, signal: AbortSignal.any(signals) });
-        },
-      },
-    }),
-    systemPrompt,
-    tools: [
-      ...((options.tools ?? []) as ToolList),
-      ...Object.values(options.mcpClients ?? {}),
-    ],
-    plugins: [
-      ...(options.plugins ?? []),
-      ...(layers.skillDirectories.length === 0
-        ? []
-        : [new AgentSkills({ skills: [...layers.skillDirectories] })]),
-      ...(storage === undefined || spec.offload === undefined
-        ? []
-        : [
-            new ContextOffloader({
-              storage,
-              maxResultTokens: spec.offload.maxResultTokens,
-              // Never evicted: the agent's role may not delete, and the SDK
-              // swallows a refused delete. The bucket's retention keeps them.
-              evictAfterCycles: null,
-              ...(spec.offload.previewTokens === undefined
-                ? {}
-                : { previewTokens: spec.offload.previewTokens }),
-            }) as Plugin,
-          ]),
-    ],
-    ...(options.interventions === undefined
-      ? {}
-      : { interventions: [...options.interventions] }),
-    ...(options.conversationManager === undefined
-      ? {}
-      : { conversationManager: options.conversationManager }),
-    structuredOutputSchema: owned.wire,
-    ...(storage === undefined
-      ? {}
-      : { storage, sessionManager: new SessionManager({ sessionId }) }),
-    ...(storage === undefined || spec.memorySpace === undefined
-      ? {}
-      : {
-          memoryManager: {
-            stores: [
-              new FileMemoryStore({
-                name: spec.memorySpace,
-                writable: true,
-                extraction: false,
-                storage,
-              }),
-            ],
-            addToolConfig: true,
-          },
-        }),
-    retryStrategy:
-      context.retryStrategy === null ? null : new RetryUnlessSpendLimited(),
-    ...(context.agentName === undefined ? {} : { name: context.agentName }),
-    printer: false,
-  });
-
-  // One submission is validated at a time, in the order the agent made them,
-  // so the first accepted is the outcome whichever tool call finishes first.
-  let validated: Promise<unknown> = Promise.resolve();
-  agent.addHook(BeforeToolCallEvent, (event) => {
-    if (event.toolUse.name !== STRUCTURED_OUTPUT_TOOL) return;
-    const turn = validated.then(async () => {
-      if (ended !== undefined || accepted !== undefined) {
-        event.cancel = RUN_ENDING;
+          );
+          return;
+        }
+        if (refusal === undefined) {
+          accepted = { value: await spec.output.parseAsync(submission) };
+          return;
+        }
+        lastRefusal = refusal;
+        event.cancel = refusal;
+        if (attempts >= owned.maxAttempts) {
+          end(
+            cause(
+              'OUTPUT_INVALID',
+              `the agent could not produce accepted structured output in ${attempts} attempts; the last was refused: ${refusal}`,
+              { payload: submission },
+            ),
+          );
+        }
+      });
+      validated = turn;
+      return turn;
+    });
+    // An accepted submission Strands did not settle on — not the first in its
+    // message — still ends the run.
+    agent.addHook(BeforeModelCallEvent, (event) => {
+      if (accepted === undefined) return;
+      event.cancel = RUN_ENDING;
+      agent?.cancel();
+    });
+    // A turn ended without an accepted submission: Strands would force the
+    // tool next, which the current models refuse.
+    agent.addHook(AfterModelCallEvent, (event) => {
+      if (event.stopData?.stopReason !== 'endTurn' || accepted !== undefined) {
         return;
       }
-      attempts += 1;
-      const submission = owned.unwrap(event.toolUse.input);
-      let refusal: string | undefined;
+      end(
+        cause(
+          'OUTPUT_INVALID',
+          lastRefusal === undefined
+            ? 'the run ended without structured output'
+            : `the run ended without accepted structured output; the last was refused: ${lastRefusal}`,
+          { payload: textOf(event.stopData.message) },
+        ),
+      );
+    });
+
+    let result: AgentResult | undefined;
+    let invokeError: unknown;
+    try {
+      result = await agent.invoke(prompt, {
+        cancelSignal: environment.signal,
+        ...(options.limits === undefined ? {} : { limits: options.limits }),
+      });
+    } catch (error) {
+      invokeError = error;
+    } finally {
+      // Flushes what Strands defers, so nothing is lost with the process.
       try {
-        refusal = await validateStructuredOutput(
-          { output: spec.output, guards: spec.guardrails?.stop ?? [] },
-          submission,
-        );
+        await agent.shutdown();
       } catch (error) {
-        // A guard that throws is a defect, never told to the agent.
-        event.cancel = RUN_ENDING;
+        console.error('the agent did not shut down', error);
         end(
           cause(
             'EXECUTION_ERROR',
-            `a stop guard threw while the structured output was validated: ${describe(error)}`,
-          ),
-        );
-        return;
-      }
-      if (refusal === undefined) {
-        accepted = { value: await spec.output.parseAsync(submission) };
-        return;
-      }
-      lastRefusal = refusal;
-      event.cancel = refusal;
-      if (attempts >= owned.maxAttempts) {
-        end(
-          cause(
-            'OUTPUT_INVALID',
-            `the agent could not produce accepted structured output in ${attempts} attempts; the last was refused: ${refusal}`,
-            { payload: submission },
+            `the agent did not shut down, so what it defers may be lost: ${describeError(error)}`,
           ),
         );
       }
-    });
-    validated = turn;
-    return turn;
-  });
-  // An accepted submission Strands did not settle on — not the first in its
-  // message — still ends the run.
-  agent.addHook(BeforeModelCallEvent, (event) => {
-    if (accepted === undefined) return;
-    event.cancel = RUN_ENDING;
-    agent?.cancel();
-  });
-  // A turn ended without an accepted submission: Strands would force the
-  // tool next, which the current models refuse.
-  agent.addHook(AfterModelCallEvent, (event) => {
-    if (event.stopData?.stopReason !== 'endTurn' || accepted !== undefined) {
-      return;
+      try {
+        await context.flushTelemetry?.();
+      } catch (error) {
+        // Telemetry is not the outcome: logged, and the run stands.
+        console.error("the run's telemetry did not flush", error);
+      }
     }
-    end(
-      cause(
-        'OUTPUT_INVALID',
-        lastRefusal === undefined
-          ? 'the run ended without structured output'
-          : `the run ended without accepted structured output; the last was refused: ${lastRefusal}`,
-        { payload: textOf(event.stopData.message) },
-      ),
-    );
-  });
 
-  let result: AgentResult | undefined;
-  let invokeError: unknown;
-  try {
-    result = await agent.invoke(prompt, {
-      cancelSignal: environment.signal,
-      ...(options.limits === undefined ? {} : { limits: options.limits }),
-    });
-  } catch (error) {
-    invokeError = error;
+    const accumulated = agent.metrics.accumulatedUsage;
+    const reachedModel = agent.metrics.cycleCount > 0;
+    const usage: RunUsage | undefined = reachedModel
+      ? {
+          inputTokens: accumulated.inputTokens,
+          outputTokens: accumulated.outputTokens,
+          cacheReadInputTokens: accumulated.cacheReadInputTokens ?? 0,
+          cacheCreationInputTokens: accumulated.cacheWriteInputTokens ?? 0,
+        }
+      : undefined;
+    const record: RunRecord = {
+      framework: { name: 'strands', fullName: STRANDS_SDK_FULL_NAME },
+      promptHash,
+      promptBytes: Buffer.byteLength(JSON.stringify(prompt)),
+      options: recordableOptions(options, spec),
+      sessionId,
+      ...(context.storage === undefined
+        ? {}
+        : {
+            transcript: {
+              bucket: context.storage.bucket,
+              agent: context.storage.agent,
+            },
+          }),
+      numberOfTurns: agent.metrics.cycleCount,
+      durationMilliseconds: Date.now() - startedAt,
+      ...(result === undefined ? {} : { terminalReason: result.stopReason }),
+      ...(usage === undefined ? {} : { usage, rawUsage: accumulated }),
+    };
+    environment.onRecord(record);
+
+    if (environment.signal.aborted) throw new TaskCanceled();
+    if (ended !== undefined) throw new TaskFailure(ended);
+    if (invokeError !== undefined) throw new TaskFailure(classify(invokeError));
+    if (result === undefined) {
+      throw new TaskFailure(
+        cause('EXECUTION_ERROR', 'the run ended without a result'),
+      );
+    }
+    if (accepted === undefined) {
+      throw new TaskFailure(settlementFailure(result));
+    }
+    if (usage === undefined) {
+      throw new TaskFailure(
+        cause(
+          'EXECUTION_ERROR',
+          'the run answered, but reports no model call and no token usage',
+        ),
+      );
+    }
+    return {
+      output: accepted.value,
+      sessionId,
+      usage,
+      rawUsage: accumulated,
+      record,
+    };
   } finally {
-    // Flushes what Strands defers, so nothing is lost with the process.
-    await agent.shutdown();
-    await context.flushTelemetry?.();
+    await disconnectMcpClients(mcpClients);
   }
-
-  const accumulated = agent.metrics.accumulatedUsage;
-  const reachedModel = agent.metrics.cycleCount > 0;
-  const usage: RunUsage | undefined = reachedModel
-    ? {
-        inputTokens: accumulated.inputTokens,
-        outputTokens: accumulated.outputTokens,
-        cacheReadInputTokens: accumulated.cacheReadInputTokens ?? 0,
-        cacheCreationInputTokens: accumulated.cacheWriteInputTokens ?? 0,
-      }
-    : undefined;
-  const record: RunRecord = {
-    framework: { name: 'strands', fullName: STRANDS_SDK_FULL_NAME },
-    promptHash,
-    promptBytes: Buffer.byteLength(JSON.stringify(prompt)),
-    options: recordableOptions(options, spec),
-    sessionId,
-    ...(context.storage === undefined
-      ? {}
-      : {
-          transcript: {
-            bucket: context.storage.bucket,
-            agent: context.storage.agent,
-          },
-        }),
-    numberOfTurns: agent.metrics.cycleCount,
-    durationMilliseconds: Date.now() - startedAt,
-    ...(result === undefined ? {} : { terminalReason: result.stopReason }),
-    ...(usage === undefined ? {} : { usage, rawUsage: accumulated }),
-  };
-  environment.onRecord(record);
-
-  if (environment.signal.aborted) throw new TaskCanceled();
-  if (ended !== undefined) throw new TaskFailure(ended);
-  if (invokeError !== undefined) throw new TaskFailure(classify(invokeError));
-  if (result === undefined) {
-    throw new TaskFailure(
-      cause('EXECUTION_ERROR', 'the run ended without a result'),
-    );
-  }
-  if (accepted === undefined) {
-    throw new TaskFailure(settlementFailure(result));
-  }
-  if (usage === undefined) {
-    throw new TaskFailure(
-      cause(
-        'EXECUTION_ERROR',
-        'the run answered, but reports no model call and no token usage',
-      ),
-    );
-  }
-  return {
-    output: accepted.value,
-    sessionId,
-    usage,
-    rawUsage: accumulated,
-    record,
-  };
 }
 
 /** Why a run that ended with a result has no accepted output, from its stop reason. */
@@ -426,6 +437,13 @@ function ownedByTheRunner<Output>(
     refuse(
       "a strands run sets neither `backgroundTasks` nor `cacheConfig`: nothing runs in the background (§REQ206), and cache points come from the prompt's cache breakpoints (§REQ210)",
     );
+  }
+  for (const key of RUNNER_OWNED_CLIENT_KEYS) {
+    if (key in (options.modelConfig ?? {})) {
+      refuse(
+        `a strands run's \`modelConfig\` sets no \`${key}\`: the runner owns the Anthropic client, its key (§REQ714) and the request's cancel`,
+      );
+    }
   }
   for (const [name, client] of Object.entries(options.mcpClients ?? {})) {
     if (client.continueOnError) {
@@ -501,6 +519,48 @@ async function refuseUnknownSession(
   }
 }
 
+/**
+ * Connects every MCP server before the first turn: one that does not start
+ * fails the run (§REQ201), and a cancel stops the wait.
+ */
+async function connectMcpClients(
+  clients: Readonly<Record<string, McpClient>>,
+  signal: AbortSignal,
+): Promise<void> {
+  for (const [name, client] of Object.entries(clients)) {
+    try {
+      await client.connect(false, { signal });
+    } catch (error) {
+      if (signal.aborted) throw new TaskCanceled();
+      throw new TaskFailure(
+        cause(
+          'EXECUTION_ERROR',
+          `MCP server "${name}" did not start: ${describeError(error)}`,
+        ),
+      );
+    }
+  }
+}
+
+/**
+ * Disconnects every MCP server once the run is over, however it ended; a
+ * stdio server is a child process. One that does not disconnect is logged:
+ * the outcome is already settled, and the task process's exit ends it.
+ */
+async function disconnectMcpClients(
+  clients: Readonly<Record<string, McpClient>>,
+): Promise<void> {
+  await Promise.all(
+    Object.entries(clients).map(async ([name, client]) => {
+      try {
+        await client.disconnect();
+      } catch (error) {
+        console.error(`MCP server "${name}" did not disconnect`, error);
+      }
+    }),
+  );
+}
+
 /** A message's text, for a cause's payload. */
 function textOf(message: Message | undefined): string | undefined {
   const texts = (message?.content ?? []).flatMap((block) =>
@@ -546,13 +606,11 @@ function recordableOptions(
       : { mcpClients: Object.keys(options.mcpClients) }),
     ...(options.plugins === undefined
       ? {}
-      : { plugins: names(options.plugins as unknown as { name?: unknown }[]) }),
+      : { plugins: names(options.plugins) }),
     ...(options.interventions === undefined
       ? {}
       : {
-          interventions: names(
-            options.interventions as unknown as { name?: unknown }[],
-          ),
+          interventions: names(options.interventions),
         }),
     ...(options.workingDirectories === undefined
       ? {}

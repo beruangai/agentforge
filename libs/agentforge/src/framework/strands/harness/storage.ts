@@ -37,26 +37,36 @@ export function storageFromEnvironment(
   };
 }
 
+/** A storage call the SDK makes. */
+export type StorageOperation = 'write' | 'read' | 'list';
+
 /**
- * The storage as the SDK sees it, reporting each write it could not make.
- * The SDK swallows a failed write in a hook or keeps an unoffloaded result,
- * so the runner fails the run instead (ADR 0011).
+ * The storage as the SDK sees it, reporting each call that failed. The SDK
+ * swallows a failed write in a hook, keeps an unoffloaded result, and recalls
+ * no memory from a failed read or list, so the runner fails the run instead
+ * (ADR 0011). A missing key is not a failure: the storage reads it as `null`.
  */
 export function recordingStorage(
   storage: Storage,
-  onRefused: (key: string, error: unknown) => void,
+  onFailed: (operation: StorageOperation, key: string, error: unknown) => void,
 ): Storage {
+  const reported = async <Result>(
+    operation: StorageOperation,
+    key: string,
+    call: () => Promise<Result>,
+  ): Promise<Result> => {
+    try {
+      return await call();
+    } catch (error) {
+      onFailed(operation, key, error);
+      throw error;
+    }
+  };
   return {
-    write: async (key, data) => {
-      try {
-        await storage.write(key, data);
-      } catch (error) {
-        onRefused(key, error);
-        throw error;
-      }
-    },
-    read: (key) => storage.read(key),
+    write: (key, data) =>
+      reported('write', key, () => storage.write(key, data)),
+    read: (key) => reported('read', key, () => storage.read(key)),
     delete: (key) => storage.delete(key),
-    list: (query) => storage.list(query),
+    list: (prefix) => reported('list', prefix, () => storage.list(prefix)),
   };
 }
