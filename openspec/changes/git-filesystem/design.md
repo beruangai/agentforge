@@ -201,7 +201,7 @@ readonly repositories?: Readonly<Record<string, string>>; // name → https:// U
 ### Repository declaration
 
 - **The variable**: `AGENTFORGE_FILESYSTEM_REPOSITORIES` is `{ name: location }`.
-- **Locally**: Nx loads the project's `.env` into every target and `.env.serve` and `.env.serve.local` into serve, the later winning. A project whose `.env` names a default remote therefore overrides it in `.env.serve` or `.env.serve.local` with a host directory, or a local serve pushes to that remote. The example declares only `.env.serve`, with a host directory.
+- **Locally**: Nx loads the project's `.env` into every target and `.env.serve` and `.env.serve.local` into serve, the later winning. A project whose `.env` names a default remote therefore overrides it in `.env.serve` or `.env.serve.local` with a host directory, or a local serve pushes to that remote. The example declares only `.env.serve`, with a host directory. A repository several projects share is declared in the workspace root's files, which Nx loads after the project's (§ Seeding a host repository).
 - **The serve executor**: for a location that is an absolute or workspace-relative path,
   - creates the bare repository if absent (`git init --bare -b main`, `uploadpack.allowFilter`), as it creates a missing bucket;
   - bind-mounts it at `/mnt/agentforge-repositories/<name>`;
@@ -210,6 +210,44 @@ readonly repositories?: Readonly<Record<string, string>>; // name → https:// U
   An `https://` location is passed as it is.
 - **On AgentCore**: `AgentRuntime({ repositories })` sets the variable. The token is an ordinary declared secret in `secrets`.
 - **Branch**: from the option only, `main` by default. A consumer that wants another branch per environment sets the option from a variable of its own in its shared options; AgentForge names none.
+
+### Seeding a host repository
+
+A host repository that serve creates empty has a history unrelated to the repository's remote, so it can never be synced with it later. StrategyFoundry sets one up by hand today. The `seed-repository` target seeds it from the remote instead.
+
+- **The target**: `seed-repository`, executor `@beruangai/agentforge:seed-repository`. Its options are given on the command line:
+  - `repository`, the name `AGENTFORGE_FILESYSTEM_REPOSITORIES` and a git filesystem's `repository` use;
+  - `remote`, `https://` only;
+  - `location`, absolute or workspace-relative;
+  - `readingClone`, optional.
+- **Workspace level, run from any project.** Everything it creates and declares belongs to the workspace: the host location, and the workspace root's `.env.serve` or `.env.serve.local`.
+  - Nx 23.3 loads a task's env files from the project root first and then from the workspace root, and the first definition of a variable wins (`getEnvPathsForTask`). So the workspace's declaration reaches every agentic project's `serve-<agent>` and the workflow project's `serve`, unless a project's own file defines the variable.
+  - The workflow project's serve runs from the workspace root, so a workspace-relative location means the same directory to its worker.
+  - The target is vended on every agentic and workflow project, not once at the workspace. Nx has no workspace-level target without a root project, which AgentForge does not own. The local store and the Temporal server already set the precedent: a target on each project over state the machine shares.
+- **Default location**: `.agentforge/repositories/<repository>.git`. It is workspace-relative, so its declaration in `.env.serve` can be committed. A location inside the workspace that `git check-ignore` does not report gets its workspace-relative path appended to the workspace's `.gitignore`. That keeps it out of version control and out of Nx's file graph.
+- **Creating**:
+  1. Validate the remote: a URL with the `https:` scheme and no user name or password. Anything else fails before anything is created.
+  2. Clone into a temporary sibling, `<parent>/.<basename>.seeding-<uuid7>`, with `git clone --bare <remote>`. The clone keeps the remote's branches and its `origin`.
+  3. Set `uploadpack.allowFilter`.
+  4. Rename the sibling into place.
+
+  A failure removes the temporary sibling, which is the target's own. Nothing pushes, and nothing fetches later; `origin` stays for an explicit sync.
+- **An existing location** is adopted only when it is a bare repository of the same remote.
+  - A bare repository is one whose `git rev-parse --absolute-git-dir` is the location itself, not a workspace around it.
+  - Its `remote.origin.url` must equal the remote, compared after dropping a trailing `/` and `.git`.
+  - Adopting it adds `uploadpack.allowFilter` if missing. This adopts StrategyFoundry's existing `git clone --bare`.
+  - Anything else fails, naming the path: a working clone, an empty or other directory, a bare repository with no `origin`, or one with another `origin`.
+- **The declaration**:
+  - The entry is merged into the variable's JSON in the workspace root's `.env.serve` (relative location) or `.env.serve.local` (absolute). The variable's line is replaced and every other line is kept. An entry already naming another location fails.
+  - A file that defines the variable replaces it whole, since its value is one JSON value. So the target then reads the variable as each agentic and workflow project's serve would load it, through Nx's own `getEnvPathsForTask` and `util.parseEnv`. If any project would not see this entry, the target fails, naming the file that masks it: a project's own `.env.serve`, say, or the workspace's `.env.serve.local`.
+- **The reading clone**:
+  - When it is absent, `git clone <location> <readingClone>`.
+  - When it exists, it must be a working clone at its own root that shares a commit with the host repository: some commit of `rev-list --all` in both. Then its `origin` is set to the location, or added, and the previous URL is printed.
+  - Otherwise the target fails, naming it.
+- **Credentials**: the host's own git, with its environment and configuration (a credential helper, `gh`). The target reads no token variable and sets no credential. Git's output is shown as it is. It carries no secret, because the URL has none and git prints no credential.
+- **Serve's empty-repository fallback stays, for a repository with no remote.** When serve creates one, it logs that it did and names `seed-repository` for a repository with a remote.
+  - Refusing was rejected. A repository with no remote, like the example's, would then need a seeding step with nothing to seed from.
+  - A host repository created empty and then seeded fails loudly (no `origin`). It never silently joins two histories.
 
 ### `delete` permission
 
@@ -246,6 +284,18 @@ Every git child is spawned without a shell, as a child of the task process, so a
   - no token in the environment, and none in a cause.
 
   This is AgentForge's composition of git, which the platform does not guarantee.
+- **`integ/local/seed-repository`**, against real git and a remote served over HTTPS from a temporary bare repository: git's dumb HTTP protocol (`update-server-info`), and a self-signed certificate that the test trusts through `GIT_SSL_CAINFO`. It covers:
+  - a fresh default location, whose `main` matches the remote's;
+  - a GitFilesystem mounting the seeded history and pushing, with the remote's refs unchanged;
+  - a re-run changing no file;
+  - adopting a hand-made `git clone --bare` without `uploadpack.allowFilter`;
+  - a working clone failing with its path named;
+  - a URL with userinfo failing before cloning;
+  - a reading clone created and one re-pointed, fetching the pushed commit;
+  - a masking project file named;
+  - no credential in any file written.
+
+  The served path over a host repository is covered by `smoke-coverage`'s e2e. A served agent over a seeded repository would need an HTTPS remote in the e2e, which waits with the hosted remote (Non-goals).
 - **`integ/aws/filesystem-s3-sync`**: one more case, a pull over a kept copy keeping a newer local edit. It is `s7cmd` behaviour AgentForge now relies on, and it could move with a release.
 - **e2e local** (`smoke-coverage`): a procedure on a git filesystem, through the client, against the serve target's host repository.
   - The first task's agent writes a file in the write scope and calls its push tool. The host repository then holds that commit, with the agent's message and the trailers, which proves the tool's rendering under `dontAsk`.
@@ -264,9 +314,11 @@ Every git child is spawned without a shell, as a child of the task process, so a
 - **A kept copy can hold a failed task's half-written files, and the next completed task's push publishes them.** → That is what keeping means (proposal). `removeLocalCopy` opts out.
 - **Two writers on one file never merge.** → The retry pulls the new tip. Consumers partition by subpath, as for S3.
 - **Each local directory keeps its own clone.** → Blobless, bounded by the session.
+- **A project's own `.env.serve` masks the workspace's repositories**, because Nx loads the project's file first and a variable is one value. → The seeding target fails, naming the masking file; the guidance says to declare repositories at the workspace root.
 
 ## Migration Plan
 
 - Consumers' filesystems now keep their local copies. Anyone relying on removal sets `removeLocalCopy: true`. This goes in `claude-plugin/skills/agentforge/references/migrations.md`.
+- Sync adds `seed-repository` to every agentic and workflow project. A host repository set up by hand from a remote is adopted by running it once; this also goes in `migrations.md`.
 - The `delete` permission is additive; handlers that iterate permissions see a new action only where deletes are enabled.
 - Rolling back is a revert; there is no persisted state outside the container.

@@ -1,6 +1,6 @@
 # Tasks
 
-Groups 1–2 come first. Groups 3 and 4 depend on 1 and can run in parallel with each other. Group 5 depends on 3; group 6 on 3–5; group 7 on everything.
+Groups 1–2 come first; 2.6 also depends on 3. Groups 3 and 4 depend on 1 and can run in parallel with each other. Group 5 depends on 3; group 6 on 3–5; group 7 on everything.
 
 ## 1. Base lifecycle: kept copies and the `delete` permission
 
@@ -15,7 +15,16 @@ Groups 1–2 come first. Groups 3 and 4 depend on 1 and can run in parallel with
 
 - [ ] 2.1 `FILESYSTEM_REPOSITORIES_VARIABLE` in `core/filesystem.ts`, and one `parseDeclared(variable, value)` replacing `parseDeclaredBuckets` for both, with tests.
 - [ ] 2.2 `AgentRuntime` takes `repositories` and names them to the harness. Construct test.
-- [ ] 2.3 The serve executor maps each repository. A path location: create a bare repository if it is absent (`uploadpack.allowFilter`), bind-mount it at `/mnt/agentforge-repositories/<name>`, and pass `file://`. A URL location passes as it is. Executor tests.
+- [ ] 2.3 The serve executor maps each repository. A path location: create a bare repository if it is absent (`uploadpack.allowFilter`), logging that it did and naming `seed-repository`; bind-mount it at `/mnt/agentforge-repositories/<name>`; and pass `file://`. A URL location passes as it is. Executor tests.
+- [ ] 2.4 The `seed-repository` executor (design § Seeding a host repository), with unit tests for remote validation, origin comparison, the env-file merge and the masking check:
+  - validation before anything is created;
+  - a clone into a temporary sibling, renamed into place, with `uploadpack.allowFilter`;
+  - adopting a bare repository of the same remote, and failing on anything else at the location;
+  - `.gitignore` for a location inside the workspace;
+  - the env-file merge, and the check that every project sees the entry;
+  - the reading clone.
+- [ ] 2.5 Vend `seed-repository` on agentic and workflow projects, through their targets and sync. Update the generator snapshots and sync tests.
+- [ ] 2.6 `integ/local/seed-repository` (design § Tests). The HTTPS remote is a spike, settled in the test itself.
 
 ## 3. `GitFilesystem`
 
@@ -55,6 +64,6 @@ Groups 1–2 come first. Groups 3 and 4 depend on 1 and can run in parallel with
 ## 7. Documents and guidance
 
 - [ ] 7.1 `docs/ARCHITECTURE.md`: Filesystems (kept copies, `delete`, the git kind, the claim released at unmount), the `/agent` and `/infra` surfaces, serve's repositories. `docs/ROADMAP.md`: StrategyFoundry's store and "git later". The root `README.md`: files within a session, `context.agentOptions`, `.env.serve`.
-- [ ] 7.2 `docs/REQUIREMENTS.md`: §REQ405, and §REQ403 amended in place. The Numbering rule gains the ADRs' exception — until a consumer depends on it, a requirement's meaning may be corrected in place by the operator — and §REQ403 notes its amendment. `docs/GLOSSARY.md`: the Filesystem entry (the git kind, `delete`, the kept local copy, the agent push) and the Agent options entry (the push tool).
-- [ ] 7.3 `claude-plugin/skills/agentforge/` skill: declaring a git filesystem at module scope, its token as an unrequired secret, `removeLocalCopy`, the agent push, the S3 kept copy with deletes, and spawning with an explicit environment. `references/migrations.md`: the unmount default.
+- [ ] 7.2 `docs/REQUIREMENTS.md`: §REQ405 and §REQ715, and §REQ403 amended in place. The Numbering rule gains the ADRs' exception — until a consumer depends on it, a requirement's meaning may be corrected in place by the operator — and §REQ403 notes its amendment. `docs/GLOSSARY.md`: the Filesystem entry (the git kind, `delete`, the kept local copy, the agent push) and the Agent options entry (the push tool).
+- [ ] 7.3 `claude-plugin/skills/agentforge/` skill: declaring a git filesystem at module scope, its token as an unrequired secret, `removeLocalCopy`, the agent push, the S3 kept copy with deletes, and spawning with an explicit environment. The Generate and operating references: `seed-repository`, declaring repositories at the workspace root, and serve's empty host repository being for a repository with no remote. `references/migrations.md`: the unmount default and `seed-repository`.
 - [ ] 7.4 `.claude/rules/testing.md`: `git` ≥ 2.40 on the `PATH` for `integ` `local` and serve.

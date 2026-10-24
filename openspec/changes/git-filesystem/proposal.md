@@ -23,6 +23,7 @@ TrendBot's git lifecycle is evidence, not a specification (`docs/lineage/predece
   - It has no timer checkpoints. When it pushes on `TASK_STATE_FAILED`, the agent gets a push tool, so the agent decides when partial work is worth publishing.
   - The repository is named, and each deployment's environment maps the name to a URL. Locally that is a host repository the serve target mounts; in the cloud, a remote.
   - The remote's token is a declared secret. The git kind takes it out of the task's environment and gives it to git alone, so it is absent from the agent's environment. The task process's initial environment, readable under `/proc` to an unfenced shell, still holds it, as it holds every secret; that is recorded under §ODO005.
+- **A target seeds a host repository from its remote.** `seed-repository`, on every agentic and workflow project, bare-clones a declared repository's `https://` remote into a host location, `.agentforge/repositories/<name>.git` in the workspace by default, kept out of version control. It declares that location for every project's local serving, in the workspace root's env files. It adopts a bare clone made by hand, optionally points a reading clone at it, and never writes to the remote. It uses the host's own git credentials and refuses a URL carrying any. Serve still creates an empty host repository, but only for a repository with no remote, and it names the target when it does. StrategyFoundry seeds its strategies repository this way instead of by hand.
 - **The AgentForge image installs `git`.**
 
 ## Requirements
@@ -32,6 +33,7 @@ TrendBot's git lifecycle is evidence, not a specification (`docs/lineage/predece
 - Serves §REQ603: no credential in anything AgentForge emits.
 - Serves §REQ701: one code path. A local host repository and a remote are the same kind, chosen by the environment.
 - Serves §REQ306: refuse, never queue. A mount's claim is unchanged.
+- **New, §REQ715**: "A consumer develops locally against a host copy of a declared repository's history, seeded from its remote without writing to it, and shared by every project in its workspace."
 - **New, §REQ405**: "A procedure's durable files may live in a version-controlled repository, so each change it persists is recorded with its history and author, and two writers' changes to one file are refused, never silently overwritten."
 - Leaves unmet: the credential broker and token rotation (§ODO005). A git write token is a key with access beyond inference, which is §ODO005's trigger. Because the token is absent from the agent's environment and its remaining exposure is the `/proc` one every secret has, the operator deferred §ODO005 again on 2026-10-24 (recorded in `DESIGN_OPTIONS.md`). Rotation stays manual.
 
@@ -52,6 +54,7 @@ TrendBot's git lifecycle is evidence, not a specification (`docs/lineage/predece
 - **The framework's derived run options**: a push tool for each mount that offers one. The framework is what renders mounts into a run (ADR 0021).
 - **A deployment's declaration** of repositories, beside its buckets: the serve target's environment and `AgentRuntime`. That is where a store is mapped to a deployment.
 - **The AgentForge image**: `git`.
+- **The vended `seed-repository` target** on agentic and workflow projects: how a consumer seeds a host repository. Generated targets are the plugin's interface (ADR 0010).
 
 ## Capabilities
 
@@ -66,13 +69,16 @@ TrendBot's git lifecycle is evidence, not a specification (`docs/lineage/predece
   - Deletes enabled add a `delete` permission.
 - `harness-framework`: the derived run options include a push tool for a mount that offers one, and render nothing for `delete`.
 - `infra-agent-runtime`: a deployment names its repositories, and maps a repository's token as a secret that is not required.
-- `plugin-agentic-agent`: serving an agent provides its declared repositories, creating a missing host repository.
+- `plugin-agentic-agent`: serving an agent provides its declared repositories, creating a missing host repository for a repository with no remote.
+- `plugin-agentic-project`: a target seeds a host repository from its remote, for every project of the workspace.
+- `plugin-workflow-project`: the same target, and the same declared repositories in the workflow project's local run.
 
 ## Non-goals
 
 - Branches per task, procedure or agent; pull requests; merging branches. Everything is on one branch.
 - Timer checkpoints for git.
 - Git LFS, submodules, signed commits, SSH remotes.
+- Syncing a host repository with its remote, or a host repository per environment.
 - A credential broker or automatic token rotation (§ODO005).
 - An end-to-end run against a hosted remote on AgentCore. It waits for StrategyFoundry's first deploy; local e2e and `integ` use a repository on disk.
 - A delete tool for the agent.
@@ -82,7 +88,7 @@ TrendBot's git lifecycle is evidence, not a specification (`docs/lineage/predece
 
 - The harness's filesystems (base lifecycle, S3 and scratch kinds, a new git kind) and both frameworks' derived run options.
 - `/agent` exports; the core declaration of repositories.
-- The Nx plugin's serve executor (bind-mounting a local repository) and `AgentRuntime` (`repositories`).
+- The Nx plugin's serve executor (bind-mounting a local repository), a new `seed-repository` executor vended on agentic and workflow projects, and `AgentRuntime` (`repositories`).
 - The AgentForge image's `Dockerfile` (`git`).
 - Docs:
   - `docs/ARCHITECTURE.md`.
@@ -93,5 +99,5 @@ TrendBot's git lifecycle is evidence, not a specification (`docs/lineage/predece
   - ADR 0015, mutated in place for kept copies and the `delete` permission.
   - New ADR 0024, proposed.
   - `docs/research/` (git and `s7cmd` behaviour relied on).
-- The AgentForge plugin's skill and `references/migrations.md` (the unmount default).
-- `packages/examples/smoke-coverage`: a procedure on a git filesystem, with local e2e. Its existing store round trips read from another runtime session, since a kept copy would otherwise answer them. `integ/local/filesystem-git`.
+- The AgentForge plugin's skill (Generate and operating references) and `references/migrations.md` (the unmount default, `seed-repository`).
+- `packages/examples/smoke-coverage`: a procedure on a git filesystem, with local e2e. Its existing store round trips read from another runtime session, since a kept copy would otherwise answer them. `integ/local/filesystem-git` and `integ/local/seed-repository`.

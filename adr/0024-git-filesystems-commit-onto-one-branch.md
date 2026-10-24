@@ -61,6 +61,10 @@ A store with history is needed for StrategyFoundry's strategy artifacts, and S3 
   * Timer checkpoints were rejected because each would be a commit the agent did not choose.
   * Offering none was rejected: a kept local copy survives the task but not the container, which an idle timeout, `maxLifetime`, a deploy or a loss ends.
 * **A repository is named, and the deployment maps the name** to a remote or, locally, a host repository the serve target mounts, as buckets are mapped. One code path everywhere (§REQ701).
+* **A host repository with a remote is seeded from it** by the `seed-repository` target, a bare clone that never writes back. Serve creates an empty host repository only for a repository with no remote, and names the target when it does.
+  * An empty repository has a history unrelated to the remote's, so it could never be synced with it.
+  * Refusing to create one was rejected: a repository with no remote would then need a seeding step with nothing to seed from.
+  * The target is on each project but its effect is the workspace's: one location and one declaration at the workspace root, which every project's serve loads after its own. Nx has no workspace-level target without a root project, and the local store set the precedent.
 
 ### Consequences
 
