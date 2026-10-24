@@ -24,7 +24,7 @@ Groups 1–2 come first; 2.6 also depends on 3. Groups 3 and 4 depend on 1 and c
   - the env-file merge, and the check that every project sees the entry;
   - the reading clone.
 - [x] 2.5 Vend `seed-repository` on agentic and workflow projects, through their targets and sync. Update the generator snapshots and sync tests.
-- [ ] 2.6 `integ/local/seed-repository` (design § Tests). The HTTPS remote is a spike, settled in the test itself.
+- [x] 2.6 `integ/local/seed-repository` (design § Tests). The HTTPS remote is a spike, settled in the test itself.
 
 ## 3. `GitFilesystem`
 
