@@ -130,8 +130,9 @@ describe('filesystems registered on a procedure', () => {
     });
     expect(house.calls).toEqual([]);
     expect(workspace.calls).toEqual(['pull /', 'push /']);
+    // Kept for the session's next task: none of them declares its copy removed.
     for (const name of ['workspace', 'scratch', 'notes']) {
-      expect(existsSync(join(root, name))).toBe(false);
+      expect(existsSync(join(root, name))).toBe(true);
     }
   });
 

@@ -104,7 +104,7 @@ export class S3Filesystem extends Filesystem {
       exclude = [],
       ...filesystemOptions
     } = options;
-    super(filesystemOptions);
+    super(filesystemOptions, { deletes: dangerouslyEnableDeletes });
     if (!FILESYSTEM_NAME_PATTERN.test(bucket)) {
       throw new Error(
         `bucket "${bucket}" must match ${FILESYSTEM_NAME_PATTERN}`,
@@ -122,6 +122,11 @@ export class S3Filesystem extends Filesystem {
         `filesystem "${mount.name}": dangerouslyEnableDeletes needs a remote root or subpath, since on the whole bucket it could empty it`,
       );
     }
+  }
+
+  /** The bucket the deployment declared under its name. */
+  protected storeIdentity(mount: Mount): string {
+    return this.#remoteUrl({ ...mount, remotePath: '/' });
   }
 
   protected pull(mount: Mount): Promise<void> {

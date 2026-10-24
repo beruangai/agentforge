@@ -1,4 +1,4 @@
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { isAbsolute, join, matchesGlob, posix } from 'node:path';
 import { z } from 'zod';
 import {
@@ -8,6 +8,12 @@ import {
 } from '#core/contract/task.ts';
 import type { FrameworkTypes, TaskContext } from '../framework.ts';
 import { TaskFailure } from '../task-failure.ts';
+import {
+  type KeptCopy,
+  recordKeptCopy,
+  removeForeignKeptCopies,
+  removeKeptCopy,
+} from './kept-copies.ts';
 import { claimLocalDirectory } from './mount-claims.ts';
 
 /** The task states a filesystem may push on: a cancel never pushes, and a rejected task never mounts. */
@@ -53,6 +59,12 @@ export interface FilesystemOptions {
     readonly intervalSeconds: number;
     readonly settleSeconds: number;
   };
+  /**
+   * Remove the local copy at unmount. Off, the copy is kept: the next task of
+   * the same runtime session that mounts the same directory, for the same
+   * store, starts from it, brought up to date by its pull.
+   */
+  readonly removeLocalCopy?: boolean;
 }
 
 /** Strict: a misspelt option is refused, never dropped. A kind strips its own before these. */
@@ -88,6 +100,7 @@ const FilesystemOptionsSchema = z
         settleSeconds: z.number().int().min(0),
       })
       .optional(),
+    removeLocalCopy: z.boolean().optional(),
   })
   .refine(
     (options) =>
@@ -105,10 +118,12 @@ export interface Mount {
   /** What it mounts from the store: `<remoteRoot>/<subpath>`, absolute within the store, `/` for all of it. A kind maps it to its store's addressing. */
   readonly remotePath: string;
   readonly write: readonly string[];
+  /** The request it was resolved for: a kind reads the task's identifiers from its context. */
+  readonly request: FilesystemRequest;
 }
 
-/** What a permission lets an agent do. */
-export type PermissionAction = 'read' | 'edit';
+/** What a permission lets an agent do. `delete` is stated when the filesystem enables deletes; no framework renders it. */
+export type PermissionAction = 'read' | 'edit' | 'delete';
 
 /** A baseline permission on a mount, in no framework's syntax: its framework renders it. */
 export interface Permission {
@@ -127,6 +142,21 @@ export interface MountedFilesystem {
   path(relativePath: string): string;
   /** As `path`, and throws unless a write glob of the scope matches it: a write outside the scope would never be pushed. */
   writablePath(relativePath: string): string;
+  /**
+   * Records and publishes the write scope now, with `message`, queued with
+   * every other push of the mount. Present only where the kind offers the
+   * agent a push and `pushOn` includes `TASK_STATE_FAILED`, since it
+   * publishes before the outcome is known.
+   */
+  readonly push?: (message: string) => Promise<PushReport>;
+}
+
+/** What a push recorded. */
+export interface PushReport {
+  /** The commit pushed; absent when there was nothing to record. */
+  readonly commit?: string;
+  /** Relative to the mount. */
+  readonly files: readonly string[];
 }
 
 /** The store failed or disagreed; retrying may succeed. Kinds throw it from `pull` and `push`. */
@@ -150,6 +180,8 @@ export abstract class Filesystem {
       readonly defaultLocalRoot?: (filesystem: {
         readonly name: string;
       }) => string;
+      /** Whether its pushes delete: its mounts' permissions then add `delete` on each write glob. */
+      readonly deletes?: boolean;
     } = {},
   ) {
     const parsed = FilesystemOptionsSchema.safeParse(options);
@@ -168,7 +200,10 @@ export abstract class Filesystem {
       );
     }
     this.#resolveLocalRoot = resolveLocalRoot;
+    this.#deletes = kind.deletes === true;
   }
+
+  readonly #deletes: boolean;
 
   /** Fetches the scope's contents into the mount; every mount pulls, so a task starts from the store, never blind. */
   protected abstract pull(mount: Mount): Promise<void>;
@@ -183,12 +218,35 @@ export abstract class Filesystem {
   protected validate(_mount: Mount): void {}
 
   /**
+   * Its store, as a kept copy is identified by: a copy left for another
+   * store is removed before a mount, never reused (a bucket, a repository and
+   * branch).
+   */
+  protected abstract storeIdentity(mount: Mount): string;
+
+  /** State the kind keeps for a mount beside its local directory, removed with its copy. */
+  protected privatePaths(_mount: Mount): readonly string[] {
+    return [];
+  }
+
+  /** A push the agent may call mid-task, with its own message; a kind that offers one defines it. */
+  protected agentPush?(mount: Mount, message: string): Promise<PushReport>;
+
+  /**
    * Mounts what `resolve` resolved: refused by the kind, refused while
    * another live task in the container holds its local directory, or
    * claimed and pulled into it.
    */
   async mount(mount: Mount): Promise<MountLifecycle> {
     this.validate(mount);
+    const kept: KeptCopy = {
+      localPath: mount.localPath,
+      kind: this.constructor.name,
+      store: this.storeIdentity(mount),
+      remotePath: mount.remotePath,
+      runtimeSessionId: mount.request.context.runtimeSessionId,
+      paths: [mount.localPath, ...this.privatePaths(mount)],
+    };
     let release: () => Promise<void>;
     try {
       release = await claimLocalDirectory(mount);
@@ -199,22 +257,30 @@ export abstract class Filesystem {
       );
     }
     try {
+      await removeForeignKeptCopies(kept);
+      await recordKeptCopy(kept);
       await mkdir(mount.localPath, { recursive: true });
       await this.pull(mount);
     } catch (error) {
-      await rm(mount.localPath, { recursive: true, force: true });
+      // A failed pull may leave a partial copy, which must never be kept and later published.
+      await removeKeptCopy(kept);
       await release();
       throw asTaskFailure(
         error,
         `filesystem "${mount.name}" could not be pulled`,
       );
     }
-    return new MountLifecycle(
-      this,
-      mount,
-      (options) => this.push(mount, options),
+    const { agentPush } = this;
+    return new MountLifecycle(this, mount, {
+      push: (options) => this.push(mount, options),
+      ...(agentPush !== undefined &&
+      this.options.pushOn?.includes('TASK_STATE_FAILED') === true
+        ? { agentPush: (message) => agentPush.call(this, mount, message) }
+        : {}),
+      deletes: this.#deletes,
       release,
-    );
+      remove: () => removeKeptCopy(kept),
+    });
   }
 
   /**
@@ -255,8 +321,20 @@ export abstract class Filesystem {
         .join(this.options.remoteRoot ?? '/', subpath)
         .replace(/(.)\/+$/, '$1'),
       write,
+      request: task.request,
     };
   }
+}
+
+/** What a mount's lifecycle acts with: its kind's operations, bound to the mount. */
+export interface MountOperations {
+  readonly push: (options: { readonly modifiedBefore?: Date }) => Promise<void>;
+  readonly agentPush?: (message: string) => Promise<PushReport>;
+  readonly deletes: boolean;
+  /** Frees the local directory's claim. */
+  readonly release: () => Promise<void>;
+  /** Removes the local copy, the kind's state for it, and its record. */
+  readonly remove: () => Promise<void>;
 }
 
 /** A mounted filesystem, held until the outcome is known: runs its checkpoints, and unmounts it. */
@@ -264,29 +342,22 @@ export class MountLifecycle {
   readonly name: string;
   readonly mounted: MountedFilesystem;
   readonly #filesystem: Filesystem;
-  readonly #mount: Mount;
-  readonly #push: (options: {
-    readonly modifiedBefore?: Date;
-  }) => Promise<void>;
-  /** Frees the local directory's claim, once it is removed. */
-  readonly #release: () => Promise<void>;
+  readonly #operations: MountOperations;
   #checkpointTimer: ReturnType<typeof setInterval> | undefined;
-  /** Pushes run one at a time: a checkpoint never overlaps the last. */
-  #latestPush: Promise<void> = Promise.resolve();
+  /** Pushes run one at a time: a checkpoint, or an agent's push, never overlaps another. */
+  #latestPush: Promise<unknown> = Promise.resolve();
   /** A tick while a checkpoint is still pushing is skipped, so a slow store builds no backlog for unmount to wait through. */
   #checkpointInFlight = false;
 
   constructor(
     filesystem: Filesystem,
     mount: Mount,
-    push: (options: { readonly modifiedBefore?: Date }) => Promise<void>,
-    release: () => Promise<void>,
+    operations: MountOperations,
   ) {
     this.#filesystem = filesystem;
-    this.#mount = mount;
-    this.#push = push;
-    this.#release = release;
+    this.#operations = operations;
     this.name = mount.name;
+    const { agentPush } = operations;
     this.mounted = {
       localPath: mount.localPath,
       path: (relativePath) => pathIn(mount, relativePath),
@@ -303,7 +374,13 @@ export class MountLifecycle {
       permissions: [
         { action: 'read', glob: '**' },
         ...mount.write.map((glob) => ({ action: 'edit' as const, glob })),
+        ...(operations.deletes
+          ? mount.write.map((glob) => ({ action: 'delete' as const, glob }))
+          : []),
       ],
+      ...(agentPush === undefined
+        ? {}
+        : { push: (message: string) => this.#queue(() => agentPush(message)) }),
     };
     const { checkpoints } = filesystem.options;
     if (checkpoints !== undefined) {
@@ -313,7 +390,7 @@ export class MountLifecycle {
         const modifiedBefore = new Date(
           Date.now() - checkpoints.settleSeconds * 1000,
         );
-        this.#queuePush({ modifiedBefore })
+        this.#queue(() => this.#operations.push({ modifiedBefore }))
           .catch((error: unknown) => {
             // The push at the end is the one the outcome waits on.
             console.error(
@@ -328,7 +405,7 @@ export class MountLifecycle {
     }
   }
 
-  /** Pushes if `pushOn` has the state the task ended in, then removes the local copy and frees its claim. */
+  /** Pushes if `pushOn` has the state the task ended in, then removes the local copy if the filesystem says so, and frees its claim. */
   async unmount(
     state: Exclude<TerminalTaskState, 'TASK_STATE_REJECTED'>,
   ): Promise<void> {
@@ -340,7 +417,7 @@ export class MountLifecycle {
         this.#filesystem.options.pushOn?.includes(state) === true;
       if (shouldPush) {
         try {
-          await this.#queuePush({});
+          await this.#queue(() => this.#operations.push({}));
         } catch (error) {
           throw asTaskFailure(
             error,
@@ -349,16 +426,17 @@ export class MountLifecycle {
         }
       }
     } finally {
-      await rm(this.#mount.localPath, { recursive: true, force: true });
-      await this.#release();
+      if (this.#filesystem.options.removeLocalCopy === true) {
+        await this.#operations.remove();
+      }
+      await this.#operations.release();
     }
   }
 
-  #queuePush(options: { readonly modifiedBefore?: Date }): Promise<void> {
-    this.#latestPush = this.#latestPush
-      .catch(() => undefined)
-      .then(() => this.#push(options));
-    return this.#latestPush;
+  #queue<T>(push: () => Promise<T>): Promise<T> {
+    const next = this.#latestPush.catch(() => undefined).then(push);
+    this.#latestPush = next;
+    return next;
   }
 }
 

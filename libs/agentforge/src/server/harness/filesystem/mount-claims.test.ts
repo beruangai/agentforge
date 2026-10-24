@@ -63,7 +63,10 @@ describe('the mount claims', () => {
         filesystem.resolve({
           name: 'vault',
           taskId: 't-1',
-          request: { input: {}, context: {} as TaskContext<FrameworkTypes> },
+          request: {
+            input: {},
+            context: { runtimeSessionId: 'r-1' } as TaskContext<FrameworkTypes>,
+          },
         }),
       ),
     ).rejects.toMatchObject({

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,14 +19,18 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-async function mount(filesystem: ScriptedFilesystem, name = 'vault') {
+async function mount(
+  filesystem: ScriptedFilesystem,
+  name = 'vault',
+  runtimeSessionId = 'r-1',
+) {
   return filesystem.mount(
     filesystem.resolve({
       name,
       taskId: 't-1',
       request: {
         input: { topic: 'today' },
-        context: {} as TaskContext<FrameworkTypes>,
+        context: { runtimeSessionId } as TaskContext<FrameworkTypes>,
       },
     }),
   );
@@ -87,7 +91,10 @@ describe('Filesystem', () => {
         filesystem.resolve({
           name: 'vault',
           taskId: 't-1',
-          request: { input: {}, context: {} as TaskContext<FrameworkTypes> },
+          request: {
+            input: {},
+            context: { runtimeSessionId: 'r-1' } as TaskContext<FrameworkTypes>,
+          },
         }),
       ).toMatchObject({
         localPath:
@@ -205,7 +212,7 @@ describe('Filesystem', () => {
     ],
     ['absent', undefined, 'TASK_STATE_COMPLETED', false],
   ])(
-    'pushOn %s, the task ends %s: pushes %s; and removes the mount',
+    'pushOn %s, the task ends %s: pushes %s; and keeps the copy',
     async (_label, pushOn, state, pushes) => {
       const localPath = join(root, 'vault');
       const filesystem = new ScriptedFilesystem({
@@ -216,11 +223,11 @@ describe('Filesystem', () => {
       expect(filesystem.calls).toEqual(
         pushes ? ['pull /', 'push /'] : ['pull /'],
       );
-      expect(existsSync(localPath)).toBe(false);
+      expect(existsSync(localPath)).toBe(true);
     },
   );
 
-  it('fails unsynced when its store fails, and removes what it mounted', async () => {
+  it('fails unsynced when its store fails, removing a failed pull and keeping a copy whose push failed', async () => {
     const localPath = join(root, 'vault');
     const unsynced = () => Promise.reject(new FilesystemUnsynced('refused'));
     await expect(
@@ -243,7 +250,145 @@ describe('Filesystem', () => {
     await expect(vault.unmount('TASK_STATE_COMPLETED')).rejects.toMatchObject({
       taskCause: { code: 'FILESYSTEM_UNSYNCED' },
     });
-    expect(existsSync(localPath)).toBe(false);
+    expect(existsSync(localPath)).toBe(true);
+  });
+
+  describe('kept copies', () => {
+    const left = (localPath: string) => join(localPath, 'left.md');
+
+    async function leaveCopy(
+      filesystem: ScriptedFilesystem,
+      runtimeSessionId = 'r-1',
+    ) {
+      const vault = await mount(filesystem, 'vault', runtimeSessionId);
+      await writeFile(left(vault.mounted.localPath), 'unpushed');
+      await vault.unmount('TASK_STATE_FAILED');
+      return vault.mounted.localPath;
+    }
+
+    it('carry to the next task of the session, which pulls over them', async () => {
+      const filesystem = new ScriptedFilesystem({
+        localRoot: join(root, 'vault'),
+      });
+      const localPath = await leaveCopy(filesystem);
+      await mount(filesystem);
+      expect(await readFile(left(localPath), 'utf8')).toBe('unpushed');
+      expect(filesystem.calls).toEqual(['pull /', 'pull /']);
+    });
+
+    it('are removed at unmount when the filesystem declares it', async () => {
+      const filesystem = new ScriptedFilesystem({
+        localRoot: join(root, 'vault'),
+        removeLocalCopy: true,
+      });
+      const localPath = await leaveCopy(filesystem);
+      expect(existsSync(localPath)).toBe(false);
+    });
+
+    it.each([
+      ['another runtime session', 'scripted', 'r-2'],
+      ['another store', 'other', 'r-1'],
+    ])('never carry to %s', async (_label, store, runtimeSessionId) => {
+      const localRoot = join(root, 'vault');
+      const localPath = await leaveCopy(new ScriptedFilesystem({ localRoot }));
+      const other = new ScriptedFilesystem({ localRoot }, { store });
+      await mount(other, 'vault', runtimeSessionId);
+      expect(existsSync(left(localPath))).toBe(false);
+      expect(existsSync(join(localPath, 'pulled.md'))).toBe(true);
+    });
+
+    it('are removed when a mount is around or inside them', async () => {
+      const localRoot = join(root, 'vault');
+      const inner = await leaveCopy(
+        new ScriptedFilesystem({
+          localRoot,
+          scope: () => ({ subpath: 'topics/a' }),
+        }),
+      );
+      await mount(new ScriptedFilesystem({ localRoot }));
+      expect(existsSync(left(inner))).toBe(false);
+      const outer = await leaveCopy(new ScriptedFilesystem({ localRoot }));
+      await mount(
+        new ScriptedFilesystem({
+          localRoot,
+          scope: () => ({ subpath: 'topics/b' }),
+        }),
+      );
+      expect(existsSync(left(outer))).toBe(false);
+    });
+  });
+
+  it('states delete on each write glob when its kind deletes', async () => {
+    const vault = await mount(
+      new ScriptedFilesystem(
+        {
+          localRoot: join(root, 'vault'),
+          pushOn: ['TASK_STATE_COMPLETED'],
+          scope: () => ({ subpath: '', write: ['notes/**'] }),
+        },
+        { deletes: true },
+      ),
+    );
+    expect(vault.mounted.permissions).toEqual([
+      { action: 'read', glob: '**' },
+      { action: 'edit', glob: 'notes/**' },
+      { action: 'delete', glob: 'notes/**' },
+    ]);
+  });
+
+  describe("the agent's push", () => {
+    it('is offered only when the filesystem pushes on TASK_STATE_FAILED', async () => {
+      const agentPush = () => Promise.resolve();
+      const completedOnly = await mount(
+        new ScriptedFilesystem(
+          { localRoot: join(root, 'a'), pushOn: ['TASK_STATE_COMPLETED'] },
+          { agentPush },
+        ),
+      );
+      expect(completedOnly.mounted.push).toBeUndefined();
+      const plain = await mount(
+        new ScriptedFilesystem({
+          localRoot: join(root, 'b'),
+          pushOn: ['TASK_STATE_FAILED'],
+        }),
+      );
+      expect(plain.mounted.push).toBeUndefined();
+      const offered = await mount(
+        new ScriptedFilesystem(
+          { localRoot: join(root, 'c'), pushOn: ['TASK_STATE_FAILED'] },
+          { agentPush },
+        ),
+      );
+      await expect(offered.mounted.push?.('partial')).resolves.toEqual({
+        files: [],
+      });
+    });
+
+    it('runs one at a time with every other push of the mount', async () => {
+      const { promise: slowStore, resolve: answer } =
+        Promise.withResolvers<void>();
+      const filesystem = new ScriptedFilesystem(
+        { localRoot: join(root, 'vault'), pushOn: ['TASK_STATE_FAILED'] },
+        { agentPush: () => slowStore },
+      );
+      const vault = await mount(filesystem);
+      const pushing = vault.mounted.push?.('partial');
+      const unmounting = vault.unmount('TASK_STATE_FAILED');
+      await vi.waitFor(() =>
+        expect(filesystem.calls).toEqual(['pull /', 'agent push partial']),
+      );
+      await new Promise((settle) => setTimeout(settle, 20));
+      // Unmount's push waits for the agent's.
+      expect(filesystem.calls).toEqual(['pull /', 'agent push partial']);
+      answer();
+      await pushing;
+      await unmounting;
+      expect(filesystem.calls).toEqual([
+        'pull /',
+        'agent push partial',
+        'push /',
+      ]);
+    });
   });
 
   it('pushes checkpoints of what has settled while mounted, and stops at unmount', async () => {

@@ -4,12 +4,12 @@ Groups 1–2 come first. Groups 3 and 4 depend on 1 and can run in parallel with
 
 ## 1. Base lifecycle: kept copies and the `delete` permission
 
-- [ ] 1.1 Add `removeLocalCopy` to the shared options (strict schema). Add `request` to `Mount`. Add the kind's `deletes` flag, and the `storeIdentity`, `privatePaths` and `agentPush` hooks, to `Filesystem`.
-- [ ] 1.2 Kept-copy markers beside the claims: the identity (local directory, kind, `storeIdentity`, remote path, runtime session) and the `paths` to remove (`privatePaths`). At mount, remove every listed path of each marker at, around or inside the directory that does not match in full, then write this task's marker. Unmount with `removeLocalCopy`, and a failed pull, remove the copy and its marker. At unmount, remove the copy only with `removeLocalCopy`, and release the claim either way. A failed pull keeps the copy.
-- [ ] 1.3 `ScratchFilesystem` always removes; `S3Filesystem` passes `deletes` from `dangerouslyEnableDeletes`.
-- [ ] 1.4 `PermissionAction` gains `delete`; baseline permissions add `delete` per write glob when the kind deletes.
-- [ ] 1.5 `MountLifecycle`'s queue takes any push thunk. `MountedFilesystem.push` is present when the kind has `agentPush` and `pushOn` includes `TASK_STATE_FAILED`.
-- [ ] 1.6 Unit tests for 1.1–1.5: keep, remove, another session, another store, a nested copy, scratch, a failed pull, delete permissions, an offered push queued with unmount's.
+- [x] 1.1 Add `removeLocalCopy` to the shared options (strict schema). Add `request` to `Mount`. Add the kind's `deletes` flag, and the `storeIdentity`, `privatePaths` and `agentPush` hooks, to `Filesystem`.
+- [x] 1.2 Kept-copy markers beside the claims: the identity (local directory, kind, `storeIdentity`, remote path, runtime session) and the `paths` to remove (`privatePaths`). At mount, remove every listed path of each marker at, around or inside the directory that does not match in full, then write this task's marker. Unmount with `removeLocalCopy`, and a failed pull, remove the copy and its marker. At unmount, remove the copy only with `removeLocalCopy`, and release the claim either way. A failed push keeps the copy.
+- [x] 1.3 `ScratchFilesystem` always removes; `S3Filesystem` passes `deletes` from `dangerouslyEnableDeletes`.
+- [x] 1.4 `PermissionAction` gains `delete`; baseline permissions add `delete` per write glob when the kind deletes.
+- [x] 1.5 `MountLifecycle`'s queue takes any push thunk. `MountedFilesystem.push` is present when the kind has `agentPush` and `pushOn` includes `TASK_STATE_FAILED`.
+- [x] 1.6 Unit tests for 1.1–1.5: keep, remove, another session, another store, a nested copy, scratch, a failed pull, delete permissions, an offered push queued with unmount's.
 
 ## 2. Repository declaration
 

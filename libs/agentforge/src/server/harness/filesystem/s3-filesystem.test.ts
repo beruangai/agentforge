@@ -54,7 +54,10 @@ function s3(
       filesystem.resolve({
         name: 'vault',
         taskId: 't-1',
-        request: { input: {}, context: {} as TaskContext<FrameworkTypes> },
+        request: {
+          input: {},
+          context: { runtimeSessionId: 'r-1' } as TaskContext<FrameworkTypes>,
+        },
       }),
     );
   return { calls, mount };
@@ -213,6 +216,7 @@ describe('S3Filesystem', () => {
       dangerouslyEnableDeletes: true,
       remoteRoot: '/projects/alpha',
       scope: () => ({ subpath: '' }),
+      removeLocalCopy: true,
     });
     await (await underRoot.mount()).unmount('TASK_STATE_COMPLETED');
     const undeclared = s3({ bucket: 'other' });
@@ -256,7 +260,12 @@ describe('the declared buckets', () => {
           filesystem.resolve({
             name: 'vault',
             taskId: 't-1',
-            request: { input: {}, context: {} as TaskContext<FrameworkTypes> },
+            request: {
+              input: {},
+              context: {
+                runtimeSessionId: 'r-1',
+              } as TaskContext<FrameworkTypes>,
+            },
           }),
         ),
       ).rejects.toThrow(message);
@@ -274,7 +283,10 @@ describe('ScratchFilesystem', () => {
           taskId,
           request: {
             input: {},
-            context: { taskId } as TaskContext<FrameworkTypes>,
+            context: {
+              taskId,
+              runtimeSessionId: 'r-1',
+            } as TaskContext<FrameworkTypes>,
           },
         }),
       );
@@ -303,7 +315,10 @@ describe('ScratchFilesystem', () => {
         taskId: 't-1',
         request: {
           input: {},
-          context: { taskId: 't-1' } as TaskContext<FrameworkTypes>,
+          context: {
+            taskId: 't-1',
+            runtimeSessionId: 'r-1',
+          } as TaskContext<FrameworkTypes>,
         },
       }),
     );

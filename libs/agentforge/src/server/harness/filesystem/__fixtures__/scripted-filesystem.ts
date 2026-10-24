@@ -4,12 +4,18 @@ import {
   Filesystem,
   type FilesystemOptions,
   type Mount,
+  type PushReport,
 } from '../filesystem.ts';
 
 /** What a scripted operation does after it is recorded: resolve, or throw. */
 interface Script {
   readonly pull?: () => Promise<void>;
   readonly push?: () => Promise<void>;
+  /** Offers the agent a push, which records its message. */
+  readonly agentPush?: () => Promise<void>;
+  /** The store a kept copy is identified by; `scripted` unless given. */
+  readonly store?: string;
+  readonly deletes?: boolean;
 }
 
 /**
@@ -21,11 +27,31 @@ export class ScriptedFilesystem extends Filesystem {
   readonly #script: Script;
 
   constructor(options: Partial<FilesystemOptions>, script: Script = {}) {
-    super({
-      scope: () => ({ subpath: '' }),
-      ...options,
-    });
+    super(
+      {
+        scope: () => ({ subpath: '' }),
+        ...options,
+      },
+      { deletes: script.deletes === true },
+    );
     this.#script = script;
+    if (script.agentPush !== undefined) {
+      const agentPush = script.agentPush;
+      this.agentPush = async (_mount: Mount, message: string) => {
+        this.calls.push(`agent push ${message}`);
+        await agentPush();
+        return { files: [] } satisfies PushReport;
+      };
+    }
+  }
+
+  protected override agentPush?: (
+    mount: Mount,
+    message: string,
+  ) => Promise<PushReport>;
+
+  protected storeIdentity(): string {
+    return this.#script.store ?? 'scripted';
   }
 
   protected async pull(mount: Mount): Promise<void> {
