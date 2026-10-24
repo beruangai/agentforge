@@ -117,7 +117,7 @@ readonly repositories?: Readonly<Record<string, string>>; // name → https:// U
 ### Kept copies (base lifecycle)
 
 - **At unmount**: push per `pushOn`. Then, if `removeLocalCopy`, remove the copy's paths and its marker. Always release the claim.
-- **The copy's identity.** Each kept copy has a marker beside the claims, never inside the mount: `<tmpdir>/agentforge-mounts/kept/<sha256(localPath)>.json`, holding `{ localPath, kind, store, remotePath, runtimeSessionId }`.
+- **The copy's identity.** Each kept copy has a marker beside the claims, never inside the mount: `<tmpdir>/agentforge-kept-copies/<sha256(localPath)>.json`, holding `{ localPath, kind, store, remotePath, runtimeSessionId }`.
   - `store` is the kind's own identity of its store: S3, the declared bucket's resolved name; git, the repository's resolved location and branch. It comes from a protected `storeIdentity(mount)`.
   - The marker also lists `paths`: the copy's local directory and any private state the kind keeps for it (git: its private directory). A kind adds its own through a protected `privatePaths(mount)`.
   - At mount, after the claim, every marker whose `localPath` is the mount's or around or inside it is read. Any that does not match this mount's identity and session in full has every path it lists removed, then the marker. The base needs no knowledge of a kind and no live instance of it, so a consumer's own kind is cleaned the same way.

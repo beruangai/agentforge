@@ -16,7 +16,12 @@ export {
   type MountedFilesystem,
   type Permission,
   type PermissionAction,
+  type PushReport,
 } from './filesystem/filesystem.ts';
+export {
+  GitFilesystem,
+  type GitFilesystemOptions,
+} from './filesystem/git-filesystem.ts';
 export { filesystems } from './filesystem/registry.ts';
 export {
   S3Filesystem,

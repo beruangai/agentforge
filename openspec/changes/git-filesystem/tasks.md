@@ -28,20 +28,20 @@ Groups 1–2 come first; 2.6 also depends on 3. Groups 3 and 4 depend on 1 and c
 
 ## 3. `GitFilesystem`
 
-- [ ] 3.1 One child runner (`runChild`) shared with `s7cmd`: async spawn with no shell, an optional bound, a per-child environment, a redacted stderr tail, a missing-binary message. The git runner on it: a 300 s bound; extraheader, `safe.directory`, no ambient config, no prompt; redaction before the task log and causes.
-- [ ] 3.2 Options, construction and `validate`:
+- [x] 3.1 One child runner (`runChild`) shared with `s7cmd`: async spawn with no shell, an optional bound, a per-child environment, a redacted stderr tail, a missing-binary message. The git runner on it: a 300 s bound; extraheader, `safe.directory`, no ambient config, no prompt; redaction before the task log and causes.
+- [x] 3.2 Options, construction and `validate`:
   - removing the token from the environment at construction;
   - refusing `checkpoints` and an invalid branch;
   - refusing a repository name outside `FILESYSTEM_NAME_PATTERN`, an undeclared repository, an unsupported scheme, userinfo, https without a token, and deletes at `/`.
-- [ ] 3.3 `pull`:
+- [x] 3.3 `pull`:
   - first mount: atomic blobless clone, base ref, subtree read into the mount, an empty path or branch mounts empty;
   - an empty branch: no base, so the first push is a root commit;
   - kept copy: stale locks removed, `advanceTo(tip)` keeping local changes the store did not make and logging each one discarded.
-- [ ] 3.4 `push`, recording: change selection by write globs, `exclude` and deletes; splice and commit with message, author and trailers; a root commit on an empty branch.
-- [ ] 3.5 `push`, publishing: refusal on a shared file, `merge-tree` onto the tip, bounded jittered retry, `CREDENTIAL_EXPIRED` for a refused token, then `advanceTo` with the pushed files recorded first.
-- [ ] 3.6 `agentPush`, `storeIdentity` and `privatePaths`; a pull over an unmoved tip restores deleted tracked files.
-- [ ] 3.7 Unit tests over a scripted runner: validation errors, redaction, change selection, retry and credential classification.
-- [ ] 3.8 Export `GitFilesystem` and `PushReport` from `/agent`.
+- [x] 3.4 `push`, recording: change selection by write globs, `exclude` and deletes; splice and commit with message, author and trailers; a root commit on an empty branch.
+- [x] 3.5 `push`, publishing: refusal on a shared file, `merge-tree` onto the tip, bounded jittered retry, `CREDENTIAL_EXPIRED` for a refused token, then `advanceTo` with the pushed files recorded first.
+- [x] 3.6 `agentPush`, `storeIdentity` and `privatePaths`; a pull over an unmoved tip restores deleted tracked files.
+- [x] 3.7 Unit tests over a scripted runner: validation errors, redaction, change selection, retry and credential classification.
+- [x] 3.8 Export `GitFilesystem` and `PushReport` from `/agent`.
 
 ## 4. Frameworks
 
@@ -52,7 +52,7 @@ Groups 1–2 come first; 2.6 also depends on 3. Groups 3 and 4 depend on 1 and c
 ## 5. Image and integration
 
 - [ ] 5.1 `git` in the AgentForge image's `Dockerfile`; the pinned-base-image integ still passes.
-- [ ] 5.2 `integ/local/filesystem-git`, covering the scenarios in design § Tests. The no-token case probes a `node:child_process` child. Record the Bun spawn finding in `docs/research/git-filesystem.md`.
+- [x] 5.2 `integ/local/filesystem-git`, covering the scenarios in design § Tests. The no-token case probes a `node:child_process` child. Record the Bun spawn finding in `docs/research/git-filesystem.md`.
 - [ ] 5.3 `integ/aws/filesystem-s3-sync`: a pull over a kept copy keeps a newer local edit, takes a newer store object, restores a missing file, and does not take a store deletion. Then update the research note's "to be verified".
 
 ## 6. Example (dogfood)

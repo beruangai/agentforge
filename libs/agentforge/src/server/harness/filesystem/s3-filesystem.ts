@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import picomatch from 'picomatch';
 import {
   FILESYSTEM_BUCKETS_VARIABLE,
@@ -12,6 +11,7 @@ import {
   FilesystemUnsynced,
   type Mount,
 } from './filesystem.ts';
+import { runChild } from './run-child.ts';
 
 export interface S3FilesystemOptions extends FilesystemOptions {
   /** Required: an S3 filesystem has no default local root. */
@@ -41,38 +41,21 @@ export type S7cmdRunner = (args: readonly string[]) => Promise<S7cmdResult>;
 
 /** The base image installs it on the `PATH` (libs/agentforge/Dockerfile). */
 const S7CMD = 's7cmd';
-/** How much of `s7cmd`'s stderr a failure carries. */
-const STDERR_TAIL_CHARACTERS = 2_000;
 /** `s7cmd` refused its arguments: AgentForge's bug. */
 const S7CMD_EXIT_INVALID_ARGUMENTS = 2;
 /** Excluded always: a key with a `..` segment would be written outside the mount. */
 const CLIMBING_PATH_PATTERN = '(^|/)\\.\\.(/|$)';
 
 /** Runs `s7cmd` as a child of the task process, so a cancel or a lost container takes it. */
-export const runS7cmd: S7cmdRunner = (args) =>
-  new Promise((resolve, reject) => {
-    const child = spawn(S7CMD, args, { stdio: ['ignore', 'inherit', 'pipe'] });
-    let stderr = '';
-    child.stderr.on('data', (chunk: Buffer) => {
-      process.stderr.write(chunk);
-      stderr = (stderr + chunk.toString()).slice(-STDERR_TAIL_CHARACTERS);
-    });
-    child.on('error', (error: NodeJS.ErrnoException) =>
-      reject(
-        error.code === 'ENOENT'
-          ? new Error(
-              `${S7CMD} is not on the PATH: S3 filesystems run in AgentForge's base image, which installs it`,
-            )
-          : error,
-      ),
-    );
-    child.on('close', (code, signal) =>
-      resolve({
-        exitCode: code ?? -1,
-        stderr: signal === null ? stderr : `${stderr}\nkilled by ${signal}`,
-      }),
-    );
+export const runS7cmd: S7cmdRunner = async (args) => {
+  const { exitCode, stderr } = await runChild({
+    command: S7CMD,
+    args,
+    echoStderr: true,
+    missing: "S3 filesystems run in AgentForge's base image, which installs it",
   });
+  return { exitCode, stderr };
+};
 
 /**
  * A prefix of an S3 bucket, synced by `s7cmd`, which verifies each object it
