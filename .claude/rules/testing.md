@@ -12,7 +12,7 @@ A live slice is integration however expensive it is; e2e means the whole path.
 
 | `integ` configuration | Folder | Needs | Costs |
 |---|---|---|---|
-| `local` | `integ/local/` | Docker (the runtime with real task processes and DynamoDB Local lives here); the Temporal CLI on `PATH` (`brew install temporal`), whose dev server `integ/local/temporal-worker/` runs a real worker against | Nothing |
+| `local` | `integ/local/` | Docker (the runtime with real task processes and DynamoDB Local lives here); the Temporal CLI on `PATH` (`brew install temporal`), whose dev server `integ/local/temporal-worker/` runs a real worker against; `git` 2.40 or later on `PATH` (`merge-tree --merge-base`), for `integ/local/filesystem-git/` and `seed-repository/`, and for serve's host repositories; `openssl`, for `seed-repository/`'s HTTPS remote | Nothing |
 | `aws` | `integ/aws/` | The test role in `us-east-2` | Short-lived AWS resources |
 | `model` | `integ/model/` | The subscription token | Inference |
 

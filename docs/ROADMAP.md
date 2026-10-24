@@ -36,7 +36,7 @@ Each milestone ends with capability verified end to end on **AgentForge's own ex
 
 **Delivered 2026-09-28**, on `hello-agent`.
 
-- Filesystems (§REQ401, [ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)): an abstract kind AgentForge mounts around a procedure, registered by middleware, scoped per request, the outcome waiting for a verified push. `S3Filesystem` on `s7cmd` over an `S3FilesystemBucket` several agents share, and `ScratchFilesystem`; git later. Specified by [`openspec/specs/filesystem-lifecycle`](../openspec/specs/filesystem-lifecycle/spec.md). **Built 2026-09-28**: `integ/aws/filesystem-s3-sync` against `s7cmd` in the base image, and `hello-agent`'s AgentCore e2e keeps a note in one container and reads it back in another on the baseline permissions alone
+- Filesystems (§REQ401, [ADR 0015](../adr/0015-filesystems-mount-around-a-procedure.md)): an abstract kind AgentForge mounts around a procedure, registered by middleware, scoped per request, the outcome waiting for a verified push. `S3Filesystem` on `s7cmd` over an `S3FilesystemBucket` several agents share, and `ScratchFilesystem`; `GitFilesystem` since 2026-10-24 ([ADR 0024](../adr/0024-git-filesystems-commit-onto-one-branch.md)), for StrategyFoundry's strategy artifacts, verified locally against real git (`integ/local/filesystem-git`, `smoke-coverage`'s local e2e), its hosted remote on AgentCore waiting for StrategyFoundry's first deploy. Specified by [`openspec/specs/filesystem-lifecycle`](../openspec/specs/filesystem-lifecycle/spec.md). **Built 2026-09-28**: `integ/aws/filesystem-s3-sync` against `s7cmd` in the base image, and `hello-agent`'s AgentCore e2e keeps a note in one container and reads it back in another on the baseline permissions alone
 
 ## A4 — Specs and audit
 
@@ -110,4 +110,4 @@ The StrategyFoundry corrections doc is written into StrategyFoundry as `docs/AGE
 
 ## Later
 
-- TrendBot migrates off its predecessor harness only after StrategyFoundry has vetted AgentForge. Its vault is a git-backed filesystem: before it can adopt, either AgentForge adds a git filesystem kind or TrendBot subclasses `Filesystem` itself
+- TrendBot migrates off its predecessor harness only after StrategyFoundry has vetted AgentForge. Its vault is a git-backed filesystem, which `GitFilesystem` now provides

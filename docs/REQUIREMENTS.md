@@ -19,7 +19,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 
 - **Ids are blocked by category, a hundred each** — `REQ1xx` declaring and typing, `REQ2xx` controlling the run, and so on, as the sections below. A new requirement takes the next free number **in its own block**, so adding one never renumbers or reorders anything.
 - **An id is never reused and never reassigned.** A requirement that is withdrawn keeps its number, recorded below with the reason, and the number is reserved forever.
-- **A requirement's text may be corrected; its meaning may not be replaced.** A genuinely different requirement is a new id, even where it supersedes an old one — and the old one is then withdrawn, pointing at it.
+- **A requirement's text may be corrected; its meaning may not be replaced.** A genuinely different requirement is a new id, even where it supersedes an old one — and the old one is then withdrawn, pointing at it. The exception is the ADRs' own: until a consumer depends on it, the operator may correct a requirement's meaning in place, and the requirement notes when.
 - **`REQ`, not `D`.** The old `D` prefix stood for *distilled*, from the consumer-contract distillation this register replaced; with that gone the letter meant nothing and read as *decision*, which is what an ADR records. Prose references carry the section mark — `§REQ304` — so a requirement is never mistaken for an [ADR](../adr/README.md) number or a [`DESIGN_OPTIONS.md`](DESIGN_OPTIONS.md) section.
 
 ---
@@ -68,8 +68,9 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 |---|---|
 | **REQ401** | The consumer controls every identifier the platforms expose — isolation, conversation, transcript, working directory — with their distinct meanings intact, and AgentForge carries and records them without imposing a mapping |
 | **REQ402** | A session started in one container resumes in another |
-| **REQ403** | Nothing carries from one invocation to the next except state the consumer declared durable, and nothing an invocation started outlives it |
+| **REQ403** | Nothing carries from one invocation to the next except state the consumer declared durable, and a declared filesystem's local copy, which carries to later invocations of the same runtime session while its container lives unless the procedure removes it; nothing an invocation started outlives it. *(Amended in place 2026-10-24, before any consumer depended on it: a filesystem's local copy was removed after every invocation.)* |
 | **REQ404** | An agent may keep memory across its tasks, in a space its run declares, so a later task recalls what an earlier one saved. It is optional: a run that declares none keeps none |
+| **REQ405** | A procedure's durable files may live in a version-controlled repository, so each change it persists is recorded with its history and author, and two writers' changes to one file are refused, never silently overwritten |
 
 ### Failure — `REQ5xx`
 
@@ -104,6 +105,7 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ712** | A consumer's Claude Code is guided in developing with AgentForge by guidance AgentForge maintains in its repository, current with the developer's clone |
 | **REQ713** | A consumer chooses each agentic project's agent framework; its contracts, callers, clients, workflows, filesystems and infrastructure are the same whichever it chooses, and a procedure written for one framework does not compile against another |
 | **REQ714** | Each deployment authenticates to its model provider only with what it declares — the operator's subscription where the framework can use it, otherwise an API key, with spend bounded by the provider account's limit — and no credential is present that it did not declare |
+| **REQ715** | A consumer develops locally against a host copy of a declared repository's history, seeded from its remote without writing to it, and shared by every project in its workspace |
 
 ---
 

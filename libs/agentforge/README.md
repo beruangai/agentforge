@@ -50,7 +50,7 @@ Every artifact spanning a project's agents — or a workflow project's connectio
 - `agents/<agent>/agent/server.ts`, `agents/<agent>/agent/task.ts`
 - `client.ts`
 - in the shared constructs, `src/app/agentic-projects/<project>/project.ts`, `src/app/agentic-projects/<project>/agents/<agent>/agent.ts`, and `src/app/agentic-projects/<project>/index.ts`, which exports them under the project's names
-- the project's targets: `image-agentforge`, `image-agentforge-<framework>`, `lock`, `image`, `lock-<agent>`, `image-<agent>`, `serve-<agent>`, `assemble`, `local-store`, `local-store-stop`
+- the project's targets: `image-agentforge`, `image-agentforge-<framework>`, `lock`, `image`, `lock-<agent>`, `image-<agent>`, `serve-<agent>`, `assemble`, `local-store`, `local-store-stop`, `seed-repository`
 
 **Maintained keys** — only these are rewritten; every other key in the file is yours:
 
@@ -70,7 +70,7 @@ Every artifact spanning a project's agents — or a workflow project's connectio
 
 A workflow project is a Temporal caller: its workflows call its connected agents' procedures, `const agents = resolveAgents()` from `agents/workflow.ts`, then `agents.goldenKata.writer.Write(input, { runtimeSessionId })`, typed by their contracts and carrying none of their code. `resolveAgents(options)` sets activity options for a set of calls, over AgentForge's defaults (a minute's heartbeat timeout, a day to close, `WAIT_CANCELLATION_COMPLETED`); a call's third argument sets its own, merged over the set's — `Write(input, { runtimeSessionId }, { startToCloseTimeout: '3 hours' })`. Neither may set `activityId`, which keys the agent's task, or `taskQueue`, since only the project's queue has a worker for its activities. Its one worker runs on Node, polls the task queue `<scope>-<project>`, and deploys through its construct as an ECS service on Temporal Cloud. A contract's output reaches a workflow as JSON, as Temporal's payload converter decodes it — a `Date` or a transformed value arrives as its JSON form, whatever the type says; a contract whose output survives the A2A wire survives this.
 
-**Maintained**: `worker.ts`, `client.ts` (`TASK_QUEUE`, `connectClient`), `agents/activities.ts` and `agents/workflow.ts` (one entry per connection), `container/Dockerfile`; in the shared constructs, `src/app/workflow-projects/<project>/project.ts` (`WorkflowProject`, `WorkflowProjectProps`, `Secrets`, requiring each connected project's construct and granting invocation of exactly its agents) and its `index.ts`; the targets `bundle-workflows`, `lock` (writes `container/bun.lock`), `bundle` (the worker and its image's build context under `dist/<project>/bundle`), `assemble`, `temporal-server`, `serve` (`local`, `hybrid`) and `test`.
+**Maintained**: `worker.ts`, `client.ts` (`TASK_QUEUE`, `connectClient`), `agents/activities.ts` and `agents/workflow.ts` (one entry per connection), `container/Dockerfile`; in the shared constructs, `src/app/workflow-projects/<project>/project.ts` (`WorkflowProject`, `WorkflowProjectProps`, `Secrets`, requiring each connected project's construct and granting invocation of exactly its agents) and its `index.ts`; the targets `bundle-workflows`, `lock` (writes `container/bun.lock`), `bundle` (the worker and its image's build context under `dist/<project>/bundle`), `assemble`, `temporal-server`, `seed-repository`, `serve` (`local`, `hybrid`) and `test`.
 
 **Maintained keys**:
 

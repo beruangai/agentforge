@@ -10,6 +10,24 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
+## git-filesystem, 2026-10-24
+
+### Breaks
+
+- **A filesystem keeps its local copy at unmount**, for the next task of the same runtime session in that container. A procedure that relied on each task starting from the store alone now finds the previous task's files there, those outside the write scope included. `ScratchFilesystem` is unchanged: always removed.
+- **`dangerouslyEnableDeletes`** adds a `delete` permission per write glob to a mount's `permissions`. Code that matches on `action` without a default case sees a value it did not handle.
+- **`nx sync:check`** reports every agentic and workflow project's `project.json` until it gains the `seed-repository` target.
+
+### Change
+
+1. Run `nx sync`.
+2. Declare `removeLocalCopy: true` on each `S3Filesystem` whose tasks must start from the store alone, and on one sharing its prefix with writers that delete: a kept copy does not take their deletions, and its push may restore them.
+3. A handler that switches over `permissions` handles `delete`.
+
+### Verify
+
+`nx sync:check` passes, `nx run <project>:seed-repository --help` lists its options, and the project's tests pass.
+
 ## Layer manifests out of the root workspace, 2026-10-23
 
 ### Breaks

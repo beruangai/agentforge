@@ -13,6 +13,7 @@ A generated agentic project has these maintained targets. Nx owns their order, s
 | `serve-<agent>` | Runs the agent's container locally against the local store, continuous |
 | `local-store`, `local-store-stop` | Starts the store every project on the machine shares (DynamoDB Local, SeaweedFS's S3, named volumes), or stops it keeping its data |
 | `assemble` | Builds every agent's image, for the shared constructs' deploy |
+| `seed-repository` | Seeds a git filesystem's host repository from its `https://` remote and declares it for every project's serve (below). On agentic and workflow projects alike, with the same effect from each |
 
 Run `nx sync` after changing an agent, a connection or AgentForge's version. `nx sync:check` fails while a maintained file differs. Right after a generator, Nx's daemon can sync against a stale project graph; if `sync:check` still fails after `nx sync`, run it again with `NX_DAEMON=false`. A dependency an image needs goes in its layer's `package.json`, followed by `lock`.
 
@@ -62,6 +63,22 @@ goldenKata.grantInvoke(callerRole);
 - A workflow project deploys as a `TemporalWorker` ECS service on Temporal Cloud, through its own construct, which requires each connected project's construct.
 - Deploy with the operator's credentials (`.env.cdk`). A project and its callers take a new AgentForge version in one deploy.
 
+## Git repositories
+
+A git filesystem's `repository` is a name the deployment declares in `AGENTFORGE_FILESYSTEM_REPOSITORIES`, a JSON object of name to location: `https://` with no credential in it, or, to `serve`, a host directory. On AgentCore, the agent's construct takes `repositories: { journal: 'https://github.com/o/journal.git' }` and the token in `secrets`.
+
+Locally, `serve` bind-mounts a host directory into the container and serves it as `file://`, so a local run never reaches the remote or needs its token. A relative location is the workspace's.
+
+- **A repository with a remote**: seed its host repository first, from any agentic or workflow project:
+
+  ```bash
+  nx run <project>:seed-repository --repository=strategies --remote=https://github.com/<owner>/strategies.git
+  ```
+
+  It bare-clones the remote with the host's own git credentials (a credential helper, `gh`) into `--location`, `.agentforge/repositories/<name>.git` by default and kept out of version control, then declares it in the workspace root's `.env.serve` (relative location, commit it) or `.env.serve.local` (absolute). Every agentic project's `serve-<agent>` and the workflow project's `serve` read it there. `--readingClone=<path>` makes a working clone whose `origin` is the host repository, for reading what agents committed. It never pushes. Run again, it changes nothing. It adopts an existing bare clone of the same remote, and fails, naming the path, on a working clone, a bare repository of another remote, or a project's own env file that would mask the workspace's declaration. Syncing the host repository with its remote is the operator's, by hand, through its `origin`.
+- **A repository with no remote**: declare it yourself in `.env.serve` (`AGENTFORGE_FILESYSTEM_REPOSITORIES={"journal":".agentforge/repositories/journal.git"}`). `serve` creates it empty on `main` and logs that it did. Never let `serve` create one that has a remote: its history is unrelated to the remote's, and seeding it later fails.
+- **StrategyFoundry's existing bare clone** is adopted by passing its path as `--location` and the remote it was cloned from, with `--readingClone` at its existing working clone.
+
 ## Known limits
 
 Read the root README's [known limits](../../../../README.md#known-limits) before relying on resume, files across containers, a shared prefix, deletes, Bash, or transcript retention. The ones that most often shape a procedure:
@@ -69,3 +86,4 @@ Read the root README's [known limits](../../../../README.md#known-limits) before
 - A resumed session doesn't bring its files to a new container. Only what a filesystem pushed is there.
 - Two tasks on one S3 prefix at once overwrite each other. Keep a prefix to one task at a time.
 - Locally, tasks, transcripts, filesystems and memory persist in the local store, across containers and restarts. Declare a filesystem's buckets to `serve` in the project's committed `.env.serve`: `AGENTFORGE_FILESYSTEM_BUCKETS={"notebook":"my-notebook"}`. A local worker reads the store's S3 at `http://127.0.0.1:8333`, path-style.
+- Two tasks pushing to one git branch at once both land when they change different files. One changing a file the other changed since its pull fails `FILESYSTEM_UNSYNCED`, retryable.
