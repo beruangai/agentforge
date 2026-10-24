@@ -45,9 +45,9 @@ Groups 1–2 come first; 2.6 also depends on 3. Groups 3 and 4 depend on 1 and c
 
 ## 4. Frameworks
 
-- [ ] 4.1 `claude`: render `read` and `edit` only, with a test that `delete` renders nothing; an `agentforge` SDK MCP server (`alwaysLoad`) with `push_<name>` per offering mount, allowed, refusing a full tool name over 64 characters. Tests.
-- [ ] 4.2 `claude`: a factory registry for the server, and the kernel's replacement of a still-connected instance, so concurrent runs each get their own. Record SDK 0.3.280's per-query connect and close in `docs/research/claude-agent-sdk.md`. Tests.
-- [ ] 4.3 `strands`: a `push_<name>` tool per offering mount, refusing a name over 64 characters; `delete` renders nothing. Tests.
+- [x] 4.1 `claude`: render `read` and `edit` only, with a test that `delete` renders nothing; an `agentforge` SDK MCP server (`alwaysLoad`) with `push_<name>` per offering mount, allowed, refusing a full tool name over 64 characters. Tests.
+- [x] 4.2 `claude`: a factory registry for the server, and the kernel's replacement of a still-connected instance, so concurrent runs each get their own. Record SDK 0.3.280's per-query connect and close in `docs/research/claude-agent-sdk.md`. Tests.
+- [x] 4.3 `strands`: a `push_<name>` tool per offering mount, refusing a name over 64 characters; `delete` renders nothing. Tests.
 
 ## 5. Image and integration
 

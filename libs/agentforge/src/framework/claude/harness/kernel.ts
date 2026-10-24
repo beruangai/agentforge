@@ -39,6 +39,7 @@ import {
   createStreamingInput,
   createUserMessage,
 } from './prompt.ts';
+import { withFreshSdkServers } from './sdk-mcp-servers.ts';
 import {
   structuredOutputWireSchema,
   unwrapStructuredOutput,
@@ -169,8 +170,10 @@ export async function runAgent<Output>(
   const declaredStore = spec.options?.sessionStore ?? context.sessionStore;
   const mirror =
     declaredStore === undefined ? undefined : recordingStore(declaredStore);
+  const mcpServers = withFreshSdkServers(ownedOptions.mcpServers);
   const options: Options = {
     ...ownedOptions,
+    ...(mcpServers === undefined ? {} : { mcpServers }),
     ...(mirror === undefined ? {} : { sessionStore: mirror.store }),
     env: {
       ...memory.env,

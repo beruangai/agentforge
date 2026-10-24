@@ -1,9 +1,32 @@
 import { isAbsolute, matchesGlob, relative } from 'node:path';
+import { tool } from '@strands-agents/sdk';
 import { CedarAuthorization } from '@strands-agents/sdk/vended-interventions/cedar';
 import { fileEditor } from '@strands-agents/sdk/vended-tools/file-editor';
+import { z } from 'zod';
 import type { MountedFilesystem } from '../../../server/harness/filesystem/filesystem.ts';
 import { agentOptionsMiddleware } from '../../../server/harness/framework.ts';
 import type { StrandsOptions } from './types.ts';
+
+/** The API's limit on a tool's name. */
+const TOOL_NAME_LIMIT = 64;
+
+/** A mount's push tool: its message in, what it recorded out; a failure is the tool's error. */
+function pushTool(name: string, push: NonNullable<MountedFilesystem['push']>) {
+  const toolName = `push_${name}`;
+  if (toolName.length > TOOL_NAME_LIMIT) {
+    throw new Error(
+      `filesystem "${name}" offers a push whose tool name, ${toolName}, is longer than ${TOOL_NAME_LIMIT} characters; register it under a shorter name`,
+    );
+  }
+  return tool({
+    name: toolName,
+    description: `Commits and pushes the write scope of the "${name}" filesystem now, with your message, so partial work survives if the task fails. Returns the commit and the files it recorded.`,
+    inputSchema: z.object({
+      message: z.string().min(1).describe('The commit message'),
+    }),
+    callback: async ({ message }) => JSON.stringify(await push(message)),
+  });
+}
 
 /** The vended file tool's commands that only read. */
 const READ_COMMANDS = new Set(['view']);
@@ -37,15 +60,20 @@ export function withinWriteScope(
  * The run options a procedure's mounts give a `strands` run: every mount as
  * a working directory, and one Cedar intervention refusing an edit through
  * the file tool outside every mount's write scope. What a shell command
- * writes is the procedure's allow list's, as for `claude`'s Bash. Empty
- * without mounts.
+ * writes is the procedure's allow list's, as for `claude`'s Bash; `delete`
+ * renders nothing, since the file tool cannot delete. A mount that offers a
+ * push gets a tool. Empty without mounts.
  */
 export function toAgentOptions(
   filesystems: Readonly<Record<string, MountedFilesystem>>,
-): Pick<StrandsOptions, 'workingDirectories' | 'interventions'> {
+): Pick<StrandsOptions, 'workingDirectories' | 'interventions' | 'tools'> {
   const mounts = Object.values(filesystems);
   if (mounts.length === 0) return {};
+  const pushTools = Object.entries(filesystems).flatMap(([name, mount]) =>
+    mount.push === undefined ? [] : [pushTool(name, mount.push)],
+  );
   return {
+    ...(pushTools.length === 0 ? {} : { tools: pushTools }),
     workingDirectories: mounts.map((mount) => mount.localPath),
     interventions: [
       new CedarAuthorization({

@@ -110,3 +110,73 @@ describe('toAgentOptions', () => {
     expect(toolResults(api.requests[3])[0]?.isError).toBe(false);
   });
 });
+
+describe('a mount that offers a push', () => {
+  const offering = (
+    push: NonNullable<MountedFilesystem['push']>,
+  ): MountedFilesystem => ({ ...mounted('/workspace/vault', ['**']), push });
+
+  it('gets a tool that pushes with its message, and a mount that offers none gets none', async () => {
+    const messages: string[] = [];
+    const options = toAgentOptions({
+      vault: offering(async (message) => {
+        messages.push(message);
+        return { commit: 'abc123', files: ['notes/a.md'] };
+      }),
+      notes: mounted('/workspace/notes'),
+    });
+    const [push, ...others] = options.tools ?? [];
+    expect(others).toEqual([]);
+    expect((push as { name?: string } | undefined)?.name).toBe('push_vault');
+    const result = await (
+      push as unknown as { invoke(input: unknown): Promise<unknown> }
+    ).invoke({ message: 'partial work' });
+    expect(messages).toEqual(['partial work']);
+    expect(JSON.parse(String(result))).toEqual({
+      commit: 'abc123',
+      files: ['notes/a.md'],
+    });
+    expect(
+      toAgentOptions({ notes: mounted('/workspace/notes') }),
+    ).not.toHaveProperty('tools');
+  });
+
+  it("fails the tool with the push's failure", async () => {
+    const [push] =
+      toAgentOptions({
+        vault: offering(() =>
+          Promise.reject(new Error('another writer changed plan.md')),
+        ),
+      }).tools ?? [];
+    await expect(
+      (push as unknown as { invoke(input: unknown): Promise<unknown> }).invoke({
+        message: 'partial work',
+      }),
+    ).rejects.toThrow('another writer changed plan.md');
+  });
+
+  it('refuses a filesystem name whose tool name is over 64 characters', () => {
+    const push = async () => ({ files: [] });
+    expect(() => toAgentOptions({ ['n'.repeat(60)]: offering(push) })).toThrow(
+      /longer than 64 characters/,
+    );
+    expect(() =>
+      toAgentOptions({ ['n'.repeat(59)]: offering(push) }),
+    ).not.toThrow();
+  });
+});
+
+describe('delete', () => {
+  it('grants no edit through the file tool', () => {
+    const vault: MountedFilesystem = {
+      ...mounted('/workspace/vault'),
+      permissions: [
+        { action: 'read', glob: '**' },
+        { action: 'delete', glob: 'notes/**' },
+      ],
+    };
+    expect(withinWriteScope([vault], '/workspace/vault/notes/a.md')).toBe(
+      false,
+    );
+  });
+});

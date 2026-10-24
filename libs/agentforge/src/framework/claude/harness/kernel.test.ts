@@ -1,17 +1,20 @@
-import type {
-  HookCallback,
-  HookInput,
-  ModelUsage,
-  Options,
-  SDKMessage,
-  SessionStore,
-  SessionStoreEntry,
+import {
+  createSdkMcpServer,
+  type HookCallback,
+  type HookInput,
+  type McpSdkServerConfigWithInstance,
+  type ModelUsage,
+  type Options,
+  type SDKMessage,
+  type SessionStore,
+  type SessionStoreEntry,
 } from '@anthropic-ai/claude-agent-sdk';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { hash as ohash } from 'ohash';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { RunRecord } from '#core/contract/task.ts';
+import type { MountedFilesystem } from '../../../server/harness/filesystem/filesystem.ts';
 import {
   TaskCanceled,
   TaskFailure,
@@ -19,6 +22,7 @@ import {
 import { S3SessionStore } from '../core/s3-session-store.ts';
 import { CLAUDE_AGENT_SDK_VERSION } from '../core/sdk-version.ts';
 import { init, result, scriptedQuery } from './__fixtures__/scripted-query.ts';
+import { toAgentOptions } from './agent-options.ts';
 import { AUTO_MEMORY_FRAGMENT } from './auto-memory.ts';
 import {
   type AgentOptions,
@@ -141,6 +145,48 @@ describe('runAgent', () => {
     expect(scripted.calls[0]?.options.outputFormat).toMatchObject({
       schema: { type: 'object', required: ['output'] },
     });
+  });
+
+  it("gives a run a fresh AgentForge server while another run holds the one in its options, and a consumer's own as it is", async () => {
+    const vault: MountedFilesystem = {
+      localPath: '/workspace/vault',
+      permissions: [{ action: 'read', glob: '**' }],
+      path: (relativePath) => relativePath,
+      writablePath: (relativePath) => relativePath,
+      push: async () => ({ files: [] }),
+    };
+    const derived = toAgentOptions({ vault });
+    const held = derived.mcpServers
+      ?.agentforge as McpSdkServerConfigWithInstance;
+    const own = createSdkMcpServer({ name: 'own' });
+    const transport = () => ({
+      start: async () => {},
+      send: async () => {},
+      close: async () => {},
+    });
+    await held.instance.connect(transport() as never);
+    await own.instance.connect(transport() as never);
+    const scripted = scriptedQuery([
+      result({ structured_output: { answer: 'x' } }),
+    ]);
+    await runAgent(
+      {
+        prompt: 'q',
+        output: OutputSchema,
+        options: { mcpServers: { ...derived.mcpServers, own } },
+      },
+      { signal: new AbortController().signal, onRecord: () => {} },
+      scripted.query,
+    );
+    const given = scripted.calls[0]?.options.mcpServers as Record<
+      string,
+      McpSdkServerConfigWithInstance
+    >;
+    expect(given.agentforge?.instance).not.toBe(held.instance);
+    expect(given.agentforge?.instance.isConnected()).toBe(false);
+    expect(given.own).toBe(own);
+    await held.instance.close();
+    await own.instance.close();
   });
 
   it('switches background work off and sets the output format', async () => {
