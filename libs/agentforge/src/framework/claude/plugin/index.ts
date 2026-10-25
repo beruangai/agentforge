@@ -34,7 +34,9 @@ export const plugin: FrameworkPlugin = {
 /**
  * What every agent in ${projectName} runs with, composed under each agent's own
  * options with \`composeOptions\`. An agent's cwd is its own directory, so the
- * \`project\` setting source composes this layer's \`.claude/\` from the parent.
+ * \`project\` setting source composes this layer's \`.claude/\` from the parent;
+ * the \`user\` source loads what the base image installs at Claude's user
+ * scope, such as a plugin, on a fresh run and a resumed one alike.
  * Reads outside a run's working directories are refused, so a procedure
  * composes \`context.agentOptions\` — its mounts as \`additionalDirectories\`
  * and their baseline rules — into a run's own; one that must read more turns
@@ -43,7 +45,7 @@ export const plugin: FrameworkPlugin = {
  */
 export function baseOptions(): AgentOptions {
   return {
-    settingSources: ['project'],
+    settingSources: ['user', 'project'],
     settings: { permissions: { blockReadsOutsideWorkingDirectories: true } },
   };
 }

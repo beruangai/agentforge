@@ -22,7 +22,8 @@ From [Persist sessions to external storage](https://code.claude.com/docs/en/agen
 - **Dual write:** the subprocess always writes locally first and the SDK forwards the batch to the store. On a run resumed *from the store*, the local copy is deleted at run end, so the store holds the only durable copy.
 - **Mirror writes are best-effort:** up to three attempts, then the batch is dropped, an error is logged and a `{ type: "system", subtype: "mirror_error" }` message is emitted. **A call that times out is not retried.** Retries can re-deliver entries, so an adapter deduplicates by `entry.uuid`.
 - **Flushing is batched by default** — `sessionStoreFlush: 'batched'` flushes at the end of a turn — so a container that dies mid-turn loses what was not yet flushed; `'eager'` flushes as entries arrive. Loading from the store times out after `loadTimeoutMs`, 60 s by default. The store API is marked `@alpha` (re-read 2026-09-24).
-- **Resuming from the store swaps the config directory.** The SDK writes the loaded session into a temporary directory and runs the CLI with `CLAUDE_CONFIG_DIR` pointing there, seeding only credentials, `.claude.json` and the user `settings.json`. Whatever else the user scope held — skills, subagents, commands, `CLAUDE.md` — is not there on a resumed run unless it is supplied another way (re-read 2026-09-24; not yet measured, [`../DESIGN_OPTIONS.md`](../DESIGN_OPTIONS.md) §ODO008).
+- **Resuming from the store swaps the config directory.** The SDK writes the loaded session into a temporary directory and runs the CLI with `CLAUDE_CONFIG_DIR` pointing there, seeding only credentials, `.claude.json` and the user `settings.json`. Whatever else the user scope held — skills, subagents, commands, `CLAUDE.md` — is not there on a resumed run unless it is supplied another way (re-read 2026-09-24).
+- **Measured 2026-10-25** against `0.3.280`, in the agent image, by reading `sdk.mjs` and a spike; `0.3.310`'s `sdk.mjs` seeds the same. The directory is `os.tmpdir()/claude-resume-<uuid>`, made only when the store's `load` returns entries; it gets `projects/<key>/<id>.jsonl` and the subagent transcripts, `.credentials.json` without its refresh token, `.claude.json`, `.config.json`, `cowork_settings.json` and `settings.json` **with `enabledPlugins`, `extraKnownMarketplaces` and `additionalMarketplaces` removed**, and `env.CLAUDE_CONFIG_DIR`. Nothing else: no `plugins/`. A plugin installed at user scope with the CLI (`claude plugin install … --scope user`) loaded on the fresh run and was absent on the resumed one — not in `init.plugins`, its skill "Unknown skill", its `SessionStart` hook silent — as StrategyFoundry measured with `pyright-lsp`. With the user config directory's other entries symlinked in and the three settings restored before the CLI started, it loaded, its skill answered, and its hook fired with `source: "resume"`. The SDK removes the directory at the end with a recursive `rm`, which under Bun 1.4.0 removes a link and not what it points to. There is no option for the seeding; `spawnClaudeCodeProcess` receives the swapped `env.CLAUDE_CONFIG_DIR` before the CLI starts, and with it the SDK no longer reads the CLI's stderr itself. The kernel seeds through it (ARCHITECTURE §6); smoke-coverage's e2e re-verifies it.
 - Conflicts: `persistSession: false` and file checkpointing both throw at startup when combined with a store.
 - Reference adapters for S3, Redis and Postgres ship in the SDK repositories, with a conformance suite. Retention is the adapter's responsibility; the SDK never deletes.
 
@@ -63,7 +64,7 @@ What remains for AgentForge is the outer validation and the typed `OUTPUT_INVALI
 ## What this means here
 
 - The working directory is not cosmetic: it keys the project, the transcript location, and the store lookup. AgentForge pins nothing: the project key is the SDK's own, derived from the run's cwd — the agent's directory unless a procedure sets `cwd` — so a resume must run from the directory its session began in ([ADR 0011](../../adr/0011-state-persists-through-apis-not-mounts.md)).
-- Cross-container resume (§REQ402) goes through the store adapter; mounts were ruled out ([ADR 0011](../../adr/0011-state-persists-through-apis-not-mounts.md)). Whether a resumed run misses anything its config directory held beyond the transcript is open, §ODO008.
+- Cross-container resume (§REQ402) goes through the store adapter; mounts were ruled out ([ADR 0011](../../adr/0011-state-persists-through-apis-not-mounts.md)). A resumed run would miss the user scope its config directory held; the kernel gives it back (above).
 - Mirror failure is a real failure mode to surface rather than swallow: `mirror_error` must reach the task record, not be logged and forgotten.
 
 
@@ -142,7 +143,7 @@ From [Configure permissions](https://code.claude.com/docs/en/permissions.md) ("W
 
 ## Plugins from a local directory — read 2026-10-25
 
-From [Plugins in the SDK](https://code.claude.com/docs/en/agent-sdk/plugins.md), for §ODO014:
+From [Plugins in the SDK](https://code.claude.com/docs/en/agent-sdk/plugins.md), for §ODO014 (closed 2026-10-25: the base image owns Claude's user scope, and vendored local plugins were declined):
 
 - **`plugins: [{ type: 'local', path }]`** is the only form the SDK takes; a marketplace plugin is downloaded first and given by its directory. A relative path resolves against `cwd`; `~` is not expanded.
 - **A path that does not exist is skipped and the session continues.** The init message lists what loaded in `plugins`, and why one did not in `plugin_errors`.

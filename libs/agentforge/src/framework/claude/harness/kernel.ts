@@ -47,6 +47,7 @@ import {
 } from './structured-output.ts';
 import { structuredOutputValidation } from './structured-output-validation.ts';
 import { composeSystemPrompt } from './system-prompt.ts';
+import { spawnWithUserScope, userConfigDirectory } from './user-scope.ts';
 
 /** The SDK options a procedure may set; the kernel owns the rest. */
 export type AgentOptions = Omit<Options, 'outputFormat' | 'abortController'>;
@@ -181,14 +182,32 @@ export async function runAgent<Output>(
   const mirror =
     declaredStore === undefined ? undefined : recordingStore(declaredStore);
   const mcpServers = withFreshSdkServers(ownedOptions.mcpServers);
+  const env = { ...memory.env, ...BACKGROUND_WORK_DISABLED };
+  // The SDK drops the CLI's stderr unless asked for it, and with it the
+  // CLI's telemetry export errors; into the task's log instead.
+  const stderr =
+    spec.options?.stderr ??
+    ((data: string) => {
+      process.stderr.write(data);
+    });
+  // A resume from the store runs in a config directory of the SDK's, which
+  // is given the user scope a fresh run has (§REQ201, §REQ402).
+  const resumesFromStore =
+    mirror !== undefined &&
+    (ownedOptions.resume !== undefined || ownedOptions.continue === true);
   const options: Options = {
     ...ownedOptions,
     ...(mcpServers === undefined ? {} : { mcpServers }),
     ...(mirror === undefined ? {} : { sessionStore: mirror.store }),
-    env: {
-      ...memory.env,
-      ...BACKGROUND_WORK_DISABLED,
-    },
+    ...(resumesFromStore
+      ? {
+          spawnClaudeCodeProcess: spawnWithUserScope(userConfigDirectory(env), {
+            spawnClaudeCodeProcess: ownedOptions.spawnClaudeCodeProcess,
+            stderr,
+          }),
+        }
+      : {}),
+    env,
     // The kernel's structured output validation after the procedure's own hooks (§REQ204).
     hooks: {
       ...spec.options?.hooks,
@@ -196,13 +215,7 @@ export async function runAgent<Output>(
     },
     outputFormat: { type: 'json_schema', schema: wire.schema },
     abortController,
-    // The SDK drops the CLI's stderr unless asked for it, and with it the
-    // CLI's telemetry export errors; into the task's log instead.
-    stderr:
-      spec.options?.stderr ??
-      ((data: string) => {
-        process.stderr.write(data);
-      }),
+    stderr,
   };
   const session = query({
     prompt: createStreamingInput(message, inputEnded),

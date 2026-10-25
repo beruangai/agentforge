@@ -479,6 +479,32 @@ describe('runAgent', () => {
       ]);
     });
 
+    it('spawns a run resumed from the store through the user scope, and a fresh run as the SDK does', async () => {
+      const context = {
+        signal: new AbortController().signal,
+        onRecord: () => {},
+        sessionStore: storeOf([]),
+      };
+      const fresh = answered();
+      await runAgent(
+        { prompt: 'q', output: OutputSchema },
+        context,
+        mirroring(fresh, ENTRIES),
+      );
+      const resumed = answered();
+      await runAgent(
+        { prompt: 'q', output: OutputSchema, options: { resume: 'session-1' } },
+        context,
+        mirroring(resumed, ENTRIES),
+      );
+      expect(fresh.calls[0]?.options).not.toHaveProperty(
+        'spawnClaudeCodeProcess',
+      );
+      expect(resumed.calls[0]?.options.spawnClaudeCodeProcess).toEqual(
+        expect.any(Function),
+      );
+    });
+
     it('fails the run when an assistant message never reached the store', async () => {
       const context = {
         signal: new AbortController().signal,

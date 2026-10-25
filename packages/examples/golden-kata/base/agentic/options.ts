@@ -5,7 +5,8 @@ import { kataServer, RUN_CASES_TOOL } from './kata-server.ts';
  * What every agent in golden-kata runs with, composed under each agent's own
  * options with `composeOptions`. An agent's cwd is its own directory, so the
  * `project` setting source composes this layer's `.claude/` — `CLAUDE.md` and
- * the `kata-style` skill — from the parent. The `kata` server runs the kata
+ * the `kata-style` skill — from the parent, and the `user` source what the
+ * base image installs at Claude's user scope. The `kata` server runs the kata
  * in `directory`; a procedure composes its mount's `context.agentOptions`, so
  * the run may read it. Reads outside the working directories are refused, and
  * anything else that would ask is denied. Agents import it as `@beruangai/golden-kata-base/options`.
@@ -13,7 +14,7 @@ import { kataServer, RUN_CASES_TOOL } from './kata-server.ts';
 export function baseOptions(directory: string): AgentOptions {
   return {
     model: 'claude-haiku-4-5',
-    settingSources: ['project'],
+    settingSources: ['user', 'project'],
     mcpServers: { kata: kataServer(directory) },
     tools: ['Read', 'Glob', 'Grep', 'Skill'],
     allowedTools: ['Skill', RUN_CASES_TOOL],

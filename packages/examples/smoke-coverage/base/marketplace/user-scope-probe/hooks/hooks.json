@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p /tmp/user-scope-probe && { cat; echo; } >> /tmp/user-scope-probe/sessions.jsonl"
+          }
+        ]
+      }
+    ]
+  }
+}

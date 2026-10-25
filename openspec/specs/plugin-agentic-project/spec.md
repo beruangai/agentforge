@@ -42,6 +42,13 @@ The base layer's options a generated `claude` project scaffolds SHALL turn on Cl
 - **WHEN** a procedure composes options that turn the fence off over the base layer's
 - **THEN** its run is not fenced
 
+### Requirement: A generated project loads Claude's user scope
+The base layer's options a generated `claude` project scaffolds SHALL load the `user` and `project` setting sources, so what the project's base image installs at Claude's user scope — a plugin, a user setting — reaches every agent's session, fresh or resumed.
+
+#### Scenario: A new project's base options
+- **WHEN** a `claude` agentic project is generated
+- **THEN** its base layer's options load `settingSources: ['user', 'project']`
+
 ### Requirement: Images are built from what the workspace installed
 AgentForge's base image, its project's framework image and each project's agentic image SHALL be built from the AgentForge version the workspace installed, with the container's dependencies resolved to the versions that version was tested with, in the workspace's build graph. A project's agentic image SHALL be built on its framework's image, and the framework's image on the base. A layer's image SHALL install only what the layer adds, keeping every version a lower layer pinned. No generated build configuration SHALL name a path inside AgentForge's own source or build output.
 

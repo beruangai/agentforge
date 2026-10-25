@@ -42,7 +42,7 @@ options: composeOptions(baseOptions(directory), context.agentOptions, {
 }),
 ```
 
-- `baseOptions` comes from the base layer's scaffolded `options.ts`, which the project owns: model, `settingSources: ['project']`, MCP servers, base tools, `permissionMode: 'dontAsk'`, and the read fence.
+- `baseOptions` comes from the base layer's scaffolded `options.ts`, which the project owns: model, `settingSources: ['user', 'project']`, MCP servers, base tools, `permissionMode: 'dontAsk'`, and the read fence.
 - `context.agentOptions` holds the run options the framework derives from the mounts. For `claude`: each mount as an additional directory, and `Read` and `Edit` allow rules from its permissions. AgentForge applies none of it. Compose it in.
 - Later parts win for scalars, objects merge, and **lists accumulate**. A narrower part cannot remove a hook or a tool rule a broader one set. An MCP server named twice throws.
 - Keep `cwd` the agent's directory, the default, so the layers' `.claude/` compose. A resume must run from the same `cwd` as the session it resumes.

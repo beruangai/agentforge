@@ -52,6 +52,22 @@ const journal = new GitFilesystem<OnTopic>({
   pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
 });
 
+/** Where the base image's `user-scope-probe` plugin records each session that starts with it. */
+const USER_SCOPE_PROBE_SESSIONS = '/tmp/user-scope-probe/sessions.jsonl';
+
+/** Whether the probe's `SessionStart` hook recorded this session starting this way. */
+async function userScopePluginStarted(
+  sessionId: string,
+  source: 'startup' | 'resume',
+): Promise<boolean> {
+  if (!existsSync(USER_SCOPE_PROBE_SESSIONS)) return false;
+  return (await readFile(USER_SCOPE_PROBE_SESSIONS, 'utf8'))
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line) as { session_id: string; source: string })
+    .some((start) => start.session_id === sessionId && start.source === source);
+}
+
 export const router = os.router({
   Summarise: os.Summarise.handler(async ({ input, context }) => {
     const run = await context.runAgent({
@@ -74,6 +90,10 @@ export const router = os.router({
       summary: run.output.summary,
       words: run.output.summary.split(/\s+/).filter(Boolean).length,
       sessionId: run.sessionId,
+      userScopePluginStarted: await userScopePluginStarted(
+        run.sessionId,
+        input.resumeSessionId === undefined ? 'startup' : 'resume',
+      ),
     };
   }),
   DistillThenAnswer: os.DistillThenAnswer.handler(

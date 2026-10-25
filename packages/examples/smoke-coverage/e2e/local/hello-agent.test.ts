@@ -112,6 +112,7 @@ describe('hello-agent, locally', () => {
     expect(ended.output.words).toBe(
       ended.output.summary.split(/\s+/).filter(Boolean).length,
     );
+    expect(ended.output.userScopePluginStarted).toBe(true);
     firstSessionId = ended.output.sessionId;
     const [run] = ended.runs;
     expect(run?.sessionId).toBe(firstSessionId);
@@ -146,7 +147,7 @@ describe('hello-agent, locally', () => {
     );
   });
 
-  it('resumes the session it started from its transcript in the local store', async () => {
+  it("resumes the session it started from its transcript in the local store, with the image's user scope", async () => {
     const listed = await LOCAL_STORE.send(
       new ListObjectsV2Command({
         Bucket: SESSION_BUCKET,
@@ -173,6 +174,9 @@ describe('hello-agent, locally', () => {
       );
     }
     expect(ended.output.sessionId).toBe(firstSessionId);
+    // Resumed from the store, in a config directory of the SDK's: the
+    // plugin the base image installed at user scope still started.
+    expect(ended.output.userScopePluginStarted).toBe(true);
   });
 
   it('keeps a note in an S3 filesystem, and a task of another session reads it back from the store', async () => {

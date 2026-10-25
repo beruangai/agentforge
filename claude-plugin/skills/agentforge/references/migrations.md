@@ -10,6 +10,23 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
+## Claude's user scope on a resumed run, 2026-10-25
+
+### Breaks
+
+- **A `claude` run resumed from the store sees the image's Claude user scope**: the plugins installed and enabled in `~/.claude`, and its skills, agents and `CLAUDE.md`, load as on a fresh run, where before they were missing. Only a run whose options load the `user` setting source reads it.
+- **Such a run's CLI is spawned through `spawnClaudeCodeProcess`.** A procedure that gives its own is still called, after the kernel prepares the config directory. The SDK then no longer quotes the CLI's stderr in the error a crashed resumed run ends with; the stderr is still in the task's log.
+- **A newly generated project's base options load `settingSources: ['user', 'project']`.** `options.ts` is scaffolded, so an existing project keeps what it wrote.
+
+### Change
+
+1. In the base layer's `options.ts`, set `settingSources: ['user', 'project']`, unless the project means to keep the user scope out of its sessions.
+2. Install what every agent needs at Claude's user scope in the base layer's detached `Dockerfile`, as `USER bun`, with the CLI the Agent SDK brings: `plugin marketplace add`, then `plugin install <plugin>@<marketplace> --scope user` ([package README](../../../../libs/agentforge/README.md#detaching)). A project that installed plugins this way already, such as StrategyFoundry's `pyright-lsp`, changes nothing else.
+
+### Verify
+
+A task that resumes a session in a container with no copy of its transcript loads the plugin: its skills are listed, and its hooks fire. In smoke-coverage, `Summarise` returns `userScopePluginStarted: true` on the resumed run.
+
 ## Run spec fields, typed scopes and the push's commit, 2026-10-25
 
 ### Breaks

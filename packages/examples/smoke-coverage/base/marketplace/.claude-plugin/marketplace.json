@@ -1,0 +1,11 @@
+{
+  "name": "smoke-coverage",
+  "owner": { "name": "AgentForge" },
+  "plugins": [
+    {
+      "name": "user-scope-probe",
+      "source": "./user-scope-probe",
+      "description": "Records each session that starts with it, and how it started, so a run can show it loaded the user scope."
+    }
+  ]
+}

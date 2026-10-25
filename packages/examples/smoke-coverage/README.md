@@ -10,13 +10,13 @@ nx g @beruangai/agentforge:agent --project smoke-coverage hello-agent --procedur
 nx sync
 ```
 
-What is maintained, scaffolded and detachable is listed in [AgentForge's README](../../../libs/agentforge/README.md#the-nx-plugin). The contract, the procedures and `options.ts` were written by hand into the scaffolds. `base/Dockerfile` is detached (`project.json`): it adds Python 3 and NautilusTrader, from its glibc-only prebuilt wheel, for every agent in the project, the route [AgentForge's README](../../../libs/agentforge/README.md#detaching) gives for what a manifest cannot say.
+What is maintained, scaffolded and detachable is listed in [AgentForge's README](../../../libs/agentforge/README.md#the-nx-plugin). The contract, the procedures and `options.ts` were written by hand into the scaffolds. `base/Dockerfile` is detached (`project.json`): it adds Python 3 and NautilusTrader, from its glibc-only prebuilt wheel, for every agent in the project, and installs the `user-scope-probe` plugin from the layer's own marketplace, `base/marketplace/`, at Claude's user scope — the route [AgentForge's README](../../../libs/agentforge/README.md#detaching) gives for what a manifest cannot say. The plugin's `SessionStart` hook records each session that starts with it, and how.
 
 ## What it covers
 
 | Procedure | Exercises |
 |---|---|
-| `Summarise` | A typed output with a computed field; a session resumed by id |
+| `Summarise` | A typed output with a computed field; a session resumed by id, with the plugin the base image installed at user scope started on the fresh and the resumed run |
 | `SleepThenAnswer` | A run long enough to cancel, or to lose, mid-Bash |
 | `KeepNote`, `RecallNote` | An S3 filesystem, `notebook`, scoped per topic: written in one container, read back in another |
 | `Remember`, `Recall` | Auto memory in an S3 filesystem, `memories`, a space per request: saved in one container, recalled in another with no tools |
@@ -25,9 +25,9 @@ What is maintained, scaffolded and detachable is listed in [AgentForge's README]
 
 | Suite | Asserts |
 |---|---|
-| `e2e/local/hello-agent.test.ts` | Against the local store: a typed output, an attach under the same key, the run's record and its logged prompt; a session resumed from its transcript in the store once the container's own copy is gone; the notebook and a memory read back by a later task, in another runtime session, from the store; the journal's commit in its host repository, with its message and trailers, and the file outside the write scope carried to the session's next task; a cancel mid-Bash leaving the container idle; NautilusTrader's version |
+| `e2e/local/hello-agent.test.ts` | Against the local store: a typed output, an attach under the same key, the run's record and its logged prompt; a session resumed from its transcript in the store once the container's own copy is gone, with the user-scope plugin started on both runs; the notebook and a memory read back by a later task, in another runtime session, from the store; the journal's commit in its host repository, with its message and trailers, and the file outside the write scope carried to the session's next task; a cancel mid-Bash leaving the container idle; NautilusTrader's version |
 | `e2e/local/temporal-activity.test.ts` | The Temporal activity returning the typed output while heartbeating, and cancelling its task when cancelled |
-| `e2e/agentcore/hello-agent.test.ts` | On AgentCore: an attach to a completed task; a session resumed in another container from its transcript in S3; the notebook across containers; a memory across containers; a container stopped mid-Bash ending the task `LOST`, its retry running as attempt 2; NautilusTrader's version on ARM64 |
+| `e2e/agentcore/hello-agent.test.ts` | On AgentCore: an attach to a completed task; a session resumed in another container from its transcript in S3, with the user-scope plugin started; the notebook across containers; a memory across containers; a container stopped mid-Bash ending the task `LOST`, its retry running as attempt 2; NautilusTrader's version on ARM64 |
 
 ## Running it
 

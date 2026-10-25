@@ -116,7 +116,7 @@ describe('hello-agent, on AgentCore', () => {
     });
   });
 
-  it('resumes a session in another container, from its transcript in S3', async () => {
+  it("resumes a session in another container, from its transcript in S3, with the image's user scope", async () => {
     const first = {
       runtimeSessionId: newRuntimeSessionId(),
       idempotencyKey: randomUUIDv7(),
@@ -172,6 +172,7 @@ describe('hello-agent, on AgentCore', () => {
       throw new Error(`expected completion, got ${JSON.stringify(resumed)}`);
     }
     expect(resumed.output.sessionId).toBe(sessionId);
+    expect(resumed.output.userScopePluginStarted).toBe(true);
   });
 
   it('keeps a note in an S3 filesystem, and reads it back in another container', async () => {

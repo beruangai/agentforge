@@ -23,6 +23,15 @@ RUN apt-get update \
  && /opt/python/bin/pip install --no-cache-dir --only-binary=:all: nautilus_trader==1.231.0
 USER bun
 ENV PATH=/opt/python/bin:${PATH}
+# A plugin at Claude's user scope, which the base image owns: installed from
+# the layer's own marketplace, kept in the image as its source, with the CLI
+# the Agent SDK brings. Every run loads it through the `user` setting source,
+# a run resumed from the store included.
+COPY --chown=bun marketplace/ /opt/smoke-coverage-marketplace/
+RUN set -- /workspace/node_modules/.bun/@anthropic-ai+claude-agent-sdk-linux-arm64@*/node_modules/@anthropic-ai/claude-agent-sdk-linux-arm64/claude \
+ && [ "$#" -eq 1 ] && [ -x "$1" ] \
+ && "$1" plugin marketplace add /opt/smoke-coverage-marketplace \
+ && "$1" plugin install user-scope-probe@smoke-coverage --scope user
 COPY --chown=bun --exclude=bun.lock --exclude=\$claude agentic/ /workspace/agentic/
 COPY --chown=bun agentic/\$claude/ /workspace/agentic/.claude/
 COPY --chown=bun agentic/bun.lock /workspace/bun.lock

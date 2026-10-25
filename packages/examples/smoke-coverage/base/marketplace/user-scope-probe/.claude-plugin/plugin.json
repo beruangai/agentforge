@@ -1,0 +1,5 @@
+{
+  "name": "user-scope-probe",
+  "version": "1.0.0",
+  "description": "Records each session that starts with it, and how it started, so a run can show it loaded the user scope."
+}

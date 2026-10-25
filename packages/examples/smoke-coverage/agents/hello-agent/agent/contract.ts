@@ -30,6 +30,12 @@ export const contract = {
         /** Computed, never asked of the model (§REQ102). */
         words: z.number(),
         sessionId: z.string(),
+        /**
+         * Whether the plugin the base image installs at Claude's user scope
+         * started with this run, fresh or resumed: read from what its hook
+         * recorded, never asked of the model.
+         */
+        userScopePluginStarted: z.boolean(),
       }),
     ),
   /** Answers a question from documents, distilled first when they exceed the cap: two runs, or one. */
