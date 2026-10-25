@@ -10,6 +10,20 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
+## Run spec fields, 2026-10-25
+
+### Breaks
+
+- **A run spec field the framework does not take fails the task** `EXECUTION_ERROR`, naming it, before the run. Before, it was dropped. On `claude`, `resume` beside `options` is the common case: it is an SDK option. On `strands`, an option `StrandsOptions` does not have fails the same way, `resume` among the options included.
+
+### Change
+
+1. Move each run spec field the task's failure names to where it belongs: `resume` into `options` on `claude`, beside `options` on `strands`.
+
+### Verify
+
+The project's `typecheck` and tests pass, and a task that reaches its run completes.
+
 ## git-filesystem, 2026-10-24
 
 ### Breaks

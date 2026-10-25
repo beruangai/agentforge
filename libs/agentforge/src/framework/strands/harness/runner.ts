@@ -27,7 +27,10 @@ import {
   type RunRecord,
   type RunUsage,
 } from '#core/contract/task.ts';
-import type { RunEnvironment } from '../../../server/harness/framework.ts';
+import {
+  type RunEnvironment,
+  refuseUnknownRunSpecFields,
+} from '../../../server/harness/framework.ts';
 import { validateStructuredOutput } from '../../../server/harness/structured-output-validation.ts';
 import {
   describeError,
@@ -44,7 +47,12 @@ import {
   composeSystemPrompt,
   STRUCTURED_OUTPUT_TOOL,
 } from './system-prompt.ts';
-import type { AgentRun, AgentRunSpec, StrandsOptions } from './types.ts';
+import type {
+  AgentRun,
+  AgentRunSpec,
+  StrandsOptions,
+  StrandsTypes,
+} from './types.ts';
 
 export { STRUCTURED_OUTPUT_TOOL } from './system-prompt.ts';
 
@@ -53,6 +61,31 @@ export const DEFAULT_MAX_STRUCTURED_OUTPUT_ATTEMPTS = 5;
 
 /** The property a non-object agent contract is nested under, when a run opts in. */
 export const STRUCTURED_OUTPUT_WRAPPER_KEY = 'output';
+
+/** The spec fields `strands` takes beside the shared ones. */
+const STRANDS_RUN_SPEC_EXTRAS: Record<keyof StrandsTypes['extras'], true> = {
+  memorySpace: true,
+  maxStructuredOutputAttempts: true,
+  resume: true,
+  offload: true,
+};
+
+/** Every option a `strands` run takes: anything else is refused, never dropped (§REQ201). */
+const STRANDS_OPTIONS_FIELDS: Record<keyof StrandsOptions, true> = {
+  model: true,
+  maxTokens: true,
+  modelConfig: true,
+  systemPrompt: true,
+  tools: true,
+  mcpClients: true,
+  plugins: true,
+  hooks: true,
+  interventions: true,
+  conversationManager: true,
+  workingDirectories: true,
+  layers: true,
+  limits: true,
+};
 
 /** The Anthropic client's settings the runner owns, refused in a run's `modelConfig`. */
 const RUNNER_OWNED_CLIENT_KEYS = ['apiKey', 'client', 'clientConfig'] as const;
@@ -429,6 +462,10 @@ function ownedByTheRunner<Output>(
   const refuse = (message: string): never => {
     throw new TaskFailure(cause('EXECUTION_ERROR', message));
   };
+  refuseUnknownRunSpecFields(spec, {
+    name: 'strands',
+    extras: STRANDS_RUN_SPEC_EXTRAS,
+  });
   const options = spec.options ?? {};
   const model =
     options.model ??
@@ -441,6 +478,14 @@ function ownedByTheRunner<Output>(
   ) {
     refuse(
       "a strands run sets neither `backgroundTasks` nor `cacheConfig`: nothing runs in the background (§REQ206), and cache points come from the prompt's cache breakpoints (§REQ210)",
+    );
+  }
+  const unknownOptions = Object.keys(options).filter(
+    (key) => !Object.hasOwn(STRANDS_OPTIONS_FIELDS, key),
+  );
+  if (unknownOptions.length > 0) {
+    refuse(
+      `a strands run's options do not take ${unknownOptions.map((key) => `\`${key}\``).join(', ')}; a field of the run spec, such as \`resume\`, goes beside \`options\``,
     );
   }
   for (const key of RUNNER_OWNED_CLIENT_KEYS) {

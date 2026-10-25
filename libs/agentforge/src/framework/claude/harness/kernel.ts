@@ -18,11 +18,12 @@ import {
   type RunUsage,
   type TranscriptLocation,
 } from '#core/contract/task.ts';
-import type {
-  RunEnvironment,
-  AgentRun as SharedAgentRun,
-  AgentRunSpec as SharedAgentRunSpec,
-  TaskContext as SharedTaskContext,
+import {
+  type RunEnvironment,
+  refuseUnknownRunSpecFields,
+  type AgentRun as SharedAgentRun,
+  type AgentRunSpec as SharedAgentRunSpec,
+  type TaskContext as SharedTaskContext,
 } from '../../../server/harness/framework.ts';
 import {
   describeError,
@@ -65,6 +66,11 @@ export type ClaudeTypes = {
   };
   /** The SDK's usage per model. */
   readonly usage: Readonly<Record<string, ModelUsage>>;
+};
+
+/** The spec fields `claude` takes beside the shared ones. */
+const CLAUDE_RUN_SPEC_EXTRAS: Record<keyof ClaudeTypes['extras'], true> = {
+  memoryDirectory: true,
 };
 
 export type AgentRunSpec<Output> = SharedAgentRunSpec<ClaudeTypes, Output>;
@@ -110,6 +116,10 @@ export async function runAgent<Output>(
   query: QueryFunction = sdkQuery,
 ): Promise<AgentRun<Output>> {
   if (context.signal.aborted) throw new TaskCanceled();
+  refuseUnknownRunSpecFields(spec, {
+    name: 'claude',
+    extras: CLAUDE_RUN_SPEC_EXTRAS,
+  });
   const startedAt = Date.now();
   const { systemPrompt, memory } = ownedByTheKernel(spec);
   const ownedOptions: AgentOptions = {

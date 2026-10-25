@@ -342,6 +342,16 @@ describe('runAgent', () => {
         { output: z.array(z.string()) },
         'root is not an object',
       ],
+      [
+        "a spec field strands does not take, claude's",
+        { memoryDirectory: '/m' },
+        'a strands run spec does not take `memoryDirectory`',
+      ],
+      [
+        'a spec field set among its options',
+        { options: { model: 'm', resume: 'abc' } },
+        "a strands run's options do not take `resume`",
+      ],
     ])('%s', async (_name, spec, message) => {
       const { requests } = await scripted([submit({ answer: 'a' })]);
       const failure = await failureOf(

@@ -16,6 +16,17 @@ Each agentic project SHALL run its procedures' agent runs through exactly one fr
 - **WHEN** a module imports only the shared procedure surface, in a workspace with no agent SDK installed
 - **THEN** it compiles, and its types name no agent SDK's
 
+### Requirement: A run spec field the framework does not take fails the run
+A run's spec SHALL carry only the fields every framework takes and its own framework's. A run whose spec carries any other field SHALL fail `EXECUTION_ERROR` before it starts, naming each, whatever the procedure's types let through. A `strands` run's options SHALL be refused the same way, since they are AgentForge's own.
+
+#### Scenario: An SDK option set beside the options
+- **WHEN** a `claude` procedure passes `resume` on the run spec rather than in its options
+- **THEN** the task fails `EXECUTION_ERROR`, naming `resume`, and no run starts
+
+#### Scenario: A spec field set among the options
+- **WHEN** a `strands` procedure passes `resume` in its options rather than on the run spec
+- **THEN** the task fails `EXECUTION_ERROR`, naming `resume`, and no run starts
+
 ### Requirement: The framework derives a run's options from the mounts
 Once a procedure's filesystems are mounted (see [filesystem-lifecycle](../filesystem-lifecycle/spec.md)), the handler SHALL receive one set of run options derived by its framework from every mount's directory and permissions, and nothing else. The options SHALL be in the framework's own terms, and a procedure with no mount SHALL receive an empty set. AgentForge SHALL NOT apply them to an agent run; the handler composes them into a run's own. For `claude`, every mount SHALL be an additional working directory and its permissions allow rules, so a run whose reads are fenced to its working directories can read its own mounts and no other.
 

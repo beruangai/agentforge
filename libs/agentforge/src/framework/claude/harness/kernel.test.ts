@@ -364,6 +364,26 @@ describe('runAgent', () => {
     );
   });
 
+  it.each([
+    ['an SDK option set beside the options', { resume: 'session-1' }, 'resume'],
+    ["another framework's field", { memorySpace: 'notes' }, 'memorySpace'],
+  ])(
+    'refuses %s on the spec before the run, EXECUTION_ERROR, naming it',
+    async (_label, extra, key) => {
+      const scripted = scriptedQuery([]);
+      const promise = runAgent(
+        { prompt: 'q', output: OutputSchema, ...extra } as never,
+        { signal: new AbortController().signal, onRecord: () => undefined },
+        scripted.query,
+      );
+      await expect(promise).rejects.toThrow(
+        `a claude run spec does not take \`${key}\``,
+      );
+      expect(await causeOf(promise)).toBe('EXECUTION_ERROR');
+      expect(scripted.calls).toHaveLength(0);
+    },
+  );
+
   describe('with a session store', () => {
     const ASSISTANT = {
       type: 'assistant',
