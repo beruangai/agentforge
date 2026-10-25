@@ -34,7 +34,7 @@ function pushServer(
     tools: offering.map(([name, push]) =>
       tool(
         `push_${name}`,
-        `Commits and pushes the write scope of the "${name}" filesystem now, with your message, so partial work survives if the task fails. Returns the commit and the files it recorded.`,
+        `Commits and pushes the write scope of the "${name}" filesystem now, with your message, so partial work survives if the task fails. Returns the commit the write scope stands at and the files this push recorded, none when nothing changed.`,
         { message: z.string().min(1).describe('The commit message') },
         async ({ message }) => {
           try {

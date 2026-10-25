@@ -156,11 +156,15 @@ export interface MountedFilesystem {
   readonly push?: (message: string) => Promise<PushReport>;
 }
 
-/** What a push recorded. */
+/** What a push recorded, and where the write scope stands after it. */
 export interface PushReport {
-  /** The commit pushed; absent when there was nothing to record. */
+  /**
+   * The commit at which the write scope stands as pushed: this push's, or,
+   * when it had nothing to record, the mount's base — an earlier push's, or
+   * the commit the mount pulled. Absent only when the branch has no commit.
+   */
   readonly commit?: string;
-  /** Relative to the mount. */
+  /** What this push recorded, relative to the mount; empty when it had nothing to record. */
   readonly files: readonly string[];
 }
 

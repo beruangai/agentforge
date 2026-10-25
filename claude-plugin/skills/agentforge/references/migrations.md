@@ -10,16 +10,18 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
-## Run spec fields and typed scopes, 2026-10-25
+## Run spec fields, typed scopes and the push's commit, 2026-10-25
 
 ### Breaks
 
 - **A run spec field the framework does not take fails the task** `EXECUTION_ERROR`, naming it, before the run. Before, it was dropped. On `claude`, `resume` beside `options` is the common case: it is an SDK option. On `strands`, an option `StrandsOptions` does not have fails the same way, `resume` among the options included.
+- **`PushReport.commit` is present when a push records nothing**: it is then the mount's base, an earlier push's commit or the tip the mount pulled. Code that read an absent `commit` as "nothing recorded" reads `files.length === 0` instead.
 
 ### Change
 
 1. Move each run spec field the task's failure names to where it belongs: `resume` into `options` on `claude`, beside `options` on `strands`.
-2. Optional: type each filesystem whose scope reads the input — `new GitFilesystem<Input>({ … })`, `S3FilesystemOptions<Input>` — and remove the scope's own parse of the input, a `.pick(…).loose().parse(input)` among them. A typed filesystem registered at router level no longer compiles; register it on its procedures.
+2. Replace any `commit === undefined` test on a push's report with `files.length === 0`. A procedure that looked up the commit holding its work some other way, such as by a task's trailers, takes `commit` from its own `mount.push(message)` after the run.
+3. Optional: type each filesystem whose scope reads the input — `new GitFilesystem<Input>({ … })`, `S3FilesystemOptions<Input>` — and remove the scope's own parse of the input, a `.pick(…).loose().parse(input)` among them. A typed filesystem registered at router level no longer compiles; register it on its procedures.
 
 ### Verify
 

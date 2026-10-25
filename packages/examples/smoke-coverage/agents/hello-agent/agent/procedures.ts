@@ -172,11 +172,21 @@ export const router = os.router({
           permissionMode: 'dontAsk',
         }),
       });
+      // The agent pushed its entry, so this push usually records nothing; it
+      // reports the commit the write scope stands at either way.
+      if (mount.push === undefined) {
+        throw new Error('the journal offers no push: it pushes on failure');
+      }
+      const { commit } = await mount.push(input.message);
+      if (commit === undefined) {
+        throw new Error('the journal reported no commit after its push');
+      }
       return {
         written:
           existsSync(entry) &&
           (await readFile(entry, 'utf8')).trim() === input.entry.trim(),
         ...(carried === undefined ? {} : { carried }),
+        commit,
       };
     },
   ),

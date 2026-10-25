@@ -333,8 +333,12 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
       deletes: this.#gitOptions.dangerouslyEnableDeletes,
     });
     const files = [...selected.changed, ...selected.deleted];
-    if (files.length === 0) return { files: [] };
     let base = await git.resolve(BASE_REF);
+    // Nothing to record: the write scope stands as the base has it, which
+    // an earlier push of this mount or its pull left.
+    const unchanged: PushReport =
+      base === undefined ? { files: [] } : { commit: base, files: [] };
+    if (files.length === 0) return unchanged;
     const prefix = repositoryPath(mount);
     // The mount's subtree with the selected files, in a copy of its index.
     const pushIndex = join(git.directory, 'push.index');
@@ -349,7 +353,7 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
       base !== undefined &&
       tree === (await git.inRepository(['rev-parse', `${base}^{tree}`]))
     ) {
-      return { files: [] };
+      return unchanged;
     }
     const fullMessage = withTrailers(message, mount);
     const ours = await this.#commit(git, tree, base, fullMessage);

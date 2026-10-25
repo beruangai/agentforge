@@ -26,7 +26,7 @@ A git filesystem SHALL take its store to be one branch of one repository, `main`
 - **THEN** the task fails `EXECUTION_ERROR`, naming the repository and the declared ones, before anything is mounted
 
 ### Requirement: A push is one commit of the write scope, merged onto the remote tip
-A git filesystem's push SHALL record, as one commit on its branch, every file in its write scope that was added or changed since its base, the commit it last pulled or pushed, and no file outside the write scope or excluded. A push with nothing to record SHALL succeed and add no commit. A commit SHALL carry the filesystem's message, its author, and trailers naming the task id, the idempotency key and the attempt. When the branch has moved since the base, the push SHALL merge its commit onto the branch's tip and push again, a bounded number of times. Only a push the remote accepted SHALL count as verified. After a push, the mount's base SHALL be the commit pushed, and its files SHALL include what the merge brought in.
+A git filesystem's push SHALL record, as one commit on its branch, every file in its write scope that was added or changed since its base, the commit it last pulled or pushed, and no file outside the write scope or excluded. A push with nothing to record SHALL succeed and add no commit. Every push SHALL report the files it recorded and the commit at which the write scope stands as pushed: the commit it pushed, or, with nothing to record, the base; only a branch with no commit SHALL report none. A commit SHALL carry the filesystem's message, its author, and trailers naming the task id, the idempotency key and the attempt. When the branch has moved since the base, the push SHALL merge its commit onto the branch's tip and push again, a bounded number of times. Only a push the remote accepted SHALL count as verified. After a push, the mount's base SHALL be the commit pushed, and its files SHALL include what the merge brought in.
 
 #### Scenario: Only the write scope is committed
 - **WHEN** a git filesystem that may write `notes/**` finds `notes/today.md` changed and `index.md` changed at push
@@ -39,6 +39,14 @@ A git filesystem's push SHALL record, as one commit on its branch, every file in
 #### Scenario: Nothing to push
 - **WHEN** a git filesystem's write scope has no change at push
 - **THEN** the push succeeds and the branch is unchanged
+
+#### Scenario: Nothing new after the agent's push
+- **WHEN** the agent pushed its work mid-task, another writer then pushed elsewhere on the branch, and the procedure pushes again with nothing new
+- **THEN** the procedure's push records no files and reports the agent's commit
+
+#### Scenario: A task that pushed nothing
+- **WHEN** a task pushes with nothing to record and no earlier push
+- **THEN** the push reports the commit the mount pulled
 
 #### Scenario: A commit names its task
 - **WHEN** a task's push records a commit

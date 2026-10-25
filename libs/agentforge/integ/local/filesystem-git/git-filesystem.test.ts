@@ -295,8 +295,24 @@ describe('GitFilesystem', () => {
     expect(git(['log', '-1', '--format=%s', 'main'], bare)).toBe(
       'partial work',
     );
-    expect(report?.commit).toBe(git(['rev-parse', 'main'], bare));
-    await expect(push?.('nothing more')).resolves.toEqual({ files: [] });
+    const pushed = git(['rev-parse', 'main'], bare);
+    expect(report?.commit).toBe(pushed);
+    // Nothing new: where the write scope stands, as the earlier push left it.
+    otherPushes({ 'elsewhere.md': 'theirs' });
+    await expect(push?.('nothing more')).resolves.toEqual({
+      commit: pushed,
+      files: [],
+    });
+    await vault.unmount('TASK_STATE_COMPLETED');
+  });
+
+  it('reports the commit the mount pulled when a task pushes nothing', async () => {
+    const pulled = otherPushes({ 'plan.md': 'plan' });
+    const vault = await mount(filesystem({ pushOn: ['TASK_STATE_FAILED'] }));
+    await expect(vault.mounted.push?.('nothing')).resolves.toEqual({
+      commit: pulled,
+      files: [],
+    });
     await vault.unmount('TASK_STATE_COMPLETED');
   });
 

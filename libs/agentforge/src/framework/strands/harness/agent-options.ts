@@ -20,7 +20,7 @@ function pushTool(name: string, push: NonNullable<MountedFilesystem['push']>) {
   }
   return tool({
     name: toolName,
-    description: `Commits and pushes the write scope of the "${name}" filesystem now, with your message, so partial work survives if the task fails. Returns the commit and the files it recorded.`,
+    description: `Commits and pushes the write scope of the "${name}" filesystem now, with your message, so partial work survives if the task fails. Returns the commit the write scope stands at and the files this push recorded, none when nothing changed.`,
     inputSchema: z.object({
       message: z.string().min(1).describe('The commit message'),
     }),

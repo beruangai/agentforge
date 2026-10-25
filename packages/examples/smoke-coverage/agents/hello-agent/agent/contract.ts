@@ -94,6 +94,8 @@ export const contract = {
         written: z.boolean(),
         /** The scratch note an earlier task of the session left, if any. */
         carried: z.string().optional(),
+        /** The commit the entry stands at, as the handler's closing push reports it after the agent's own. */
+        commit: z.string(),
       }),
     ),
   /** Saves a fact to the agent's auto memory in a space. */

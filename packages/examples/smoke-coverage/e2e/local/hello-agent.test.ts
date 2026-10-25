@@ -295,6 +295,17 @@ describe('hello-agent, locally', () => {
       expect(journal('show', `main:topics/${topic}/entries/${day}.md`)).toBe(
         `On ${day}, ${topic} was kept in git.`,
       );
+      // The handler's closing push recorded nothing new, and names the commit the entry stands at.
+      expect(kept.output.commit).toBe(
+        journal(
+          'log',
+          '-1',
+          '--format=%H',
+          'main',
+          '--',
+          `topics/${topic}/entries/${day}.md`,
+        ),
+      );
       return kept.output;
     };
     expect((await keep('monday', 'first scratch')).carried).toBeUndefined();
