@@ -47,6 +47,7 @@ options: composeOptions(baseOptions(directory), context.agentOptions, {
 - Later parts win for scalars, objects merge, and **lists accumulate**. A narrower part cannot remove a hook or a tool rule a broader one set. An MCP server named twice throws.
 - Keep `cwd` the agent's directory, the default, so the layers' `.claude/` compose. A resume must run from the same `cwd` as the session it resumes.
 - **The run spec takes only its own fields**: `prompt`, `output`, `wrapNonObjectOutput`, `options`, `guardrails`, and the framework's extras (`claude`: `memoryDirectory`). Anything else fails the task `EXECUTION_ERROR`, naming it, even where a conditional spread got it past the type check. On `claude`, `resume` is an SDK option and goes in `options`; on `strands` it sits beside them.
+- **A language server's diagnostics need `Bash` among `tools`.** With a language-server plugin enabled (Anthropic's `pyright-lsp`), the `LSP` tool answers with any `tools` list, but the `<new-diagnostics>` reminder after a write reaches the model only when `tools` includes `Bash`, or when no `tools` list is given. StrategyFoundry found this on Agent SDK 0.3.280 (2026-10-25). AgentForge does not check it; see "Language-server diagnostics need `Bash`" in [the research note](../../../../docs/research/claude-agent-sdk.md).
 
 ### Context
 

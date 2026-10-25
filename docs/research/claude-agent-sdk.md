@@ -139,3 +139,20 @@ From [Configure permissions](https://code.claude.com/docs/en/permissions.md) ("W
 - **`McpServer.isConnected()`** (`@modelcontextprotocol/sdk` 1.30.1) is true from `connect` until `close`.
 - **So** AgentForge's own `agentforge` server is made by a registered factory (`framework/claude/harness/sdk-mcp-servers.ts`), and the kernel gives a run a fresh instance in place of one still connected. That is correct whether or not the SDK keeps closing transports at a query's end, so no `integ/model` case pins it. A consumer's own SDK server is untouched; running one in two concurrent runs is the consumer's to avoid.
 - **`createSdkMcpServer({ alwaysLoad: true })`** keeps its tools out of tool search's deferral, and makes startup wait, up to 5 s, for the server to connect (`sdk.d.ts`).
+
+## Plugins from a local directory — read 2026-10-25
+
+From [Plugins in the SDK](https://code.claude.com/docs/en/agent-sdk/plugins.md), for §ODO014:
+
+- **`plugins: [{ type: 'local', path }]`** is the only form the SDK takes; a marketplace plugin is downloaded first and given by its directory. A relative path resolves against `cwd`; `~` is not expanded.
+- **A path that does not exist is skipped and the session continues.** The init message lists what loaded in `plugins`, and why one did not in `plugin_errors`.
+- The page lists skills, agents, hooks and MCP servers as what a plugin brings. It does not mention language servers, and it does not say whether the option depends on `settingSources` or the config directory.
+
+## Language-server diagnostics need `Bash` — reported 2026-10-25 against `0.3.280` (CLI 2.1.280)
+
+Reported by StrategyFoundry, not re-verified here: AgentForge relies on none of it.
+
+- **Setup**: the `claude` image, with Anthropic's `pyright-lsp` plugin from `claude-plugins-official` installed at user scope and `settingSources: ['user', 'project']`.
+- **The plugin loads, and the `LSP` tool answers hover**, whatever `tools` lists.
+- **Diagnostics arrive only with `Bash` among `tools`.** They reach the model as a `<new-diagnostics>` system reminder on the turn after a write. With `tools: ['Read', 'Write', 'Edit', 'LSP']`, with or without `Glob` and `Grep`, none arrived. Adding `Bash`, or passing no `tools` list, delivered them. Headless `claude -p` delivered them too.
+- **What this means for AgentForge:** nothing it runs depends on it, so the kernel does not check it. A procedure that wants a language server's diagnostics lists `Bash`, as the skill's Options say. Raising it with the Agent SDK is the operator's.
