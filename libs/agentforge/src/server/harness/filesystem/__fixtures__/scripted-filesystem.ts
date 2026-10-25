@@ -22,11 +22,11 @@ interface Script {
  * A kind whose operations are recorded, and fail as scripted: `pull` leaves
  * `pulled.md` in the mount.
  */
-export class ScriptedFilesystem extends Filesystem {
+export class ScriptedFilesystem<in Input = unknown> extends Filesystem<Input> {
   readonly calls: string[] = [];
   readonly #script: Script;
 
-  constructor(options: Partial<FilesystemOptions>, script: Script = {}) {
+  constructor(options: Partial<FilesystemOptions<Input>>, script: Script = {}) {
     super(
       {
         scope: () => ({ subpath: '' }),

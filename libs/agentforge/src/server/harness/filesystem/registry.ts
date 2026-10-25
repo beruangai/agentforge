@@ -18,7 +18,8 @@ import { isWithin } from './mount-claims.ts';
  */
 const FILESYSTEM_REGISTRY = 'agentforge.filesystems';
 
-type Registry = Readonly<Record<string, Filesystem>>;
+/** Of any input: each was checked against its procedure's when it was registered. */
+type Registry = Readonly<Record<string, Filesystem<never>>>;
 
 type RegistryContext = { readonly [FILESYSTEM_REGISTRY]?: Registry };
 
@@ -27,9 +28,12 @@ type RegistryContext = { readonly [FILESYSTEM_REGISTRY]?: Registry };
  * is registered upstream, a name already there replaced. With
  * `replaceUpstream: true`, everything registered upstream is dropped. Nothing is mounted here;
  * AgentForge mounts what is registered just before the handler (ADR 0015).
+ * A filesystem typed by its procedure's input (`Filesystem<Input>`) is
+ * accepted only by a procedure whose parsed input has that type, so its
+ * scope reads the input as the contract typed it.
  */
-export function filesystems(
-  entries: Readonly<Record<string, Filesystem>>,
+export function filesystems<Input = unknown>(
+  entries: Readonly<Record<string, Filesystem<Input>>>,
   options: { readonly replaceUpstream?: boolean } = {},
 ) {
   for (const name of Object.keys(entries)) {
@@ -39,18 +43,21 @@ export function filesystems(
       );
     }
   }
-  return os.$context<RegistryContext>().middleware(({ context, next }) =>
-    next({
-      context: {
-        [FILESYSTEM_REGISTRY]: {
-          ...(options.replaceUpstream === true
-            ? {}
-            : context[FILESYSTEM_REGISTRY]),
-          ...entries,
+  // The input is only typed here, so `.use()` checks the procedure's against it.
+  return os
+    .$context<RegistryContext>()
+    .middleware(({ context, next }, _input: Input) =>
+      next({
+        context: {
+          [FILESYSTEM_REGISTRY]: {
+            ...(options.replaceUpstream === true
+              ? {}
+              : context[FILESYSTEM_REGISTRY]),
+            ...entries,
+          },
         },
-      },
-    }),
-  );
+      }),
+    );
 }
 
 /**
@@ -71,7 +78,8 @@ export function mountRegisteredFilesystems(lifecycles: MountLifecycle[]) {
             filesystem.resolve({
               name,
               taskId: context.taskId,
-              request: { input, context },
+              // Parsed by the procedure's contract, which `filesystems()` checked it against.
+              request: { input: input as never, context },
             }),
           ] as const,
       );

@@ -14,18 +14,22 @@ import { baseOptions } from '@beruangai/strands-smoke-base/options';
 import { fileEditor } from '@strands-agents/sdk/vended-tools/file-editor';
 import { makeShell } from '@strands-agents/sdk/vended-tools/shell';
 import { z } from 'zod';
-import { contract, TopicField } from './contract.ts';
+import { contract } from './contract.ts';
 
 const os = implementAgent(contract);
 
-/** The notebook, a directory per topic under one root; a procedure that writes declares its push. */
-const NOTEBOOK: S3FilesystemOptions = {
+/** What a procedure on a topic's filesystem takes, as its contract parsed it. */
+type OnTopic = { readonly topic: string };
+
+/**
+ * The notebook, a directory per topic under one root; a procedure that
+ * writes declares its push. Typed by its procedures' input, so its scope
+ * reads the topic the contract parsed.
+ */
+const NOTEBOOK: S3FilesystemOptions<OnTopic> = {
   localRoot: '/workspace/notebook',
   bucket: 'notebook',
-  // A scope receives its input untyped; the contract's own field reads it.
-  scope: ({ input }) => ({
-    subpath: `topics/${z.object({ topic: TopicField }).parse(input).topic}`,
-  }),
+  scope: ({ input }) => ({ subpath: `topics/${input.topic}` }),
 };
 
 /**
@@ -33,14 +37,11 @@ const NOTEBOOK: S3FilesystemOptions = {
  * module scope, as a git filesystem with a token must be. It pushes on
  * failure too, so the agent is offered a push of its own.
  */
-const journal = new GitFilesystem({
+const journal = new GitFilesystem<OnTopic>({
   localRoot: '/workspace/journal',
   repository: 'journal',
   remoteRoot: '/topics',
-  scope: ({ input }) => ({
-    subpath: z.object({ topic: TopicField }).parse(input).topic,
-    write: ['entries/**'],
-  }),
+  scope: ({ input }) => ({ subpath: input.topic, write: ['entries/**'] }),
   pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
 });
 

@@ -23,10 +23,15 @@ export const PushOnStateEnum = TerminalTaskStateEnum.extract([
 ]);
 export type PushOnState = z.infer<typeof PushOnStateEnum>;
 
-/** What a filesystem's scope is resolved from: the request the procedure serves. */
-export interface FilesystemRequest {
-  /** Validated against the procedure's contract. */
-  readonly input: unknown;
+/**
+ * What a filesystem's scope is resolved from: the request the procedure
+ * serves. `Input` is the procedure's input as its contract parses it; a
+ * filesystem typed by it can be registered only on procedures whose input
+ * has that type, which `filesystems()` checks when the procedure compiles.
+ */
+export interface FilesystemRequest<Input = unknown> {
+  /** Already parsed by the procedure's contract: read it, never parse it again. */
+  readonly input: Input;
   readonly context: TaskContext<FrameworkTypes>;
 }
 
@@ -42,12 +47,12 @@ export interface FilesystemScope {
 }
 
 /** Options every filesystem kind shares (ADR 0015). */
-export interface FilesystemOptions {
+export interface FilesystemOptions<Input = unknown> {
   /** The local directory its mounts live under, absolute; a kind sets a default or requires it. */
   readonly localRoot?: string;
   /** The store's partition its mounts live under, absolute within the store; `/`, the whole store, when absent. */
   readonly remoteRoot?: string;
-  readonly scope: (request: FilesystemRequest) => FilesystemScope;
+  readonly scope: (request: FilesystemRequest<Input>) => FilesystemScope;
   /**
    * The task states unmount pushes the write scope back on, verified before
    * the outcome is published: `['TASK_STATE_COMPLETED']`, or with
@@ -167,14 +172,15 @@ export class FilesystemUnsynced extends Error {}
  * local directory — before its handler, unmounted once its outcome is known.
  * A kind implements `pull` and `push`; the lifecycle — and checkpoints, which
  * are pushes of what has settled — is run from the options (ADR 0015).
+ * `Input` types the request its scope reads (§REQ103).
  */
-export abstract class Filesystem {
-  readonly options: FilesystemOptions;
+export abstract class Filesystem<in Input = unknown> {
+  readonly options: FilesystemOptions<Input>;
   /** The local root for a registered name: the consumer's, or the kind's default. */
   readonly #resolveLocalRoot: (filesystem: { readonly name: string }) => string;
 
   protected constructor(
-    options: FilesystemOptions,
+    options: FilesystemOptions<Input>,
     kind: {
       /** The local root when the consumer names none; absent, the consumer must. */
       readonly defaultLocalRoot?: (filesystem: {
@@ -190,7 +196,7 @@ export abstract class Filesystem {
         `${this.constructor.name}'s options are invalid: ${z.prettifyError(parsed.error)}`,
       );
     }
-    this.options = parsed.data as FilesystemOptions;
+    this.options = parsed.data as FilesystemOptions<Input>;
     const { localRoot } = this.options;
     const resolveLocalRoot =
       localRoot === undefined ? kind.defaultLocalRoot : () => localRoot;
@@ -290,7 +296,7 @@ export abstract class Filesystem {
   resolve(task: {
     readonly name: string;
     readonly taskId: string;
-    readonly request: FilesystemRequest;
+    readonly request: FilesystemRequest<Input>;
   }): Mount {
     const scope = this.options.scope(task.request);
     // Typed away, but a scope is the consumer's code: a dropped key would be silent.
@@ -341,7 +347,8 @@ export interface MountOperations {
 export class MountLifecycle {
   readonly name: string;
   readonly mounted: MountedFilesystem;
-  readonly #filesystem: Filesystem;
+  /** Of any input: only its options are read. */
+  readonly #filesystem: Filesystem<never>;
   readonly #operations: MountOperations;
   #checkpointTimer: ReturnType<typeof setInterval> | undefined;
   /** Pushes run one at a time: a checkpoint, or an agent's push, never overlaps another. */
@@ -350,7 +357,7 @@ export class MountLifecycle {
   #checkpointInFlight = false;
 
   constructor(
-    filesystem: Filesystem,
+    filesystem: Filesystem<never>,
     mount: Mount,
     operations: MountOperations,
   ) {

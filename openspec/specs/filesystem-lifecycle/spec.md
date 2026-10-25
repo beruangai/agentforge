@@ -71,7 +71,15 @@ While a task holds a mounted local directory, no other task in the same containe
 - **THEN** the mount succeeds
 
 ### Requirement: Scope is resolved per request and bounds every push
-A filesystem SHALL resolve, from the request's input and context, what it mounts and the write scope within it; the write scope SHALL default to the whole mount when the filesystem pushes, and SHALL be empty when it does not. A push SHALL upload and delete only within the write scope.
+A filesystem SHALL resolve, from the request's input and context, what it mounts and the write scope within it; the write scope SHALL default to the whole mount when the filesystem pushes, and SHALL be empty when it does not. A push SHALL upload and delete only within the write scope. The input SHALL be the one the procedure's contract parsed. A filesystem MAY be typed by the input it reads, and a procedure whose parsed input does not have that type SHALL NOT compile with it registered.
+
+#### Scenario: A typed scope reads the parsed input
+- **WHEN** a filesystem typed by `{ topic: string }` is registered on a procedure whose input has a `topic`, and a task is sent with topic `alpha`
+- **THEN** its scope reads `input.topic` as `alpha`, with no parse of its own
+
+#### Scenario: A typed filesystem on a procedure without its input
+- **WHEN** a filesystem typed by `{ topic: string }` is registered on a procedure whose input has no `topic`, or on a router
+- **THEN** the procedure does not compile
 
 #### Scenario: A file written outside the write scope stays local
 - **WHEN** a filesystem that may write only `notes/today.md` finds another changed file at push

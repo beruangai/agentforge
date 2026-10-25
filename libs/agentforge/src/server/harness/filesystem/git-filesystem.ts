@@ -24,8 +24,8 @@ import {
 } from './filesystem.ts';
 import { type ChildResult, runChild } from './run-child.ts';
 
-export interface GitFilesystemOptions
-  extends Omit<FilesystemOptions, 'checkpoints'> {
+export interface GitFilesystemOptions<Input = unknown>
+  extends Omit<FilesystemOptions<Input>, 'checkpoints'> {
   /** Required: a git filesystem has no default local root. */
   readonly localRoot: string;
   /** The repository's name as the deployment declares it (`AGENTFORGE_FILESYSTEM_REPOSITORIES`). */
@@ -41,7 +41,7 @@ export interface GitFilesystemOptions
    */
   readonly tokenVariable?: string;
   /** A commit's message; `agentforge: <filesystem name>` when absent. Trailers naming the task are added either way. */
-  readonly message?: (request: FilesystemRequest) => string;
+  readonly message?: (request: FilesystemRequest<Input>) => string;
   /** A commit's author and committer; the agent's name at `agentforge.invalid` when absent. */
   readonly author?: { readonly name: string; readonly email: string };
   /** Globs relative to the mount: never committed, pushed or deleted. */
@@ -188,12 +188,14 @@ function entries(output: string): string[] {
  * onto the base it pulled, merges onto a moved tip in memory, and refuses
  * a file both writers changed (ADR 0024).
  */
-export class GitFilesystem extends Filesystem {
+export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
   readonly #gitOptions: {
     readonly repository: string;
     readonly branch: string;
     readonly tokenVariable: string | undefined;
-    readonly message: ((request: FilesystemRequest) => string) | undefined;
+    readonly message:
+      | ((request: FilesystemRequest<Input>) => string)
+      | undefined;
     readonly author:
       | { readonly name: string; readonly email: string }
       | undefined;
@@ -205,7 +207,7 @@ export class GitFilesystem extends Filesystem {
   #declaredRepositories: Readonly<Record<string, string>> | undefined;
 
   constructor(
-    options: GitFilesystemOptions,
+    options: GitFilesystemOptions<Input>,
     /** Test seams. */
     seams: {
       readonly git?: GitRunner;
@@ -747,7 +749,9 @@ export class GitFilesystem extends Filesystem {
 
   #defaultMessage(mount: Mount): string {
     return (
-      this.#gitOptions.message?.(mount.request) ?? `agentforge: ${mount.name}`
+      // Resolved by this filesystem, from a request of its own input.
+      this.#gitOptions.message?.(mount.request as FilesystemRequest<Input>) ??
+      `agentforge: ${mount.name}`
     );
   }
 }

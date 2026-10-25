@@ -13,7 +13,8 @@ import {
 } from './filesystem.ts';
 import { runChild } from './run-child.ts';
 
-export interface S3FilesystemOptions extends FilesystemOptions {
+export interface S3FilesystemOptions<Input = unknown>
+  extends FilesystemOptions<Input> {
   /** Required: an S3 filesystem has no default local root. */
   readonly localRoot: string;
   /** The bucket's name as the deployment declared it (`AgentRuntime.filesystems`). */
@@ -62,7 +63,7 @@ export const runS7cmd: S7cmdRunner = async (args) => {
  * transfers by ETag. A push compares by ETag, so an unchanged file is not
  * sent again, and never leaves the write scope.
  */
-export class S3Filesystem extends Filesystem {
+export class S3Filesystem<in Input = unknown> extends Filesystem<Input> {
   readonly #s3Options: {
     readonly bucket: string;
     readonly dangerouslyEnableDeletes: boolean;
@@ -74,7 +75,7 @@ export class S3Filesystem extends Filesystem {
   #declaredBuckets: Readonly<Record<string, string>> | undefined;
 
   constructor(
-    options: S3FilesystemOptions,
+    options: S3FilesystemOptions<Input>,
     /** Test seams. */
     seams: {
       readonly s7cmd?: S7cmdRunner;

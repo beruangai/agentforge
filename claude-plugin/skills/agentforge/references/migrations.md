@@ -10,7 +10,7 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
-## Run spec fields, 2026-10-25
+## Run spec fields and typed scopes, 2026-10-25
 
 ### Breaks
 
@@ -19,6 +19,7 @@ Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded
 ### Change
 
 1. Move each run spec field the task's failure names to where it belongs: `resume` into `options` on `claude`, beside `options` on `strands`.
+2. Optional: type each filesystem whose scope reads the input — `new GitFilesystem<Input>({ … })`, `S3FilesystemOptions<Input>` — and remove the scope's own parse of the input, a `.pick(…).loose().parse(input)` among them. A typed filesystem registered at router level no longer compiles; register it on its procedures.
 
 ### Verify
 

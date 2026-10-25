@@ -13,17 +13,15 @@ import { baseOptions } from '@beruangai/research-brief-base/options';
 import { AfterToolCallEvent, type Plugin } from '@strands-agents/sdk';
 import { fileEditor } from '@strands-agents/sdk/vended-tools/file-editor';
 import { z } from 'zod';
-import { CorpusField, contract } from './contract.ts';
+import { contract } from './contract.ts';
 
 const os = implementAgent(contract);
 
-/** The documents, a directory per corpus under one root; only read. */
-const DOCUMENTS: S3FilesystemOptions = {
+/** The documents, a directory per corpus under one root; only read. Its scope reads the corpus the contract parsed. */
+const DOCUMENTS: S3FilesystemOptions<{ readonly corpus: string }> = {
   localRoot: '/workspace/documents',
   bucket: 'documents',
-  scope: ({ input }) => ({
-    subpath: `corpora/${z.object({ corpus: CorpusField }).parse(input).corpus}`,
-  }),
+  scope: ({ input }) => ({ subpath: `corpora/${input.corpus}` }),
 };
 
 /** Every file the file tool viewed, by absolute path, as the run goes. */

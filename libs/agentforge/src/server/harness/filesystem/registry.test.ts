@@ -25,7 +25,16 @@ const contract = {
   added: oc.input(z.strictObject({ fail: z.boolean() })).output(Mounted),
   alone: oc.input(z.strictObject({ fail: z.boolean() })).output(Mounted),
   bare: oc.input(z.strictObject({ fail: z.boolean() })).output(Mounted),
+  typed: oc.input(z.strictObject({ fail: z.boolean() })).output(Mounted),
 };
+
+/** A filesystem whose scope reads its procedure's input as the contract typed it. */
+const typedFilesystem = () =>
+  new ScriptedFilesystem<{ readonly fail: boolean }>({
+    ...at('typed'),
+    scope: ({ input }) => ({ subpath: input.fail ? 'failing' : 'passing' }),
+  });
+let typed: ReturnType<typeof typedFilesystem>;
 
 let root: string;
 let house: ScriptedFilesystem;
@@ -70,6 +79,13 @@ function build() {
         pulled: false,
         agentOptions: structuredClone(context.agentOptions),
       })),
+    typed: os.typed
+      .use(filesystems({ typed }, { replaceUpstream: true }))
+      .handler(async ({ context }) => ({
+        names: Object.keys(context.filesystems),
+        pulled: false,
+        agentOptions: {},
+      })),
   });
 }
 
@@ -107,6 +123,7 @@ beforeEach(async () => {
   scratch = new ScriptedFilesystem(at('scratch'));
   workspace = new ScriptedFilesystem(at('workspace'));
   notes = new ScriptedFilesystem(at('notes'));
+  typed = typedFilesystem();
   ran = false;
 });
 
@@ -149,6 +166,26 @@ describe('filesystems registered on a procedure', () => {
     });
     expect(scratch.calls).toEqual([]);
     expect(notes.calls).toEqual(['pull /', 'push /']);
+  });
+
+  it('resolve a typed scope from the input the contract parsed, unparsed again', async () => {
+    expect(await execute('typed', true)).toMatchObject({
+      state: 'TASK_STATE_COMPLETED',
+    });
+    expect(typed.calls).toEqual(['pull /failing', 'push /failing']);
+  });
+
+  it('accept a typed filesystem only on a procedure whose input has its type', () => {
+    const os = implementAgent(framework, contract);
+    const topical = new ScriptedFilesystem<{ readonly topic: string }>(
+      at('topical'),
+    );
+    // @ts-expect-error — the procedure's input has no `topic`
+    os.bare.use(filesystems({ topical }));
+    // An untyped one fits every procedure, and a router.
+    os.use(filesystems({ notes }));
+    // @ts-expect-error — a router's procedures share no input
+    os.use(filesystems({ typed }));
   });
 
   it('fail a completed task whose push fails, unsynced', async () => {
