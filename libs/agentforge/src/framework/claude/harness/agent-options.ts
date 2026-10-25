@@ -1,6 +1,9 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
-import type { MountedFilesystem } from '../../../server/harness/filesystem/filesystem.ts';
+import {
+  type MountedFilesystem,
+  pushToolDescription,
+} from '../../../server/harness/filesystem/filesystem.ts';
 import { agentOptionsMiddleware } from '../../../server/harness/framework.ts';
 import type { AgentOptions } from './kernel.ts';
 import { registeredSdkServer } from './sdk-mcp-servers.ts';
@@ -25,16 +28,17 @@ export function pushToolName(name: string): string {
 function pushServer(
   offering: readonly (readonly [
     string,
+    MountedFilesystem,
     NonNullable<MountedFilesystem['push']>,
   ])[],
 ) {
   return createSdkMcpServer({
     name: AGENTFORGE_MCP_SERVER,
     alwaysLoad: true,
-    tools: offering.map(([name, push]) =>
+    tools: offering.map(([name, mount, push]) =>
       tool(
         `push_${name}`,
-        `Commits and pushes the write scope of the "${name}" filesystem now, with your message, so partial work survives if the task fails. Returns the commit the write scope stands at and the files this push recorded, none when nothing changed.`,
+        pushToolDescription(name, mount),
         { message: z.string().min(1).describe('The commit message') },
         async ({ message }) => {
           try {
@@ -73,7 +77,7 @@ export function toAgentOptions(
   const mounts = Object.values(filesystems);
   if (mounts.length === 0) return {};
   const offering = Object.entries(filesystems).flatMap(([name, mount]) =>
-    mount.push === undefined ? [] : [[name, mount.push] as const],
+    mount.push === undefined ? [] : [[name, mount, mount.push] as const],
   );
   const pushTools = offering.map(([name]) => pushToolName(name));
   return {

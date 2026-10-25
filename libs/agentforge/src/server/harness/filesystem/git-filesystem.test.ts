@@ -83,6 +83,16 @@ describe('GitFilesystem options', () => {
       { tokenVariable: 'vault-token' },
       /tokenVariable "vault-token"/,
     ],
+    [
+      'the message option it replaced',
+      { message: () => 'record today' },
+      /Unrecognized key: "message"/,
+    ],
+    [
+      'a commit message that is no function',
+      { commitMessage: 'record today' },
+      /commitMessage is a function/,
+    ],
   ])('refuses %s when declared', (_label, options, message) => {
     expect(() => construct(options)).toThrow(message);
   });

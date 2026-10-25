@@ -40,8 +40,15 @@ export interface GitFilesystemOptions<Input = unknown>
    * before any agent runs.
    */
   readonly tokenVariable?: string;
-  /** A commit's message; `agentforge: <filesystem name>` when absent. Trailers naming the task are added either way. */
-  readonly message?: (request: FilesystemRequest<Input>) => string;
+  /**
+   * Every commit's message, whoever pushed: shaped from `message`, the one
+   * the push was given — by the procedure's `mount.push`, or the agent's
+   * push tool, which then tells the agent its message is shaped — and absent
+   * at unmount, and the request. Absent, a given message is committed as it
+   * is, and unmount's is `agentforge: <filesystem name>`. Trailers naming
+   * the task are added either way.
+   */
+  readonly commitMessage?: GitCommitMessage<Input>;
   /** A commit's author and committer; the agent's name at `agentforge.invalid` when absent. */
   readonly author?: { readonly name: string; readonly email: string };
   /** Globs relative to the mount: never committed, pushed or deleted. */
@@ -49,6 +56,13 @@ export interface GitFilesystemOptions<Input = unknown>
   /** Off by default. When on, a push records a file removed from the write scope as deleted; never a file the base did not have. */
   readonly dangerouslyEnableDeletes?: boolean;
 }
+
+/** Shapes a commit's message from the one its push was given, if any, and the request. */
+export type GitCommitMessage<Input = unknown> = (push: {
+  /** What the procedure or the agent gave the push; absent at unmount. */
+  readonly message?: string;
+  readonly request: FilesystemRequest<Input>;
+}) => string;
 
 /** One git run, with its environment and working directory chosen by the kind. */
 export type GitRunner = (
@@ -193,9 +207,7 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
     readonly repository: string;
     readonly branch: string;
     readonly tokenVariable: string | undefined;
-    readonly message:
-      | ((request: FilesystemRequest<Input>) => string)
-      | undefined;
+    readonly commitMessage: GitCommitMessage<Input> | undefined;
     readonly author:
       | { readonly name: string; readonly email: string }
       | undefined;
@@ -223,13 +235,21 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
       repository,
       branch = 'main',
       tokenVariable,
-      message,
+      commitMessage,
       author,
       exclude = [],
       dangerouslyEnableDeletes = false,
       ...filesystemOptions
     } = options;
-    super(filesystemOptions, { deletes: dangerouslyEnableDeletes });
+    super(filesystemOptions, {
+      deletes: dangerouslyEnableDeletes,
+      shapesPushMessage: commitMessage !== undefined,
+    });
+    if (commitMessage !== undefined && typeof commitMessage !== 'function') {
+      throw new Error(
+        "GitFilesystem's commitMessage is a function of the message given and the request",
+      );
+    }
     if (!FILESYSTEM_NAME_PATTERN.test(repository)) {
       throw new Error(
         `repository "${repository}" must match ${FILESYSTEM_NAME_PATTERN}`,
@@ -260,7 +280,7 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
       repository,
       branch,
       tokenVariable,
-      message,
+      commitMessage,
       author,
       exclude,
       dangerouslyEnableDeletes,
@@ -315,7 +335,7 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
     if (options.modifiedBefore !== undefined) {
       throw new Error('GitFilesystem has no checkpoints');
     }
-    await this.#push(mount, this.#defaultMessage(mount));
+    await this.#push(mount, undefined);
   }
 
   protected override agentPush(
@@ -325,7 +345,8 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
     return this.#push(mount, message);
   }
 
-  async #push(mount: Mount, message: string): Promise<PushReport> {
+  /** Pushes with the message given, by the procedure or the agent; none at unmount. */
+  async #push(mount: Mount, given: string | undefined): Promise<PushReport> {
     const git = this.#mountGit(mount);
     const selected = selectChanges(await localChanges(git), {
       write: mount.write,
@@ -355,7 +376,7 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
     ) {
       return unchanged;
     }
-    const fullMessage = withTrailers(message, mount);
+    const fullMessage = withTrailers(this.#commitMessage(mount, given), mount);
     const ours = await this.#commit(git, tree, base, fullMessage);
     let candidate = ours;
     for (let attempt = 1; ; attempt += 1) {
@@ -751,12 +772,22 @@ export class GitFilesystem<in Input = unknown> extends Filesystem<Input> {
     return { name: agent, email: `${agent}@agentforge.invalid` };
   }
 
-  #defaultMessage(mount: Mount): string {
-    return (
+  /** The commit's message: the consumer's, shaped from the one given, or the one given, or unmount's default. */
+  #commitMessage(mount: Mount, given: string | undefined): string {
+    const { commitMessage } = this.#gitOptions;
+    if (commitMessage === undefined)
+      return given ?? `agentforge: ${mount.name}`;
+    const shaped = commitMessage({
+      ...(given === undefined ? {} : { message: given }),
       // Resolved by this filesystem, from a request of its own input.
-      this.#gitOptions.message?.(mount.request as FilesystemRequest<Input>) ??
-      `agentforge: ${mount.name}`
-    );
+      request: mount.request as FilesystemRequest<Input>,
+    });
+    if (typeof shaped !== 'string' || shaped.trim() === '') {
+      throw new Error(
+        `filesystem "${mount.name}": its commitMessage gave no message ${given === undefined ? 'for the push at unmount' : `for ${JSON.stringify(given)}`}`,
+      );
+    }
+    return shaped;
   }
 }
 

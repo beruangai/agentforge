@@ -169,7 +169,7 @@ describe('GitFilesystem', () => {
     const vault = await mount(
       filesystem({
         scope: () => ({ subpath: '', write: ['notes/**'] }),
-        message: () => 'record today',
+        commitMessage: () => 'record today',
       }),
     );
     const { localPath } = vault.mounted;
@@ -304,6 +304,62 @@ describe('GitFilesystem', () => {
       files: [],
     });
     await vault.unmount('TASK_STATE_COMPLETED');
+  });
+
+  it("shapes the message of every push, the agent's and unmount's, from the one given and the request", async () => {
+    const vault = await mount(
+      filesystem({
+        pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
+        commitMessage: ({ message, request }) =>
+          `rnd(iteration/${request.context.attempt}): ${message ?? 'record the iteration'}`,
+      }),
+    );
+    const { localPath, push, shapesPushMessage } = vault.mounted;
+    expect(shapesPushMessage).toBe(true);
+    await writeFile(join(localPath, 'partial.md'), 'partial');
+    await push?.('add the BTC trend gate');
+    expect(git(['log', '-1', '--format=%s', 'main'], bare)).toBe(
+      'rnd(iteration/1): add the BTC trend gate',
+    );
+    await writeFile(join(localPath, 'final.md'), 'final');
+    await vault.unmount('TASK_STATE_COMPLETED');
+    expect(git(['log', '-1', '--format=%s', 'main'], bare)).toBe(
+      'rnd(iteration/1): record the iteration',
+    );
+  });
+
+  it('refuses a shaped message that is empty, committing nothing', async () => {
+    const before = otherPushes({ 'plan.md': 'plan' });
+    const vault = await mount(
+      filesystem({ pushOn: ['TASK_STATE_FAILED'], commitMessage: () => ' ' }),
+    );
+    await writeFile(join(vault.mounted.localPath, 'plan.md'), 'ours');
+    await expect(vault.mounted.push?.('change the plan')).rejects.toThrow(
+      'filesystem "vault": its commitMessage gave no message for "change the plan"',
+    );
+    await expect(vault.unmount('TASK_STATE_FAILED')).rejects.toThrow(
+      'its commitMessage gave no message for the push at unmount',
+    );
+    expect(git(['rev-parse', 'main'], bare)).toBe(before);
+  });
+
+  it('is read-only without pushOn: it reads the branch, grants no edit, offers no push and never commits', async () => {
+    const before = otherPushes({ 'plan.md': 'plan' });
+    const vault = await mount(
+      // The helper's pushOn removed, and a push-only option a read-only
+      // filesystem spreading shared options would carry.
+      filesystem({
+        pushOn: undefined,
+        commitMessage: () => 'never',
+      } as unknown as Partial<GitFilesystemOptions>),
+    );
+    const { localPath, permissions, push } = vault.mounted;
+    expect(readFileSync(join(localPath, 'plan.md'), 'utf8')).toBe('plan');
+    expect(permissions).toEqual([{ action: 'read', glob: '**' }]);
+    expect(push).toBeUndefined();
+    await writeFile(join(localPath, 'plan.md'), 'changed locally');
+    await vault.unmount('TASK_STATE_COMPLETED');
+    expect(git(['rev-parse', 'main'], bare)).toBe(before);
   });
 
   it('reports the commit the mount pulled when a task pushes nothing', async () => {

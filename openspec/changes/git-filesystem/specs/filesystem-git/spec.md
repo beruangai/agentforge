@@ -26,7 +26,7 @@ A git filesystem SHALL take its store to be one branch of one repository, `main`
 - **THEN** the task fails `EXECUTION_ERROR`, naming the repository and the declared ones, before anything is mounted
 
 ### Requirement: A push is one commit of the write scope, merged onto the remote tip
-A git filesystem's push SHALL record, as one commit on its branch, every file in its write scope that was added or changed since its base, the commit it last pulled or pushed, and no file outside the write scope or excluded. A push with nothing to record SHALL succeed and add no commit. Every push SHALL report the files it recorded and the commit at which the write scope stands as pushed: the commit it pushed, or, with nothing to record, the base; only a branch with no commit SHALL report none. A commit SHALL carry the filesystem's message, its author, and trailers naming the task id, the idempotency key and the attempt. When the branch has moved since the base, the push SHALL merge its commit onto the branch's tip and push again, a bounded number of times. Only a push the remote accepted SHALL count as verified. After a push, the mount's base SHALL be the commit pushed, and its files SHALL include what the merge brought in.
+A git filesystem's push SHALL record, as one commit on its branch, every file in its write scope that was added or changed since its base, the commit it last pulled or pushed, and no file outside the write scope or excluded. A push with nothing to record SHALL succeed and add no commit. Every push SHALL report the files it recorded and the commit at which the write scope stands as pushed: the commit it pushed, or, with nothing to record, the base; only a branch with no commit SHALL report none. A commit SHALL carry its message, its author, and trailers naming the task id, the idempotency key and the attempt. Where the filesystem declares a commit-message function, every commit's message SHALL be the one it returns from the message the push was given — by the procedure, or by the agent through its push tool, and none at unmount — and the request, and a push for which it returns an empty message SHALL fail, committing nothing. Without one, a given message SHALL be committed as it is, and a push at unmount SHALL carry a default naming the filesystem. When the branch has moved since the base, the push SHALL merge its commit onto the branch's tip and push again, a bounded number of times. Only a push the remote accepted SHALL count as verified. After a push, the mount's base SHALL be the commit pushed, and its files SHALL include what the merge brought in.
 
 #### Scenario: Only the write scope is committed
 - **WHEN** a git filesystem that may write `notes/**` finds `notes/today.md` changed and `index.md` changed at push
@@ -51,6 +51,14 @@ A git filesystem's push SHALL record, as one commit on its branch, every file in
 #### Scenario: A commit names its task
 - **WHEN** a task's push records a commit
 - **THEN** the commit's trailers carry the task's id, idempotency key and attempt
+
+#### Scenario: The consumer shapes every commit's message
+- **WHEN** a git filesystem's commit-message function prefixes each message with the request's scope, the agent pushes with `add the BTC trend gate`, and the task then completes with another change, pushed at unmount
+- **THEN** the agent's commit is the prefix and `add the BTC trend gate`, and unmount's is the prefix and the function's own words for a push given no message
+
+#### Scenario: An empty shaped message
+- **WHEN** a git filesystem's commit-message function returns an empty message for a push with changes to record
+- **THEN** the push fails naming the filesystem, and the branch is unchanged
 
 ### Requirement: Two writers' changes to one file are refused
 A git filesystem's push SHALL fail with cause `FILESYSTEM_UNSYNCED`, retryable, naming the files, when a file it would record was also changed on the branch since its base, and SHALL publish nothing in that case. A push SHALL never overwrite or textually merge another writer's change to a file.
@@ -82,7 +90,7 @@ A git filesystem SHALL be refused, when it is declared, if it declares checkpoin
 - **THEN** declaring it throws, naming the option
 
 ### Requirement: The agent may push a git mount
-When a git filesystem pushes on `TASK_STATE_FAILED`, its mount SHALL offer a push the agent may call while the task runs, with a message of its own. The push SHALL record and publish the write scope as a push at unmount does, one at a time with every other push of the mount, and SHALL report what it recorded or why it failed to its caller, without ending the task. A git filesystem that pushes only on `TASK_STATE_COMPLETED` SHALL offer none, since a push mid-task publishes before the outcome is known.
+When a git filesystem pushes on `TASK_STATE_FAILED`, its mount SHALL offer a push the agent may call while the task runs, with a message of its own, and SHALL state whether that message will be shaped by the filesystem's commit-message function. The push SHALL record and publish the write scope as a push at unmount does, one at a time with every other push of the mount, and SHALL report what it recorded or why it failed to its caller, without ending the task. A git filesystem that pushes only on `TASK_STATE_COMPLETED` SHALL offer none, since a push mid-task publishes before the outcome is known.
 
 #### Scenario: The agent publishes partial work
 - **WHEN** an agent calls its git mount's push with a message, midway through a task whose filesystem pushes on `TASK_STATE_FAILED`

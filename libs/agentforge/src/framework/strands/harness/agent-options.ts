@@ -3,7 +3,10 @@ import { tool } from '@strands-agents/sdk';
 import { CedarAuthorization } from '@strands-agents/sdk/vended-interventions/cedar';
 import { fileEditor } from '@strands-agents/sdk/vended-tools/file-editor';
 import { z } from 'zod';
-import type { MountedFilesystem } from '../../../server/harness/filesystem/filesystem.ts';
+import {
+  type MountedFilesystem,
+  pushToolDescription,
+} from '../../../server/harness/filesystem/filesystem.ts';
 import { agentOptionsMiddleware } from '../../../server/harness/framework.ts';
 import type { StrandsOptions } from './types.ts';
 
@@ -11,7 +14,11 @@ import type { StrandsOptions } from './types.ts';
 const TOOL_NAME_LIMIT = 64;
 
 /** A mount's push tool: its message in, what it recorded out; a failure is the tool's error. */
-function pushTool(name: string, push: NonNullable<MountedFilesystem['push']>) {
+function pushTool(
+  name: string,
+  mount: MountedFilesystem,
+  push: NonNullable<MountedFilesystem['push']>,
+) {
   const toolName = `push_${name}`;
   if (toolName.length > TOOL_NAME_LIMIT) {
     throw new Error(
@@ -20,7 +27,7 @@ function pushTool(name: string, push: NonNullable<MountedFilesystem['push']>) {
   }
   return tool({
     name: toolName,
-    description: `Commits and pushes the write scope of the "${name}" filesystem now, with your message, so partial work survives if the task fails. Returns the commit the write scope stands at and the files this push recorded, none when nothing changed.`,
+    description: pushToolDescription(name, mount),
     inputSchema: z.object({
       message: z.string().min(1).describe('The commit message'),
     }),
@@ -70,7 +77,7 @@ export function toAgentOptions(
   const mounts = Object.values(filesystems);
   if (mounts.length === 0) return {};
   const pushTools = Object.entries(filesystems).flatMap(([name, mount]) =>
-    mount.push === undefined ? [] : [pushTool(name, mount.push)],
+    mount.push === undefined ? [] : [pushTool(name, mount, mount.push)],
   );
   return {
     ...(pushTools.length === 0 ? {} : { tools: pushTools }),

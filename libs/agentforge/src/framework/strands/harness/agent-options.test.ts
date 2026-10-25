@@ -141,6 +141,17 @@ describe('a mount that offers a push', () => {
     ).not.toHaveProperty('tools');
   });
 
+  it('tells the agent when its message will be shaped', () => {
+    const push = async () => ({ files: [] });
+    const description = (vault: MountedFilesystem) =>
+      (toAgentOptions({ vault }).tools?.[0] as { description?: string })
+        ?.description;
+    expect(description(offering(push))).not.toContain('not committed as given');
+    expect(
+      description({ ...offering(push), shapesPushMessage: true }),
+    ).toContain('Your message is not committed as given');
+  });
+
   it("fails the tool with the push's failure", async () => {
     const [push] =
       toAgentOptions({

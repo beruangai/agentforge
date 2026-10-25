@@ -42,7 +42,7 @@ export interface FilesystemScope {
    * `<remoteRoot>/<subpath>` in the store; `''` for the whole root.
    */
   readonly subpath: string;
-  /** Globs relative to the mount; the whole mount by default when the filesystem pushes, none when it does not. A push never leaves them. */
+  /** Globs relative to the mount; the whole mount by default when the filesystem pushes. A read-only filesystem's are none, and any it is given fail the task. A push never leaves them. */
   readonly write?: readonly string[];
 }
 
@@ -56,7 +56,8 @@ export interface FilesystemOptions<Input = unknown> {
   /**
    * The task states unmount pushes the write scope back on, verified before
    * the outcome is published: `['TASK_STATE_COMPLETED']`, or with
-   * `'TASK_STATE_FAILED'` too. Absent, it never pushes.
+   * `'TASK_STATE_FAILED'` too. Absent, it never pushes: the filesystem is
+   * read-only (`Filesystem.readOnly`).
    */
   readonly pushOn?: readonly PushOnState[];
   /** Also push every `intervalSeconds` while the task runs, only files unchanged for `settleSeconds` so writes in progress settle first; only when `pushOn` has `TASK_STATE_FAILED`, since they publish before the outcome is known. */
@@ -154,6 +155,16 @@ export interface MountedFilesystem {
    * publishes before the outcome is known.
    */
   readonly push?: (message: string) => Promise<PushReport>;
+  /** With `push`: true when the consumer's code shapes the message a push records from the one given, which a push tool tells the agent. */
+  readonly shapesPushMessage?: boolean;
+}
+
+/** What a framework's push tool for the mount `name` tells the agent. */
+export function pushToolDescription(
+  name: string,
+  mount: MountedFilesystem,
+): string {
+  return `Commits and pushes the write scope of the "${name}" filesystem now, with your message, so partial work survives if the task fails.${mount.shapesPushMessage === true ? ' Your message is not committed as given: the filesystem shapes the commit message from it, so say only what changed, in no commit convention of your own.' : ''} Returns the commit the write scope stands at and the files this push recorded, none when nothing changed.`;
 }
 
 /** What a push recorded, and where the write scope stands after it. */
@@ -192,6 +203,10 @@ export abstract class Filesystem<in Input = unknown> {
       }) => string;
       /** Whether its pushes delete: its mounts' permissions then add `delete` on each write glob. */
       readonly deletes?: boolean;
+      /** Whether it has no store, so its writes stay in the task by design: it is then never read-only, and never pushes. */
+      readonly localOnly?: boolean;
+      /** Whether its agent push records a message the consumer's code shapes from the one given. */
+      readonly shapesPushMessage?: boolean;
     } = {},
   ) {
     const parsed = FilesystemOptionsSchema.safeParse(options);
@@ -209,11 +224,29 @@ export abstract class Filesystem<in Input = unknown> {
         `${this.constructor.name} needs a localRoot: the directory its mounts live under`,
       );
     }
+    if (kind.localOnly === true && this.options.pushOn !== undefined) {
+      throw new Error(
+        `${this.constructor.name} has no store, so it never pushes: it takes no pushOn`,
+      );
+    }
     this.#resolveLocalRoot = resolveLocalRoot;
     this.#deletes = kind.deletes === true;
+    this.#localOnly = kind.localOnly === true;
+    this.#shapesPushMessage = kind.shapesPushMessage === true;
   }
 
   readonly #deletes: boolean;
+  readonly #localOnly: boolean;
+  readonly #shapesPushMessage: boolean;
+
+  /**
+   * A filesystem with a store and no `pushOn` is read-only, whatever its
+   * kind: its mounts are readable whole, grant no edit, offer no push and
+   * are never pushed, and a scope that grants it a write fails the task.
+   */
+  get readOnly(): boolean {
+    return !this.#localOnly && this.options.pushOn === undefined;
+  }
 
   /** Fetches the scope's contents into the mount; every mount pulls, so a task starts from the store, never blind. */
   protected abstract pull(mount: Mount): Promise<void>;
@@ -288,6 +321,7 @@ export abstract class Filesystem<in Input = unknown> {
         ? { agentPush: (message) => agentPush.call(this, mount, message) }
         : {}),
       deletes: this.#deletes,
+      shapesPushMessage: this.#shapesPushMessage,
       release,
       remove: () => removeKeptCopy(kept),
     });
@@ -317,6 +351,11 @@ export abstract class Filesystem<in Input = unknown> {
     }
     const localRoot = this.#resolveLocalRoot(task).replace(/\/+$/, '');
     const pushes = this.options.pushOn !== undefined;
+    if (this.readOnly && (scope.write?.length ?? 0) > 0) {
+      throw new Error(
+        `filesystem "${task.name}" is read-only, having no pushOn, but its scope writes ${scope.write?.join(', ')}: a write there would never be published; declare pushOn, or drop the scope's write`,
+      );
+    }
     const write = scope.write ?? (pushes ? ['**'] : []);
     if (pushes && write.length === 0) {
       throw new Error(
@@ -341,6 +380,7 @@ export interface MountOperations {
   readonly push: (options: { readonly modifiedBefore?: Date }) => Promise<void>;
   readonly agentPush?: (message: string) => Promise<PushReport>;
   readonly deletes: boolean;
+  readonly shapesPushMessage: boolean;
   /** Frees the local directory's claim. */
   readonly release: () => Promise<void>;
   /** Removes the local copy, the kind's state for it, and its record. */
@@ -375,9 +415,14 @@ export class MountLifecycle {
       writablePath: (relativePath) => {
         const resolved = pathIn(mount, relativePath);
         const inMount = posix.normalize(relativePath);
+        if (filesystem.readOnly) {
+          throw new Error(
+            `filesystem "${mount.name}" is read-only: "${relativePath}" may be read, never written`,
+          );
+        }
         if (!mount.write.some((glob) => matchesGlob(inMount, glob))) {
           throw new Error(
-            `filesystem "${mount.name}": "${relativePath}" is outside its write scope (${mount.write.join(', ') || 'none'}), so a write there would never be pushed`,
+            `filesystem "${mount.name}": "${relativePath}" is outside its write scope (${mount.write.join(', ')}), so a write there would never be pushed`,
           );
         }
         return resolved;
@@ -391,7 +436,10 @@ export class MountLifecycle {
       ],
       ...(agentPush === undefined
         ? {}
-        : { push: (message: string) => this.#queue(() => agentPush(message)) }),
+        : {
+            push: (message: string) => this.#queue(() => agentPush(message)),
+            shapesPushMessage: operations.shapesPushMessage,
+          }),
     };
     const { checkpoints } = filesystem.options;
     if (checkpoints !== undefined) {

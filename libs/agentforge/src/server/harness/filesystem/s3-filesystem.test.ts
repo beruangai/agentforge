@@ -326,6 +326,12 @@ describe('ScratchFilesystem', () => {
       join(tmpdir(), 'agentforge-scratch', 'scratch', 't-1'),
     );
     expect(existsSync(scratch.mounted.localPath)).toBe(true);
+    // No store and no pushOn, yet writable whole: never read-only.
+    expect(filesystem.readOnly).toBe(false);
+    expect(scratch.mounted.permissions).toContainEqual({
+      action: 'edit',
+      glob: '**',
+    });
     await scratch.unmount('TASK_STATE_COMPLETED');
     expect(existsSync(scratch.mounted.localPath)).toBe(false);
   });

@@ -85,6 +85,21 @@ A filesystem SHALL resolve, from the request's input and context, what it mounts
 - **WHEN** a filesystem that may write only `notes/today.md` finds another changed file at push
 - **THEN** only `notes/today.md` is pushed
 
+### Requirement: A filesystem without `pushOn` is read-only
+A filesystem with a store that declares no `pushOn` SHALL be read-only, whatever its kind: its mounts SHALL be readable whole, SHALL grant no edit and offer no push in any framework, SHALL refuse a path resolved for writing, and SHALL never be pushed. A scope that gives a read-only filesystem write globs SHALL fail the task with cause `EXECUTION_ERROR` before anything is mounted, naming the filesystem, since nothing would publish the write. A kind with no store, such as scratch, SHALL NOT be read-only: its writes stay in the task by design, and it SHALL refuse `pushOn`.
+
+#### Scenario: A read-only mount
+- **WHEN** a procedure registers a git or S3 filesystem with no `pushOn`
+- **THEN** its baseline permissions are `read` on the whole mount alone, it offers no push, resolving a path for writing throws, and the task's end pushes nothing
+
+#### Scenario: A read-only filesystem whose scope writes
+- **WHEN** a filesystem `evaluation` with no `pushOn` resolves a scope with write globs
+- **THEN** the task fails `EXECUTION_ERROR`, naming `evaluation`, before anything is mounted
+
+#### Scenario: A scratch filesystem is writable
+- **WHEN** a procedure registers a scratch filesystem
+- **THEN** its mount grants `edit` on the whole mount, though it never pushes
+
 ### Requirement: A kind decides its local root, and what it needs
 Each filesystem kind SHALL either set a default local root the consumer may override, or require the consumer to give one, and SHALL refuse options it cannot honour before anything is mounted. A scratch filesystem's subpath SHALL be its task's own, so a local root it is given holds one directory per task. Two filesystems of one procedure SHALL NOT resolve the same local directory or one inside the other; the task SHALL fail before anything is mounted.
 

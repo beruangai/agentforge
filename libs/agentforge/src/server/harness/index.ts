@@ -19,6 +19,7 @@ export {
   type PushReport,
 } from './filesystem/filesystem.ts';
 export {
+  type GitCommitMessage,
   GitFilesystem,
   type GitFilesystemOptions,
 } from './filesystem/git-filesystem.ts';

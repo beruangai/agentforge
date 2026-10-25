@@ -7,7 +7,7 @@
  * from its transcript in the local store; a note in an S3 filesystem and a
  * memory, each read back by a task of another runtime session, so from the
  * store and not a kept copy; a journal entry in a git filesystem, pushed by
- * the agent's own tool; a cancel mid-Bash; a procedure that distills
+ * the agent's own tool under a subject the filesystem shapes; a cancel mid-Bash; a procedure that distills
  * its documents in a run before answering in another; and Python importing
  * what the base layer installed.
  */
@@ -260,11 +260,11 @@ describe('hello-agent, locally', () => {
     expect(recalled.output.answer).toContain(codename);
   });
 
-  it("keeps a journal entry in a git filesystem, pushed by the agent's tool with its message, and the session's next task finds what the first kept locally", async () => {
+  it("keeps a journal entry in a git filesystem, pushed by the agent's tool with its message shaped by the filesystem, and the session's next task finds what the first kept locally", async () => {
     const topic = `e2e-${randomUUIDv7()}`;
     const keep = async (day: string, scratch: string) => {
       const idempotencyKey = randomUUIDv7();
-      const message = `journal: ${topic} ${day}`;
+      const message = `keep the ${day} entry`;
       const kept = await awaitTask(
         helloAgent.KeepJournal,
         await helloAgent.KeepJournal.SendMessage(
@@ -285,7 +285,8 @@ describe('hello-agent, locally', () => {
         );
       }
       expect(kept.output.written).toBe(true);
-      // The agent's push: its message, and the trailers naming the task.
+      // The agent's push: its message, shaped by the filesystem's
+      // commitMessage, and the trailers naming the task.
       const commit = journal(
         'log',
         '-1',
@@ -294,6 +295,7 @@ describe('hello-agent, locally', () => {
         '--',
         `topics/${topic}/entries/${day}.md`,
       );
+      expect(commit.startsWith(`journal(${topic}): `)).toBe(true);
       expect(commit).toContain(message);
       expect(commit).toContain(`AgentForge-Idempotency-Key: ${idempotencyKey}`);
       expect(journal('show', `main:topics/${topic}/entries/${day}.md`)).toBe(

@@ -153,6 +153,27 @@ describe('toAgentOptions', () => {
       await client.close();
     });
 
+    it('tells the agent when its message will be shaped', async () => {
+      const push = async () => report;
+      const descriptions = async (vault: MountedFilesystem) => {
+        const client = await connect(
+          toAgentOptions({ vault }).mcpServers
+            ?.agentforge as McpSdkServerConfigWithInstance,
+        );
+        const listed = (await client.request('tools/list', {})) as {
+          tools: { description: string }[];
+        };
+        await client.close();
+        return listed.tools[0]?.description;
+      };
+      expect(await descriptions(offering(push))).not.toContain(
+        'not committed as given',
+      );
+      expect(
+        await descriptions({ ...offering(push), shapesPushMessage: true }),
+      ).toContain('Your message is not committed as given');
+    });
+
     it("reports a failed push to the agent as the tool's error", async () => {
       const options = toAgentOptions({
         vault: offering(() =>

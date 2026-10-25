@@ -10,6 +10,24 @@ To upgrade, apply every entry newer than the AgentForge the project was built ag
 
 Maintained files are not listed in a Change: `nx sync` rewrites them. Scaffolded files and detached ones are the project's, so their steps are listed. The [ROADMAP](../../../../docs/ROADMAP.md) links each milestone's changes.
 
+## Commit messages and read-only filesystems, 2026-10-25
+
+### Breaks
+
+- **`GitFilesystemOptions.message` is replaced by `commitMessage`**, which shapes every commit's message, the agent's push and the procedure's `mount.push` included, not only unmount's. A filesystem still declaring `message` is refused when constructed (`Unrecognized key: "message"`).
+- **A filesystem without `pushOn` whose scope returns `write` globs fails the task** `EXECUTION_ERROR`, naming the filesystem, before anything is mounted. Before, its mounts granted edits that were never published. `ScratchFilesystem` is unchanged.
+- **A read-only mount's `writablePath` throws** `is read-only`, where it threw `is outside its write scope (none)`.
+
+### Change
+
+1. Rename `message: (request) => …` to `commitMessage: ({ message, request }) => …`. `message` is the one the push was given, absent at unmount: return `message ?? <your unmount message>` to keep unmount's, and shape `message` where the agent's and the procedure's pushes should follow the same convention.
+2. Where `commitMessage` formats a convention, drop the agent's prose instructions to follow it (a `CLAUDE.md` or prompt line) and the procedure's own formatting of `mount.push` messages: the filesystem now applies it to both, and a message already formatted would be formatted twice.
+3. For each filesystem the task now refuses as read-only: declare `pushOn` if its writes are meant to be published, or stop returning `write` from its scope.
+
+### Verify
+
+The project's `typecheck` and tests pass; a commit the agent pushes carries the subject `commitMessage` returns, and the push tool's description says the message is shaped.
+
 ## Claude's user scope on a resumed run, 2026-10-25
 
 ### Breaks

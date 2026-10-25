@@ -4,7 +4,8 @@ import { Filesystem } from './filesystem.ts';
 
 /**
  * An empty directory of the task's own, always removed when the task ends,
- * since its subpath is never mounted again: nothing is pulled or pushed. Its subpath is the task's id, so each task mounts its
+ * since its subpath is never mounted again: nothing is pulled or pushed, and
+ * it is writable whole, never read-only. Its subpath is the task's id, so each task mounts its
  * own directory under the root: the consumer's `localRoot`, or one of its
  * name under the system's temporary directory.
  */
@@ -21,6 +22,7 @@ export class ScratchFilesystem extends Filesystem {
       {
         defaultLocalRoot: ({ name }) =>
           join(tmpdir(), 'agentforge-scratch', name),
+        localOnly: true,
       },
     );
   }

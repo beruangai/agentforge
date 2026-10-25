@@ -182,10 +182,57 @@ describe('Filesystem', () => {
     });
   });
 
-  it('writes nothing by default when it never pushes', async () => {
-    const localPath = join(root, 'vault');
-    const vault = await mount(new ScriptedFilesystem({ localRoot: localPath }));
-    expect(vault.mounted.permissions).toEqual([{ action: 'read', glob: '**' }]);
+  describe('without pushOn', () => {
+    it('is read-only: readable whole, with no edit, no push, and no path to write', async () => {
+      const filesystem = new ScriptedFilesystem(
+        { localRoot: join(root, 'vault') },
+        { agentPush: () => Promise.resolve() },
+      );
+      expect(filesystem.readOnly).toBe(true);
+      const vault = await mount(filesystem);
+      expect(vault.mounted.permissions).toEqual([
+        { action: 'read', glob: '**' },
+      ]);
+      expect(vault.mounted.push).toBeUndefined();
+      expect(() => vault.mounted.writablePath('notes/a.md')).toThrow(
+        'filesystem "vault" is read-only: "notes/a.md" may be read, never written',
+      );
+      await vault.unmount('TASK_STATE_COMPLETED');
+      expect(filesystem.calls).toEqual(['pull /']);
+    });
+
+    it('refuses a scope that writes, naming the filesystem, before anything is mounted', async () => {
+      const filesystem = new ScriptedFilesystem({
+        localRoot: join(root, 'vault'),
+        scope: () => ({ subpath: '', write: ['notes/**'] }),
+      });
+      await expect(mount(filesystem, 'evaluation')).rejects.toThrow(
+        'filesystem "evaluation" is read-only, having no pushOn, but its scope writes notes/**',
+      );
+      expect(filesystem.calls).toEqual([]);
+    });
+
+    it('is writable where its kind has no store, which takes no pushOn', async () => {
+      const filesystem = new ScriptedFilesystem(
+        {
+          localRoot: join(root, 'scratch'),
+          scope: () => ({ subpath: '', write: ['**'] }),
+        },
+        { localOnly: true },
+      );
+      expect(filesystem.readOnly).toBe(false);
+      expect((await mount(filesystem)).mounted.permissions).toContainEqual({
+        action: 'edit',
+        glob: '**',
+      });
+      expect(
+        () =>
+          new ScriptedFilesystem(
+            { localRoot: join(root, 'x'), pushOn: ['TASK_STATE_COMPLETED'] },
+            { localOnly: true },
+          ),
+      ).toThrow('ScriptedFilesystem has no store, so it never pushes');
+    });
   });
 
   it.each<
@@ -362,6 +409,17 @@ describe('Filesystem', () => {
       await expect(offered.mounted.push?.('partial')).resolves.toEqual({
         files: [],
       });
+      expect(offered.mounted.shapesPushMessage).toBe(false);
+    });
+
+    it('says whether its kind shapes the message', async () => {
+      const shaping = await mount(
+        new ScriptedFilesystem(
+          { localRoot: join(root, 'vault'), pushOn: ['TASK_STATE_FAILED'] },
+          { agentPush: () => Promise.resolve(), shapesPushMessage: true },
+        ),
+      );
+      expect(shaping.mounted.shapesPushMessage).toBe(true);
     });
 
     it('runs one at a time with every other push of the mount', async () => {

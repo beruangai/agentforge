@@ -42,7 +42,8 @@ const MEMORIES: S3FilesystemOptions<{ readonly space: string }> = {
 /**
  * The journal, a git repository with a directory per topic. Declared at
  * module scope, as a git filesystem with a token must be. It pushes on
- * failure too, so the agent is offered a push of its own.
+ * failure too, so the agent is offered a push of its own. Every commit's
+ * subject names its topic, whoever pushed: the agent, the handler or unmount.
  */
 const journal = new GitFilesystem<OnTopic>({
   localRoot: '/workspace/journal',
@@ -50,6 +51,8 @@ const journal = new GitFilesystem<OnTopic>({
   remoteRoot: '/topics',
   scope: ({ input }) => ({ subpath: input.topic, write: ['entries/**'] }),
   pushOn: ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED'],
+  commitMessage: ({ message, request }) =>
+    `journal(${request.input.topic}): ${message ?? 'close the entry'}`,
 });
 
 /** Where the base image's `user-scope-probe` plugin records each session that starts with it. */

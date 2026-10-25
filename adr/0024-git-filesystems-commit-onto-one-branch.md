@@ -14,7 +14,8 @@ A store with history is needed for StrategyFoundry's strategy artifacts, and S3 
 * which branch;
 * what happens when two writers push;
 * how a remote is authenticated without the agent holding its credential;
-* how partial work is kept without timer checkpoints.
+* how partial work is kept without timer checkpoints;
+* who decides a commit's message, when the agent pushes too.
 
 ## Considered Options
 
@@ -33,6 +34,9 @@ A store with history is needed for StrategyFoundry's strategy artifacts, and S3 
   * a push the agent may call;
   * or timer checkpoints;
   * or none.
+* **Commit message**:
+  * one function of the consumer's that shapes every push's message;
+  * or the message as given, with a function for unmount's alone.
 
 ## Decision Outcome
 
@@ -60,6 +64,11 @@ A store with history is needed for StrategyFoundry's strategy artifacts, and S3 
   * A git mount that pushes on `TASK_STATE_FAILED` offers a push, which each framework renders as one tool. It is gated on that state because a push mid-task publishes before the outcome.
   * Timer checkpoints were rejected because each would be a commit the agent did not choose.
   * Offering none was rejected: a kept local copy survives the task but not the container, which an idle timeout, `maxLifetime`, a deploy or a loss ends.
+* **One function of the consumer's shapes every commit's message.** *(Amended 2026-10-25: `message(request)` formatted unmount's alone.)*
+  * `commitMessage({ message, request })` receives what the push was given — by the procedure's `mount.push`, or the agent's push tool, which is the same push — absent at unmount, and returns the message to commit; the trailers follow it either way. An empty one fails the push.
+  * Without one, a given message is committed as it is, and unmount's is `agentforge: <name>`.
+  * A mount whose filesystem shapes its message says so, and each framework's push tool tells the agent, so it gives what changed rather than a convention of its own.
+  * Unmount's alone was rejected: the agent's message reached the commit unshaped, so a repository's convention could only be asked of the agent in prose (§REQ406).
 * **A repository is named, and the deployment maps the name** to a remote or, locally, a host repository the serve target mounts, as buckets are mapped. One code path everywhere (§REQ701).
 * **A host repository with a remote is seeded from it** by the `seed-repository` target, a bare clone that never writes back. Serve creates an empty host repository only for a repository with no remote, and names the target when it does.
   * An empty repository has a history unrelated to the remote's, so it could never be synced with it.

@@ -16,6 +16,8 @@ interface Script {
   /** The store a kept copy is identified by; `scripted` unless given. */
   readonly store?: string;
   readonly deletes?: boolean;
+  readonly localOnly?: boolean;
+  readonly shapesPushMessage?: boolean;
 }
 
 /**
@@ -32,7 +34,11 @@ export class ScriptedFilesystem<in Input = unknown> extends Filesystem<Input> {
         scope: () => ({ subpath: '' }),
         ...options,
       },
-      { deletes: script.deletes === true },
+      {
+        deletes: script.deletes === true,
+        localOnly: script.localOnly === true,
+        shapesPushMessage: script.shapesPushMessage === true,
+      },
     );
     this.#script = script;
     if (script.agentPush !== undefined) {

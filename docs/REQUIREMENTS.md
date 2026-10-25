@@ -71,6 +71,8 @@ It began as a distillation of two consumer drafts, StrategyFoundry's and TrendBo
 | **REQ403** | Nothing carries from one invocation to the next except state the consumer declared durable, and a declared filesystem's local copy, which carries to later invocations of the same runtime session while its container lives unless the procedure removes it; nothing an invocation started outlives it. *(Amended in place 2026-10-24, before any consumer depended on it: a filesystem's local copy was removed after every invocation.)* |
 | **REQ404** | An agent may keep memory across its tasks, in a space its run declares, so a later task recalls what an earlier one saved. It is optional: a run that declares none keeps none |
 | **REQ405** | A procedure's durable files may live in a version-controlled repository, so each change it persists is recorded with its history and author, and two writers' changes to one file are refused, never silently overwritten |
+| **REQ406** | The consumer decides, in code, the message of every change persisted to a repository — whether the procedure, its agent or AgentForge at the end of the task persisted it — from the message that change was given and the request; an agent that persists one knows its message will be shaped |
+| **REQ407** | A procedure's filesystem may be read-only: its agent reads all of it, edits none of it and publishes nothing to it, whatever the framework. A filesystem is never declared so that it grants writes it will never publish: such a declaration fails loudly, naming the filesystem |
 
 ### Failure — `REQ5xx`
 
